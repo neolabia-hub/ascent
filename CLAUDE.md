@@ -32,6 +32,7 @@
 - [x] Modelo conceptual del dominio adoptado y ratificado por el cliente
 - [x] Decisiones estructurales confirmadas (este documento, secciones 2 y 10)
 - [x] Documento maestro v1.0
+- [x] Decisiones #31-#34 cerradas (nombres, subdominio por tenant, cargo único, español único)
 
 **Pendiente antes de Sprint 0:**
 - [ ] Validar con Transprensa: contenido exacto de la constancia/certificado y firmantes
@@ -164,7 +165,8 @@ Todo por tenant, configurable desde UI, sin deploy:
   - Identidad: nombre, NIT, logo, colores (tema de marca), textos institucionales.
   - Reglas de negocio: nota mínima de aprobación (Transprensa: 90%), intentos máximos por
     defecto, espera entre intentos, vigencias, cadencia de píldoras, tope de notificaciones.
-  - Rótulos de UI: "Actividad formativa"/"Contenido formativo" renombrables por tenant.
+  - Rótulos de UI: fijos en español en F1 ("Actividad formativa", "Convocatoria", "Plan de
+    capacitación"); el rótulo por tenant queda previsto en settings SIN UI (Decisión #31).
   - Catálogos propios (3.2). Plantillas de certificado propias. Templates de notificación.
 Resolución en cascada con snapshot: default plataforma → override tenant → override actividad →
 SNAPSHOT en la versión publicada. Cambiar el setting NO reinterpreta exámenes ya rendidos.
@@ -457,7 +459,9 @@ Capa 1 — Prisma Client Extension: fuerza where.tenant_id en toda lectura y lo 
          escritura. Un handler no puede "olvidar" el filtro.
 Capa 2 — PostgreSQL RLS: políticas por tabla USING (tenant_id = current_setting('app.tenant_id')::uuid);
          el TenantInterceptor ejecuta SET LOCAL por request. Desde Fase 1, ANTES del riesgo.
-Branding por tenant resuelto en el edge (slug/subdominio → tema).
+Acceso por SUBDOMINIO por tenant (Decisión #32): transprensa.neopulse.app identifica el tenant
+ANTES del login (necesario porque el login es por cédula, única solo dentro del tenant); el
+branding carga desde la pantalla de login; cookies aisladas por subdominio. DNS wildcard.
 ```
 
 ---
@@ -596,7 +600,8 @@ enrollments                      -- "Ejecución/Inscripción": qué ocurrió con
   assignment_id NULL
   status (ENROLLED|IN_PROGRESS|COMPLETED|PASSED|FAILED|WITHDRAWN|EXPIRED)
   enrolled_at, started_at, completed_at, final_score NUMERIC NULL
-  score_snapshot JSONB           -- por VALOR: título, versión, nota mínima exigida, temario ref
+  score_snapshot JSONB           -- por VALOR: título, versión, nota mínima exigida, temario ref,
+                                 -- y cargo/área/vinculación del usuario AL MOMENTO (Decisión #33)
   blocked_at NULL, blocked_reason NULL, unblocked_by NULL     -- intentos agotados → refuerzo
   UNIQUE(offering_id, user_id)
 
@@ -907,6 +912,10 @@ neo-pulse/
 | 28 | `learning_events` append-only con vocabulario tipo xAPI desde F1 | xAPI/cmi5 futuro = exportador, no migración |
 | 29 | Intentos limitados; agotados → bloqueo + notificación a analista/jefe + rehabilitación auditada | La evaluación mide; el indicador no se infla solo |
 | 30 | Intensidad horaria SIEMPRE desglosada teórica/práctica; actividad tributa a N normas | PESV Paso 10 y acumulador BPM 10 h/año |
+| 31 | BD/código en inglés; UI en español FIJO en F1 (rótulo por tenant previsto en settings, sin UI) | Cerrado con el cliente 2026-08-25; los rótulos son datos, no riesgo |
+| 32 | Acceso por SUBDOMINIO por tenant (transprensa.neopulse.app): el tenant se identifica ANTES del login | El login por cédula es ambiguo sin contexto de tenant; branding desde la pantalla de login; cookies aisladas |
+| 33 | Un colaborador tiene UN cargo y UN área vigentes; cambio de cargo reevalúa audiencias; ejecuciones y certificados guardan SNAPSHOT de cargo/área del momento | El histórico no se reescribe; auditoría exige el cargo que tenía al capacitarse |
+| 34 | Español único en F1: sin tablas de traducción de UI ni de contenido | i18n hoy es sobreingeniería para el mercado objetivo; se agrega cuando exista el cliente que lo pida |
 
 ---
 
