@@ -3,17 +3,21 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClsModule } from 'nestjs-cls';
+import { ActivitiesModule } from './activities/activities.module.js';
 import { AppController } from './app.controller.js';
 import { ApprovalsModule } from './approvals/approvals.module.js';
+import { AssessmentsModule } from './assessments/assessments.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CatalogsModule } from './catalogs/catalogs.module.js';
 import { AuditService } from './common/audit.service.js';
 import { JwtAuthGuard } from './common/jwt-auth.guard.js';
 import { PermissionsGuard } from './common/permissions.guard.js';
 import { TenantInterceptor } from './common/tenant.interceptor.js';
+import { LessonsModule } from './lessons/lessons.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RolesModule } from './roles/roles.module.js';
+import { StorageModule } from './storage/storage.module.js';
 import { PublicTenantsController } from './tenants/public-tenants.controller.js';
 import { TenantSettingsController } from './tenants/tenant-settings.controller.js';
 import { UsersModule } from './users/users.module.js';
@@ -30,9 +34,14 @@ import { UsersModule } from './users/users.module.js';
     AuthModule,
     NotificationsModule,
     ApprovalsModule,
+    StorageModule,
     CatalogsModule,
     RolesModule,
     UsersModule,
+    // Catalogo formativo (Sprint 2).
+    ActivitiesModule,
+    LessonsModule,
+    AssessmentsModule,
   ],
   controllers: [AppController, PublicTenantsController, TenantSettingsController],
   providers: [

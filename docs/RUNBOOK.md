@@ -67,6 +67,31 @@ sesion del pool y `''::uuid` lanza 22P02 rompiendo la query. Las policies usan
 `NULLIF(current_setting(...), '')::uuid` (evalua a NULL = cero filas, sin error). Lo descubrio
 `scripts/verify-rls.ts` — por eso ese script corre en CI y no se quita.
 
+### 2026-08-25 — Como funciona de verdad el versionado (Sprint 2)
+Lo que garantiza que "lo que alguien curso" no cambie nunca:
+- Publicar una version de actividad CLONA las lecciones referenciadas a copias con estado
+  PUBLISHED, y la version publicada apunta a los clones. Las lecciones PUBLISHED rechazan toda
+  edicion (`LESSON_NOT_EDITABLE`). La leccion original queda en DRAFT para la siguiente version.
+- "Editar lo publicado" no edita: crea la version N+1 en DRAFT copiando contenidos y clonando
+  de vuelta las lecciones como DRAFT editables.
+- Verificado de punta a punta: tras editar la leccion de la v2, la leccion de la v1 conserva sus
+  tarjetas originales. Es LA prueba del sprint (script de humo en scratchpad, e2e en `e2e/sprint-2.spec.ts`).
+- Publicar valida antes: version sin contenidos o con contenidos sin material asignado se rechaza
+  (`VERSION_EMPTY`, `CONTENT_INCOMPLETE`); una seccion aleatoria que pida mas preguntas de las que
+  existen tambien (`NOT_ENOUGH_QUESTIONS`).
+
+### 2026-08-25 — Donde vive la respuesta correcta de una pregunta
+Solo en `apps/api/src/assessments/question-payload.ts`. Ningun otro servicio arma la vista de una
+pregunta. `toLearnerView()` es la UNICA forma de servir una pregunta a quien la responde: quita
+`correct` y tambien la retroalimentacion por opcion (que la delataria). Hay una prueba que falla
+si alguien filtra esos campos. Al escribir el reproductor de examenes (Sprint 4), usar esa
+funcion y no construir la vista a mano.
+
+### 2026-08-25 — Trampa de PowerShell con scripts generados
+PowerShell 5.1 lee los `.ps1` como ANSI si no tienen BOM: un guion largo o una tilde desbalancea
+las comillas y da "Falta la cadena en el terminador" apuntando a la ultima linea (mensaje
+enganoso). Escribir los scripts de utilidad en ASCII puro o guardarlos con BOM UTF-8.
+
 ### Decisiones de auth que no hay que rediscutir
 - El tenant se resuelve ANTES del login (slug por subdominio; en dev `?tenant=` o
   NEXT_PUBLIC_DEV_TENANT). Por eso NO existe cliente Prisma "owner" en runtime: login corre

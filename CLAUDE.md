@@ -37,6 +37,13 @@
 - [x] Decisiones estructurales confirmadas (este documento, secciones 2 y 10)
 - [x] Documento maestro v1.0
 - [x] Decisiones #31-#34 cerradas (nombres, subdominio por tenant, cargo único, español único)
+- [x] **Sprint 0** — fundaciones: monorepo, schema (58 modelos), RLS verificado, auth por subdominio
+- [x] **Sprint 1** — administración: catálogos, personas + carga masiva, aprobaciones, notificaciones,
+      sistema de diseño Pulso (`.claude/skills/pulse-ui`)
+- [x] **Sprint 2** — catálogo formativo: versionado copy-on-publish inmutable, lecciones en tarjetas
+      con editor y vista previa móvil, banco de preguntas versionado, constructor de exámenes,
+      almacenamiento con validación por firma binaria. Infraestructura de producción decidida
+      (`docs/03-infraestructura-produccion.md`)
 
 **Pendiente antes de Sprint 0:**
 - [ ] Validar con Transprensa: contenido exacto de la constancia/certificado y firmantes
@@ -453,7 +460,7 @@ Heredado de SAC-NEO (probado en producción por este equipo), con las adiciones 
 | Storage | Cloudflare R2 (videos, media, PDFs de certificados, firmas) |
 | Monorepo | Turborepo (`apps/web`, `apps/api`, `packages/shared`) |
 | CI/CD | GitHub Actions |
-| Hosting | Mismo esquema del piloto SAC-NEO (VM + Docker Compose; web en Vercel), con camino a pago sin refactor |
+| Hosting | **VPS dedicado propio** (NO comparte nada con el entorno de SAC-NEO, que es piloto/demo). Todo el stack en Docker Compose sobre un VPS. Análisis y recomendación: `docs/03-infraestructura-produccion.md` — resumen: R2 obligatorio por el egress cero del video; VPS en Vultr/DigitalOcean Miami (mejor latencia a Colombia) o Hetzner Ashburn (mejor precio/potencia); AWS descartado por sobreprecio y egress |
 | Monitoreo | Sentry + Betterstack |
 | Video embebido | YouTube/Vimeo (F1); subido a R2 con streaming simple; transcoding en F2 si hace falta |
 

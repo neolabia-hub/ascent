@@ -13,3 +13,5 @@ keys/
 
 test-results/
 playwright-report/
+
+storage-dev/
