@@ -128,10 +128,19 @@ export function updateVersionSettings(versionId: string, body: Record<string, un
   return apiFetch(`/activities/versions/${versionId}/settings`, { method: 'PATCH', body });
 }
 
-export function publishVersion(versionId: string, migrationPolicy: MigrationPolicy) {
-  return apiFetch<VersionSummary>(`/activities/versions/${versionId}/publish`, {
+/**
+ * Resultado de pedir la publicacion: si el usuario tiene permiso, se publico (`executed`);
+ * si no, quedo una solicitud de aprobacion para el administrador.
+ */
+export interface PublishResult {
+  executed: boolean;
+  approvalId?: string;
+}
+
+export function publishVersion(versionId: string, migrationPolicy: MigrationPolicy, justification?: string) {
+  return apiFetch<PublishResult>(`/activities/versions/${versionId}/publish`, {
     method: 'POST',
-    body: { migrationPolicy, confirm: true },
+    body: { migrationPolicy, confirm: true, justification },
   });
 }
 

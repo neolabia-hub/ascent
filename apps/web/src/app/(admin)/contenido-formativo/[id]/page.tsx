@@ -17,7 +17,7 @@ import {
   Trash2,
   Video,
 } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, me } from '@/lib/api';
 import {
   addContent,
   createNextVersion,
@@ -87,6 +87,9 @@ export default function ActividadDetallePage() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [migrationPolicy, setMigrationPolicy] = useState<MigrationPolicy>('MOVE_NOT_STARTED');
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [justification, setJustification] = useState('');
+  // Quien no tiene catalog:publish (Analista) no publica: envia la solicitud al administrador.
+  const [canPublish, setCanPublish] = useState(true);
 
   const [lessons, setLessons] = useState<LessonListItem[]>([]);
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
@@ -128,6 +131,12 @@ export default function ActividadDetallePage() {
     void listLessons('DRAFT').then(setLessons).catch(() => undefined);
     void listAssessments().then(setAssessments).catch(() => undefined);
   }, [addOpen]);
+
+  useEffect(() => {
+    void me()
+      .then((session) => setCanPublish(session.permissions.includes('catalog:publish')))
+      .catch(() => undefined);
+  }, []);
 
   const isDraft = version?.status === 'DRAFT';
 
@@ -205,15 +214,24 @@ export default function ActividadDetallePage() {
     setBusy(true);
     setPublishError(null);
     try {
-      await publishVersion(version.id, migrationPolicy);
+      const result = await publishVersion(version.id, migrationPolicy, justification.trim() || undefined);
       setPublishOpen(false);
       await loadActivity();
       await refreshVersion();
-      showToast({
-        kind: 'success',
-        title: `Version ${version.versionNumber} publicada`,
-        description: 'El contenido quedo congelado: lo que se cursa ya no puede cambiar.',
-      });
+      if (result.executed) {
+        showToast({
+          kind: 'success',
+          title: `Version ${version.versionNumber} publicada`,
+          description: 'El contenido quedo congelado: lo que se cursa ya no puede cambiar.',
+        });
+      } else {
+        // El analista no publica directo: su solicitud queda esperando al administrador.
+        showToast({
+          kind: 'info',
+          title: 'Solicitud enviada a aprobacion',
+          description: 'Un administrador debe aprobarla. Se publicara automaticamente al aprobarse.',
+        });
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         const map: Record<string, string> = {
@@ -306,7 +324,7 @@ export default function ActividadDetallePage() {
           ) : null}
           {isDraft ? (
             <Button onClick={() => setPublishOpen(true)} disabled={!version || version.contents.length === 0}>
-              Publicar version
+              {canPublish ? 'Publicar version' : 'Enviar a aprobacion'}
             </Button>
           ) : null}
         </div>
@@ -563,15 +581,19 @@ export default function ActividadDetallePage() {
       <Drawer
         open={publishOpen}
         onOpenChange={setPublishOpen}
-        title={`Publicar version ${version?.versionNumber ?? ''}`}
-        description="Publicar congela el contenido. No se puede deshacer."
+        title={canPublish ? `Publicar version ${version?.versionNumber ?? ''}` : 'Enviar a aprobacion'}
+        description={
+          canPublish
+            ? 'Publicar congela el contenido. No se puede deshacer.'
+            : 'Tu rol no publica directamente: un administrador debe aprobarlo.'
+        }
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setPublishOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={doPublish} loading={busy}>
-              Publicar y congelar
+            <Button onClick={doPublish} loading={busy} disabled={!canPublish && justification.trim().length < 10}>
+              {canPublish ? 'Publicar y congelar' : 'Enviar solicitud'}
             </Button>
           </div>
         }
@@ -581,6 +603,24 @@ export default function ActividadDetallePage() {
             Al publicar, las lecciones se copian a una version congelada. Quien curse esta version vera siempre lo
             mismo, aunque despues edites el contenido para una version futura.
           </p>
+
+          {!canPublish ? (
+            <Field
+              htmlFor="publish-justification"
+              label="Justificacion"
+              required
+              hint="Minimo 10 caracteres. La lee el administrador que aprueba."
+            >
+              <textarea
+                id="publish-justification"
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                rows={3}
+                maxLength={2000}
+                className="focus-ring block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink-900"
+              />
+            </Field>
+          ) : null}
           <div>
             <p className="mb-2 text-sm font-medium text-ink-900">Que pasa con quienes ya estan inscritos</p>
             <div className="space-y-2">

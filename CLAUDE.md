@@ -5,6 +5,8 @@
 
 > ## FUENTES DE ESTE DOCUMENTO — NO BORRAR ENTRE SESIONES
 >
+> - `docs/sprints/` — BITÁCORA DETALLADA por sprint: qué se construyó, por qué, cómo se
+>   verificó y qué quedó pendiente. Es el primer sitio donde mirar para entender el estado.
 > - `docs/00-brief-crudo.md` — transcripción LITERAL de lo que dictó el cliente. Solo se ANEXA.
 > - `docs/01-decisiones-preliminares.md` — acta de decisiones de la sesión de descubrimiento.
 > - `docs/research/02-microlearning-y-tendencias.md` — investigación de producto (microlearning,

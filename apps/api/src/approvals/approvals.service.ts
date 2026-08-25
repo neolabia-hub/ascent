@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { ApprovalStatus } from '@prisma/client';
-import type { CreateApprovalInput, DecideApprovalInput } from '@neo-pulse/shared';
+import type { CreateApprovalInput, DecideApprovalInput, PermissionCode } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -30,16 +30,18 @@ export class ApprovalsService {
   }
 
   /**
-   * COMPUERTA reutilizable del flujo Analista (negocio 3.3): si el actor puede decidir
-   * (approvals:decide, es decir Admin), ejecuta directo; si no, crea la solicitud con
-   * justificacion y notifica a los admins. Devuelve que camino tomo.
+   * COMPUERTA reutilizable del flujo Analista (negocio 3.3): si el actor tiene el permiso que
+   * habilita la accion, la ejecuta directo; si no, crea la solicitud con justificacion y
+   * notifica a quienes deciden. Devuelve que camino tomo, para que la UI diga la verdad
+   * ("publicado" o "enviado a aprobacion") en vez de dar un 403 seco.
    */
   async requestOrExecute(
     actor: AuthUser,
+    requiredPermission: PermissionCode,
     input: CreateApprovalInput,
     execute: () => Promise<void>,
   ): Promise<{ executed: boolean; approvalId?: string }> {
-    if (actor.hasPermission('approvals:decide')) {
+    if (actor.hasPermission(requiredPermission)) {
       await execute();
       return { executed: true };
     }

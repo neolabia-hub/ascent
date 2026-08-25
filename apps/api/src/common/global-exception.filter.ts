@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ZodError } from 'zod';
+import { captureError } from './sentry.js';
 
 /** Errores en formato Problem Details (RFC 9457). */
 @Catch()
@@ -36,7 +37,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       extensions = rest;
     }
 
-    if (status >= 500) this.logger.error(exception);
+    if (status >= 500) {
+      this.logger.error(exception);
+      // Sin ruta ni metodo, un 5xx en produccion es imposible de reproducir.
+      captureError(exception, { path: req.url, method: req.method });
+    }
 
     res.status(status).type('application/problem+json').send({
       ...extensions,

@@ -4,8 +4,12 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { GlobalExceptionFilter } from './common/global-exception.filter.js';
+import { initSentry } from './common/sentry.js';
 
 async function bootstrap(): Promise<void> {
+  // Lo antes posible: si hay SENTRY_DSN, activa el reporte de errores (no-op sin DSN).
+  if (initSentry()) console.log('Sentry activo (observabilidad de errores).');
+
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('v1');

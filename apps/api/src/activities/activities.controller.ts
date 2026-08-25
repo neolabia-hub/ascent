@@ -9,9 +9,11 @@ import {
   updateContentSchema,
   updateVersionSettingsSchema,
 } from '@neo-pulse/shared';
+import { ApprovalsService } from '../approvals/approvals.service.js';
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { ActivitiesService } from './activities.service.js';
+import { APPROVAL_ENTITY_ACTIVITY_VERSION } from './publish-approval.js';
 import { VersioningService } from './versioning.service.js';
 
 /**
@@ -23,6 +25,7 @@ export class ActivitiesController {
   constructor(
     private readonly activities: ActivitiesService,
     private readonly versioning: VersioningService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   @Get()
@@ -73,11 +76,43 @@ export class ActivitiesController {
     return this.versioning.updateDraftSettings(actor, versionId, updateVersionSettingsSchema.parse(body));
   }
 
-  /** Publicar CONGELA la version: operacion irreversible, por eso exige confirmacion explicita. */
+  /**
+   * Publicar CONGELA la version: irreversible, por eso exige confirmacion explicita.
+   *
+   * Quien tiene `catalog:publish` (Admin) publica de una. Quien no lo tiene (Analista) NO recibe
+   * un 403: se crea una SOLICITUD DE APROBACION con su justificacion y el Admin decide; al
+   * aprobar, el sistema publica de verdad (ver PublishApprovalRegistrar). Por eso el guard exige
+   * `catalog:manage_draft` y la decision fina vive en el servicio.
+   */
   @Post('versions/:versionId/publish')
-  @RequirePermissions('catalog:publish')
-  publish(@CurrentUser() actor: AuthUser, @Param('versionId', ParseUUIDPipe) versionId: string, @Body() body: unknown) {
-    return this.versioning.publish(actor, versionId, publishVersionSchema.parse(body));
+  @RequirePermissions('catalog:manage_draft')
+  async publish(
+    @CurrentUser() actor: AuthUser,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() body: unknown,
+  ) {
+    const input = publishVersionSchema.parse(body);
+    // La justificacion es obligatoria solo cuando la solicitud va a aprobacion.
+    const justification =
+      typeof (body as { justification?: unknown }).justification === 'string'
+        ? ((body as { justification: string }).justification)
+        : 'Solicitud de publicacion enviada desde el catalogo formativo.';
+
+    const result = await this.approvals.requestOrExecute(
+      actor,
+      'catalog:publish',
+      {
+        entityType: APPROVAL_ENTITY_ACTIVITY_VERSION,
+        entityId: versionId,
+        action: 'PUBLISH',
+        payload: { migrationPolicy: input.migrationPolicy },
+        justification,
+      },
+      async () => {
+        await this.versioning.publish(actor, versionId, input);
+      },
+    );
+    return result;
   }
 
   /** Editar lo publicado = nacer la version N+1 en borrador. La publicada no se toca. */
