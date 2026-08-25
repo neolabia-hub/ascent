@@ -517,6 +517,8 @@ model User {
 
   @@unique([tenantId, documentNumber])
   @@unique([tenantId, email])
+    @@index([tenantId, active, fullName])
+  @@index([tenantId, areaId])
   @@map("users")
 }
 
@@ -679,6 +681,9 @@ model Activity {
   deletedAt DateTime? @map("deleted_at")
 
   @@unique([tenantId, code])
+    @@index([tenantId, active, updatedAt])
+  @@index([tenantId, activityTypeId])
+  @@index([tenantId, processId])
   @@map("activities")
 }
 
@@ -753,6 +758,7 @@ model ActivityVersion {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([activityId, versionNumber])
+    @@index([activityId, status])
   @@map("activity_versions")
 }
 
@@ -777,6 +783,7 @@ model ActivityContent {
 
   progress ActivityProgress[]
 
+    @@index([activityVersionId, displayOrder])
   @@map("activity_contents")
 }
 
@@ -794,6 +801,7 @@ model Lesson {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+    @@index([tenantId, status, updatedAt])
   @@map("lessons")
 }
 
@@ -807,6 +815,7 @@ model LessonCard {
   payload      Json     @default("{}")
   mediaKey     String?  @map("media_key")
 
+    @@index([lessonId, displayOrder])
   @@map("lesson_cards")
 }
 
@@ -898,6 +907,8 @@ model Offering {
   updatedBy String?  @map("updated_by") @db.Uuid
 
   @@unique([tenantId, code])
+    @@index([tenantId, status, scheduledDate])
+  @@index([activityVersionId])
   @@map("offerings")
 }
 
@@ -929,6 +940,8 @@ model Enrollment {
   attempts Attempt[]
 
   @@unique([offeringId, userId])
+    @@index([tenantId, userId, status])
+  @@index([offeringId, status])
   @@map("enrollments")
 }
 
@@ -1214,6 +1227,7 @@ model Question {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+    @@index([tenantId, categoryId, active])
   @@map("questions")
 }
 
@@ -1236,6 +1250,7 @@ model QuestionVersion {
   attemptQuestions AttemptQuestion[]
 
   @@unique([questionId, versionNumber])
+    @@index([questionId, versionNumber])
   @@map("question_versions")
 }
 
@@ -1275,6 +1290,7 @@ model AssessmentVersion {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([assessmentId, versionNumber])
+    @@index([assessmentId, status])
   @@map("assessment_versions")
 }
 
@@ -1289,6 +1305,7 @@ model AssessmentSection {
   fixedQuestionVersionIds String[]          @default([]) @map("fixed_question_version_ids") @db.Uuid
   displayOrder            Int               @default(0) @map("display_order")
 
+    @@index([assessmentVersionId, displayOrder])
   @@map("assessment_sections")
 }
 
@@ -1312,6 +1329,7 @@ model Attempt {
   questions AttemptQuestion[]
 
   @@unique([enrollmentId, assessmentVersionId, attemptNumber])
+    @@index([enrollmentId, attemptNumber])
   @@map("attempts")
 }
 
@@ -1332,6 +1350,7 @@ model AttemptQuestion {
   gradedAt          DateTime?       @map("graded_at")
   invalidated       Boolean         @default(false) // anular y recalificar
 
+    @@index([attemptId, displayOrder])
   @@map("attempt_questions")
 }
 
@@ -1424,6 +1443,8 @@ model CertificationGrant {
   certificates Certificate[]
 
   @@unique([certificationId, userId, cycleNumber])
+    @@index([tenantId, userId, status])
+  @@index([tenantId, validUntil])
   @@map("certification_grants")
 }
 
@@ -1466,6 +1487,7 @@ model Certificate {
   revokedReason    String?             @map("revoked_reason")
 
   @@unique([tenantId, serialNumber])
+    @@index([tenantId, userId, issuedAt])
   @@map("certificates")
 }
 

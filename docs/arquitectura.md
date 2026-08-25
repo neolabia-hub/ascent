@@ -240,6 +240,8 @@ Honesta y priorizada:
 | Deuda | Impacto | Cuando resolverla |
 |---|---|---|
 | Adaptador de almacenamiento en la nube | Bloquea el despliegue (a proposito) | Sprint de produccion |
+| El despachador de correo recorre todas las empresas cada 30 segundos | Irrelevante con una empresa; con decenas conviene una cola real | Cuando haya varias empresas |
+| La integracion continua nunca se ha ejecutado de verdad (no hay repositorio remoto) | El flujo esta escrito pero no probado | Al publicar el repositorio |
 | Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo usa tareas programadas en proceso | Cuando el volumen lo pida |
 | Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
 | Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |

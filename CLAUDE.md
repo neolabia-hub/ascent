@@ -5,6 +5,11 @@
 
 > ## FUENTES DE ESTE DOCUMENTO — NO BORRAR ENTRE SESIONES
 >
+> ### Cómo mantener todo esto
+> - `docs/COMO-DOCUMENTAR.md` — **la regla vinculante**: qué documento se actualiza ante cada
+>   tipo de cambio. Se documenta por CONCEPTO de negocio, no por módulo. Consúltala antes de
+>   cerrar cualquier cambio.
+>
 > ### Documentación viva (se corrige; NO envejece con los sprints)
 > - `docs/glosario.md` — **EL diccionario del dominio.** Qué es una actividad formativa, una
 >   convocatoria, una asignación, el plan y sus métricas. Léelo ANTES de discutir cualquier
