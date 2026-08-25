@@ -19,5 +19,16 @@ dentro de un ano) entienda que hay construido sin leer el codigo:
 | 05 | Asistencia, certificados, encuestas y cumplimiento | Pendiente |
 | 06 | Reportes, IA, auditoria y salida a produccion | Pendiente |
 
-El plan completo esta en `CLAUDE.md` seccion 10. Lo operativo (comandos, credenciales,
-incidentes) esta en `docs/RUNBOOK.md`, que NO se reescribe: solo se anade.
+## Esto es historia, no referencia
+
+Un documento de sprint cuenta **lo que paso en una fecha** y envejece a proposito: lo que dice el
+Sprint 2 dejara de ser exacto cuando el Sprint 5 cambie algo, y esta bien.
+
+Para saber **como funciona el sistema hoy**, usar la documentacion viva:
+
+| Documento | Responde |
+|---|---|
+| `docs/glosario.md` | Que significa cada concepto del negocio (actividad, convocatoria, asignacion, plan, cobertura...) |
+| `docs/arquitectura.md` | Como esta construido: aislamiento, inmutabilidad, seguridad, calidad, deuda tecnica |
+| `docs/RUNBOOK.md` | Como se opera: comandos, credenciales, incidentes y lecciones. Solo se anade |
+| `CLAUDE.md` | El modelo completo y las decisiones irreversibles |

@@ -1,0 +1,251 @@
+# Arquitectura tecnica — NEO PULSE
+
+Referencia VIVA del sistema: como esta construido HOY. Se corrige cuando cambia el diseno; no es
+un historico (para eso estan `docs/sprints/`).
+
+Para el significado de los conceptos de negocio, ver `docs/glosario.md`.
+
+---
+
+## 1. Mapa general
+
+```
+NAVEGADOR
+  |
+  |  transprensa.neopulse.app  (el subdominio identifica la empresa ANTES del login)
+  v
+apps/web  — Next.js 14 (App Router)
+  |  Cliente HTTP tipado (lib/api.ts, lib/admin-api.ts, lib/catalog-api.ts)
+  |  Token de acceso SOLO en memoria; renovacion con cookie httpOnly
+  v
+apps/api  — NestJS  (prefijo /v1)
+  |  Guards: JWT -> Permisos
+  |  Interceptor: fija la empresa del contexto
+  v
+PostgreSQL (con seguridad a nivel de fila)      Redis (previsto)      Almacenamiento (disco / R2)
+```
+
+**packages/shared** es la fuente unica de los contratos (esquemas Zod). La API valida con ellos y
+la interfaz los usa para saber que enviar. Un cambio de contrato rompe la compilacion en ambos
+lados, que es exactamente lo que se busca.
+
+---
+
+## 2. Aislamiento entre empresas (lo mas importante del sistema)
+
+Una fuga de datos entre empresas seria catastrofica e irreparable. Por eso hay **dos capas
+independientes**, no una:
+
+### Capa 1 — La aplicacion
+`PrismaService.scoped` devuelve un cliente ya atado a la empresa de la sesion:
+
+```ts
+// Correcto: filtrado por empresa, siempre
+this.prisma.scoped.activity.findMany()
+
+// Imposible de escribir sin darse cuenta: no hay forma de consultar "todo"
+```
+
+El interceptor guarda la empresa del usuario autenticado en el contexto de la peticion, y
+`scoped` la lee de ahi. **Un desarrollador no puede olvidar el filtro porque no existe la version
+sin filtro.**
+
+### Capa 2 — La base de datos
+Politicas de seguridad a nivel de fila en toda tabla con `tenant_id`. Antes de cada consulta se
+fija la empresa en la transaccion; PostgreSQL descarta cualquier fila ajena.
+
+La aplicacion se conecta con un usuario de base de datos **sin privilegios especiales**, sujeto a
+esas politicas. Las migraciones usan otro usuario.
+
+### La prueba que lo respalda
+`pnpm db:verify-rls` comprueba tres cosas y **corre en integracion continua**:
+1. Con el contexto de la empresa A no se ven filas de la B.
+2. Sin contexto no se ve **ninguna** fila.
+3. Intentar escribir una fila de la empresa B desde la A es rechazado por la base.
+
+Si esa prueba falla, no se integra el cambio.
+
+---
+
+## 3. Autenticacion y permisos
+
+### Flujo de ingreso
+1. El subdominio determina la empresa (en desarrollo, un parametro en la URL).
+2. La pantalla de ingreso carga la marca de esa empresa (endpoint publico, solo nombre y colores).
+3. El usuario entra con **cedula o correo** y su contrasena.
+4. Se emite un token de acceso (15 minutos) y una cookie de renovacion (7 dias, httpOnly).
+5. Si es su primer ingreso: cambio de contrasena obligatorio y aceptacion de Habeas Data y del
+   acuerdo de firma electronica.
+
+**Por que el tenant va primero:** con ingreso por cedula, dos empresas pueden tener la misma. Sin
+saber la empresa, el ingreso seria ambiguo.
+
+**Proteccion contra fuerza bruta:** bloqueo por cuenta tras varios intentos fallidos (no solo por
+IP, porque 18 personas detras del mismo NAT corporativo comparten IP). Todo intento queda auditado.
+
+### Permisos, nunca nombres de rol
+Los guards evaluan **codigos de permiso** (`catalog:publish`, `users:manage`). En el codigo no
+existe `if (rol === 'ADMIN')`. Consecuencia practica: el administrador puede ajustar que hace
+cada rol desde la interfaz, sin desarrollo.
+
+Los permisos efectivos = permisos del rol + concesiones individuales − revocaciones individuales.
+
+---
+
+## 4. Las tres reglas de inmutabilidad
+
+Todo el valor probatorio del sistema descansa en estas tres. Si alguna se rompe, el producto deja
+de servir para auditoria.
+
+### 4.1 Contenido publicado
+Publicar una version **congela** todo:
+- Las lecciones se **copian** a copias marcadas como publicadas, que rechazan toda edicion.
+- Se congelan el temario (para las constancias) y la nota minima exigida.
+- La version publicada rechaza agregar, quitar o reordenar contenidos.
+
+"Editar" lo publicado crea la version siguiente en borrador, con copias editables. La anterior no
+se toca.
+
+**Verificado:** tras editar la leccion de la version 2, la de la version 1 conserva sus tarjetas
+originales.
+
+### 4.2 Preguntas y examenes
+Editar una pregunta crea una version nueva. Cada intento guarda **que preguntas cayeron, en que
+orden y con que opciones**, apuntando a la version que se sirvio.
+
+Esto permite anular una pregunta defectuosa y recalificar solo a quienes les toco. Sin ese
+detalle, una impugnacion no se puede defender.
+
+### 4.3 Registros e historia
+- Las membresias de audiencia guardan cuando se entro y cuando se salio; **nunca se borran**.
+- Las obligaciones retiradas se marcan como retiradas, no se eliminan.
+- Cada renovacion de una certificacion es un registro nuevo.
+- Cada inscripcion guarda una foto del momento: titulo, version, nota minima y **el cargo y area
+  que la persona tenia ese dia**.
+
+---
+
+## 5. Donde vive cada cosa
+
+```
+apps/api/src/
+  auth/          Ingreso, renovacion, activacion de cuenta
+  common/        Guards, decoradores, filtro de errores, auditoria, permisos, Sentry
+  prisma/        Acceso a datos con aislamiento por empresa
+  tenants/       Datos publicos de la empresa y sus preferencias
+  catalogs/      Los 8 catalogos maestros (un solo motor para los ocho)
+  roles/         Roles y sus permisos
+  users/         Personas, contrasenas generadas, carga masiva
+  approvals/     Solicitudes del analista y su aplicacion al aprobar
+  notifications/ Bandeja de salida, bandeja interna y envio de correo
+  storage/       Archivos con adaptador y validacion por firma binaria
+  activities/    Catalogo formativo y MOTOR DE VERSIONADO
+  lessons/       Lecciones y tarjetas
+  assessments/   Banco de preguntas y constructor de examenes
+
+apps/web/src/
+  app/(admin)/   Panel de administracion (escritorio)
+  components/ui/ Biblioteca del sistema de diseno "Pulso"
+  components/layout/  Estructura: barra lateral, barra superior, sesion
+  lib/           Clientes HTTP tipados
+
+packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
+```
+
+### Archivos que conviene conocer
+
+| Archivo | Por que importa |
+|---|---|
+| `prisma/prisma.service.ts` | El aislamiento por empresa. Todo pasa por aqui |
+| `activities/versioning.service.ts` | El motor de inmutabilidad. La pieza mas delicada |
+| `assessments/question-payload.ts` | **El unico lugar** que sabe donde vive la respuesta correcta |
+| `approvals/approvals.service.ts` | La compuerta del flujo del analista |
+| `prisma/sql/rls.sql` | Las politicas de la base de datos |
+| `.claude/skills/pulse-ui/SKILL.md` | El contrato de diseno de toda la interfaz |
+
+---
+
+## 6. Seguridad aplicada
+
+| Riesgo | Como se ataja |
+|---|---|
+| Ver datos de otra empresa | Dos capas independientes + prueba automatica en integracion continua |
+| Robo del token | El token de acceso vive solo en memoria, dura 15 minutos; la renovacion va en cookie httpOnly con rotacion en cada uso |
+| Fuerza bruta | Bloqueo por cuenta, no solo por IP. Auditado |
+| Ver las respuestas del examen | Un solo modulo las conoce; la vista del aprendiz las elimina, y una prueba falla si se filtran |
+| Subir un ejecutable disfrazado | Validacion por **firma binaria**, no por extension ni por lo que declare el navegador |
+| Saltarse la secuencia por API | Las validaciones viven en el servidor, no en la interfaz |
+| Enumerar certificados | El codigo publico de verificacion es aleatorio, nunca el consecutivo |
+| Filtrar datos personales a terceros | Sentry configurado sin datos personales |
+
+---
+
+## 7. Calidad: que corre y cuando
+
+| Nivel | Que cubre | Cuando |
+|---|---|---|
+| **Unitarias** | Logica pura y delicada: generacion de contrasenas, traduccion de preguntas (incluida la que falla si se filtra una respuesta), validacion de archivos | En cada cambio |
+| **Aislamiento** | Que una empresa no vea ni escriba datos de otra | Compuerta dura de integracion continua |
+| **De extremo a extremo** | El flujo real en navegador, un archivo por sprint, acumulativo | Antes de cerrar cada sprint |
+| **Humo por HTTP** | Flujos completos contra la API real (versionado, aprobaciones) | Al construir cada motor |
+
+Integracion continua: un trabajo de calidad estatica (lint, tipos, compilacion, unitarias) y otro
+de integracion (base de datos real, politicas de seguridad, datos semilla, aislamiento y pruebas
+de navegador, con reporte adjunto si falla).
+
+---
+
+## 8. Entorno de desarrollo
+
+```
+pnpm docker:up      Base de datos y Redis (puertos propios; ver docs/02-aislamiento-proyectos.md)
+pnpm db:migrate     Migraciones
+pnpm db:rls         Politicas de seguridad de la base
+pnpm db:seed        Datos semilla de Transprensa
+pnpm db:verify-rls  Prueba de aislamiento
+pnpm dev            API y web
+pnpm lint / typecheck / test / build
+pnpm test:e2e       Pruebas de navegador
+```
+
+**Se ejecuta con Node nativo de Windows, no desde WSL.** Medido: los mismos comandos tardan de 10
+a 30 veces mas a traves del puente de WSL hacia el disco de Windows (la compilacion de la API
+paso de mas de 5 minutos a 22 segundos). Detalle en `docs/RUNBOOK.md`.
+
+---
+
+## 9. Produccion
+
+Decidido y analizado en `docs/03-infraestructura-produccion.md`. En resumen:
+
+- **VPS propio** con todo en contenedores. No comparte nada con el entorno de SAC-NEO.
+- **Cloudflare R2 para archivos**, por su trafico de salida sin costo: es la decision que evita
+  que el video dispare la factura.
+- **AWS descartado** para esta etapa: se paga el ecosistema sin usarlo y su trafico de salida
+  castiga justo lo que mas consume el producto.
+- Copias de seguridad diarias con copia fuera del servidor, y **restauracion probada** antes de
+  salir a produccion.
+
+**Lo que falta antes de desplegar:** el adaptador de R2 (hoy lanza un error explicito a proposito,
+para que sea imposible desplegar sin completarlo), la definicion de contenedores de produccion,
+los guiones de despliegue y respaldo, el dominio con subdominios comodin, y el monitoreo de
+disponibilidad.
+
+---
+
+## 10. Deuda tecnica conocida
+
+Honesta y priorizada:
+
+| Deuda | Impacto | Cuando resolverla |
+|---|---|---|
+| Adaptador de almacenamiento en la nube | Bloquea el despliegue (a proposito) | Sprint de produccion |
+| Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo usa tareas programadas en proceso | Cuando el volumen lo pida |
+| Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
+| Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |
+| SCORM sin motor | Solo importa si el cliente tiene contenido comprado en ese formato | Segun respuesta del cliente |
+
+---
+
+*Este documento se corrige cuando cambia la arquitectura. La historia de como se llego aqui esta
+en `docs/sprints/`.*

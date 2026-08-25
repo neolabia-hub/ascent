@@ -5,8 +5,16 @@
 
 > ## FUENTES DE ESTE DOCUMENTO — NO BORRAR ENTRE SESIONES
 >
-> - `docs/sprints/` — BITÁCORA DETALLADA por sprint: qué se construyó, por qué, cómo se
->   verificó y qué quedó pendiente. Es el primer sitio donde mirar para entender el estado.
+> ### Documentación viva (se corrige; NO envejece con los sprints)
+> - `docs/glosario.md` — **EL diccionario del dominio.** Qué es una actividad formativa, una
+>   convocatoria, una asignación, el plan y sus métricas. Léelo ANTES de discutir cualquier
+>   funcionalidad: si dos personas usan la misma palabra distinto, el sistema sale mal.
+> - `docs/arquitectura.md` — cómo está construido HOY: aislamiento entre empresas, las tres
+>   reglas de inmutabilidad, dónde vive cada cosa, seguridad, calidad y deuda técnica.
+>
+> ### Histórico
+> - `docs/sprints/` — BITÁCORA por sprint: qué se construyó, por qué, cómo se
+>   verificó y qué quedó pendiente. Es historia: envejece a propósito.
 > - `docs/00-brief-crudo.md` — transcripción LITERAL de lo que dictó el cliente. Solo se ANEXA.
 > - `docs/01-decisiones-preliminares.md` — acta de decisiones de la sesión de descubrimiento.
 > - `docs/research/02-microlearning-y-tendencias.md` — investigación de producto (microlearning,
