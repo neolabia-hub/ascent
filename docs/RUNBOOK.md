@@ -27,10 +27,26 @@ pnpm db:seed            # seed Transprensa (idempotente)
 pnpm db:verify-rls      # prueba de aislamiento multi-tenant (3 chequeos) — debe pasar SIEMPRE
 pnpm dev                # api :3002 + web :3100
 pnpm lint / typecheck / test / build
+pnpm test:e2e           # Playwright (levanta api y web solo; requiere build previo)
+pnpm test:e2e:ui        # modo interactivo para depurar un test
 ```
 
-Credenciales seed (solo dev): tenant `transprensa`, usuario `999999999` / `Transprensa2026*`
-(pide cambio de contrasena y activacion Habeas Data + firma electronica en el primer ingreso).
+Credenciales seed (solo dev): tenant `transprensa`.
+- Administrador real: `999999999` / `Transprensa2026*` — pide cambio de contrasena y aceptacion
+  de Habeas Data + firma electronica en el primer ingreso (comportamiento de produccion).
+- Usuario de PRUEBAS automatizadas: `888888888` / `PruebaE2E2026*` — rol ADMIN, contrasena ya
+  cambiada y politicas aceptadas, para que los e2e sean repetibles. NUNCA se crea con
+  NODE_ENV=production (ver `seedE2EUser` en prisma/seed.ts).
+
+## Pruebas
+
+- Unitarias (Jest, en `apps/api/src/**/*.spec.ts`): logica de dominio pura.
+  Nota: Jest usa `moduleNameMapper` para resolver los imports con extension `.js` (NodeNext).
+- Aislamiento multi-tenant: `pnpm db:verify-rls`. Compuerta DURA del CI; si falla, no se mergea.
+- E2E (Playwright, en `e2e/`): un archivo por sprint, acumulativo. Localizar por `id` cuando el
+  campo es obligatorio: el asterisco del label cambia el texto accesible y `getByLabel(..., {exact:true})` falla.
+- CI (`.github/workflows/ci.yml`): job `calidad` (lint/typecheck/build/unit) + job `integracion`
+  (Postgres de servicio, migrate, RLS via psql, seed, verify-rls, e2e con reporte adjunto si falla).
 
 ## Aislamiento con SAC-NEO
 

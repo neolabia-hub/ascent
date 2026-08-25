@@ -19,12 +19,15 @@
     "db:rls": "pnpm --filter @neo-pulse/api db:rls",
     "db:seed": "pnpm --filter @neo-pulse/api db:seed",
     "db:studio": "pnpm --filter @neo-pulse/api prisma:studio",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@next/eslint-plugin-next": "^15.0.0",
+    "@playwright/test": "^1.48.0",
     "eslint": "^9.13.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.11.0",

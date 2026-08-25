@@ -1,4 +1,4 @@
-# NEO PULSE — CI: lint + typecheck + build + tests.
+# NEO PULSE — CI: calidad estatica + pruebas unitarias + aislamiento RLS + e2e.
 name: CI
 
 on:
@@ -7,15 +7,64 @@ on:
   pull_request:
 
 jobs:
-  ci:
+  calidad:
+    name: Lint, typecheck, build y pruebas unitarias
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
 
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+      - name: Generar Prisma Client
+        run: pnpm db:generate
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+      - name: Pruebas unitarias
+        run: pnpm test
+
+  integracion:
+    name: Aislamiento RLS y e2e
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: neopulse
+          POSTGRES_PASSWORD: neopulse_dev
+          POSTGRES_DB: neopulse
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U neopulse -d neopulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://neopulse_app:neopulse_app@localhost:5433/neopulse?schema=public
+      DIRECT_DATABASE_URL: postgresql://neopulse:neopulse_dev@localhost:5433/neopulse?schema=public
+      JWT_PRIVATE_KEY_PATH: ./keys/private.pem
+      JWT_PUBLIC_KEY_PATH: ./keys/public.pem
+      REFRESH_TOKEN_PEPPER: ci-pepper
+      PORT: '3002'
+      FRONTEND_URL: http://localhost:3100
+      NEXT_PUBLIC_API_URL: http://localhost:3002
+      APP_TIMEZONE: America/Bogota
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -24,17 +73,44 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
-      - name: Generar Prisma Client
-        run: pnpm db:generate
+      - name: Generar llaves RS256 de CI
+        working-directory: apps/api
+        run: |
+          mkdir -p keys
+          openssl genrsa -out keys/private.pem 2048
+          openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 
-      - name: Lint
-        run: pnpm lint
+      - name: Migrar base de datos
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Aplicar politicas RLS
+        # En CI Postgres es un servicio (no un contenedor propio), asi que el SQL se aplica
+        # con psql directo en vez del script que usa docker exec.
+        run: psql "$DIRECT_DATABASE_URL" -v ON_ERROR_STOP=1 -f apps/api/prisma/sql/rls.sql
 
-      - name: Build
+      - name: Sembrar datos
+        working-directory: apps/api
+        run: pnpm exec tsx prisma/seed.ts
+
+      - name: Verificar aislamiento multi-tenant
+        # Compuerta dura: si RLS deja de aislar, el pipeline falla y no se mergea.
+        working-directory: apps/api
+        run: pnpm exec tsx scripts/verify-rls.ts
+
+      - name: Construir aplicaciones
         run: pnpm build
 
-      - name: Tests
-        run: pnpm test
+      - name: Instalar navegador de pruebas
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Pruebas e2e
+        run: pnpm test:e2e
+
+      - name: Publicar reporte e2e si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-e2e
+          path: playwright-report/
+          retention-days: 7

@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { changePassword, me } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 
 interface Requirement {
   label: string;
@@ -47,19 +50,16 @@ export default function CambiarContrasenaPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-xl font-semibold text-gray-900">Cambiar contraseña</h1>
-          <p className="mt-1 text-sm text-gray-500">Debes definir una nueva contraseña para continuar.</p>
+          <h1 className="font-display text-xl font-semibold text-ink-900">Cambiar contraseña</h1>
+          <p className="mt-1 text-sm text-ink-500">Debes definir una nueva contraseña para continuar.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div>
-            <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
-              Contraseña actual
-            </label>
-            <input
+        <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+          <Field htmlFor="currentPassword" label="Contraseña actual">
+            <Input
               id="currentPassword"
               name="currentPassword"
               type="password"
@@ -67,29 +67,26 @@ export default function CambiarContrasenaPage() {
               required
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
-              Nueva contraseña
-            </label>
-            <input
-              id="newPassword"
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <ul className="mt-2 space-y-1">
+          <div className="space-y-1.5">
+            <Field htmlFor="newPassword" label="Nueva contraseña">
+              <Input
+                id="newPassword"
+                name="newPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+            </Field>
+            <ul className="space-y-1 pt-1">
               {requirements.map((requirement) => (
                 <li
                   key={requirement.label}
-                  className={`text-xs ${requirement.met ? 'text-green-700' : 'text-gray-500'}`}
+                  className={`text-xs ${requirement.met ? 'text-ok' : 'text-ink-500'}`}
                 >
                   {requirement.met ? 'OK' : 'Pendiente'} — {requirement.label}
                 </li>
@@ -97,38 +94,32 @@ export default function CambiarContrasenaPage() {
             </ul>
           </div>
 
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-              Confirmar nueva contraseña
-            </label>
-            <input
+          <Field
+            htmlFor="confirmPassword"
+            label="Confirmar nueva contraseña"
+            error={confirmPassword.length > 0 && !passwordsMatch ? 'Las contraseñas no coinciden.' : undefined}
+          >
+            <Input
               id="confirmPassword"
               name="confirmPassword"
               type="password"
               autoComplete="new-password"
               required
+              invalid={confirmPassword.length > 0 && !passwordsMatch}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            {confirmPassword.length > 0 && !passwordsMatch ? (
-              <p className="mt-1 text-xs text-red-600">Las contraseñas no coinciden.</p>
-            ) : null}
-          </div>
+          </Field>
 
           {errorMessage ? (
-            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}
 
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <Button type="submit" disabled={!canSubmit} loading={submitting} className="w-full">
             {submitting ? 'Guardando...' : 'Guardar contraseña'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

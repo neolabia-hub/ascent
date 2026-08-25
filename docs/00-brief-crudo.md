@@ -173,3 +173,16 @@ Asignación e Inscripción no son lo mismo, ¿cierto? Por ejemplo: asignación =
 obligación? e inscripción = ¿qué ocurrió con Usuario 1 en esa convocatoria?
 Ejemplo: Usuario 1 → inscrito → asistió → terminó → aprobó. Y ¿qué ocurrió en cada evaluación?
 Esto es así.
+
+## Bloque 4 — 2026-08-25 (nueva capacidad: evaluacion de desempeno)
+
+Hay una seccion importante de EVALUACION DE DESEMPENO donde se realiza cada ano o cierto tiempo,
+donde se evalua al usuario en su cargo o como persona (no se). Son evaluaciones que se debe
+permitir crear desde UI, muy parametrizables: tipos de preguntas y mas. Consultar como se debe
+hacer y lo mejor, y que sea por tenant tambien.
+
+No se como se verian las metricas de la evaluacion, pero NO deben afectar ni mezclarse con
+capacitaciones o inducciones. Debe ser muy personalizado. Que lo pueda hacer quien tenga los
+permisos.
+
+(Prioridad: terminar el Sprint 1 primero; luego definir donde encaja esta capacidad.)

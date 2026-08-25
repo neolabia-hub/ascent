@@ -162,3 +162,36 @@ export function me(): Promise<MeResponse> {
     method: 'GET',
   });
 }
+
+export interface InboxItem {
+  id: string;
+  eventType: string;
+  subject: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface InboxResponse {
+  unread: number;
+  items: InboxItem[];
+}
+
+export function getInbox(unreadOnly = false): Promise<InboxResponse> {
+  const query = unreadOnly ? '?unread=true' : '';
+  return apiFetch<InboxResponse>(`/notifications${query}`, {
+    method: 'GET',
+  });
+}
+
+export function markNotificationRead(id: string): Promise<void> {
+  return apiFetch<void>(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: 'POST',
+  });
+}
+
+export function markAllNotificationsRead(): Promise<void> {
+  return apiFetch<void>('/notifications/read-all', {
+    method: 'POST',
+  });
+}

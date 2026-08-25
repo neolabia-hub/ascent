@@ -4,6 +4,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveTenantSlug } from '@/lib/tenant';
 import { ApiError, getPublicTenant, login, setAccessToken, type TenantBranding } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 
 type BrandingState =
   | { status: 'loading' }
@@ -76,16 +79,16 @@ export function LoginForm() {
 
   if (brandingState.status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <p className="text-sm text-gray-500">Cargando...</p>
+      <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+        <p className="text-sm text-ink-500">Cargando...</p>
       </div>
     );
   }
 
   if (brandingState.status === 'not_found') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <p className="text-sm text-gray-600">Empresa no encontrada.</p>
+      <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+        <p className="text-sm text-ink-700">Empresa no encontrada.</p>
       </div>
     );
   }
@@ -93,19 +96,16 @@ export function LoginForm() {
   const { branding } = brandingState;
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-xl font-semibold text-gray-900">{branding.companyDisplayName}</h1>
-          <p className="mt-1 text-sm text-gray-500">Plataforma de formacion NEO PULSE</p>
+          <h1 className="font-display text-xl font-semibold text-ink-900">{branding.companyDisplayName}</h1>
+          <p className="mt-1 text-sm text-ink-500">Plataforma de formacion NEO PULSE</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <div>
-            <label htmlFor="identifier" className="block text-sm font-medium text-gray-700">
-              Cedula o correo
-            </label>
-            <input
+        <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+          <Field htmlFor="identifier" label="Cedula o correo">
+            <Input
               id="identifier"
               name="identifier"
               type="text"
@@ -113,15 +113,11 @@ export function LoginForm() {
               required
               value={identifier}
               onChange={(event) => setIdentifier(event.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Contraseña
-            </label>
-            <input
+          <Field htmlFor="password" label="Contraseña">
+            <Input
               id="password"
               name="password"
               type="password"
@@ -129,23 +125,18 @@ export function LoginForm() {
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-          </div>
+          </Field>
 
           {errorMessage ? (
-            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <Button type="submit" loading={submitting} className="w-full">
             {submitting ? 'Ingresando...' : 'Ingresar'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

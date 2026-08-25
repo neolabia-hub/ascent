@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { activate } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 export default function ActivacionPage() {
   const router = useRouter();
@@ -32,24 +33,24 @@ export default function ActivacionPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-xl font-semibold text-gray-900">Activar cuenta</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="font-display text-xl font-semibold text-ink-900">Activar cuenta</h1>
+          <p className="mt-1 text-sm text-ink-500">
             Para continuar debes aceptar los siguientes terminos.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="card space-y-4 p-6">
           <label className="flex items-start gap-3">
             <input
               type="checkbox"
               checked={acceptHabeasData}
               onChange={(event) => setAcceptHabeasData(event.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              className="focus-ring mt-1 h-4 w-4 rounded border-line-strong text-primary"
             />
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-ink-700">
               Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012 y la
               politica de tratamiento de datos.
             </span>
@@ -60,27 +61,23 @@ export default function ActivacionPage() {
               type="checkbox"
               checked={acceptESignAgreement}
               onChange={(event) => setAcceptESignAgreement(event.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              className="focus-ring mt-1 h-4 w-4 rounded border-line-strong text-primary"
             />
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-ink-700">
               Acepto el acuerdo de uso de firma electronica (Decreto 2364 de 2012): mis acciones
               autenticadas en la plataforma (asistencias, evaluaciones) tienen valor de firma.
             </span>
           </label>
 
           {errorMessage ? (
-            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           ) : null}
 
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <Button type="submit" disabled={!canSubmit} loading={submitting} className="w-full">
             {submitting ? 'Activando...' : 'Activar mi cuenta'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

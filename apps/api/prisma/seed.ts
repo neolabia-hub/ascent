@@ -589,6 +589,69 @@ async function seedAdmin(params: SeedAdminParams): Promise<void> {
   console.log(`SEED OK — login: ${ADMIN_DOCUMENT_NUMBER} / ${ADMIN_PASSWORD}`);
 }
 
+// ─────────────────────── 8. Usuario de pruebas E2E ───────────────────────
+
+const E2E_DOCUMENT_NUMBER = '888888888';
+const E2E_PASSWORD = 'PruebaE2E2026*';
+
+/**
+ * Usuario dedicado a las pruebas automatizadas (Playwright): ya tiene la contrasena cambiada y
+ * las politicas aceptadas, de modo que el e2e entra directo al panel y es REPETIBLE sobre la
+ * misma base. NUNCA se crea en produccion.
+ */
+async function seedE2EUser(params: SeedAdminParams): Promise<void> {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('SEED e2e OMITIDO (NODE_ENV=production)');
+    return;
+  }
+
+  const now = new Date();
+  const existing = await prisma.user.findUnique({
+    where: {
+      tenantId_documentNumber: { tenantId: params.tenantId, documentNumber: E2E_DOCUMENT_NUMBER },
+    },
+    select: { id: true },
+  });
+
+  const data = {
+    fullName: 'Usuario Pruebas Automatizadas',
+    email: 'e2e@transprensa.test',
+    emailKind: 'CORPORATE' as const,
+    jobTitleId: params.jobTitleId,
+    areaId: params.areaId,
+    roleId: params.roleId,
+    employmentType: 'DIRECTO' as const,
+    active: true,
+    // Listo para operar: sin cambio forzado y con las politicas ya aceptadas.
+    mustChangePassword: false,
+    habeasDataConsentAt: now,
+    habeasDataVersion: '1.0',
+    esignAgreementAt: now,
+    esignAgreementVersion: '1.0',
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+  };
+
+  if (existing) {
+    // La contrasena SI se restablece en cada corrida: el e2e depende de que sea conocida.
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { ...data, passwordHash: await argon2.hash(E2E_PASSWORD) },
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        ...data,
+        tenantId: params.tenantId,
+        documentNumber: E2E_DOCUMENT_NUMBER,
+        passwordHash: await argon2.hash(E2E_PASSWORD),
+      },
+    });
+  }
+
+  console.log(`SEED e2e OK — login pruebas: ${E2E_DOCUMENT_NUMBER} / ${E2E_PASSWORD}`);
+}
+
 // ─────────────────────────────── main ───────────────────────────────
 
 async function main(): Promise<void> {
@@ -610,12 +673,14 @@ async function main(): Promise<void> {
       throw new Error('SEED: faltan dependencias (rol/cargo/area) para crear el usuario administrador');
     }
 
-    await seedAdmin({
+    const adminParams: SeedAdminParams = {
       tenantId: tenant.id,
       roleId: adminRoleId,
       jobTitleId: adminJobTitleId,
       areaId: adminAreaId,
-    });
+    };
+    await seedAdmin(adminParams);
+    await seedE2EUser(adminParams);
 
     console.log('SEED completo.');
   } finally {
