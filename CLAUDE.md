@@ -19,6 +19,10 @@
 >
 > Proyecto INDEPENDIENTE de SAC-NEO (repo, despliegue y ciclo de vida propios). Comparte
 > filosofía, stack y convenciones, no código.
+>
+> ANTES de tocar Docker o puertos: `docs/02-aislamiento-proyectos.md` — tabla de recursos
+> reservados por proyecto (compose `name:`, contenedores, volúmenes, puertos, roles de DB) para
+> que SAC-NEO y NEO PULSE nunca se pisen en la máquina de desarrollo.
 
 ---
 
@@ -981,6 +985,40 @@ administradores; cursos piloto cargados.
 soportes en menos de un minuto. Piloto en producción.
 
 ---
+
+## 10.5 Estrategia de Calidad, Pruebas y Monitoreo (MANDATORIA)
+
+```
+PRUEBAS (piramide por sprint):
+  - Unitarias (Jest): cada handler de negocio lleva su .spec (logica de dominio: gating de
+    intentos, congelado de proyectados, calculo de vigencias, motor de repeticion espaciada).
+  - Integracion: verify-rls (aislamiento multi-tenant) corre en CI contra Postgres de servicio;
+    cualquier PR que rompa el aislamiento NO se mergea.
+  - E2E (Playwright): al cierre de cada sprint funcional se agrega el flujo completo del sprint.
+    Flujo maestro (crece sprint a sprint): login -> crear actividad -> publicar version ->
+    convocatoria -> asignacion -> usuario final completa leccion + examen -> certificado ->
+    verificacion publica. Los e2e NO corren desde /mnt/c (leccion SAC-NEO); corren nativos.
+  - Datos de prueba: seed idempotente + factories por test; nunca depender de datos manuales.
+
+MONITOREO Y PREVENCION (deteccion ANTES del incidente):
+  - Sentry (API + Web) desde Sprint 1: todo 5xx y toda excepcion de frontend reportada.
+  - Health checks: /v1/health (API), y por worker BullMQ (heartbeat) cuando existan colas.
+  - Uptime externo (Betterstack) sobre health + login sintetico en produccion.
+  - Metricas operativas minimas: latencia p95 por endpoint, errores por minuto, profundidad de
+    colas, jobs fallidos (dead letter) con alerta por correo al equipo.
+  - Auditoria inmutable (audit_logs) + learning_events append-only: reconstruir cualquier
+    incidente sin adivinar.
+  - Backups: pg_dump diario + retencion 14 dias + copia offsite R2 (mismo patron SAC-NEO)
+    DESDE el primer dia de produccion. Un piloto sin backup no es un piloto.
+  - Presupuesto de error: si un despliegue produce errores nuevos en Sentry, se revierte
+    primero y se diagnostica despues (main siempre deployable).
+
+ENTORNO DE DESARROLLO (leccion 2026-08-25):
+  - Los comandos corren con Node NATIVO de Windows (PowerShell) sobre el repo en Documents.
+    WSL solo para utilidades shell. RAZON: WSL accede a /mnt/c por el puente 9P, que degrada
+    10-30x los builds con node_modules grandes (fue la lentitud cronica de SAC-NEO).
+  - Docker/puertos: respetar docs/02-aislamiento-proyectos.md.
+```
 
 ## 11. Seguridad
 

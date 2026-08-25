@@ -1,0 +1,271 @@
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { BadRequestException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as argon2 from 'argon2';
+import { AuditService } from '../common/audit.service.js';
+import type { JwtPayload } from '../common/types.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+
+export interface AuthUserView {
+  id: string;
+  fullName: string;
+  email: string;
+  mustChangePassword: boolean;
+  activated: boolean;
+}
+
+export interface LoginResult {
+  accessToken: string;
+  expiresIn: string;
+  refreshToken: string; // el controller lo pone en cookie httpOnly (userId.tenantId.token)
+  user: AuthUserView;
+}
+
+/** Contexto de la peticion (IP/UA) para el rastro de auditoria. */
+export interface AuthContext {
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
+// Anti-fuerza-bruta: bloqueo por CUENTA (ademas del rate limit por IP del edge).
+const MAX_FAILED_ATTEMPTS = Number(process.env.AUTH_MAX_FAILED_ATTEMPTS ?? 5);
+const LOCK_MINUTES = Number(process.env.AUTH_LOCK_MINUTES ?? 15);
+
+// Versiones vigentes de las politicas aceptadas en la activacion (quedan registradas por usuario).
+const HABEAS_DATA_POLICY_VERSION = process.env.HABEAS_DATA_POLICY_VERSION ?? '1.0';
+const ESIGN_AGREEMENT_VERSION = process.env.ESIGN_AGREEMENT_VERSION ?? '1.0';
+
+type ThrottledUser = {
+  id: string;
+  tenantId: string;
+  passwordHash: string;
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
+};
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /**
+   * Login multi-tenant (Decision #32): el tenant llega RESUELTO (slug del subdominio), asi que
+   * el usuario se busca con clave compuesta (tenant + cedula | tenant + email) BAJO RLS via
+   * forTenant — sin cliente owner ni ambiguedad de cedulas repetidas entre tenants.
+   * El identificador es cedula o correo, indistinto (Decision #10).
+   */
+  async login(tenantSlug: string, identifier: string, password: string, ctx: AuthContext = {}): Promise<LoginResult> {
+    // `tenants` no esta bajo RLS (no tiene tenant_id): el rol de app puede resolver el slug.
+    const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+    if (!tenant || !tenant.active) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
+
+    const scoped = this.prisma.forTenant(tenant.id);
+    const isEmail = identifier.includes('@');
+    const user = isEmail
+      ? await scoped.user.findUnique({
+          where: { tenantId_email: { tenantId: tenant.id, email: identifier.toLowerCase() } },
+        })
+      : await scoped.user.findUnique({
+          where: { tenantId_documentNumber: { tenantId: tenant.id, documentNumber: identifier } },
+        });
+    if (!user || !user.active || user.deletedAt) {
+      throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
+    }
+
+    // Cuenta bloqueada: rechazar sin verificar contrasena.
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const retryAfter = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
+      await this.audit.record({
+        tenantId: tenant.id,
+        userId: user.id,
+        action: 'ACCOUNT_LOCKED',
+        resourceType: 'auth',
+        resourceId: user.id,
+        newValues: { identifier, retryAfter },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      throw new HttpException(
+        { code: 'ACCOUNT_LOCKED', message: 'Cuenta bloqueada temporalmente por intentos fallidos.', retryAfter },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const ok = await argon2.verify(user.passwordHash, password).catch(() => false);
+    if (!ok) {
+      await this.registerFailedAttempt(user, identifier, ctx);
+      throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
+    }
+
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.prisma
+        .forTenant(tenant.id)
+        .user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
+    }
+    await this.audit.record({
+      tenantId: tenant.id,
+      userId: user.id,
+      action: 'LOGIN_SUCCESS',
+      resourceType: 'auth',
+      resourceId: user.id,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+
+    return this.issueTokens(user.id, tenant.id);
+  }
+
+  /** Rotacion de refresh token (compara hash SHA-256 con pepper; rota en cada uso). */
+  async refresh(userId: string, tenantId: string, presentedToken: string): Promise<LoginResult> {
+    const user = await this.prisma
+      .forTenant(tenantId)
+      .user.findUnique({ where: { id: userId } })
+      .catch(() => null);
+    if (!user?.refreshTokenHash || !user.active) throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+
+    const expected = Buffer.from(user.refreshTokenHash, 'hex');
+    const actual = Buffer.from(this.hashRefresh(presentedToken), 'hex');
+    const ok = expected.length === actual.length && timingSafeEqual(expected, actual);
+    if (!ok) throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+
+    return this.issueTokens(user.id, tenantId);
+  }
+
+  async logout(userId: string, tenantId: string): Promise<void> {
+    await this.prisma.forTenant(tenantId).user.update({ where: { id: userId }, data: { refreshTokenHash: null } });
+  }
+
+  /** Auto-servicio: cambia contrasena verificando la actual; limpia el flag de cambio forzado. */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ ok: true }> {
+    const user = await this.prisma.scoped.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+    if (!user) throw new UnauthorizedException({ code: 'USER_NOT_FOUND' });
+    const ok = await argon2.verify(user.passwordHash, currentPassword).catch(() => false);
+    if (!ok) throw new BadRequestException({ code: 'INVALID_CURRENT_PASSWORD' });
+    await this.prisma.scoped.user.update({
+      where: { id: userId },
+      data: { passwordHash: await argon2.hash(newPassword), mustChangePassword: false },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Activacion de cuenta: registra Habeas Data (Ley 1581/2012) y el acuerdo de firma electronica
+   * (D2364/2012 art. 5) con version y timestamp. Este acuerdo es lo que da valor probatorio a las
+   * asistencias y evaluaciones digitales (Decision #15).
+   */
+  async activate(userId: string, tenantId: string, ctx: AuthContext = {}): Promise<{ ok: true }> {
+    const now = new Date();
+    await this.prisma.forTenant(tenantId).user.update({
+      where: { id: userId },
+      data: {
+        habeasDataConsentAt: now,
+        habeasDataVersion: HABEAS_DATA_POLICY_VERSION,
+        esignAgreementAt: now,
+        esignAgreementVersion: ESIGN_AGREEMENT_VERSION,
+      },
+    });
+    await this.audit.record({
+      tenantId,
+      userId,
+      action: 'ACCOUNT_ACTIVATED',
+      resourceType: 'auth',
+      resourceId: userId,
+      newValues: { habeasDataVersion: HABEAS_DATA_POLICY_VERSION, esignVersion: ESIGN_AGREEMENT_VERSION },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+    return { ok: true };
+  }
+
+  async me(userId: string, tenantId: string): Promise<AuthUserView & { permissions: string[] }> {
+    const user = await this.prisma.forTenant(tenantId).user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { role: { include: { permissions: { include: { permission: true } } } } },
+    });
+    return {
+      ...this.toView(user),
+      permissions: user.role.permissions.map((rp) => rp.permission.code),
+    };
+  }
+
+  private async registerFailedAttempt(user: ThrottledUser, identifier: string, ctx: AuthContext): Promise<void> {
+    const attempts = user.failedLoginAttempts + 1;
+    const lock = attempts >= MAX_FAILED_ATTEMPTS;
+    // Al bloquear, reinicia el contador y fija lockedUntil; al expirar el bloqueo cuenta desde cero.
+    await this.prisma.forTenant(user.tenantId).user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: lock ? 0 : attempts,
+        lockedUntil: lock ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null,
+      },
+    });
+    await this.audit.record({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: lock ? 'ACCOUNT_LOCKED' : 'LOGIN_FAILED',
+      resourceType: 'auth',
+      resourceId: user.id,
+      newValues: { identifier, attempts, locked: lock },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+  }
+
+  private async issueTokens(userId: string, tenantId: string): Promise<LoginResult> {
+    const scoped = this.prisma.forTenant(tenantId);
+    const user = await scoped.user.findUniqueOrThrow({ where: { id: userId } });
+    const payload: JwtPayload = {
+      sub: user.id,
+      tenantId: user.tenantId,
+      roleId: user.roleId,
+      email: user.email,
+    };
+    const accessToken = await this.jwt.signAsync(payload);
+
+    const refreshToken = randomBytes(48).toString('base64url');
+    await scoped.user.update({
+      where: { id: user.id },
+      data: { refreshTokenHash: this.hashRefresh(refreshToken), lastLogin: new Date() },
+    });
+
+    return {
+      accessToken,
+      expiresIn: process.env.JWT_ACCESS_TTL ?? '15m',
+      refreshToken,
+      user: this.toView(user),
+    };
+  }
+
+  private toView(user: {
+    id: string;
+    fullName: string;
+    email: string;
+    mustChangePassword: boolean;
+    habeasDataConsentAt: Date | null;
+    esignAgreementAt: Date | null;
+  }): AuthUserView {
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+      activated: Boolean(user.habeasDataConsentAt && user.esignAgreementAt),
+    };
+  }
+
+  private pepper(token: string): string {
+    return `${token}.${process.env.REFRESH_TOKEN_PEPPER ?? ''}`;
+  }
+
+  /**
+   * SHA-256 (+pepper) para el refresh token: es un secreto ALEATORIO de 384 bits, no necesita un
+   * KDF lento como argon2 (que solo aporta contra contrasenas de baja entropia). Microsegundos
+   * por refresh en vez de cientos de ms — critico en 1 vCPU (leccion de SAC-NEO en produccion).
+   */
+  private hashRefresh(token: string): string {
+    return createHash('sha256').update(this.pepper(token)).digest('hex');
+  }
+}

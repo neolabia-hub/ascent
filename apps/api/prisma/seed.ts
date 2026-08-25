@@ -1,0 +1,629 @@
+// NEO PULSE — Seed del tenant piloto TRANSPRENSA.
+//
+// Idempotente: toda entidad se crea con upsert sobre su clave unica (o se borra/reinserta
+// cuando la clave es compuesta y no aporta valor como llave de negocio, caso de
+// role_permissions). Correr este script varias veces deja el mismo resultado.
+//
+// Corre como OWNER de la base de datos (DIRECT_DATABASE_URL): sin RLS. Es el unico punto
+// del sistema que crea el primer tenant, antes de que exista cualquier sesion autenticada.
+//
+// Ejecucion: pnpm --filter @neo-pulse/api db:seed (tsx sobre este archivo).
+
+import { PrismaClient, type Prisma } from '@prisma/client';
+import * as argon2 from 'argon2';
+
+import {
+  PERMISSIONS,
+  SEED_ROLE_PERMISSIONS,
+  type PermissionCode,
+} from '../../../packages/shared/src/constants/permissions.js';
+import {
+  tenantBrandingSchema,
+  tenantSettingsSchema,
+} from '../../../packages/shared/src/schemas/tenant-settings.js';
+
+const prisma = new PrismaClient({
+  datasources: { db: { url: process.env.DIRECT_DATABASE_URL } },
+});
+
+const TENANT_SLUG = 'transprensa';
+const ADMIN_DOCUMENT_NUMBER = '999999999';
+const ADMIN_PASSWORD = 'Transprensa2026*';
+
+// ─────────────────────────────── Utilidades ───────────────────────────────
+
+interface CatalogSeedItem {
+  code: string;
+  name: string;
+}
+
+/** Categoria de un permiso: el prefijo antes de ":" (p. ej. "catalog:read" -> "catalog"). */
+function permissionCategory(code: string): string {
+  const [category] = code.split(':');
+  return category;
+}
+
+/** Descripcion de respaldo si un codigo de PERMISSIONS no tiene texto curado abajo. */
+function fallbackPermissionDescription(code: string): string {
+  const [category, action] = code.split(':');
+  return `Permite ${action.replace(/_/g, ' ')} en el modulo ${category}`;
+}
+
+// Descripciones curadas en espanol para el catalogo de permisos (mejor calidad que un
+// texto generado). Si en el futuro se agrega un permiso nuevo a PERMISSIONS sin entrada
+// aqui, se usa fallbackPermissionDescription para no romper el seed.
+const PERMISSION_DESCRIPTIONS: Partial<Record<PermissionCode, string>> = {
+  'catalog:read': 'Consultar el catalogo de actividades formativas',
+  'catalog:manage_draft': 'Crear y editar borradores de actividades formativas',
+  'catalog:publish': 'Publicar versiones de actividades formativas',
+  'lessons:manage': 'Crear y editar lecciones (tarjetas)',
+  'ai:generate': 'Generar borradores de contenido con inteligencia artificial',
+
+  'offerings:read': 'Consultar convocatorias',
+  'offerings:manage': 'Crear y editar convocatorias',
+  'offerings:publish': 'Publicar convocatorias',
+  'attendance:take': 'Registrar asistencia en convocatorias presenciales',
+  'enrollments:read_all': 'Ver las inscripciones de todo el tenant',
+  'enrollments:read_scope': 'Ver las inscripciones de su ambito (procesos/areas asignados)',
+  'enrollments:read_own': 'Ver sus propias inscripciones',
+  'enrollments:unblock': 'Rehabilitar inscripciones bloqueadas por intentos agotados',
+
+  'assignments:manage': 'Crear y gestionar asignaciones de formacion',
+  'audiences:manage': 'Crear y gestionar audiencias (reglas de segmentacion)',
+  'plans:manage': 'Crear y editar el plan de capacitacion',
+  'plans:approve': 'Aprobar el plan de capacitacion',
+
+  'questions:manage': 'Crear y editar el banco de preguntas',
+  'attempts:grade_manual': 'Calificar manualmente intentos de evaluacion',
+  'attempts:invalidate_question': 'Anular una pregunta e invalidar las respuestas asociadas',
+
+  'certificates:issue': 'Emitir certificados',
+  'certificates:revoke': 'Revocar certificados emitidos',
+  'certificate_templates:manage': 'Crear y editar plantillas de certificado',
+
+  'reports:read_all': 'Ver reportes de todo el tenant',
+  'reports:read_scope': 'Ver reportes de su ambito (procesos/areas asignados)',
+  'reports:export': 'Exportar reportes',
+  'audit:read': 'Consultar el log de auditoria',
+
+  'users:manage': 'Crear y editar usuarios',
+  'users:import': 'Importar usuarios de forma masiva',
+  'roles:manage': 'Crear y editar roles y sus permisos',
+  'users:manage_permissions': 'Asignar o revocar permisos individuales a usuarios',
+  'config:manage_catalogs': 'Administrar catalogos del tenant (areas, cargos, regionales, normas...)',
+  'config:manage_tenant': 'Administrar la configuracion general del tenant',
+  'approvals:decide': 'Aprobar o rechazar solicitudes de aprobacion',
+};
+
+function permissionDescription(code: PermissionCode): string {
+  return PERMISSION_DESCRIPTIONS[code] ?? fallbackPermissionDescription(code);
+}
+
+// ─────────────────────────────── 1. Tenant ───────────────────────────────
+
+async function seedTenant(): Promise<{ id: string; slug: string }> {
+  const settings = tenantSettingsSchema.parse({
+    passingScoreDefault: 90,
+    maxAttemptsDefault: 3,
+  });
+  const branding = tenantBrandingSchema.parse({
+    companyDisplayName: 'TRANSPRENSA',
+    primaryColor: '#1f3a5f',
+    accentColor: '#e8734a',
+  });
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: TENANT_SLUG },
+    update: {
+      name: 'TRANSPRENSA',
+      timezone: 'America/Bogota',
+      plan: 'pilot',
+      active: true,
+      settings,
+      branding,
+    },
+    create: {
+      name: 'TRANSPRENSA',
+      slug: TENANT_SLUG,
+      timezone: 'America/Bogota',
+      plan: 'pilot',
+      active: true,
+      settings,
+      branding,
+    },
+  });
+
+  console.log(`SEED tenant OK: ${tenant.slug}`);
+  return tenant;
+}
+
+// ─────────────────────────────── 2. Permisos ───────────────────────────────
+
+async function seedPermissions(): Promise<void> {
+  for (const code of PERMISSIONS) {
+    await prisma.permission.upsert({
+      where: { code },
+      update: {
+        category: permissionCategory(code),
+        description: permissionDescription(code),
+      },
+      create: {
+        code,
+        category: permissionCategory(code),
+        description: permissionDescription(code),
+      },
+    });
+  }
+
+  console.log(`SEED permissions OK: ${PERMISSIONS.length} permisos`);
+}
+
+// ─────────────────────────────── 3. Roles ───────────────────────────────
+
+const ROLE_DEFINITIONS: CatalogSeedItem[] = [
+  { code: 'ADMIN', name: 'Administrador' },
+  { code: 'ANALISTA', name: 'Analista' },
+  { code: 'USUARIO', name: 'Usuario' },
+];
+
+async function seedRoles(tenantId: string): Promise<Record<string, string>> {
+  const roleIdByCode: Record<string, string> = {};
+
+  for (const definition of ROLE_DEFINITIONS) {
+    const role = await prisma.role.upsert({
+      where: { tenantId_code: { tenantId, code: definition.code } },
+      update: { name: definition.name, isSystem: true, active: true },
+      create: {
+        tenantId,
+        code: definition.code,
+        name: definition.name,
+        isSystem: true,
+        active: true,
+      },
+    });
+    roleIdByCode[definition.code] = role.id;
+  }
+
+  const permissions = await prisma.permission.findMany({ select: { id: true, code: true } });
+  const permissionIdByCode = new Map(permissions.map((permission) => [permission.code, permission.id]));
+
+  for (const [roleCode, permissionCodes] of Object.entries(SEED_ROLE_PERMISSIONS)) {
+    const roleId = roleIdByCode[roleCode];
+    if (!roleId) {
+      throw new Error(`SEED: el rol "${roleCode}" de SEED_ROLE_PERMISSIONS no fue creado`);
+    }
+
+    const data = permissionCodes.map((code) => {
+      const permissionId = permissionIdByCode.get(code);
+      if (!permissionId) {
+        throw new Error(`SEED: el permiso "${code}" no existe en el catalogo de permisos`);
+      }
+      return { roleId, permissionId, tenantId };
+    });
+
+    // Clave compuesta sin valor de negocio propio: se reemplaza el set completo del rol
+    // en cada corrida para reflejar exactamente SEED_ROLE_PERMISSIONS (idempotente).
+    await prisma.rolePermission.deleteMany({ where: { roleId } });
+    if (data.length > 0) {
+      await prisma.rolePermission.createMany({ data });
+    }
+  }
+
+  console.log(`SEED roles OK: ${ROLE_DEFINITIONS.length} roles`);
+  return roleIdByCode;
+}
+
+// ─────────────────────────────── 4. Catalogos ───────────────────────────────
+
+interface CatalogSeedResult {
+  areas: Record<string, string>;
+  jobTitles: Record<string, string>;
+}
+
+async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
+  const AREAS: CatalogSeedItem[] = [
+    { code: 'GESTION_HUMANA', name: 'Gestion Humana' },
+    { code: 'LOGISTICA', name: 'Logistica' },
+    { code: 'COMERCIAL', name: 'Comercial' },
+    { code: 'CONTABILIDAD', name: 'Contabilidad' },
+    { code: 'SAC', name: 'Servicio al Cliente' },
+    { code: 'SEGURIDAD', name: 'Seguridad' },
+    { code: 'COMPRAS', name: 'Compras' },
+    { code: 'CONTROL_INTERNO', name: 'Control Interno' },
+    { code: 'SISTEMAS', name: 'Sistemas' },
+  ];
+  const areaIdByCode: Record<string, string> = {};
+  for (const [index, item] of AREAS.entries()) {
+    const area = await prisma.area.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: { name: item.name, displayOrder: index, active: true },
+      create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
+    });
+    areaIdByCode[item.code] = area.id;
+  }
+
+  const PROCESSES: CatalogSeedItem[] = [
+    { code: 'SGI', name: 'Sistema de Gestion Integral' },
+    { code: 'LOGISTICA', name: 'Logistica' },
+    { code: 'SST', name: 'Seguridad y Salud en el Trabajo' },
+    { code: 'PESV', name: 'Plan Estrategico de Seguridad Vial' },
+    { code: 'SEGURIDAD', name: 'Seguridad' },
+    { code: 'GESTION_HUMANA', name: 'Gestion Humana' },
+    { code: 'SAC', name: 'Servicio al Cliente' },
+    { code: 'COMERCIAL', name: 'Comercial' },
+    { code: 'CONTABILIDAD', name: 'Contabilidad' },
+    { code: 'CONTROL_INTERNO', name: 'Control Interno' },
+    { code: 'SARLAFT', name: 'SARLAFT' },
+    { code: 'COMPRAS', name: 'Compras' },
+    { code: 'EXCELENCIA_SERVICIO', name: 'Excelencia del Servicio' },
+  ];
+  for (const [index, item] of PROCESSES.entries()) {
+    await prisma.process.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: { name: item.name, displayOrder: index, active: true },
+      create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
+    });
+  }
+
+  const JOB_TITLE_TYPES: CatalogSeedItem[] = [
+    { code: 'ADMINISTRATIVO', name: 'Administrativo' },
+    { code: 'OPERATIVO', name: 'Operativo' },
+    { code: 'COMERCIAL', name: 'Comercial' },
+  ];
+  const jobTitleTypeIdByCode: Record<string, string> = {};
+  for (const [index, item] of JOB_TITLE_TYPES.entries()) {
+    const jobTitleType = await prisma.jobTitleType.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: { name: item.name, displayOrder: index, active: true },
+      create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
+    });
+    jobTitleTypeIdByCode[item.code] = jobTitleType.id;
+  }
+
+  // Lista corta de arranque; el catalogo real lo carga el cliente (job_titles es CRUD por UI).
+  const JOB_TITLES: Array<CatalogSeedItem & { typeCode: string }> = [
+    { code: 'DIRECTOR_GH', name: 'Director de Gestion Humana', typeCode: 'ADMINISTRATIVO' },
+    { code: 'ANALISTA_SST', name: 'Analista SST', typeCode: 'ADMINISTRATIVO' },
+    { code: 'CONDUCTOR', name: 'Conductor', typeCode: 'OPERATIVO' },
+    { code: 'AUX_BODEGA', name: 'Auxiliar de Bodega', typeCode: 'OPERATIVO' },
+    { code: 'EJECUTIVO_COMERCIAL', name: 'Ejecutivo Comercial', typeCode: 'COMERCIAL' },
+  ];
+  const jobTitleIdByCode: Record<string, string> = {};
+  for (const [index, item] of JOB_TITLES.entries()) {
+    const jobTitleTypeId = jobTitleTypeIdByCode[item.typeCode];
+    if (!jobTitleTypeId) {
+      throw new Error(`SEED: el tipo de cargo "${item.typeCode}" no existe`);
+    }
+    const jobTitle = await prisma.jobTitle.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: { name: item.name, jobTitleTypeId, displayOrder: index, active: true },
+      create: {
+        tenantId,
+        code: item.code,
+        name: item.name,
+        jobTitleTypeId,
+        displayOrder: index,
+        active: true,
+      },
+    });
+    jobTitleIdByCode[item.code] = jobTitle.id;
+  }
+
+  const SERVICES: CatalogSeedItem[] = [
+    { code: 'ALMACENAMIENTO', name: 'Almacenamiento' },
+    { code: 'MASIVO', name: 'Masivo' },
+    { code: 'PAQUETEO', name: 'Paqueteo' },
+  ];
+  for (const [index, item] of SERVICES.entries()) {
+    await prisma.service.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: { name: item.name, displayOrder: index, active: true },
+      create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
+    });
+  }
+
+  const REGIONALS: CatalogSeedItem[] = [
+    { code: 'ANTIOQUIA', name: 'Antioquia' },
+    { code: 'BARRANQUILLA', name: 'Barranquilla' },
+    { code: 'BUCARAMANGA', name: 'Bucaramanga' },
+    { code: 'CUNDINAMARCA', name: 'Cundinamarca' },
+    { code: 'EJE_CAFETERO', name: 'Eje Cafetero' },
+    { code: 'VALLE_DEL_CAUCA', name: 'Valle del Cauca' },
+  ];
+  for (const [index, item] of REGIONALS.entries()) {
+    await prisma.regional.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: { name: item.name, displayOrder: index, active: true },
+      create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
+    });
+  }
+
+  const NORMS: Array<CatalogSeedItem & { annualHoursRequired: number | null }> = [
+    { code: 'BASC', name: 'BASC', annualHoursRequired: null },
+    {
+      code: 'RES_2674',
+      name: 'Resolucion 2674 de 2013 (BPM y HACCP)',
+      annualHoursRequired: 10,
+    },
+    { code: 'TRINORMA', name: 'Trinorma ISO', annualHoursRequired: null },
+    { code: 'RES_PESV', name: 'Resolucion PESV (40595 de 2022)', annualHoursRequired: null },
+    { code: 'NA', name: 'No aplica', annualHoursRequired: null },
+  ];
+  for (const [index, item] of NORMS.entries()) {
+    await prisma.norm.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: {
+        name: item.name,
+        annualHoursRequired: item.annualHoursRequired,
+        displayOrder: index,
+        active: true,
+      },
+      create: {
+        tenantId,
+        code: item.code,
+        name: item.name,
+        annualHoursRequired: item.annualHoursRequired,
+        displayOrder: index,
+        active: true,
+      },
+    });
+  }
+
+  console.log(
+    `SEED catalogos OK: ${AREAS.length} areas, ${PROCESSES.length} procesos, ` +
+      `${JOB_TITLE_TYPES.length} tipos de cargo, ${JOB_TITLES.length} cargos, ` +
+      `${SERVICES.length} servicios, ${REGIONALS.length} regionales, ${NORMS.length} normas`,
+  );
+
+  return { areas: areaIdByCode, jobTitles: jobTitleIdByCode };
+}
+
+// ───────────────────────── 5. Tipos de actividad formativa ─────────────────────────
+
+interface ActivityTypeSeedItem {
+  code: string;
+  name: string;
+  colorHex: string;
+  config: Prisma.InputJsonObject;
+}
+
+async function seedActivityTypes(tenantId: string): Promise<void> {
+  const ACTIVITY_TYPES: ActivityTypeSeedItem[] = [
+    {
+      code: 'INDUCCION_GENERAL',
+      name: 'Induccion general',
+      colorHex: '#1d4ed8',
+      config: {
+        requiresAssessment: true,
+        issuesCertificate: true,
+        requiresBeforeHire: true,
+        defaultAssignmentMode: 'ON_HIRE',
+        participatesInPlan: false,
+        isMicro: false,
+      },
+    },
+    {
+      code: 'INDUCCION_ESPECIFICA',
+      name: 'Induccion especifica',
+      colorHex: '#0e7490',
+      config: {
+        requiresAssessment: true,
+        issuesCertificate: true,
+        defaultAssignmentMode: 'BY_JOB_TITLE',
+        participatesInPlan: false,
+        isMicro: false,
+      },
+    },
+    {
+      code: 'REINDUCCION',
+      name: 'Reinduccion',
+      colorHex: '#6d28d9',
+      config: {
+        requiresAssessment: true,
+        issuesCertificate: true,
+        defaultRecurrenceMonths: 12,
+        participatesInPlan: false,
+        isMicro: false,
+      },
+    },
+    {
+      code: 'PLAN',
+      name: 'Capacitacion del plan',
+      colorHex: '#15803d',
+      config: {
+        requiresAssessment: true,
+        requiresSurvey: true,
+        issuesCertificate: true,
+        participatesInPlan: true,
+        isMicro: false,
+      },
+    },
+    {
+      code: 'EXTRA',
+      name: 'Capacitacion extraordinaria',
+      colorHex: '#b45309',
+      config: {
+        requiresAssessment: true,
+        issuesCertificate: true,
+        participatesInPlan: false,
+        isMicro: false,
+      },
+    },
+    {
+      code: 'MICROLEARNING',
+      name: 'Pildora',
+      colorHex: '#be185d',
+      config: {
+        requiresAssessment: false,
+        issuesCertificate: false,
+        participatesInPlan: false,
+        isMicro: true,
+      },
+    },
+  ];
+
+  for (const [index, item] of ACTIVITY_TYPES.entries()) {
+    await prisma.activityType.upsert({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      update: {
+        name: item.name,
+        colorHex: item.colorHex,
+        config: item.config,
+        isSystem: true,
+        active: true,
+        displayOrder: index,
+      },
+      create: {
+        tenantId,
+        code: item.code,
+        name: item.name,
+        colorHex: item.colorHex,
+        config: item.config,
+        isSystem: true,
+        active: true,
+        displayOrder: index,
+      },
+    });
+  }
+
+  console.log(`SEED tipos de actividad OK: ${ACTIVITY_TYPES.length} tipos`);
+}
+
+// ───────────────────────── 6. Politicas de retencion ─────────────────────────
+
+interface RetentionSeedItem {
+  recordClass: 'SST_TRAINING' | 'GENERAL_TRAINING' | 'AUDIT' | 'PII';
+  retentionYears: number;
+  legalBasis: string;
+}
+
+async function seedRetention(tenantId: string): Promise<void> {
+  const POLICIES: RetentionSeedItem[] = [
+    {
+      recordClass: 'SST_TRAINING',
+      retentionYears: 20,
+      legalBasis: 'Decreto 1072 de 2015 art. 2.2.4.6.13',
+    },
+    { recordClass: 'GENERAL_TRAINING', retentionYears: 5, legalBasis: 'Politica interna' },
+    { recordClass: 'AUDIT', retentionYears: 10, legalBasis: 'Politica interna' },
+    { recordClass: 'PII', retentionYears: 5, legalBasis: 'Ley 1581 de 2012' },
+  ];
+
+  for (const policy of POLICIES) {
+    await prisma.retentionPolicy.upsert({
+      where: { tenantId_recordClass: { tenantId, recordClass: policy.recordClass } },
+      update: {
+        retentionYears: policy.retentionYears,
+        legalBasis: policy.legalBasis,
+        actionOnExpiry: 'ANONYMIZE',
+        active: true,
+      },
+      create: {
+        tenantId,
+        recordClass: policy.recordClass,
+        retentionYears: policy.retentionYears,
+        legalBasis: policy.legalBasis,
+        actionOnExpiry: 'ANONYMIZE',
+        active: true,
+      },
+    });
+  }
+
+  console.log(`SEED politicas de retencion OK: ${POLICIES.length} politicas`);
+}
+
+// ─────────────────────────────── 7. Usuario admin ───────────────────────────────
+
+interface SeedAdminParams {
+  tenantId: string;
+  roleId: string;
+  jobTitleId: string;
+  areaId: string;
+}
+
+async function seedAdmin(params: SeedAdminParams): Promise<void> {
+  // El hash solo se calcula/aplica al CREAR: si el usuario ya existe, una corrida repetida
+  // del seed no debe pisar una contrasena que el admin ya cambio en produccion.
+  const existing = await prisma.user.findUnique({
+    where: {
+      tenantId_documentNumber: { tenantId: params.tenantId, documentNumber: ADMIN_DOCUMENT_NUMBER },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        fullName: 'Administrador NEO PULSE',
+        email: 'admin@transprensa.com',
+        emailKind: 'CORPORATE',
+        jobTitleId: params.jobTitleId,
+        areaId: params.areaId,
+        roleId: params.roleId,
+        employmentType: 'DIRECTO',
+        active: true,
+      },
+    });
+  } else {
+    const passwordHash = await argon2.hash(ADMIN_PASSWORD);
+    await prisma.user.create({
+      data: {
+        tenantId: params.tenantId,
+        documentNumber: ADMIN_DOCUMENT_NUMBER,
+        fullName: 'Administrador NEO PULSE',
+        email: 'admin@transprensa.com',
+        emailKind: 'CORPORATE',
+        phone: null,
+        passwordHash,
+        mustChangePassword: true,
+        jobTitleId: params.jobTitleId,
+        areaId: params.areaId,
+        roleId: params.roleId,
+        employmentType: 'DIRECTO',
+        active: true,
+      },
+    });
+  }
+
+  console.log(`SEED OK — login: ${ADMIN_DOCUMENT_NUMBER} / ${ADMIN_PASSWORD}`);
+}
+
+// ─────────────────────────────── main ───────────────────────────────
+
+async function main(): Promise<void> {
+  try {
+    console.log('SEED iniciando — tenant TRANSPRENSA');
+
+    const tenant = await seedTenant();
+    await seedPermissions();
+    const roles = await seedRoles(tenant.id);
+    const catalogs = await seedCatalogs(tenant.id);
+    await seedActivityTypes(tenant.id);
+    await seedRetention(tenant.id);
+
+    const adminRoleId = roles.ADMIN;
+    const adminJobTitleId = catalogs.jobTitles.DIRECTOR_GH;
+    const adminAreaId = catalogs.areas.GESTION_HUMANA;
+
+    if (!adminRoleId || !adminJobTitleId || !adminAreaId) {
+      throw new Error('SEED: faltan dependencias (rol/cargo/area) para crear el usuario administrador');
+    }
+
+    await seedAdmin({
+      tenantId: tenant.id,
+      roleId: adminRoleId,
+      jobTitleId: adminJobTitleId,
+      areaId: adminAreaId,
+    });
+
+    console.log('SEED completo.');
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main().catch((error: unknown) => {
+  console.error('SEED FALLO:', error);
+  process.exitCode = 1;
+});

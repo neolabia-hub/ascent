@@ -1,0 +1,44 @@
+# NEO PULSE — stack de desarrollo: Postgres + Redis.
+# Puertos DISTINTOS a SAC-NEO (5432/6379) para poder correr ambos proyectos a la vez.
+# `name:` es OBLIGATORIO: sin el, compose usa el nombre de la carpeta ("docker") como proyecto,
+# que COLISIONA con el compose de SAC-NEO (misma carpeta "docker") y recrea sus contenedores.
+# Leccion aprendida el 2026-08-25 (se recupero sin perdida de datos).
+name: neo-pulse
+# Levantar: pnpm docker:up  (o docker compose -f docker/docker-compose.yml up -d)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: neo-pulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: neopulse
+      POSTGRES_PASSWORD: neopulse_dev
+      POSTGRES_DB: neopulse
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neopulse -d neopulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: neo-pulse-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:

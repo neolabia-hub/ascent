@@ -1,0 +1,68 @@
+import { z } from 'zod';
+
+/**
+ * Settings del tenant (tenants.settings JSONB) — Zod es la fuente unica (Decision #18).
+ * Version del esquema incluida para migraciones de settings sin romper tenants viejos.
+ * Cascada de resolucion: default plataforma -> override tenant -> override actividad ->
+ * SNAPSHOT en la version publicada (la que rige el intento). Ver CLAUDE.md 3.1.
+ */
+export const tenantSettingsSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+
+    // Reglas academicas por defecto (snapshot al publicar cada version de actividad).
+    passingScoreDefault: z.number().int().min(1).max(100).default(80),
+    maxAttemptsDefault: z.number().int().min(1).max(10).default(3),
+    retryWaitHours: z.number().int().min(0).max(720).default(0),
+
+    // Microlearning / engagement.
+    pillCadencePerWeek: z.number().int().min(1).max(7).default(3),
+    notificationWeeklyCap: z.number().int().min(1).max(21).default(5),
+    streakFreezesMax: z.number().int().min(0).max(5).default(2),
+
+    // Eficacia diferida (Kirkpatrick nivel 3).
+    efficacyDaysDefault: z.number().int().min(1).max(180).default(30),
+
+    // Rotulos de UI (Decision #31: fijos en F1; previstos aqui, sin UI de edicion todavia).
+    labels: z
+      .object({
+        activity: z.string().min(1).default('Actividad formativa'),
+        catalog: z.string().min(1).default('Contenido formativo'),
+        offering: z.string().min(1).default('Convocatoria'),
+        plan: z.string().min(1).default('Plan de capacitacion'),
+        pill: z.string().min(1).default('Pildora'),
+        extra: z.string().min(1).default('Capacitacion extraordinaria'),
+      })
+      .default({}),
+
+    // Flags de modulos.
+    features: z
+      .object({
+        pills: z.boolean().default(true),
+        streaks: z.boolean().default(true),
+        aiGeneration: z.boolean().default(true),
+        scormRuntime: z.boolean().default(false), // F2, solo si el tenant lo necesita (Decision #25)
+      })
+      .default({}),
+  })
+  .strict();
+
+export type TenantSettings = z.infer<typeof tenantSettingsSchema>;
+
+/** Branding del tenant (tenants.branding JSONB). Colores en HEX validado. */
+export const tenantBrandingSchema = z
+  .object({
+    logoKey: z.string().nullable().default(null),
+    primaryColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .default('#1f3a5f'),
+    accentColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .default('#e8734a'),
+    companyDisplayName: z.string().min(1).max(120).default(''),
+  })
+  .strict();
+
+export type TenantBranding = z.infer<typeof tenantBrandingSchema>;

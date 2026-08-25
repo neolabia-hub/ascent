@@ -1,0 +1,1656 @@
+// NEO PULSE — Prisma schema v1.0. Fuente: CLAUDE.md seccion 6 (modelo de 5 capas).
+// RLS se activa por SQL aparte (prisma/sql/rls.sql) tras migrar. Ver Decision #17.
+//
+// Convenciones:
+//  - tenant_id UUID NOT NULL en toda tabla de datos (sin relacion Prisma hacia Tenant a proposito:
+//    evita 50+ back-relations; la integridad la dan RLS + capa ORM tenant-bound).
+//  - created_by/updated_by son UUID planos (sin relacion) por la misma razon.
+//  - Historicos INMUTABLES (solo INSERT): enrollments snapshots, attempts, grants, certificates,
+//    learning_events, audit_logs, audience_members (joined/left, nunca DELETE).
+//  - Polimorficos (target_type/target_id, entity_type/entity_id) sin FK formal.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // usuario app (sujeto a RLS)
+  directUrl = env("DIRECT_DATABASE_URL") // usuario owner (migraciones/seed)
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+enum DocumentType {
+  CEDULA
+  CE
+  PASAPORTE
+  NIT
+}
+
+enum EmailKind {
+  PERSONAL
+  CORPORATE
+}
+
+enum EmploymentType {
+  DIRECTO
+  CONTRATISTA
+  TEMPORAL
+  EN_MISION
+}
+
+// Actor vial (PESV Res. 40595/2022 Paso 10).
+enum RoadActor {
+  CONDUCTOR
+  MOTOCICLISTA
+  CICLISTA
+  PEATON
+  PASAJERO
+}
+
+enum Modality {
+  PRESENCIAL
+  VIRTUAL
+  HIBRIDA
+}
+
+enum ExecutedBy {
+  PROPIOS
+  TEMPORALES
+  ARL
+  EPS
+  OTROS
+}
+
+enum VersionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+// Que pasa con los inscritos al publicar la version N+1 (Decision #6 / regla de oro 4).
+enum MigrationPolicy {
+  FINISH_OLD
+  RESTART_NEW
+  MOVE_NOT_STARTED
+}
+
+enum ContentType {
+  LESSON
+  VIDEO
+  DOCUMENT
+  ASSESSMENT
+  SURVEY
+  SCORM
+  LINK
+}
+
+enum CardType {
+  TEXT_IMAGE
+  VIDEO_SHORT
+  QUIZ
+  FLIP
+  POLL
+  FILL_GAP
+  // F2: HOTSPOT | MATCH (se agregan cuando exista el bloque)
+}
+
+enum PackageKind {
+  FILE
+  VIDEO
+  SCORM_12
+  SCORM_2004
+}
+
+enum OfferingKind {
+  EVENT
+  PERMANENT
+  HYBRID
+}
+
+enum OfferingStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+  PASSED
+  FAILED
+  WITHDRAWN
+  EXPIRED
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  JUSTIFIED
+}
+
+enum AttendanceMethod {
+  INSTRUCTOR
+  QR
+  SIGNATURE
+}
+
+enum AssignmentTargetType {
+  ACTIVITY
+  PATH
+  CERTIFICATION
+}
+
+enum AssignmentSource {
+  MANUAL
+  RULE
+  PLAN
+  STATIC_SNAPSHOT
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  WITHDRAWN_LEFT_AUDIENCE
+  WAIVED
+}
+
+enum RuleTrigger {
+  ON_JOIN // al entrar a la audiencia
+  ON_HIRE // ingreso: due ANTES de hired_at (induccion previa al inicio, D1072)
+  SCHEDULED // programada/recurrente
+}
+
+enum PlanStatus {
+  DRAFT
+  APPROVED
+  ACTIVE
+  CLOSED
+}
+
+enum PlanItemStatus {
+  PLANNED
+  EXECUTED
+  RESCHEDULED
+  CANCELLED
+}
+
+enum PathItemType {
+  ACTIVITY
+  PATH
+}
+
+enum QuestionType {
+  SINGLE
+  MULTI
+  TRUE_FALSE
+  ESSAY
+}
+
+enum GradingPolicy {
+  HIGHEST
+  LAST
+  FIRST
+  AVERAGE
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  PENDING_MANUAL
+}
+
+enum SectionMode {
+  FIXED
+  RANDOM_FROM_POOL
+}
+
+enum SurveyKind {
+  SATISFACTION
+  EFFICACY
+}
+
+enum SurveyResult {
+  POSITIVE
+  NEGATIVE
+  NA
+}
+
+enum EfficacyStatus {
+  PENDING
+  SENT
+  RESPONDED
+  EXPIRED
+}
+
+enum GrantStatus {
+  ACTIVE
+  SUPERSEDED
+  REVOKED
+}
+
+enum ApprovalAction {
+  PUBLISH
+  EDIT_PUBLISHED
+  CANCEL_OFFERING
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AiJobTarget {
+  LESSON_CARDS
+  QUESTIONS
+  BOTH
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  DRAFT_READY
+  APPROVED
+  DISCARDED
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum RecordClass {
+  SST_TRAINING
+  GENERAL_TRAINING
+  AUDIT
+  PII
+}
+
+enum RetentionAction {
+  ANONYMIZE
+  DELETE
+}
+
+enum ImportRowStatus {
+  OK
+  ERROR
+}
+
+enum ImportBatchStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ──────────────────────── 6.1 Plataforma y tenants ────────────────────────
+
+model Tenant {
+  id       String  @id @default(uuid()) @db.Uuid
+  name     String
+  slug     String  @unique // subdominio: transprensa.neopulse.app (Decision #32)
+  nit      String?
+  timezone String  @default("America/Bogota")
+  plan     String  @default("pilot")
+  active   Boolean @default(true)
+  branding Json    @default("{}") // validado con tenantBrandingSchema (Zod)
+  settings Json    @default("{}") // validado con tenantSettingsSchema (Zod)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+// ──────────────────────── 6.2 Organizacion (catalogos) ────────────────────────
+
+model Area {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  name          String
+  code          String
+  parentId      String? @map("parent_id") @db.Uuid
+  parent        Area?   @relation("AreaTree", fields: [parentId], references: [id])
+  children      Area[]  @relation("AreaTree")
+  managerUserId String? @map("manager_user_id") @db.Uuid
+  active        Boolean @default(true)
+  displayOrder  Int     @default(0) @map("display_order")
+
+  users         User[]
+  processes     Process[]
+  analystScopes AnalystScope[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("areas")
+}
+
+model Process {
+  id                String  @id @default(uuid()) @db.Uuid
+  tenantId          String  @map("tenant_id") @db.Uuid
+  name              String
+  code              String // SGI | SST | PESV | SARLAFT | ...
+  responsibleUserId String? @map("responsible_user_id") @db.Uuid
+  areaId            String? @map("area_id") @db.Uuid
+  area              Area?   @relation(fields: [areaId], references: [id])
+  active            Boolean @default(true)
+  displayOrder      Int     @default(0) @map("display_order")
+
+  activities    Activity[]
+  analystScopes AnalystScope[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("processes")
+}
+
+model JobTitleType {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  name         String // Administrativo | Operativo | Comercial
+  code         String
+  active       Boolean @default(true)
+  displayOrder Int     @default(0) @map("display_order")
+
+  jobTitles JobTitle[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("job_title_types")
+}
+
+model JobTitle {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  name           String
+  code           String
+  jobTitleTypeId String       @map("job_title_type_id") @db.Uuid
+  jobTitleType   JobTitleType @relation(fields: [jobTitleTypeId], references: [id])
+  active         Boolean      @default(true)
+  displayOrder   Int          @default(0) @map("display_order")
+
+  users              User[]
+  activityJobTitles  ActivityJobTitle[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("job_titles")
+}
+
+model Service {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  name         String // Almacenamiento | Masivo | Paqueteo
+  code         String
+  active       Boolean @default(true)
+  displayOrder Int     @default(0) @map("display_order")
+
+  activityServices ActivityService[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("services")
+}
+
+model Regional {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  name         String
+  code         String
+  active       Boolean @default(true)
+  displayOrder Int     @default(0) @map("display_order")
+
+  users             User[]
+  offerings         Offering[]
+  activityRegionals ActivityRegional[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("regionals")
+}
+
+model Norm {
+  id                  String  @id @default(uuid()) @db.Uuid
+  tenantId            String  @map("tenant_id") @db.Uuid
+  name                String // BASC | Res. 2674/2013 BPM-HACCP | Trinorma | RES-PESV | N/A
+  code                String
+  annualHoursRequired Int?    @map("annual_hours_required") // BPM: 10 h/ano por manipulador
+  active              Boolean @default(true)
+  displayOrder        Int     @default(0) @map("display_order")
+
+  activityNorms ActivityNorm[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("norms")
+}
+
+// ──────────────────────── 6.3 Usuarios y acceso ────────────────────────
+
+model User {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  documentType   DocumentType @default(CEDULA) @map("document_type")
+  documentNumber String       @map("document_number")
+  fullName       String       @map("full_name")
+  phone          String?
+  email          String
+  emailKind      EmailKind    @default(PERSONAL) @map("email_kind")
+
+  passwordHash        String    @map("password_hash")
+  mustChangePassword  Boolean   @default(true) @map("must_change_password")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastLogin           DateTime? @map("last_login")
+  refreshTokenHash    String?   @map("refresh_token_hash")
+
+  jobTitleId String    @map("job_title_id") @db.Uuid
+  jobTitle   JobTitle  @relation(fields: [jobTitleId], references: [id])
+  areaId     String    @map("area_id") @db.Uuid
+  area       Area      @relation(fields: [areaId], references: [id])
+  regionalId String?   @map("regional_id") @db.Uuid
+  regional   Regional? @relation(fields: [regionalId], references: [id])
+
+  hiredAt        DateTime?      @map("hired_at") @db.Date // dispara induccion PREVIA al inicio (D1072)
+  employmentType EmploymentType @default(DIRECTO) @map("employment_type")
+  roadActor      RoadActor?     @map("road_actor") // PESV Paso 10
+  terminatedAt   DateTime?      @map("terminated_at") @db.Date // ancla de retencion 20 anos (SST)
+
+  // Aceptaciones legales en la activacion de la cuenta.
+  habeasDataConsentAt   DateTime? @map("habeas_data_consent_at")
+  habeasDataVersion     String?   @map("habeas_data_version")
+  esignAgreementAt      DateTime? @map("esign_agreement_accepted_at")
+  esignAgreementVersion String?   @map("esign_agreement_version")
+
+  roleId String @map("role_id") @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  active    Boolean   @default(true)
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  overrides       UserPermissionOverride[]
+  analystScopes   AnalystScope[]
+  enrollments     Enrollment[]
+  assignments     Assignment[]
+  attempts        Attempt[]
+  audienceMembers AudienceMember[]
+  streak          UserStreak?
+
+  @@unique([tenantId, documentNumber])
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Role {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  name     String
+  code     String // ADMIN | ANALISTA | USUARIO (seed; el tenant puede crear mas)
+  isSystem Boolean @default(false) @map("is_system")
+  active   Boolean @default(true)
+
+  permissions RolePermission[]
+  users       User[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("roles")
+}
+
+// Catalogo GLOBAL de permisos (sin tenant_id -> sin RLS; legible por todos).
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  code        String @unique
+  category    String
+  description String
+
+  rolePermissions RolePermission[]
+  overrides       UserPermissionOverride[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  // tenant_id duplicado para RLS (la PK ya aisla via role, pero RLS exige la columna).
+  tenantId     String     @map("tenant_id") @db.Uuid
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermissionOverride {
+  userId       String     @map("user_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  tenantId     String     @map("tenant_id") @db.Uuid
+  granted      Boolean // true = permiso extra; false = revocar el del rol
+  setBy        String     @map("set_by") @db.Uuid
+  setAt        DateTime   @default(now()) @map("set_at")
+
+  @@id([userId, permissionId])
+  @@map("user_permission_overrides")
+}
+
+// Ambito del Analista: que procesos/areas gestiona.
+model AnalystScope {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processId String?  @map("process_id") @db.Uuid
+  process   Process? @relation(fields: [processId], references: [id])
+  areaId    String?  @map("area_id") @db.Uuid
+  area      Area?    @relation(fields: [areaId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("analyst_scopes")
+}
+
+model UserImportBatch {
+  id         String            @id @default(uuid()) @db.Uuid
+  tenantId   String            @map("tenant_id") @db.Uuid
+  filename   String
+  storageKey String?           @map("storage_key")
+  status     ImportBatchStatus @default(PROCESSING)
+  totalRows  Int               @default(0) @map("total_rows")
+  okRows     Int               @default(0) @map("ok_rows")
+  failedRows Int               @default(0) @map("failed_rows")
+  createdBy  String            @map("created_by") @db.Uuid
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  rows UserImportRow[]
+
+  @@map("user_import_batches")
+}
+
+model UserImportRow {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  batchId     String          @map("batch_id") @db.Uuid
+  batch       UserImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber   Int             @map("row_number")
+  raw         Json
+  status      ImportRowStatus
+  errorDetail String?         @map("error_detail")
+  userId      String?         @map("user_id") @db.Uuid
+
+  @@map("user_import_rows")
+}
+
+// ──────────────────────── 6.4 Catalogo formativo ────────────────────────
+
+model ActivityType {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  name         String // Induccion general | Induccion especifica | Reinduccion | Plan | Extraordinaria | Pildora
+  code         String // INDUCCION_GENERAL | INDUCCION_ESPECIFICA | REINDUCCION | PLAN | EXTRA | MICROLEARNING
+  icon         String?
+  colorHex     String? @map("color_hex")
+  isSystem     Boolean @default(false) @map("is_system")
+  active       Boolean @default(true)
+  displayOrder Int     @default(0) @map("display_order")
+  // requires_assessment, requires_survey, requires_efficacy, issues_certificate,
+  // default_assignment_mode, default_recurrence_months, is_micro, participates_in_plan,
+  // requires_before_hire
+  config       Json    @default("{}")
+
+  activities Activity[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("activity_types")
+}
+
+model Activity {
+  id                String       @id @default(uuid()) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  code              String
+  name              String
+  description       String?
+  activityTypeId    String       @map("activity_type_id") @db.Uuid
+  activityType      ActivityType @relation(fields: [activityTypeId], references: [id])
+  processId         String       @map("process_id") @db.Uuid
+  process           Process      @relation(fields: [processId], references: [id])
+  responsibleUserId String?      @map("responsible_user_id") @db.Uuid
+  modality          Modality     @default(VIRTUAL) // default; la convocatoria puede precisar
+  currentVersionId  String?      @unique @map("current_version_id") @db.Uuid
+  tags              String[]     @default([])
+
+  versions   ActivityVersion[]  @relation("ActivityVersions")
+  norms      ActivityNorm[]
+  services   ActivityService[]
+  regionals  ActivityRegional[]
+  jobTitles  ActivityJobTitle[]
+
+  active    Boolean   @default(true)
+  version   Int       @default(1) // optimistic lock
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([tenantId, code])
+  @@map("activities")
+}
+
+model ActivityNorm {
+  activityId String   @map("activity_id") @db.Uuid
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  normId     String   @map("norm_id") @db.Uuid
+  norm       Norm     @relation(fields: [normId], references: [id], onDelete: Cascade)
+  tenantId   String   @map("tenant_id") @db.Uuid
+
+  @@id([activityId, normId])
+  @@map("activity_norms")
+}
+
+model ActivityService {
+  activityId String   @map("activity_id") @db.Uuid
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  serviceId  String   @map("service_id") @db.Uuid
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  tenantId   String   @map("tenant_id") @db.Uuid
+
+  @@id([activityId, serviceId])
+  @@map("activity_services")
+}
+
+model ActivityRegional {
+  activityId String   @map("activity_id") @db.Uuid
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  regionalId String   @map("regional_id") @db.Uuid
+  regional   Regional @relation(fields: [regionalId], references: [id], onDelete: Cascade)
+  tenantId   String   @map("tenant_id") @db.Uuid
+
+  @@id([activityId, regionalId])
+  @@map("activity_regionals")
+}
+
+model ActivityJobTitle {
+  activityId String   @map("activity_id") @db.Uuid
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  jobTitleId String   @map("job_title_id") @db.Uuid
+  jobTitle   JobTitle @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  tenantId   String   @map("tenant_id") @db.Uuid
+
+  @@id([activityId, jobTitleId])
+  @@map("activity_job_titles")
+}
+
+// INMUTABLE al publicar (copy-on-publish, Decision #6).
+model ActivityVersion {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  activityId    String        @map("activity_id") @db.Uuid
+  activity      Activity      @relation("ActivityVersions", fields: [activityId], references: [id])
+  versionNumber Int           @map("version_number")
+  status        VersionStatus @default(DRAFT)
+  publishedAt   DateTime?     @map("published_at")
+  publishedBy   String?       @map("published_by") @db.Uuid
+
+  // SNAPSHOT resuelto de la cascada (tenant -> actividad) al publicar (Decision #27).
+  passingScore       Int             @map("passing_score")
+  maxAttempts        Int             @map("max_attempts")
+  retryWaitHours     Int?            @map("retry_wait_hours")
+  completionCriteria Json            @default("{}") @map("completion_criteria")
+  syllabusSnapshot   Json            @default("{}") @map("syllabus_snapshot") // temario para constancias
+  migrationPolicy    MigrationPolicy @default(MOVE_NOT_STARTED) @map("migration_policy")
+  estimatedMinutes   Int?            @map("estimated_minutes")
+
+  contents    ActivityContent[]
+  offerings   Offering[]
+  enrollments Enrollment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([activityId, versionNumber])
+  @@map("activity_versions")
+}
+
+model ActivityContent {
+  id                  String            @id @default(uuid()) @db.Uuid
+  tenantId            String            @map("tenant_id") @db.Uuid
+  activityVersionId   String            @map("activity_version_id") @db.Uuid
+  activityVersion     ActivityVersion   @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
+  type                ContentType
+  title               String
+  displayOrder        Int               @map("display_order")
+  isRequired          Boolean           @default(true) @map("is_required")
+  config              Json              @default("{}") // min_watch_pct, min_seconds...
+  lessonId            String?           @map("lesson_id") @db.Uuid
+  lesson              Lesson?           @relation(fields: [lessonId], references: [id])
+  contentPackageId    String?           @map("content_package_id") @db.Uuid
+  contentPackage      ContentPackage?   @relation(fields: [contentPackageId], references: [id])
+  assessmentVersionId String?           @map("assessment_version_id") @db.Uuid
+  assessmentVersion   AssessmentVersion? @relation(fields: [assessmentVersionId], references: [id])
+  surveyTemplateId    String?           @map("survey_template_id") @db.Uuid
+  surveyTemplate      SurveyTemplate?   @relation(fields: [surveyTemplateId], references: [id])
+
+  progress ActivityProgress[]
+
+  @@map("activity_contents")
+}
+
+model Lesson {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  title            String
+  estimatedMinutes Int?          @map("estimated_minutes")
+  status           VersionStatus @default(DRAFT)
+
+  cards    LessonCard[]
+  contents ActivityContent[]
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("lessons")
+}
+
+model LessonCard {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  lessonId     String   @map("lesson_id") @db.Uuid
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  cardType     CardType @map("card_type")
+  displayOrder Int      @map("display_order")
+  payload      Json     @default("{}")
+  mediaKey     String?  @map("media_key")
+
+  @@map("lesson_cards")
+}
+
+// Inmutable: re-subir = paquete nuevo. SCORM schema-ready (runtime F2, Decision #25).
+model ContentPackage {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  kind         PackageKind
+  storageKey   String      @map("storage_key")
+  originalName String      @map("original_name")
+  mimeType     String      @map("mime_type")
+  sizeBytes    Int         @map("size_bytes")
+  checksum     String
+  manifest     Json?
+  uploadedBy   String?     @map("uploaded_by") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  contents ActivityContent[]
+
+  @@map("content_packages")
+}
+
+// tenant_id NULL = biblioteca global de NEO (visible a todos los tenants; sin RLS por columna nullable
+// -> la policy la contempla; ver rls.sql).
+model ActivityTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  name      String
+  payload   Json
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("activity_templates")
+}
+
+// ──────────────────────── 6.5 Convocatorias y ejecucion ────────────────────────
+
+model Offering {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  activityVersionId String          @map("activity_version_id") @db.Uuid
+  activityVersion   ActivityVersion @relation(fields: [activityVersionId], references: [id])
+  code              String
+  kind              OfferingKind
+  modality          Modality
+
+  scheduledDate DateTime? @map("scheduled_date") @db.Date
+  startTime     String?   @map("start_time") // HH:mm
+  endTime       String?   @map("end_time")
+  windowStart   DateTime? @map("window_start") @db.Date // autoservicio / parte virtual
+  windowEnd     DateTime? @map("window_end") @db.Date
+
+  // Desglose PESV Paso 10; suma para las 10 h/ano de BPM.
+  intensityTheoryHours   Decimal? @map("intensity_theory_hours") @db.Decimal(5, 2)
+  intensityPracticeHours Decimal? @map("intensity_practice_hours") @db.Decimal(5, 2)
+
+  instructorUserId        String?    @map("instructor_user_id") @db.Uuid
+  instructorExternalName  String?    @map("instructor_external_name")
+  instructorCredentialKey String?    @map("instructor_credential_key") // idoneidad adjuntable
+  executedBy              ExecutedBy @default(PROPIOS) @map("executed_by")
+  executedByOther         String?    @map("executed_by_other")
+
+  location   String?
+  regionalId String?   @map("regional_id") @db.Uuid
+  regional   Regional? @relation(fields: [regionalId], references: [id])
+  capacity   Int?
+
+  // Derivado de la regla de asignacion y CONGELADO al publicar (Decision #5).
+  projectedCount        Int?      @map("projected_count")
+  projectedFrozenAt     DateTime? @map("projected_frozen_at")
+  projectedAdjustReason String?   @map("projected_adjust_reason")
+
+  sessionCode          String?   @map("session_code") // QR de asistencia (rotativo)
+  sessionCodeExpiresAt DateTime? @map("session_code_expires_at")
+
+  status          OfferingStatus @default(DRAFT)
+  cancelledReason String?        @map("cancelled_reason")
+  observations    String?
+
+  enrollments Enrollment[]
+  attendance  AttendanceRecord[]
+  sessionActs SessionAct[]
+  planItems   PlanItem[]
+
+  version   Int      @default(1)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  @@unique([tenantId, code])
+  @@map("offerings")
+}
+
+model Enrollment {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  offeringId        String          @map("offering_id") @db.Uuid
+  offering          Offering        @relation(fields: [offeringId], references: [id])
+  userId            String          @map("user_id") @db.Uuid
+  user              User            @relation(fields: [userId], references: [id])
+  activityVersionId String          @map("activity_version_id") @db.Uuid // SNAPSHOT de version
+  activityVersion   ActivityVersion @relation(fields: [activityVersionId], references: [id])
+  assignmentId      String?         @map("assignment_id") @db.Uuid
+
+  status      EnrollmentStatus @default(ENROLLED)
+  enrolledAt  DateTime         @default(now()) @map("enrolled_at")
+  startedAt   DateTime?        @map("started_at")
+  completedAt DateTime?        @map("completed_at")
+  finalScore  Decimal?         @map("final_score") @db.Decimal(5, 2)
+  // Por VALOR: titulo, version, nota minima exigida, temario ref, y cargo/area/vinculacion
+  // del usuario AL MOMENTO (Decision #33).
+  scoreSnapshot Json           @default("{}") @map("score_snapshot")
+
+  blockedAt     DateTime? @map("blocked_at") // intentos agotados -> refuerzo
+  blockedReason String?   @map("blocked_reason")
+  unblockedBy   String?   @map("unblocked_by") @db.Uuid
+
+  progress ActivityProgress[]
+  attempts Attempt[]
+
+  @@unique([offeringId, userId])
+  @@map("enrollments")
+}
+
+model ActivityProgress {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  enrollmentId      String          @map("enrollment_id") @db.Uuid
+  enrollment        Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  activityContentId String          @map("activity_content_id") @db.Uuid
+  activityContent   ActivityContent @relation(fields: [activityContentId], references: [id])
+  status            ProgressStatus  @default(NOT_STARTED)
+  pct               Int             @default(0)
+  timeSpentS        Int             @default(0) @map("time_spent_s")
+  firstAt           DateTime?       @map("first_at")
+  lastAt            DateTime?       @map("last_at")
+  data              Json            @default("{}") // suspend_data SCORM futuro
+
+  @@unique([enrollmentId, activityContentId])
+  @@map("activity_progress")
+}
+
+model AttendanceRecord {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @map("tenant_id") @db.Uuid
+  offeringId    String           @map("offering_id") @db.Uuid
+  offering      Offering         @relation(fields: [offeringId], references: [id])
+  userId        String           @map("user_id") @db.Uuid
+  status        AttendanceStatus
+  justification String?
+  method        AttendanceMethod
+  checkedAt     DateTime         @default(now()) @map("checked_at")
+  markedBy      String?          @map("marked_by") @db.Uuid
+  signatureKey  String?          @map("signature_key") // imagen de firma en R2 (dato biometrico)
+
+  @@unique([offeringId, userId])
+  @@map("attendance_records")
+}
+
+// Acta de sesion generada (PDF inmutable).
+model SessionAct {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  offeringId    String   @map("offering_id") @db.Uuid
+  offering      Offering @relation(fields: [offeringId], references: [id])
+  pdfStorageKey String   @map("pdf_storage_key")
+  contentHash   String   @map("content_hash")
+  generatedAt   DateTime @default(now()) @map("generated_at")
+  generatedBy   String   @map("generated_by") @db.Uuid
+
+  @@map("session_acts")
+}
+
+// Append-only. Costura xAPI (Decision #28): verbo/objeto/resultado.
+model LearningEvent {
+  id           BigInt   @id @default(autoincrement())
+  tenantId     String   @map("tenant_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  enrollmentId String?  @map("enrollment_id") @db.Uuid
+  verb         String // LAUNCHED | PROGRESSED | COMPLETED | PASSED | FAILED | ATTENDED | SIGNED | CARD_VIEWED | REVIEW_ANSWERED
+  objectType   String   @map("object_type")
+  objectId     String   @map("object_id") @db.Uuid
+  result       Json     @default("{}")
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+
+  @@index([tenantId, userId, occurredAt])
+  @@map("learning_events")
+}
+
+// ──────────────────── 6.6 Asignacion por regla y requisitos ────────────────────
+
+model Audience {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  name      String
+  rule      Json // condiciones sobre job_title/job_title_type/area/regional/employment_type
+  isDynamic Boolean @default(true) @map("is_dynamic")
+  active    Boolean @default(true)
+
+  members AudienceMember[]
+  rules   AssignmentRule[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("audiences")
+}
+
+// Proyeccion materializada con historia. NUNCA DELETE (Decision #11).
+model AudienceMember {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  audienceId String    @map("audience_id") @db.Uuid
+  audience   Audience  @relation(fields: [audienceId], references: [id])
+  userId     String    @map("user_id") @db.Uuid
+  user       User      @relation(fields: [userId], references: [id])
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+  leftAt     DateTime? @map("left_at")
+
+  @@index([audienceId, userId, leftAt])
+  @@map("audience_members")
+}
+
+// El "Requisito": obligacion viva en el tiempo (Decision #12).
+model AssignmentRule {
+  id                   String               @id @default(uuid()) @db.Uuid
+  tenantId             String               @map("tenant_id") @db.Uuid
+  audienceId           String               @map("audience_id") @db.Uuid
+  audience             Audience             @relation(fields: [audienceId], references: [id])
+  targetType           AssignmentTargetType @map("target_type")
+  targetId             String               @map("target_id") @db.Uuid
+  trigger              RuleTrigger
+  dueDaysAfterTrigger  Int?                 @map("due_days_after_trigger")
+  recurrence           Json?                // {every_months} | {fixed_date: "01-31"}
+  active               Boolean              @default(true)
+  createdBy            String?              @map("created_by") @db.Uuid
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  assignments Assignment[]
+
+  @@map("assignment_rules")
+}
+
+// La OBLIGACION individual. Se retira, nunca se borra (Decision #11).
+model Assignment {
+  id         String               @id @default(uuid()) @db.Uuid
+  tenantId   String               @map("tenant_id") @db.Uuid
+  userId     String               @map("user_id") @db.Uuid
+  user       User                 @relation(fields: [userId], references: [id])
+  targetType AssignmentTargetType @map("target_type")
+  targetId   String               @map("target_id") @db.Uuid
+
+  source     AssignmentSource
+  ruleId     String?          @map("rule_id") @db.Uuid
+  rule       AssignmentRule?  @relation(fields: [ruleId], references: [id])
+  planItemId String?          @map("plan_item_id") @db.Uuid
+  planItem   PlanItem?        @relation(fields: [planItemId], references: [id])
+  assignedBy String?          @map("assigned_by") @db.Uuid
+
+  cycleNumber Int              @default(1) @map("cycle_number") // ronda de recurrencia
+  dueAt       DateTime?        @map("due_at")
+  status      AssignmentStatus @default(PENDING)
+
+  waivedBy     String? @map("waived_by") @db.Uuid
+  waivedReason String? @map("waived_reason")
+
+  // Enlace asignacion -> ejecucion que la satisfizo (Decision #2: se enlazan, no se fusionan).
+  completedEnrollmentId String? @map("completed_enrollment_id") @db.Uuid
+
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  @@index([tenantId, userId, status])
+  @@index([tenantId, targetType, targetId])
+  @@map("assignments")
+}
+
+// ──────────────────── 6.7 Plan de capacitacion anual ────────────────────
+
+// ENTIDAD EMPRESARIAL PROPIA (Decision #3): referencia convocatorias, no posee actividades.
+model TrainingPlan {
+  id         String     @id @default(uuid()) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  year       Int
+  name       String
+  objective  String?
+  goals      String?
+  scope      String?
+  status     PlanStatus @default(DRAFT)
+  approvedBy String?    @map("approved_by") @db.Uuid
+  approvedAt DateTime?  @map("approved_at")
+
+  items PlanItem[]
+
+  version   Int      @default(1)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  @@unique([tenantId, year, name])
+  @@map("training_plans")
+}
+
+model PlanItem {
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  planId            String         @map("plan_id") @db.Uuid
+  plan              TrainingPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  offeringId        String         @map("offering_id") @db.Uuid
+  offering          Offering       @relation(fields: [offeringId], references: [id])
+  plannedMonth      Int            @map("planned_month") // 1..12
+  projectedSnapshot Int?           @map("projected_snapshot") // congelado al aprobar el plan
+  status            PlanItemStatus @default(PLANNED)
+  rescheduledToId   String?        @map("rescheduled_to_item_id") @db.Uuid
+  notes             String?
+
+  assignments Assignment[]
+
+  // METRICAS DEL PLAN: exclusivamente enrollments cuyo assignment.source = PLAN y
+  // assignment.plan_item_id pertenece al plan (regla de oro 2). Nada externo las altera.
+
+  @@map("plan_items")
+}
+
+// ──────────────────── 6.8 Rutas de aprendizaje ────────────────────
+
+model LearningPath {
+  id       String        @id @default(uuid()) @db.Uuid
+  tenantId String        @map("tenant_id") @db.Uuid
+  code     String
+  name     String
+  status   VersionStatus @default(DRAFT)
+  active   Boolean       @default(true)
+
+  items       PathItem[]
+  enrollments PathEnrollment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("learning_paths")
+}
+
+model PathItem {
+  id                   String       @id @default(uuid()) @db.Uuid
+  tenantId             String       @map("tenant_id") @db.Uuid
+  pathId               String       @map("path_id") @db.Uuid
+  path                 LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  sectionName          String?      @map("section_name")
+  itemType             PathItemType @map("item_type")
+  itemId               String       @map("item_id") @db.Uuid
+  displayOrder         Int          @map("display_order")
+  isRequired           Boolean      @default(true) @map("is_required")
+  minRequiredInSection Int?         @map("min_required_in_section")
+  // F1: secuencia lineal. DAG schema-ready sin UI (Decision del informe de dominio).
+  prerequisiteItemIds  String[]     @default([]) @map("prerequisite_item_ids") @db.Uuid
+
+  @@map("path_items")
+}
+
+model PathEnrollment {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenantId    String       @map("tenant_id") @db.Uuid
+  pathId      String       @map("path_id") @db.Uuid
+  path        LearningPath @relation(fields: [pathId], references: [id])
+  userId      String       @map("user_id") @db.Uuid
+  status      EnrollmentStatus @default(ENROLLED)
+  progressPct Int          @default(0) @map("progress_pct")
+  completedAt DateTime?    @map("completed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@unique([pathId, userId])
+  @@map("path_enrollments")
+}
+
+// ──────────────────── 6.9 Evaluaciones ────────────────────
+
+model QuestionCategory {
+  id       String             @id @default(uuid()) @db.Uuid
+  tenantId String             @map("tenant_id") @db.Uuid
+  parentId String?            @map("parent_id") @db.Uuid
+  parent   QuestionCategory?  @relation("QuestionCategoryTree", fields: [parentId], references: [id])
+  children QuestionCategory[] @relation("QuestionCategoryTree")
+  name     String
+
+  questions Question[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("question_categories")
+}
+
+model Question {
+  id               String           @id @default(uuid()) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  categoryId       String           @map("category_id") @db.Uuid
+  category         QuestionCategory @relation(fields: [categoryId], references: [id])
+  currentVersionId String?          @unique @map("current_version_id") @db.Uuid
+  active           Boolean          @default(true)
+
+  versions QuestionVersion[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("questions")
+}
+
+// INMUTABLE (Decision #6): editar = version nueva.
+model QuestionVersion {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  questionId    String       @map("question_id") @db.Uuid
+  question      Question     @relation(fields: [questionId], references: [id])
+  versionNumber Int          @map("version_number")
+  qtype         QuestionType
+  stem          String
+  options       Json         @default("[]")
+  correct       Json         @default("{}") // NUNCA viaja al cliente
+  feedback      Json         @default("{}")
+  points        Decimal      @default(1) @db.Decimal(6, 2)
+  createdBy     String?      @map("created_by") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  attemptQuestions AttemptQuestion[]
+
+  @@unique([questionId, versionNumber])
+  @@map("question_versions")
+}
+
+model Assessment {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @map("tenant_id") @db.Uuid
+  title            String
+  currentVersionId String? @unique @map("current_version_id") @db.Uuid
+
+  versions AssessmentVersion[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("assessments")
+}
+
+// INMUTABLE al publicar.
+model AssessmentVersion {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  assessmentId     String        @map("assessment_id") @db.Uuid
+  assessment       Assessment    @relation(fields: [assessmentId], references: [id])
+  versionNumber    Int           @map("version_number")
+  status           VersionStatus @default(DRAFT)
+  timeLimitMin     Int?          @map("time_limit_min")
+  maxAttempts      Int?          @map("max_attempts") // NULL = hereda de activity_version
+  gradingPolicy    GradingPolicy @default(HIGHEST) @map("grading_policy")
+  passingScore     Int?          @map("passing_score") // NULL = hereda
+  shuffleQuestions Boolean       @default(true) @map("shuffle_questions")
+  shuffleOptions   Boolean       @default(true) @map("shuffle_options")
+  reviewPolicy     Json          @default("{}") @map("review_policy")
+
+  sections AssessmentSection[]
+  attempts Attempt[]
+  contents ActivityContent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([assessmentId, versionNumber])
+  @@map("assessment_versions")
+}
+
+model AssessmentSection {
+  id                      String            @id @default(uuid()) @db.Uuid
+  tenantId                String            @map("tenant_id") @db.Uuid
+  assessmentVersionId     String            @map("assessment_version_id") @db.Uuid
+  assessmentVersion       AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Cascade)
+  mode                    SectionMode
+  categoryId              String?           @map("category_id") @db.Uuid
+  pickCount               Int?              @map("pick_count")
+  fixedQuestionVersionIds String[]          @default([]) @map("fixed_question_version_ids") @db.Uuid
+  displayOrder            Int               @default(0) @map("display_order")
+
+  @@map("assessment_sections")
+}
+
+model Attempt {
+  id                  String            @id @default(uuid()) @db.Uuid
+  tenantId            String            @map("tenant_id") @db.Uuid
+  enrollmentId        String            @map("enrollment_id") @db.Uuid
+  enrollment          Enrollment        @relation(fields: [enrollmentId], references: [id])
+  assessmentVersionId String            @map("assessment_version_id") @db.Uuid
+  assessmentVersion   AssessmentVersion @relation(fields: [assessmentVersionId], references: [id])
+  userId              String            @map("user_id") @db.Uuid
+  user                User              @relation(fields: [userId], references: [id])
+  attemptNumber       Int               @map("attempt_number")
+  status              AttemptStatus     @default(IN_PROGRESS)
+  startedAt           DateTime          @default(now()) @map("started_at")
+  submittedAt         DateTime?         @map("submitted_at")
+  score               Decimal?          @db.Decimal(5, 2)
+  passed              Boolean?
+  anomalyFlags        Json?             @map("anomaly_flags") // completitud en tiempo anomalo, etc.
+
+  questions AttemptQuestion[]
+
+  @@unique([enrollmentId, assessmentVersionId, attemptNumber])
+  @@map("attempts")
+}
+
+// SNAPSHOT de lo servido (Decision #7): la defensa ante impugnaciones.
+model AttemptQuestion {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  attemptId         String          @map("attempt_id") @db.Uuid
+  attempt           Attempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionVersionId String          @map("question_version_id") @db.Uuid
+  questionVersion   QuestionVersion @relation(fields: [questionVersionId], references: [id])
+  displayOrder      Int             @map("display_order")
+  optionsOrder      Json            @default("[]") @map("options_order")
+  answer            Json?
+  pointsPossible    Decimal         @map("points_possible") @db.Decimal(6, 2)
+  pointsAwarded     Decimal?        @map("points_awarded") @db.Decimal(6, 2)
+  gradedBy          String?         @map("graded_by") @db.Uuid
+  gradedAt          DateTime?       @map("graded_at")
+  invalidated       Boolean         @default(false) // anular y recalificar
+
+  @@map("attempt_questions")
+}
+
+// ──────────────────── 6.10 Encuestas y eficacia ────────────────────
+
+model SurveyTemplate {
+  id                 String     @id @default(uuid()) @db.Uuid
+  tenantId           String     @map("tenant_id") @db.Uuid
+  kind               SurveyKind
+  name               String
+  questions          Json       @default("[]")
+  scheduledDaysAfter Int?       @map("scheduled_days_after") // eficacia diferida
+  active             Boolean    @default(true)
+  version            Int        @default(1)
+
+  responses SurveyResponse[]
+  contents  ActivityContent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("survey_templates")
+}
+
+model SurveyResponse {
+  id                    String         @id @default(uuid()) @db.Uuid
+  tenantId              String         @map("tenant_id") @db.Uuid
+  surveyTemplateId      String         @map("survey_template_id") @db.Uuid
+  surveyTemplate        SurveyTemplate @relation(fields: [surveyTemplateId], references: [id])
+  templateVersion       Int            @map("template_version")
+  enrollmentId          String         @map("enrollment_id") @db.Uuid
+  respondentUserId      String         @map("respondent_user_id") @db.Uuid // participante o JEFE (eficacia)
+  answers               Json           @default("{}")
+  result                SurveyResult?
+  followUpAssignmentId  String?        @map("follow_up_assignment_id") @db.Uuid // refuerzo si eficacia negativa
+  respondedAt           DateTime       @default(now()) @map("responded_at")
+
+  @@map("survey_responses")
+}
+
+model EfficacySchedule {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  enrollmentId    String         @map("enrollment_id") @db.Uuid
+  dueAt           DateTime       @map("due_at")
+  evaluatorUserId String         @map("evaluator_user_id") @db.Uuid // el jefe
+  status          EfficacyStatus @default(PENDING)
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  @@map("efficacy_schedules")
+}
+
+// ──────────────────── 6.11 Certificacion y certificados ────────────────────
+
+model Certification {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @map("tenant_id") @db.Uuid
+  name             String
+  code             String
+  awardedByType    PathItemType @map("awarded_by_type") // ACTIVITY | PATH
+  awardedById      String  @map("awarded_by_id") @db.Uuid
+  renewalTargetId  String? @map("renewal_target_id") @db.Uuid // actividad de renovacion (puede ser distinta)
+  validityMonths   Int?    @map("validity_months")
+  fixedExpiryRule  Json?   @map("fixed_expiry_rule") // {month, day} — anclaje por fecha fija anual
+  renewalWindowDays Int    @default(60) @map("renewal_window_days")
+  active           Boolean @default(true)
+
+  grants CertificationGrant[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@map("certifications")
+}
+
+// UNA FILA POR RONDA, inmutable (Decision #13).
+model CertificationGrant {
+  id                 String        @id @default(uuid()) @db.Uuid
+  tenantId           String        @map("tenant_id") @db.Uuid
+  certificationId    String        @map("certification_id") @db.Uuid
+  certification      Certification @relation(fields: [certificationId], references: [id])
+  userId             String        @map("user_id") @db.Uuid
+  cycleNumber        Int           @map("cycle_number")
+  grantedAt          DateTime      @default(now()) @map("granted_at")
+  validUntil         DateTime?     @map("valid_until")
+  status             GrantStatus   @default(ACTIVE) // por vencer/vencido se CALCULAN de valid_until
+  sourceEnrollmentId String        @map("source_enrollment_id") @db.Uuid
+
+  certificates Certificate[]
+
+  @@unique([certificationId, userId, cycleNumber])
+  @@map("certification_grants")
+}
+
+model CertificateTemplate {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  name          String
+  versionNumber Int     @default(1) @map("version_number")
+  htmlTemplate  String  @map("html_template")
+  signers       Json    @default("[]") // [{name, title, imageKey}]
+  active        Boolean @default(true)
+
+  certificates Certificate[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("certificate_templates")
+}
+
+// El registro; el PDF es artefacto congelado (Decision #14).
+model Certificate {
+  id               String              @id @default(uuid()) @db.Uuid
+  tenantId         String              @map("tenant_id") @db.Uuid
+  userId           String              @map("user_id") @db.Uuid
+  enrollmentId     String?             @map("enrollment_id") @db.Uuid
+  grantId          String?             @map("grant_id") @db.Uuid
+  grant            CertificationGrant? @relation(fields: [grantId], references: [id])
+  serialNumber     String              @map("serial_number") // CERT-2026-000123 (serie tenant/ano)
+  verificationCode String              @unique @map("verification_code") // aleatorio, NO adivinable
+  templateId       String              @map("template_id") @db.Uuid
+  template         CertificateTemplate @relation(fields: [templateId], references: [id])
+  templateVersion  Int                 @map("template_version")
+  renderSnapshot   Json                @map("render_snapshot") // todos los datos por VALOR
+  pdfStorageKey    String?             @map("pdf_storage_key")
+  issuedAt         DateTime            @default(now()) @map("issued_at")
+  validUntil       DateTime?           @map("valid_until")
+  revokedAt        DateTime?           @map("revoked_at")
+  revokedBy        String?             @map("revoked_by") @db.Uuid
+  revokedReason    String?             @map("revoked_reason")
+
+  @@unique([tenantId, serialNumber])
+  @@map("certificates")
+}
+
+// Numeracion por serie tenant/ano con row-lock (FOR UPDATE).
+model SequenceCounter {
+  tenantId   String @map("tenant_id") @db.Uuid
+  entityType String @map("entity_type") // CERTIFICATE | OFFERING | PLAN | ...
+  year       Int
+  lastValue  BigInt @default(0) @map("last_value")
+
+  @@id([tenantId, entityType, year])
+  @@map("sequence_counters")
+}
+
+// ──────────────── 6.12 Engagement: repeticion espaciada, racha, puntos ────────────────
+
+// Motor determinista 2-7-14-30 tipo Leitner (Decision #22).
+model ReviewQueueItem {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  questionVersionId  String    @map("question_version_id") @db.Uuid
+  sourceEnrollmentId String    @map("source_enrollment_id") @db.Uuid
+  stage              Int       @default(0) // 0..4
+  dueAt              DateTime  @map("due_at")
+  lapses             Int       @default(0)
+  lastResult         String?   @map("last_result") // PASS | FAIL
+  retired            Boolean   @default(false) // dominada (test out)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, questionVersionId])
+  @@index([tenantId, userId, dueAt, retired])
+  @@map("review_queue")
+}
+
+// PRIVADA: solo la ve el usuario (Decision #23). Unidad = leccion completada.
+model UserStreak {
+  userId           String    @id @map("user_id") @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId         String    @map("tenant_id") @db.Uuid
+  currentStreak    Int       @default(0) @map("current_streak")
+  longestStreak    Int       @default(0) @map("longest_streak")
+  lastActivityDate DateTime? @map("last_activity_date") @db.Date
+  freezesAvailable Int       @default(2) @map("freezes_available")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_streaks")
+}
+
+model PointsLedgerEntry {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  points     Int
+  reasonCode String   @map("reason_code")
+  refType    String?  @map("ref_type")
+  refId      String?  @map("ref_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, userId])
+  @@map("points_ledger")
+}
+
+// ──────────────── 6.13 Aprobaciones (flujo Analista) e IA ────────────────
+
+model ApprovalRequest {
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @map("tenant_id") @db.Uuid
+  requestedBy   String         @map("requested_by") @db.Uuid
+  entityType    String         @map("entity_type")
+  entityId      String         @map("entity_id") @db.Uuid
+  action        ApprovalAction
+  payload       Json // el cambio propuesto; se APLICA solo al aprobar
+  justification String
+  status        ApprovalStatus @default(PENDING)
+  decidedBy     String?        @map("decided_by") @db.Uuid
+  decidedAt     DateTime?      @map("decided_at")
+  decisionNote  String?        @map("decision_note")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([tenantId, status])
+  @@map("approval_requests")
+}
+
+model AiGenerationJob {
+  id                String      @id @default(uuid()) @db.Uuid
+  tenantId          String      @map("tenant_id") @db.Uuid
+  sourceDocumentKey String      @map("source_document_key")
+  target            AiJobTarget
+  status            AiJobStatus @default(QUEUED)
+  draft             Json?       // tarjetas/preguntas propuestas; NUNCA se publica sin revision (Decision #24)
+  requestedBy       String      @map("requested_by") @db.Uuid
+  reviewedBy        String?     @map("reviewed_by") @db.Uuid
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@map("ai_generation_jobs")
+}
+
+// ──────────────────── 6.14 Transversales ────────────────────
+
+model StoredDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id") @db.Uuid
+  storageKey   String   @map("storage_key")
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  uploadedBy   String   @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, entityType, entityId])
+  @@map("documents")
+}
+
+// Outbox transaccional: PENDING se escribe en la MISMA transaccion del cambio de dominio.
+model Notification {
+  id              String              @id @default(uuid()) @db.Uuid
+  tenantId        String              @map("tenant_id") @db.Uuid
+  eventType       String              @map("event_type")
+  channel         NotificationChannel
+  recipientUserId String?             @map("recipient_user_id") @db.Uuid
+  recipientEmail  String?             @map("recipient_email")
+  status          NotificationStatus  @default(PENDING)
+  subject         String?
+  body            String?
+  referenceType   String?             @map("reference_type")
+  referenceId     String?             @map("reference_id") @db.Uuid
+  sentAt          DateTime?           @map("sent_at")
+  readAt          DateTime?           @map("read_at")
+  failedReason    String?             @map("failed_reason")
+  retryCount      Int                 @default(0) @map("retry_count")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@index([tenantId, status])
+  @@index([tenantId, recipientUserId, readAt])
+  @@map("notifications")
+}
+
+model NotificationTemplate {
+  id              String              @id @default(uuid()) @db.Uuid
+  tenantId        String              @map("tenant_id") @db.Uuid
+  eventType       String              @map("event_type")
+  channel         NotificationChannel
+  subjectTemplate String              @map("subject_template")
+  bodyTemplate    String              @map("body_template")
+  active          Boolean             @default(true)
+
+  @@unique([tenantId, eventType, channel])
+  @@map("notification_templates")
+}
+
+// Inmutable: nunca se actualiza ni borra (hasta politica de retencion).
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  tenantId     String   @map("tenant_id") @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  oldValues    Json?    @map("old_values")
+  newValues    Json?    @map("new_values")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, resourceType, resourceId])
+  @@index([tenantId, userId, createdAt])
+  @@map("audit_logs")
+}
+
+// SST_TRAINING: 20 anos desde users.terminated_at (D1072 art. 2.2.4.6.13). ANONYMIZE selectivo:
+// se scrubea PII de contacto pero el REGISTRO formativo se PRESERVA por mandato legal (Decision #16).
+model RetentionPolicy {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  recordClass    RecordClass     @map("record_class")
+  retentionYears Int             @map("retention_years")
+  legalBasis     String          @map("legal_basis")
+  actionOnExpiry RetentionAction @map("action_on_expiry")
+  active         Boolean         @default(true)
+
+  @@unique([tenantId, recordClass])
+  @@map("retention_policies")
+}
