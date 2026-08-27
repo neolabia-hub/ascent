@@ -1089,12 +1089,20 @@ model Assignment {
   waivedReason String? @map("waived_reason")
 
   // Enlace asignacion -> ejecucion que la satisfizo (Decision #2: se enlazan, no se fusionan).
-  completedEnrollmentId String? @map("completed_enrollment_id") @db.Uuid
+  completedEnrollmentId String?   @map("completed_enrollment_id") @db.Uuid
+  // Cuando quedo cumplida. Es el ANCLA de la recurrencia ("cada 12 meses desde que la hizo"):
+  // sin este dato la ronda siguiente tendria que anclarse al vencimiento, que castiga al que se
+  // adelanta y premia al que se atrasa.
+  completedAt           DateTime? @map("completed_at")
 
   assignedAt DateTime @default(now()) @map("assigned_at")
 
+  // Idempotencia del motor de requisitos: una obligacion por regla, persona y ronda. El cron y
+  // el alta de una persona pueden correr a la vez sin duplicar nada.
+  @@unique([ruleId, userId, cycleNumber])
   @@index([tenantId, userId, status])
   @@index([tenantId, targetType, targetId])
+  @@index([tenantId, status, dueAt])
   @@map("assignments")
 }
 

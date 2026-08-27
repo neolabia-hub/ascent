@@ -13,6 +13,7 @@ import {
   Layers,
   LogOut,
   Settings,
+  Target,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/lecciones', label: 'Lecciones', icon: Layers },
   { href: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
   { href: '/convocatorias', label: 'Convocatorias', icon: CalendarDays },
+  { href: '/asignaciones', label: 'Asignaciones', icon: Target },
   { href: '/plan', label: 'Plan', icon: ClipboardList },
   { href: '/personas', label: 'Personas', icon: Users },
   { href: '/aprobaciones', label: 'Aprobaciones', icon: CheckSquare },

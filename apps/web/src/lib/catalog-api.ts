@@ -89,7 +89,13 @@ export interface VersionDetail extends VersionSummary {
   contents: VersionContent[];
 }
 
-export function listActivities(params: { q?: string; activityTypeId?: string; processId?: string; page?: number }) {
+export function listActivities(params: {
+  q?: string;
+  activityTypeId?: string;
+  processId?: string;
+  page?: number;
+  pageSize?: number;
+}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== '') search.set(k, String(v));

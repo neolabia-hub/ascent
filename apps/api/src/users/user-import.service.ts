@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import * as argon2 from 'argon2';
 import ExcelJS from 'exceljs';
 import { IMPORT_HEADERS, importRowSchema, type ImportRowInput } from '@neo-pulse/shared';
+import { RequirementEngineService } from '../assignments/requirement-engine.service.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -13,6 +14,8 @@ interface RowResult {
   documento: string;
   error?: string;
   generatedPassword?: string;
+  /** Id de la persona creada: enlaza la fila del lote y alimenta el motor de requisitos. */
+  userId?: string;
 }
 
 export interface ImportResult {
@@ -34,6 +37,7 @@ export class UserImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly requirements: RequirementEngineService,
   ) {}
 
   /** Plantilla CSV descargable (encabezados exactos + una fila de ejemplo). */
@@ -109,10 +113,17 @@ export class UserImportService {
           raw: raw.values,
           status: result.status,
           errorDetail: result.error ?? null,
-          userId: null,
+          userId: result.userId ?? null,
         },
       });
     }
+
+    // Las obligaciones del lote nacen aqui, en una sola pasada: es el criterio de aceptacion
+    // del Sprint 3 (entra gente por archivo y le nace su induccion sin que nadie la asigne).
+    await this.requirements.syncPeopleSafely(
+      tenantId,
+      results.map((r) => r.userId).filter((id): id is string => Boolean(id)),
+    );
 
     const ok = results.filter((r) => r.status === 'OK').length;
     const failed = results.length - ok;
@@ -172,8 +183,10 @@ export class UserImportService {
     if (row.regional && !regionalId) return fail(`Regional "${row.regional}" no existe en el catalogo`);
 
     const generatedPassword = generateInitialPassword(row.documento);
+    let created: { id: string };
     try {
-      await this.prisma.scoped.user.create({
+      created = await this.prisma.scoped.user.create({
+        select: { id: true },
         data: {
           tenantId: ctx.tenantId,
           documentNumber: row.documento,
@@ -198,7 +211,7 @@ export class UserImportService {
 
     ctx.seenDocs.add(row.documento);
     ctx.seenEmails.add(row.correo);
-    return { rowNumber, status: 'OK', documento: row.documento, generatedPassword };
+    return { rowNumber, status: 'OK', documento: row.documento, generatedPassword, userId: created.id };
   }
 
   /** Acepta .csv (separador ; o ,) y .xlsx. Devuelve filas crudas con su numero (1-based sin encabezado). */

@@ -100,6 +100,73 @@ export {
 export type { CardPayload, CardType, CreateLessonInput, SaveCardsInput } from './schemas/lessons.js';
 
 export {
+  offeringKindSchema,
+  offeringStatusSchema,
+  executedBySchema,
+  createOfferingSchema,
+  updateOfferingSchema,
+  listOfferingsQuerySchema,
+  publishOfferingSchema,
+  cancelOfferingSchema,
+  enrollOfferingSchema,
+} from './schemas/offerings.js';
+export type {
+  CreateOfferingInput,
+  UpdateOfferingInput,
+  ListOfferingsQuery,
+  PublishOfferingInput,
+  CancelOfferingInput,
+  EnrollOfferingInput,
+} from './schemas/offerings.js';
+
+export {
+  audienceRuleSchema,
+  createAudienceSchema,
+  updateAudienceSchema,
+  assignmentTargetTypeSchema,
+  ruleTriggerSchema,
+  recurrenceSchema,
+  createAssignmentRuleSchema,
+  updateAssignmentRuleSchema,
+  toggleJobTitleMatrixSchema,
+  assignmentStatusSchema,
+  createAssignmentSchema,
+  waiveAssignmentSchema,
+  listAssignmentsQuerySchema,
+} from './schemas/assignments.js';
+export type {
+  AudienceRule,
+  CreateAudienceInput,
+  UpdateAudienceInput,
+  Recurrence,
+  CreateAssignmentRuleInput,
+  UpdateAssignmentRuleInput,
+  ToggleJobTitleMatrixInput,
+  CreateAssignmentInput,
+  WaiveAssignmentInput,
+  ListAssignmentsQuery,
+} from './schemas/assignments.js';
+
+export {
+  planStatusSchema,
+  planItemStatusSchema,
+  createTrainingPlanSchema,
+  updateTrainingPlanSchema,
+  addPlanItemSchema,
+  updatePlanItemSchema,
+  approvePlanSchema,
+  listPlansQuerySchema,
+} from './schemas/plans.js';
+export type {
+  CreateTrainingPlanInput,
+  UpdateTrainingPlanInput,
+  AddPlanItemInput,
+  UpdatePlanItemInput,
+  ApprovePlanInput,
+  ListPlansQuery,
+} from './schemas/plans.js';
+
+export {
   questionTypeSchema,
   questionPayloadSchema,
   createQuestionSchema,

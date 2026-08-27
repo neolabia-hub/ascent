@@ -8,6 +8,7 @@ import type {
   SetOverridesInput,
   UpdateUserInput,
 } from '@neo-pulse/shared';
+import { RequirementEngineService } from '../assignments/requirement-engine.service.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -40,6 +41,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly requirements: RequirementEngineService,
   ) {}
 
   async list(query: ListUsersQuery) {
@@ -138,6 +140,11 @@ export class UsersService {
       newValues: { documentNumber: input.documentNumber, email: input.email, roleCode: input.roleCode },
     });
 
+    // Al entrar alguien, sus obligaciones formativas nacen SOLAS: la induccion general con
+    // vencimiento antes de su fecha de ingreso (D1072) y las especificas de su cargo. Si el
+    // motor fallara, el alta no se pierde: el cron de requisitos lo recupera en la proxima hora.
+    await this.requirements.syncPersonSafely(tenantId, user.id);
+
     // La contrasena generada viaja UNA vez; solo persiste el hash.
     return { user, generatedPassword };
   }
@@ -189,6 +196,21 @@ export class UsersService {
       oldValues: before,
       newValues: input,
     });
+
+    // Cambiar de cargo, area, regional, vinculacion o fecha de ingreso cambia a que audiencias
+    // pertenece la persona, y con ello lo que se le exige (Decision #33). Se recalcula al
+    // instante para que la matriz de competencia no quede mintiendo hasta el proximo cron.
+    const affectsAudiences =
+      input.jobTitleId !== undefined ||
+      input.areaId !== undefined ||
+      input.regionalId !== undefined ||
+      input.employmentType !== undefined ||
+      input.roadActor !== undefined ||
+      input.hiredAt !== undefined ||
+      input.active !== undefined;
+    if (affectsAudiences) {
+      await this.requirements.syncPersonSafely(this.prisma.currentTenantId, id);
+    }
     return user;
   }
 

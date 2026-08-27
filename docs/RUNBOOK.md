@@ -92,6 +92,33 @@ PowerShell 5.1 lee los `.ps1` como ANSI si no tienen BOM: un guion largo o una t
 las comillas y da "Falta la cadena en el terminador" apuntando a la ultima linea (mensaje
 enganoso). Escribir los scripts de utilidad en ASCII puro o guardarlos con BOM UTF-8.
 
+### 2026-08-27 — Una fecha de calendario NO es un instante (Sprint 3)
+`users.hired_at` es `@db.Date`: el driver la entrega como **medianoche UTC**. Aplicarle el desfase
+de Bogota (como se hace con un timestamp real) la corre un dia: "ingresa el 1 de diciembre" se
+leia como 30 de noviembre y TODOS los vencimientos anclados al ingreso quedaban un dia antes.
+Hay dos funciones separadas a proposito en `due-date.ts`: `toBogotaDate` (instantes) y
+`fromDateOnly` (columnas de solo fecha). Lo detecto el e2e porque comprueba la **fecha exacta**,
+no solo que fuera anterior al ingreso — de ahi la leccion secundaria: en fechas, afirmar el valor
+exacto y no una desigualdad.
+
+### 2026-08-27 — Crear migraciones sin terminal interactiva
+`prisma migrate dev` es interactivo y falla en esta sesion ("environment is non-interactive").
+La via que funciona:
+```
+docker exec neo-pulse-postgres psql -U neopulse -d postgres -c "CREATE DATABASE neopulse_shadow;"   # una vez
+npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma `
+  --shadow-database-url "postgresql://neopulse:neopulse_dev@localhost:5433/neopulse_shadow" --script
+# se revisa el SQL, se guarda en prisma/migrations/<timestamp>_<nombre>/migration.sql y luego:
+DATABASE_URL=<url del owner> npx prisma migrate deploy
+```
+OJO: `migrate deploy` necesita el usuario **owner** (`neopulse`), no `neopulse_app` (que esta bajo
+RLS y no puede alterar tablas). Las credenciales estan en `apps/api/.env`.
+
+### 2026-08-27 — El SQL crudo NO pasa por el cliente atado al tenant
+`forTenant()` envuelve las operaciones de **modelos**, no `$queryRaw`. Una consulta cruda fuera de
+`prisma.tx(...)` corre sin `app.tenant_id` y RLS la deja sin filas (o falla). Por eso
+`SequenceService.next()` exige recibir el cliente de transaccion: ahi el `set_config` ya ocurrio.
+
 ### Decisiones de auth que no hay que rediscutir
 - El tenant se resuelve ANTES del login (slug por subdominio; en dev `?tenant=` o
   NEXT_PUBLIC_DEV_TENANT). Por eso NO existe cliente Prisma "owner" en runtime: login corre

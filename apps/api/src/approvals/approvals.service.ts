@@ -35,15 +35,16 @@ export class ApprovalsService {
    * notifica a quienes deciden. Devuelve que camino tomo, para que la UI diga la verdad
    * ("publicado" o "enviado a aprobacion") en vez de dar un 403 seco.
    */
-  async requestOrExecute(
+  async requestOrExecute<T>(
     actor: AuthUser,
     requiredPermission: PermissionCode,
     input: CreateApprovalInput,
-    execute: () => Promise<void>,
-  ): Promise<{ executed: boolean; approvalId?: string }> {
+    execute: () => Promise<T>,
+  ): Promise<{ executed: boolean; approvalId?: string; result?: T }> {
     if (actor.hasPermission(requiredPermission)) {
-      await execute();
-      return { executed: true };
+      // Devuelve lo ejecutado: la pantalla necesita el estado nuevo, no solo un "si se hizo".
+      const result = await execute();
+      return { executed: true, result };
     }
     const approval = await this.create(actor, input);
     return { executed: false, approvalId: approval.id };

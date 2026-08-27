@@ -172,6 +172,32 @@ fueran lo mismo, ese estado no existiria.
 - **manual** (el analista se la asigna a alguien porque detecto la necesidad),
 - de un **requisito recurrente** que vencio.
 
+**Sus estados, y por que importan:**
+
+| Estado | Que significa |
+|---|---|
+| Pendiente | Obligada y aun a tiempo |
+| En curso | Ya empezo a hacerla |
+| Cumplida | La termino; queda enlazada a la ejecucion que la satisfizo |
+| **Vencida** | Se paso la fecha. No desaparece: es el numero que mira el auditor |
+| **Retirada** | La persona salio de la audiencia (cambio de cargo, retiro). Solo se retira lo **pendiente**; lo que ya estaba en curso o cumplido no se toca |
+| **Eximida** | Alguien con permiso la libero **con motivo escrito**. Deja de contar, pero el motivo y el autor quedan |
+
+Nunca se borra ninguna: un cumplimiento del que se puede borrar evidencia no es evidencia.
+
+### Ronda (ciclo de una obligacion)
+**Que es:** cada vuelta de una obligacion que se repite. La reinduccion de 2026 y la de 2027 son
+la **misma regla** pero **dos rondas distintas**, cada una con su fecha y su resultado.
+
+**Como se llama:** "Ronda"; en la base `assignments.cycle_number`.
+
+**Por que existe:** sin rondas, renovar una certificacion seria sobrescribir la anterior, y la
+pregunta legal *"estaba vigente en mayo de 2026?"* dejaria de tener respuesta.
+
+**Cuando nace la siguiente:** cuando la anterior queda **cumplida**, y solo cuando falta poco
+para el nuevo vencimiento (por defecto 60 dias). Se cuenta **desde que la persona la completo**,
+no desde el vencimiento: quien se adelanta no pierde el tiempo que gano.
+
 ### Ejecucion (inscripcion)
 **Que es:** lo que realmente paso con una persona en una convocatoria: inscrita, asistio,
 progreso, presento el examen, aprobo o reprobo, con su nota.
@@ -214,6 +240,14 @@ Los cuatro numeros del plan. Se confunden constantemente:
 
 **Proyectados no se digita a mano** (salvo ajuste justificado y auditado). Si fuera un numero
 libre, el indicador de cumplimiento seria una opinion, y eso es justo lo que audita el SG-SST.
+
+**De donde sale el numero, en orden:** de los **requisitos** que exigen esa actividad (su
+audiencia es la respuesta exacta); si no hay requisitos, de los **cargos a los que la actividad
+esta dirigida**; si tampoco, queda en cero y la pantalla pide ajustarlo con justificacion.
+
+**Si la convocatoria es de una regional, el alcance se acota a esa regional.** Una jornada en
+Neiva no le promete nada a Barranquilla, y por eso "inscribir a todos los obligados" tampoco
+arrastra a la empresa entera: numerador y denominador tienen que hablar de la misma gente.
 
 ### La regla de las metricas congeladas
 **El caso que la origina:** el Plan 2026 programo "Seguridad Vial" para marzo con 50 proyectados

@@ -59,6 +59,10 @@
       con editor y vista previa móvil, banco de preguntas versionado, constructor de exámenes,
       almacenamiento con validación por firma binaria. Infraestructura de producción decidida
       (`docs/03-infraestructura-produccion.md`)
+- [x] **Sprint 3** — entrega de la formación: audiencias dinámicas con historia, requisitos y motor
+      de obligaciones por rondas (ON_HIRE previo al ingreso, recurrencia, vencidas, retiro al salir
+      de la audiencia), matriz cargo × actividad, convocatorias con proyectados derivados y
+      congelados, y plan anual con cumplimiento y cobertura aislados (`docs/sprints/03-*.md`)
 
 **Pendiente antes de Sprint 0:**
 - [ ] Validar con Transprensa: contenido exacto de la constancia/certificado y firmantes
@@ -942,6 +946,12 @@ neo-pulse/
 | 32 | Acceso por SUBDOMINIO por tenant (transprensa.neopulse.app): el tenant se identifica ANTES del login | El login por cédula es ambiguo sin contexto de tenant; branding desde la pantalla de login; cookies aisladas |
 | 33 | Un colaborador tiene UN cargo y UN área vigentes; cambio de cargo reevalúa audiencias; ejecuciones y certificados guardan SNAPSHOT de cargo/área del momento | El histórico no se reescribe; auditoría exige el cargo que tenía al capacitarse |
 | 34 | Español único en F1: sin tablas de traducción de UI ni de contenido | i18n hoy es sobreingeniería para el mercado objetivo; se agrega cuando exista el cliente que lo pida |
+| 35 | **Motor de obligaciones idempotente**: índice único (requisito, persona, ronda) + `skipDuplicates`. Corre en caliente al alta/cambio de cargo y en frío cada hora | El alta y el cron pueden dispararlo a la vez; duplicar obligaciones corrompe todo indicador de cumplimiento |
+| 36 | **La recurrencia se ancla en la finalización** (`assignments.completed_at`), no en el vencimiento, y la ronda siguiente abre con ventana (60 días por defecto) | Anclar al vencimiento castiga a quien se adelanta; sin ventana, la reinducción anual nacería ya vencida |
+| 37 | **Regla de audiencia con una sola definición y dos derivaciones** (filtro de base + predicado en memoria) | Dos implementaciones separadas discreparían, y la lista que ve el analista dejaría de coincidir con las obligaciones que nacen |
+| 38 | **Proyectados e inscripción masiva se acotan a la regional de la convocatoria** | Una jornada en Neiva no le promete nada a Barranquilla: numerador y denominador de la cobertura deben hablar de la misma gente |
+| 39 | **Fechas de calendario ≠ instantes**: `fromDateOnly` para columnas `@db.Date`, `toBogotaDate` para timestamps | Leer `hired_at` como instante corría un día TODOS los vencimientos anclados al ingreso (fallo real, Sprint 3) |
+| 40 | **El plan aprobado no se edita**; reprogramar un renglón lo marca como RESCHEDULED | Sus renglones ya obligan a personas reales; editarlo en silencio reescribiría el pasado |
 
 ---
 

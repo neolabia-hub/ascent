@@ -125,6 +125,40 @@ detalle, una impugnacion no se puede defender.
 
 ---
 
+## 4.5 El motor de obligaciones
+
+Es el unico componente que **crea trabajo por su cuenta**, asi que su diseno se rige por tres
+propiedades, en este orden:
+
+**1. Idempotente.** Un indice unico de (requisito, persona, ronda) y `skipDuplicates` en la
+insercion. El motor corre en dos disparadores a la vez —el alta de una persona y el ciclo horario—
+y repetirlo no puede duplicar nada. Las obligaciones manuales y las del plan no llevan requisito,
+asi que no entran en esa restriccion: esas se controlan en el servicio comprobando lo que ya esta
+vivo.
+
+**2. En caliente donde importa, en frio donde alcanza.** Al dar de alta a alguien o cambiarle el
+cargo, sus obligaciones se recalculan en el acto: la matriz de competencia no puede mentir hasta
+el proximo ciclo. Lo que solo cambia con el paso del tiempo —la reinduccion que cumple su ano, lo
+que se paso de fecha— lo cubre un ciclo por hora. Si el enganche en caliente falla, no tumba el
+alta: lo registra y el ciclo lo recupera.
+
+**3. Una sola definicion de la regla.** El filtro que busca miembros y el predicado que decide en
+memoria se derivan del mismo listado de facetas (`audience-rule.ts`). Dos implementaciones podrian
+discrepar, y ahi la lista que ve el analista y las obligaciones que nacen dejarian de coincidir.
+
+### Fechas: dia civil, no instante
+Un vencimiento es un **dia**: "vence el 31 de enero" significa que a las 11 de la noche del 31
+todavia se cumple. Todo vencimiento se ancla al cierre del dia en Colombia (que no tiene horario
+de verano, asi que el desfase es siempre -05:00 y la aritmetica es exacta, sin libreria de zonas).
+
+**La trampa, ya pagada una vez:** una columna de solo fecha (`hired_at`) llega como medianoche
+UTC. Si se le aplica el desfase de Bogota, el 1 de diciembre se lee como 30 de noviembre y **todos**
+los vencimientos anclados al ingreso se corren un dia. Hay dos funciones distintas a proposito
+(`toBogotaDate` para instantes, `fromDateOnly` para fechas de calendario) y una prueba que falla
+si se confunden.
+
+---
+
 ## 5. Donde vive cada cosa
 
 ```
@@ -242,7 +276,10 @@ Honesta y priorizada:
 | Adaptador de almacenamiento en la nube | Bloquea el despliegue (a proposito) | Sprint de produccion |
 | El despachador de correo recorre todas las empresas cada 30 segundos | Irrelevante con una empresa; con decenas conviene una cola real | Cuando haya varias empresas |
 | La integracion continua nunca se ha ejecutado de verdad (no hay repositorio remoto) | El flujo esta escrito pero no probado | Al publicar el repositorio |
-| Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo usa tareas programadas en proceso | Cuando el volumen lo pida |
+| Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo y el motor de obligaciones usan tareas programadas en proceso | Cuando el volumen lo pida |
+| El ciclo de obligaciones recorre requisito por requisito y persona por persona | Correcto y legible, pero con miles de personas y decenas de requisitos conviene resolverlo por lotes en la base | Cuando una pasada tarde mas de unos segundos |
+| Un requisito solo puede exigir una **actividad** (no rutas ni certificaciones) | El modelo ya las soporta; el motor no. Devuelve un error explicito en vez de fingir | Sprints 4-5 |
+| La obligacion no se cierra sola: falta enlazar la ejecucion completada | La cobertura del plan se queda en cero hasta que exista el lado del aprendiz | Sprint 4 |
 | Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
 | Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |
 | SCORM sin motor | Solo importa si el cliente tiene contenido comprado en ese formato | Segun respuesta del cliente |
