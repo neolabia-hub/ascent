@@ -3,7 +3,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveTenantSlug } from '@/lib/tenant';
-import { ApiError, getPublicTenant, login, setAccessToken, type TenantBranding } from '@/lib/api';
+import { ApiError, getPublicTenant, login, me, setAccessToken, type TenantBranding } from '@/lib/api';
+import { ADMIN_HOME, landingFor } from '@/lib/landing';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -57,7 +58,10 @@ export function LoginForm() {
       } else if (!response.user.activated) {
         router.push('/activacion');
       } else {
-        router.push('/inicio');
+        // A donde entra depende de lo que PUEDE hacer: el rol Usuario solo tiene su propia
+        // formacion, y el panel de administracion seria una pantalla donde todo esta prohibido.
+        const profile = await me().catch(() => null);
+        router.push(profile ? landingFor(profile.permissions) : ADMIN_HOME);
       }
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_CREDENTIALS') {

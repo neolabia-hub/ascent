@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { getPublicTenant, me, refresh, setAccessToken, type MeResponse } from '@/lib/api';
+import { LEARNER_HOME, isLearnerOnly } from '@/lib/landing';
 import { resolveTenantSlug } from '@/lib/tenant';
 import { TenantProvider, applyTenantBranding, type TenantContextValue } from '@/components/providers/tenant-provider';
 import { ToastProvider } from '@/components/ui/toast';
@@ -93,6 +94,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
       if (!profile.activated) {
         router.push('/activacion');
+        return;
+      }
+      // Quien solo tiene su propia formacion no entra al panel: aqui no podria hacer nada.
+      if (isLearnerOnly(profile.permissions)) {
+        setSession({ status: 'redirecting' });
+        router.push(LEARNER_HOME);
         return;
       }
 

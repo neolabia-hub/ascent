@@ -96,6 +96,22 @@ Derivadas en runtime: --brand-primary-soft (10% sobre superficie), --brand-prima
 - Examenes: una pregunta por pantalla, opciones como tarjetas seleccionables 56px, feedback
   inmediato solo si la politica lo permite.
 
+#### Como esta implementado (Sprint 4) — respetarlo al agregar pantallas
+- Tres grupos de rutas: `(admin)` panel, `(learner)` barra inferior + cabecera, `(player)` sin
+  chrome. Los dos ultimos comparten sesion via `LearnerSession`; el player NO lleva barra.
+- El modo oscuro se activa SOLO bajo `.learner-surface` (clase en la raiz de cada pantalla del
+  aprendiz), nunca en `:root`: el admin se presenta en claro y no debe cambiar de color porque el
+  portatil de turno tenga el sistema en oscuro. Toda pantalla nueva del aprendiz lleva esa clase.
+- Contenedor movil: `max-w-md` centrado, `px-5`, y `pb-24` en el main para que la barra inferior
+  no tape el ultimo elemento. La barra respeta `env(safe-area-inset-bottom)`.
+- Progreso de una pila (tarjetas, preguntas): segmentos de 1px de alto en fila, patron stories.
+  Los completados en `--brand-primary` (o `--brand-accent` sobre fondo oscuro); el resto en
+  `--line`.
+- Selector de dos vistas (p. ej. Pendiente / Historial): pastillas dentro de un carril
+  `rounded-full bg-paper p-1`, la activa con `bg-surface` y sombra de tarjeta. Alto 44px.
+- Aviso de "sin conexion": franja fija arriba, `--warn`, `role="status"`. Siempre dice que se
+  puede seguir y que el avance no se pierde. Nunca un modal que bloquee.
+
 ## 3. Componentes con receta propia
 
 - **StatusPill**: punto 6px + etiqueta MAYUSCULAS 11/600 tracking .04em. CUMPLIDO=ok,

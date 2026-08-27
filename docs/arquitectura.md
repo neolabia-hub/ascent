@@ -176,12 +176,22 @@ apps/api/src/
   activities/    Catalogo formativo y MOTOR DE VERSIONADO
   lessons/       Lecciones y tarjetas
   assessments/   Banco de preguntas y constructor de examenes
+  offerings/     Convocatorias y sus proyectados congelados
+  assignments/   Audiencias, requisitos y MOTOR DE OBLIGACIONES
+  plans/         Plan anual y sus metricas aisladas
+  learning/      EL LADO DEL APRENDIZ: reproductor, intentos y cierre del ciclo
+  engagement/    Repeticion espaciada, racha, puntos y cadencia de avisos
+  workers/       Tareas programadas: obligaciones y avisos de pildora
 
-apps/web/src/
-  app/(admin)/   Panel de administracion (escritorio)
-  components/ui/ Biblioteca del sistema de diseno "Pulso"
-  components/layout/  Estructura: barra lateral, barra superior, sesion
-  lib/           Clientes HTTP tipados
+apps/web/
+  public/sw.js   Service worker propio: cache sin senal y cola de reenvio
+  public/icons/  Iconos de la PWA (se generan con scripts/generate-icons.mjs)
+  src/app/(admin)/    Panel de administracion (escritorio)
+  src/app/(learner)/  Superficie del aprendiz (movil, barra inferior)
+  src/app/(player)/   Reproductor y examenes (pantalla completa, sin chrome)
+  src/components/ui/  Biblioteca del sistema de diseno "Pulso"
+  src/components/layout/  Estructura: barra lateral, barra superior, sesion
+  src/lib/            Clientes HTTP tipados
 
 packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 ```
@@ -194,6 +204,9 @@ packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 | `activities/versioning.service.ts` | El motor de inmutabilidad. La pieza mas delicada |
 | `assessments/question-payload.ts` | **El unico lugar** que sabe donde vive la respuesta correcta |
 | `approvals/approvals.service.ts` | La compuerta del flujo del analista |
+| `learning/completion.service.ts` | Cierra el ciclo ejecucion -> obligacion -> cobertura del plan |
+| `engagement/nudge.ts` | El limite entre recordar y hostigar. Funcion pura, probada aparte |
+| `apps/web/public/sw.js` | Que se guarda en el telefono y que se reintenta sin senal |
 | `prisma/sql/rls.sql` | Las politicas de la base de datos |
 | `.claude/skills/pulse-ui/SKILL.md` | El contrato de diseno de toda la interfaz |
 
@@ -211,6 +224,8 @@ packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 | Saltarse la secuencia por API | Las validaciones viven en el servidor, no en la interfaz |
 | Enumerar certificados | El codigo publico de verificacion es aleatorio, nunca el consecutivo |
 | Filtrar datos personales a terceros | Sentry configurado sin datos personales |
+| Leer la formacion de otro en un telefono compartido | Al cerrar sesion se borran el cache sin senal y la cola pendiente del dispositivo |
+| Perder el avance de alguien por un token vencido | La cola de reenvio usa el token vigente que le pasa la pagina, no el que se guardo horas antes; un rechazo por sesion caducada CONSERVA el envio en vez de descartarlo |
 
 ---
 
@@ -279,7 +294,10 @@ Honesta y priorizada:
 | Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo y el motor de obligaciones usan tareas programadas en proceso | Cuando el volumen lo pida |
 | El ciclo de obligaciones recorre requisito por requisito y persona por persona | Correcto y legible, pero con miles de personas y decenas de requisitos conviene resolverlo por lotes en la base | Cuando una pasada tarde mas de unos segundos |
 | Un requisito solo puede exigir una **actividad** (no rutas ni certificaciones) | El modelo ya las soporta; el motor no. Devuelve un error explicito en vez de fingir | Sprints 4-5 |
-| La obligacion no se cierra sola: falta enlazar la ejecucion completada | La cobertura del plan se queda en cero hasta que exista el lado del aprendiz | Sprint 4 |
+| El cache sin senal guarda lo que la persona **ya visito**; no descarga por adelantado las lecciones que tiene asignadas | Quien nunca abrio la pildora con senal no puede cursarla sin senal | Cuando se sepa el peso real del contenido de Transprensa: es una precarga al entrar a los pendientes |
+| Los videos y documentos no se cachean para uso sin senal | Un video de 3 minutos multiplica lo que se guarda en el telefono. La leccion de tarjetas —el formato principal— si funciona sin senal | Segun el peso del contenido real |
+| Sin notificaciones push: el aviso de pildora sale por correo y bandeja in-app | El recordatorio llega, pero no al bloqueo de pantalla | Exige claves VAPID y permiso del usuario; se decide con el cliente |
+| La franja horaria del aviso se deduce en cada pasada de los ultimos 60 dias de eventos (tope 5.000) | Suficiente para el piloto | Con miles de personas, materializar la hora en una columna |
 | Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
 | Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |
 | SCORM sin motor | Solo importa si el cliente tiene contenido comprado en ese formato | Segun respuesta del cliente |

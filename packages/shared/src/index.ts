@@ -148,6 +148,27 @@ export type {
 } from './schemas/assignments.js';
 
 export {
+  progressSchema,
+  answerSchema,
+  saveAnswerSchema,
+  submitAttemptSchema,
+  reviewAnswerSchema,
+  submitReviewSchema,
+  selfEnrollSchema,
+  listMyWorkQuerySchema,
+} from './schemas/learning.js';
+export type {
+  ProgressInput,
+  AnswerInput,
+  SaveAnswerInput,
+  SubmitAttemptInput,
+  ReviewAnswerInput,
+  SubmitReviewInput,
+  SelfEnrollInput,
+  ListMyWorkQuery,
+} from './schemas/learning.js';
+
+export {
   planStatusSchema,
   planItemStatusSchema,
   createTrainingPlanSchema,

@@ -395,7 +395,73 @@ rompe.
 
 ---
 
-## 11. Terminos que NO usamos (y por que)
+## 11. Lo que sostiene el habito
+
+### Pildora
+
+**Que es:** una formacion corta —de tres a siete minutos— hecha de una leccion de tarjetas y unas
+pocas preguntas. Es un **tipo de actividad formativa**, no una entidad aparte: pasa por el mismo
+motor de obligacion, ejecucion y evidencia que una induccion.
+
+**Para que sirve:** sostener en el tiempo lo que ya se enseno. Una induccion se hace una vez al
+ano; una pildora de "revisa que la carga este centrada" se puede repetir en marzo y en agosto sin
+sacar a nadie de su turno.
+
+**Que NO es:** un curso recortado. Una pildora se disena corta; no es lo que sobra de otra cosa.
+
+### Repaso espaciado (la cola de repaso)
+
+**Que es:** el mecanismo que hace volver una pregunta que la persona fallo, en intervalos que se
+alargan: a los 2 dias, a los 7, a los 14 y a los 30. Si la responde bien sube de escalon; si la
+vuelve a fallar, se acerca en el tiempo. Al dominarla, sale de la cola.
+
+**Por que existe:** completar no es aprender. Un examen aprobado en enero no dice nada sobre lo
+que se recuerda en junio, y lo que se olvida en seguridad industrial cuesta accidentes.
+
+**Que ve la persona:** una sesion diaria de tres a cinco minutos, **acotada a proposito**. Una cola
+de cuarenta preguntas rompe el compromiso de los tres minutos y hace que nadie la abra.
+
+**Que NO es:** un examen. No da nota, no bloquea nada y no aparece en ningun indicador de
+cumplimiento.
+
+### Racha
+
+**Que es:** los dias seguidos en los que la persona ha completado al menos una leccion. Tiene dos
+**protectores** que cubren un dia perdido.
+
+**Que la mueve:** completar una leccion. **Entrar a la aplicacion no cuenta.** La racha premia
+haber aprendido algo, no haber abierto el telefono.
+
+**Quien la ve:** solo su dueno. Es privada por decision explicita (Decision #23): no existe
+ninguna pantalla donde una persona vea la racha de otra, ni ranking, ni tabla de posiciones. La
+comparacion publica expulsa a los de abajo, que en una empresa son justo quienes mas necesitan
+formarse.
+
+**Por que hay protectores:** un conductor en carretera puede pasar un dia sin senal. Perder
+sesenta dias de racha por eso hace que no vuelva.
+
+### Puntos
+
+**Que son:** un contador que sube por logro real —terminar una leccion, aprobar una evaluacion,
+hacer el repaso del dia—. Nunca por entrar ni por pulsar.
+
+**Que NO son:** una moneda. No se gastan, no se canjean y no compran nada.
+
+### Aviso de pildora (la cadencia)
+
+**Que es:** el recordatorio que llega a quien tiene microlearning pendiente y dejo de volver.
+
+**Como se gobierna:** solo a quien no estudio hoy, en la franja horaria en la que esa persona
+suele estudiar, con una separacion minima entre avisos y **un tope semanal por empresa que manda
+siempre** —incluso durante la primera semana de un ingreso nuevo, que es la unica que admite
+ritmo diario—. Un tope que admite excepciones no es un tope.
+
+**Por que tanto cuidado:** el limite entre recordar y hostigar es el que decide si la aplicacion
+se abre o se silencia.
+
+---
+
+## 12. Terminos que NO usamos (y por que)
 
 | Termino | Por que se evita | Que se usa |
 |---|---|---|

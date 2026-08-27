@@ -126,3 +126,40 @@ RLS y no puede alterar tablas). Las credenciales estan en `apps/api/.env`.
 - Cookie de refresh: `np_refresh` = `userId.tenantId.token`, httpOnly, path /v1/auth, rotacion
   en cada uso, hash SHA-256+pepper (no argon2: el token ya es aleatorio de 384 bits).
 - Bloqueo por cuenta: 5 intentos -> 15 min (env AUTH_*). Auditado en audit_logs.
+
+### 2026-08-27 — Iconos de la PWA: se generan, no se suben
+`apps/web/public/icons/` no se edita a mano. Los cuatro PNG (192, 512, maskable 512 y el de iOS)
+salen de:
+```
+node scripts/generate-icons.mjs
+```
+El script dibuja el pulso de la marca y codifica el PNG con `zlib` (sin dependencias). Cambiar el
+icono es cambiar la constante `PULSE` o los colores del script: asi la revision es un diff legible
+y se puede sacar cualquier tamano nuevo que pida una plataforma.
+
+### 2026-08-27 — El service worker se queda pegado entre despliegues
+`public/sw.js` usa `VERSION = 'v1'` en el nombre de los caches. **Al cambiar lo que se cachea hay
+que subir esa version**: en `activate` se borra todo cache cuyo nombre no coincida. Si no se sube,
+un telefono puede seguir sirviendo el armazon viejo despues de un despliegue.
+
+Para depurar en el telefono: Chrome -> `chrome://inspect` -> Service Workers -> "Unregister", y
+recargar. Los envios encolados viven en IndexedDB, base `neo-pulse-outbox`, almacen `progress`.
+
+### 2026-08-27 — Node no siempre esta en el PATH de la sesion
+Si `pnpm` responde "no se reconoce", la sesion no heredo el PATH del perfil. En PowerShell:
+```
+$env:PATH = "C:\Program Files\nodejs;$env:APPDATA\npm;$env:PATH"
+```
+No es un problema del proyecto; pasa al abrir una terminal sin perfil cargado.
+
+### 2026-08-27 — E2E: seleccionar el texto de una opcion de quiz
+En el editor de lecciones, las filas de opciones de una tarjeta QUIZ no tienen `id` ni
+`placeholder`: lo unico estable es el nombre accesible del radio de "opcion correcta". El e2e llega
+al campo desde ahi:
+```ts
+page.getByRole('radio', { name: 'Marcar opcion 1 como correcta' })
+    .locator('xpath=following-sibling::input[1]')
+```
+Leccion general: cuando un e2e no encuentra por donde agarrar un campo, la salida NO es un
+`nth(0)` sobre `input` — es apoyarse en el nombre accesible del elemento vecino, que ademas es lo
+que usa un lector de pantalla.

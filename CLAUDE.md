@@ -63,6 +63,12 @@
       de obligaciones por rondas (ON_HIRE previo al ingreso, recurrencia, vencidas, retiro al salir
       de la audiencia), matriz cargo × actividad, convocatorias con proyectados derivados y
       congelados, y plan anual con cumplimiento y cobertura aislados (`docs/sprints/03-*.md`)
+- [x] **Sprint 4** — experiencia del aprendiz: superficie propia móvil-first (grupo `(learner)`),
+      reproductor de tarjetas a pantalla completa con telemetría tolerante a señal intermitente,
+      exámenes con intentos y bloqueo, repetición espaciada + sesión de repaso diaria, racha
+      privada y puntos, PWA instalable con service worker propio (cache + cola de reenvío en
+      IndexedDB), cadencia de píldoras con tope semanal, y cierre del ciclo ejecución → obligación
+      → cobertura del plan (`docs/sprints/04-*.md`)
 
 **Pendiente antes de Sprint 0:**
 - [ ] Validar con Transprensa: contenido exacto de la constancia/certificado y firmantes
@@ -952,6 +958,8 @@ neo-pulse/
 | 38 | **Proyectados e inscripción masiva se acotan a la regional de la convocatoria** | Una jornada en Neiva no le promete nada a Barranquilla: numerador y denominador de la cobertura deben hablar de la misma gente |
 | 39 | **Fechas de calendario ≠ instantes**: `fromDateOnly` para columnas `@db.Date`, `toBogotaDate` para timestamps | Leer `hired_at` como instante corría un día TODOS los vencimientos anclados al ingreso (fallo real, Sprint 3) |
 | 40 | **El plan aprobado no se edita**; reprogramar un renglón lo marca como RESCHEDULED | Sus renglones ya obligan a personas reales; editarlo en silencio reescribiría el pasado |
+| 41 | **Un envío encolado sin señal devuelve 503, nunca un éxito fingido.** El service worker guarda el avance y lo reintenta, pero la pantalla dice la verdad ("lo guardaremos al recuperar señal") | Devolver un 202 con la forma que espera la interfaz le mentiría al usuario sobre su propio registro formativo y rompería el código que lee la respuesta. Solo se encola el AVANCE (acumulativo e idempotente): la entrega de un examen y el repaso devuelven nota y mueven estado, y hacerlos a espaldas de la persona es peor que pedirle señal |
+| 42 | **A dónde entra cada persona se decide por PERMISOS, no por nombre de rol ni por dispositivo**: quien solo tiene `enrollments:read_own` entra a la superficie del aprendiz | Los roles son configurables por empresa; los permisos no. Mandar al panel a quien tiene un solo permiso es mandarlo a una pantalla donde todo está prohibido |
 
 ---
 

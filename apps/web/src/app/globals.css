@@ -57,22 +57,47 @@
 }
 
 /*
- * Dark mode (learner PWA) — preparado, NO activo todavia en el admin.
- * Se habilita en una fase posterior (aprendiz movil) via prefers-color-scheme.
+ * Dark mode: SOLO en la superficie del aprendiz (Sprint 4).
  *
- * @media (prefers-color-scheme: dark) {
- *   :root {
- *     --paper: #0e1114;
- *     --surface: #171b20;
- *     --ink-900: #e8ebee;
- *     --ink-700: #c9d0d6;
- *     --ink-500: #8b96a1;
- *     --ink-300: #4a525a;
- *     --line: #262c33;
- *     --line-strong: #333b44;
- *   }
- * }
+ * Se cuelga de `.learner-surface` y no de `:root` a proposito. El panel de administracion se
+ * disena y se presenta en claro, y una empresa proyectandolo en una sala no espera que cambie de
+ * color porque el portatil de turno tenga el sistema en oscuro. El telefono del colaborador si:
+ * se usa de noche, en bodega y en carretera.
+ *
+ * Como son variables CSS, redefinirlas en el contenedor basta para que todo lo de dentro
+ * (tarjetas, semanticos, bordes) cambie sin tocar una sola clase.
  */
+@media (prefers-color-scheme: dark) {
+  .learner-surface {
+    --ink-900: #e8ebee;
+    --ink-700: #c9d0d6;
+    --ink-500: #8b96a1;
+    --ink-300: #4a525a;
+    --paper: #0e1114;
+    --surface: #171b20;
+    --line: #262c33;
+    --line-strong: #333b44;
+
+    /* Los semanticos suben un paso de luminosidad para no perder contraste sobre el fondo. */
+    --ok: #3ba76f;
+    --ok-soft: #14251c;
+    --warn: #d98324;
+    --warn-soft: #2a1f11;
+    --danger: #e05c52;
+    --danger-soft: #2b1614;
+    --info: #4d94d8;
+    --info-soft: #12212f;
+  }
+}
+
+/*
+ * La superficie del aprendiz lee a 16px (skill pulse-ui: base 16 en learner, 14 en admin) y no
+ * rebota al final del scroll dentro del reproductor.
+ */
+.learner-surface {
+  font-size: 16px;
+  overscroll-behavior-y: contain;
+}
 
 @layer base {
   * {

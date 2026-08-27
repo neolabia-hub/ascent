@@ -15,7 +15,7 @@ dentro de un ano) entienda que hay construido sin leer el codigo:
 | [01](01-administracion.md) | Administracion del tenant: catalogos, personas, aprobaciones, diseno | Terminado |
 | [02](02-catalogo-formativo.md) | Catalogo formativo: versionado, lecciones, evaluaciones | Terminado |
 | [03](03-convocatorias-asignaciones-plan.md) | Convocatorias, audiencias, asignaciones y plan anual | Terminado |
-| 04 | Experiencia del aprendiz (PWA, repaso espaciado, examenes) | Pendiente |
+| [04](04-experiencia-aprendiz.md) | Experiencia del aprendiz: PWA, reproductor de tarjetas, examenes, repaso y racha | Terminado |
 | 05 | Asistencia, certificados, encuestas y cumplimiento | Pendiente |
 | 06 | Reportes, IA, auditoria y salida a produccion | Pendiente |
 

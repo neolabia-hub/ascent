@@ -14,6 +14,7 @@ import { AuditService } from './common/audit.service.js';
 import { JwtAuthGuard } from './common/jwt-auth.guard.js';
 import { PermissionsGuard } from './common/permissions.guard.js';
 import { TenantInterceptor } from './common/tenant.interceptor.js';
+import { LearningModule } from './learning/learning.module.js';
 import { LessonsModule } from './lessons/lessons.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { OfferingsModule } from './offerings/offerings.module.js';
@@ -52,6 +53,8 @@ import { WorkersModule } from './workers/workers.module.js';
     OfferingsModule,
     PlansModule,
     WorkersModule,
+    // Experiencia del colaborador: reproductor, examenes y repaso espaciado (Sprint 4).
+    LearningModule,
   ],
   controllers: [AppController, PublicTenantsController, TenantSettingsController],
   providers: [

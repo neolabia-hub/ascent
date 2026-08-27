@@ -1,0 +1,241 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
+import type { SelfEnrollInput } from '@neo-pulse/shared';
+import type { AuthUser } from '../common/types.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+
+/** Obligaciones que todavia pesan sobre la persona. */
+const OPEN_ASSIGNMENT: Prisma.EnumAssignmentStatusFilter = { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] };
+
+/**
+ * LO MIO: lo que debo, lo que estoy haciendo y lo que ya hice.
+ *
+ * Esta es la unica pantalla que la mayoria del personal operativo va a ver, y casi siempre desde
+ * el telefono. Por eso responde una sola pregunta —"que me toca ahora"— y trae ya resuelto COMO
+ * hacerlo: si hay una ejecucion abierta, su id; si hay una convocatoria de autoservicio, su id;
+ * y si no hay ninguna via, lo dice en vez de dejar un boton que no lleva a ninguna parte.
+ */
+@Injectable()
+export class LearnerService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async pending(actor: AuthUser) {
+    const assignments = await this.prisma.scoped.assignment.findMany({
+      where: { userId: actor.id, status: OPEN_ASSIGNMENT, targetType: 'ACTIVITY' },
+      orderBy: [{ dueAt: 'asc' }, { assignedAt: 'asc' }],
+      select: {
+        id: true,
+        targetId: true,
+        dueAt: true,
+        status: true,
+        cycleNumber: true,
+        source: true,
+      },
+    });
+
+    const activityIds = [...new Set(assignments.map((assignment) => assignment.targetId))];
+    const [activities, enrollments, offerings] = await Promise.all([
+      this.prisma.scoped.activity.findMany({
+        where: { id: { in: activityIds } },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          activityType: { select: { code: true, name: true, colorHex: true } },
+          currentVersionId: true,
+          versions: {
+            where: { status: 'PUBLISHED' },
+            orderBy: { versionNumber: 'desc' },
+            take: 1,
+            select: { id: true, estimatedMinutes: true },
+          },
+        },
+      }),
+      this.prisma.scoped.enrollment.findMany({
+        where: { userId: actor.id, status: { in: ['ENROLLED', 'IN_PROGRESS'] } },
+        select: { id: true, status: true, activityVersion: { select: { activityId: true } } },
+      }),
+      // Autoservicio: convocatoria permanente o mixta, publicada y dentro de su ventana.
+      this.prisma.scoped.offering.findMany({
+        where: {
+          status: { in: ['PUBLISHED', 'IN_PROGRESS'] },
+          kind: { in: ['PERMANENT', 'HYBRID'] },
+          activityVersion: { activityId: { in: activityIds } },
+        },
+        select: {
+          id: true,
+          windowStart: true,
+          windowEnd: true,
+          activityVersion: { select: { activityId: true } },
+        },
+      }),
+    ]);
+
+    const activityById = new Map(activities.map((activity) => [activity.id, activity]));
+    const enrollmentByActivity = new Map(enrollments.map((row) => [row.activityVersion.activityId, row]));
+    const today = new Date();
+    const offeringByActivity = new Map(
+      offerings
+        .filter((offering) => this.isOpenWindow(offering.windowStart, offering.windowEnd, today))
+        .map((offering) => [offering.activityVersion.activityId, offering.id]),
+    );
+
+    return {
+      items: assignments.map((assignment) => {
+        const activity = activityById.get(assignment.targetId);
+        const enrollment = enrollmentByActivity.get(assignment.targetId);
+        return {
+          assignmentId: assignment.id,
+          activityId: assignment.targetId,
+          title: activity?.name ?? 'Actividad formativa',
+          description: activity?.description ?? null,
+          type: activity?.activityType ?? null,
+          estimatedMinutes: activity?.versions[0]?.estimatedMinutes ?? null,
+          dueAt: assignment.dueAt,
+          overdue: assignment.status === 'OVERDUE',
+          cycleNumber: assignment.cycleNumber,
+          source: assignment.source,
+          enrollmentId: enrollment?.id ?? null,
+          started: enrollment?.status === 'IN_PROGRESS',
+          /** Convocatoria de autoservicio donde puede empezarla por su cuenta. */
+          selfServiceOfferingId: enrollment ? null : (offeringByActivity.get(assignment.targetId) ?? null),
+        };
+      }),
+    };
+  }
+
+  /** Mi historial: lo que ya hice, con su nota. Es la hoja de vida formativa de la persona. */
+  async history(actor: AuthUser) {
+    const enrollments = await this.prisma.scoped.enrollment.findMany({
+      where: { userId: actor.id, status: { in: ['COMPLETED', 'PASSED', 'FAILED'] } },
+      orderBy: { completedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        completedAt: true,
+        finalScore: true,
+        scoreSnapshot: true,
+        offering: {
+          select: {
+            code: true,
+            scheduledDate: true,
+            activityVersion: {
+              select: { versionNumber: true, activity: { select: { id: true, name: true } } },
+            },
+          },
+        },
+      },
+    });
+    return { items: enrollments };
+  }
+
+  /**
+   * Empezar por cuenta propia una convocatoria de autoservicio. La inscripcion nace ENLAZADA a
+   * la obligacion que va a satisfacer (Decision #2) y con el cargo y area de HOY congelados
+   * (Decision #33): el certificado debe decir el cargo que tenia el dia que la hizo.
+   */
+  async selfEnroll(actor: AuthUser, input: SelfEnrollInput) {
+    const tenantId = this.prisma.currentTenantId;
+    const offering = await this.prisma.scoped.offering.findUnique({
+      where: { id: input.offeringId },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        capacity: true,
+        windowStart: true,
+        windowEnd: true,
+        activityVersionId: true,
+        activityVersion: {
+          select: { activityId: true, versionNumber: true, passingScore: true, activity: { select: { name: true } } },
+        },
+        _count: { select: { enrollments: true } },
+      },
+    });
+    if (!offering) throw new NotFoundException({ code: 'OFFERING_NOT_FOUND' });
+    if (offering.status !== 'PUBLISHED' && offering.status !== 'IN_PROGRESS') {
+      throw new ConflictException({ code: 'OFFERING_NOT_OPEN' });
+    }
+    if (offering.kind === 'EVENT') {
+      throw new ConflictException({
+        code: 'OFFERING_NOT_SELF_SERVICE',
+        message: 'Esta convocatoria tiene fecha y cupo: te inscribe quien la programa.',
+      });
+    }
+    if (!this.isOpenWindow(offering.windowStart, offering.windowEnd, new Date())) {
+      throw new ConflictException({ code: 'OFFERING_WINDOW_CLOSED', message: 'Esta formacion no esta disponible hoy.' });
+    }
+
+    const existing = await this.prisma.scoped.enrollment.findFirst({
+      where: { offeringId: offering.id, userId: actor.id },
+      select: { id: true },
+    });
+    if (existing) return { enrollmentId: existing.id, created: false as const };
+
+    if (offering.capacity !== null && offering._count.enrollments >= offering.capacity) {
+      throw new ConflictException({ code: 'OFFERING_CAPACITY_EXCEEDED' });
+    }
+
+    const [person, assignment] = await Promise.all([
+      this.prisma.scoped.user.findUniqueOrThrow({
+        where: { id: actor.id },
+        select: { employmentType: true, jobTitle: { select: { name: true } }, area: { select: { name: true } } },
+      }),
+      this.prisma.scoped.assignment.findFirst({
+        where: {
+          userId: actor.id,
+          targetType: 'ACTIVITY',
+          targetId: offering.activityVersion.activityId,
+          status: OPEN_ASSIGNMENT,
+        },
+        orderBy: { dueAt: 'asc' },
+        select: { id: true },
+      }),
+    ]);
+
+    const enrollment = await this.prisma.scoped.enrollment.create({
+      data: {
+        tenantId,
+        offeringId: offering.id,
+        userId: actor.id,
+        activityVersionId: offering.activityVersionId,
+        assignmentId: assignment?.id ?? null,
+        status: 'ENROLLED',
+        scoreSnapshot: {
+          activityName: offering.activityVersion.activity.name,
+          versionNumber: offering.activityVersion.versionNumber,
+          passingScore: offering.activityVersion.passingScore,
+          jobTitle: person.jobTitle.name,
+          area: person.area.name,
+          employmentType: person.employmentType,
+        } as Prisma.InputJsonValue,
+      },
+      select: { id: true },
+    });
+
+    await this.prisma.scoped.learningEvent.create({
+      data: {
+        tenantId,
+        userId: actor.id,
+        enrollmentId: enrollment.id,
+        verb: 'LAUNCHED',
+        objectType: 'offerings',
+        objectId: offering.id,
+        result: { selfService: true } as Prisma.InputJsonValue,
+      },
+    });
+    return { enrollmentId: enrollment.id, created: true as const };
+  }
+
+  /** Una ventana vacia significa "siempre disponible". */
+  private isOpenWindow(start: Date | null, end: Date | null, today: Date): boolean {
+    if (start && today < start) return false;
+    if (end) {
+      // La ventana incluye su ultimo dia completo.
+      const endOfLastDay = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+      if (today >= endOfLastDay) return false;
+    }
+    return true;
+  }
+}
