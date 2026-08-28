@@ -30,9 +30,14 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
   await page.getByRole('button', { name: 'Crear actividad' }).click();
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
+  // La formacion es una ficha con pestanas: el contenido vive en la suya.
+  await page.getByRole('button', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
-  await page.locator('#c-type').selectOption('LESSON');
+  // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
+  await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
   await page.locator('#c-title').fill('Bienvenida');
+  // Paso 2: se reutiliza una leccion de la biblioteca en vez de crear una nueva.
+  await page.getByRole('radio', { name: 'Traer de la biblioteca' }).click();
   const lessonValue = await page
     .locator('#c-lesson option', { hasText: `Leccion ${name} ${suffix}` })
     .first()
@@ -64,7 +69,8 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
 
     // 2. Requisito de ingreso: vence UN DIA ANTES de empezar a trabajar (D1072).
     await page.getByRole('button', { name: 'Requisitos' }).click();
-    await page.getByRole('button', { name: 'Nuevo requisito' }).click();
+    // Hay dos: el del encabezado y el del estado vacio. Cualquiera sirve.
+    await page.getByRole('button', { name: 'Nuevo requisito' }).first().click();
     // El texto de la opcion incluye el conteo de personas: se resuelve el value real.
     const audienceValue = await page
       .locator('#r-audience option', { hasText: `Toda la empresa ${suffix}` })
@@ -80,7 +86,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(page.getByRole('row').filter({ hasText: activityName }).getByText('1 dia antes')).toBeVisible();
 
     // 3. Alta de una persona con fecha de ingreso futura.
-    await page.goto('/personas');
+    await page.goto('/usuarios');
     await page.getByRole('button', { name: 'Nueva persona' }).first().click();
     await page.locator('#u-doc').fill(`77${suffix}`);
     await page.locator('#u-name').fill(`Persona S3 ${suffix}`);

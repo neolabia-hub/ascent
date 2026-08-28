@@ -99,6 +99,60 @@
   overscroll-behavior-y: contain;
 }
 
+/*
+ * SUPERFICIE DE LECTURA del reproductor.
+ *
+ * Antes era negra a pantalla completa, el patron "stories". Se cambio a proposito: ese formato
+ * es el de una red social, no el de algo que hay que LEER y entender, y a los tres minutos cansa.
+ * Una pagina calida con mucho aire se lee mejor, se ve mas cuidada y no compite con el contenido.
+ *
+ * El papel no es blanco puro: un blanco de pantalla a plena luz de bodega deslumbra.
+ */
+.reading-surface {
+  --reading-paper: #faf9f7;
+  --reading-ink: #1a1917;
+  --reading-muted: #6b6862;
+  --reading-line: #e8e4de;
+  background-color: var(--reading-paper);
+  color: var(--reading-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .reading-surface:not([data-force-light]) {
+    --reading-paper: #16151a;
+    --reading-ink: #ece9e4;
+    --reading-muted: #9a958c;
+    --reading-line: #2b2a30;
+  }
+}
+
+/* Ritmo de lectura: el cuerpo de una tarjeta se lee, no se escanea. */
+.reading-body {
+  font-size: 1.19rem;
+  line-height: 1.72;
+  letter-spacing: -0.003em;
+  color: var(--reading-ink);
+}
+
+/*
+ * Entrada de cada tarjeta. Sube 14px y aparece: da la sensacion de que el contenido AVANZA, que
+ * es lo que esta pasando. Con `prefers-reduced-motion` se apaga sola (regla global de mas abajo).
+ */
+@keyframes reading-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reading-enter {
+  animation: reading-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 @layer base {
   * {
     @apply border-line;

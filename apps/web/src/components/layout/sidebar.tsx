@@ -7,10 +7,8 @@ import {
   CheckSquare,
   ChevronsLeft,
   ChevronsRight,
-  ClipboardCheck,
   ClipboardList,
   House,
-  Layers,
   LogOut,
   Settings,
   Target,
@@ -32,15 +30,21 @@ interface NavItem {
   icon: LucideIcon;
 }
 
+/**
+ * El menu nombra COSAS DEL NEGOCIO, no tablas.
+ *
+ * "Lecciones" y "Evaluaciones" salieron de aqui a proposito: no son destinos, son piezas que se
+ * crean DENTRO de una formacion. Tenerlas en el menu obligaba a construir una formacion saltando
+ * entre tres entradas distintas y a acordarse de volver. Siguen existiendo como biblioteca
+ * reutilizable, y se llega a ellas desde el selector de contenido de la formacion.
+ */
 const NAV_ITEMS: NavItem[] = [
   { href: '/inicio', label: 'Inicio', icon: House },
-  { href: '/contenido-formativo', label: 'Contenido formativo', icon: BookOpen },
-  { href: '/lecciones', label: 'Lecciones', icon: Layers },
-  { href: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
+  { href: '/contenido-formativo', label: 'Formaciones', icon: BookOpen },
   { href: '/convocatorias', label: 'Convocatorias', icon: CalendarDays },
   { href: '/asignaciones', label: 'Asignaciones', icon: Target },
-  { href: '/plan', label: 'Plan', icon: ClipboardList },
-  { href: '/personas', label: 'Personas', icon: Users },
+  { href: '/plan', label: 'Plan anual', icon: ClipboardList },
+  { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/aprobaciones', label: 'Aprobaciones', icon: CheckSquare },
   { href: '/reportes', label: 'Reportes', icon: ChartColumn },
   { href: '/configuracion', label: 'Configuracion', icon: Settings },

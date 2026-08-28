@@ -7,8 +7,12 @@ import type { CardPayload } from '@/lib/learner-api';
 import { cn } from '@/components/ui/cn';
 
 /**
- * Las seis tarjetas de la Fase 1 (CLAUDE.md 3.5), dibujadas para el REPRODUCTOR: fondo oscuro,
- * un solo foco por tarjeta, texto de 18-20 y nada mas en pantalla.
+ * Las seis tarjetas de la Fase 1 (CLAUDE.md 3.5), dibujadas para LEER.
+ *
+ * Cambio de fondo (2026-08-27): antes iban sobre negro a pantalla completa, el patron "stories".
+ * Se paso a una pagina calida y con aire. El motivo no es estetico: una tarjeta de formacion hay
+ * que entenderla, no consumirla en dos segundos, y el formato de red social empuja justo a lo
+ * contrario. Ademas el negro a plena pantalla cansa a los tres minutos.
  *
  * El QUIZ de una leccion es REFUERZO, no nota: se responde, se dice si estuvo bien y se sigue.
  * Por eso su respuesta correcta si viaja al cliente, al contrario que la de un examen.
@@ -42,8 +46,28 @@ export function requiresInteraction(payload: CardPayload): boolean {
   return payload.cardType === 'QUIZ' || payload.cardType === 'FILL_GAP';
 }
 
+/** Titular de tarjeta: grande y con aire. Es lo que ancla la lectura. */
 function CardTitle({ children }: { children: string }) {
-  return <h2 className="mb-3 font-display text-xl font-semibold leading-tight text-white">{children}</h2>;
+  return (
+    <h2
+      className="mb-5 font-display text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] lg:text-[34px]"
+      style={{ color: 'var(--reading-ink)' }}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/** Rotulo pequeno que dice de que tipo es la tarjeta, en voz baja. */
+function CardKicker({ children }: { children: string }) {
+  return (
+    <p
+      className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em]"
+      style={{ color: 'var(--reading-muted)' }}
+    >
+      {children}
+    </p>
+  );
 }
 
 function TextImageCard({ payload }: { payload: Extract<CardPayload, { cardType: 'TEXT_IMAGE' }> }) {
@@ -51,19 +75,22 @@ function TextImageCard({ payload }: { payload: Extract<CardPayload, { cardType: 
     <div>
       {payload.title ? <CardTitle>{payload.title}</CardTitle> : null}
       {payload.mediaKey ? (
-        <figure className="mb-4">
+        <figure className="mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={mediaUrl(payload.mediaKey)}
             alt={payload.caption ?? ''}
-            className="max-h-[38vh] w-full rounded-lg object-cover"
+            className="w-full rounded-xl object-cover"
+            style={{ maxHeight: '46vh' }}
           />
           {payload.caption ? (
-            <figcaption className="mt-2 text-sm text-white/60">{payload.caption}</figcaption>
+            <figcaption className="mt-2.5 text-sm" style={{ color: 'var(--reading-muted)' }}>
+              {payload.caption}
+            </figcaption>
           ) : null}
         </figure>
       ) : null}
-      <p className="whitespace-pre-line text-lg leading-relaxed text-white/90">{payload.body}</p>
+      <p className="reading-body whitespace-pre-line">{payload.body}</p>
     </div>
   );
 }
@@ -74,9 +101,9 @@ function VideoShortCard({ payload }: { payload: Extract<CardPayload, { cardType:
     <div>
       {payload.title ? <CardTitle>{payload.title}</CardTitle> : null}
       {payload.mediaKey ? (
-        <video src={mediaUrl(payload.mediaKey)} controls playsInline className="w-full rounded-lg" />
+        <video src={mediaUrl(payload.mediaKey)} controls playsInline className="w-full rounded-xl bg-black" />
       ) : embed ? (
-        <div className="aspect-video w-full overflow-hidden rounded-lg">
+        <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
           <iframe
             src={embed}
             title={payload.title ?? 'Video'}
@@ -90,7 +117,8 @@ function VideoShortCard({ payload }: { payload: Extract<CardPayload, { cardType:
           href={payload.externalUrl}
           target="_blank"
           rel="noreferrer"
-          className="focus-ring block rounded-lg border border-white/20 px-4 py-3 text-white underline"
+          className="focus-ring block rounded-xl border px-4 py-3 underline"
+          style={{ borderColor: 'var(--reading-line)', color: 'var(--reading-ink)' }}
         >
           Ver el video
         </a>
@@ -102,26 +130,95 @@ function VideoShortCard({ payload }: { payload: Extract<CardPayload, { cardType:
 function FlipCard({ payload }: { payload: Extract<CardPayload, { cardType: 'FLIP' }> }) {
   const [flipped, setFlipped] = useState(false);
 
-  // Cada tarjeta nueva empieza por su cara frontal.
   useEffect(() => {
     setFlipped(false);
   }, [payload.front]);
 
   return (
+    <div>
+      <CardKicker>Para pensarlo un segundo</CardKicker>
+      <button
+        type="button"
+        onClick={() => setFlipped((value) => !value)}
+        aria-label={flipped ? 'Ver la pregunta' : 'Ver la respuesta'}
+        className="focus-ring w-full rounded-2xl border p-8 text-left transition-shadow duration-200 ease-pulse hover:shadow-card lg:p-10"
+        style={{ borderColor: 'var(--reading-line)' }}
+      >
+        <p
+          key={flipped ? 'back' : 'front'}
+          className="reading-enter font-display text-[22px] font-medium leading-snug lg:text-[26px]"
+          style={{ color: 'var(--reading-ink)' }}
+        >
+          {flipped ? payload.back : payload.front}
+        </p>
+        <span
+          className="mt-6 inline-flex items-center gap-2 text-sm"
+          style={{ color: 'var(--reading-muted)' }}
+        >
+          <RotateCw className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+          {flipped ? 'Volver a la pregunta' : 'Toca para ver la respuesta'}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/** Opcion de respuesta: area grande, letra al principio, estado claro al revelarse. */
+function Option({
+  letter,
+  text,
+  state,
+  disabled,
+  onClick,
+}: {
+  letter: string;
+  text: string;
+  state: 'idle' | 'chosen' | 'correct' | 'wrong';
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
     <button
       type="button"
-      onClick={() => setFlipped((value) => !value)}
-      aria-label={flipped ? 'Ver el frente' : 'Ver el reverso'}
-      className="focus-ring flex min-h-[220px] w-full flex-col items-center justify-center gap-4 rounded-xl border border-white/15 bg-white/5 p-6 text-center"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'focus-ring flex min-h-[60px] w-full items-center gap-4 rounded-xl border px-4 py-3.5 text-left transition-all duration-150 ease-pulse',
+        state === 'idle' && 'hover:-translate-y-px hover:shadow-card',
+        disabled && state === 'idle' && 'opacity-55',
+      )}
+      style={{
+        borderColor:
+          state === 'correct' ? 'var(--ok)' : state === 'wrong' ? 'var(--danger)' : state === 'chosen' ? 'var(--brand-primary)' : 'var(--reading-line)',
+        backgroundColor:
+          state === 'correct' ? 'var(--ok-soft)' : state === 'wrong' ? 'var(--danger-soft)' : state === 'chosen' ? 'var(--brand-primary-soft)' : 'transparent',
+      }}
     >
-      <p className="text-lg leading-relaxed text-white">{flipped ? payload.back : payload.front}</p>
-      <span className="inline-flex items-center gap-1.5 text-sm text-white/50">
-        <RotateCw className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-        {flipped ? 'Volver' : 'Toca para ver la respuesta'}
+      <span
+        aria-hidden="true"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold"
+        style={{
+          backgroundColor: state === 'idle' ? 'var(--reading-line)' : 'transparent',
+          color:
+            state === 'correct' ? 'var(--ok)' : state === 'wrong' ? 'var(--danger)' : 'var(--reading-muted)',
+        }}
+      >
+        {state === 'correct' ? (
+          <Check className="h-4 w-4" strokeWidth={3} />
+        ) : state === 'wrong' ? (
+          <X className="h-4 w-4" strokeWidth={3} />
+        ) : (
+          letter
+        )}
+      </span>
+      <span className="min-w-0 text-[17px] leading-snug" style={{ color: 'var(--reading-ink)' }}>
+        {text}
       </span>
     </button>
   );
 }
+
+const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 
 function QuizCard({
   payload,
@@ -137,50 +234,43 @@ function QuizCard({
     setChosen(null);
   }, [payload.question]);
 
-  function choose(optionId: string) {
-    if (chosen) return;
-    setChosen(optionId);
-    onInteracted();
-  }
-
   return (
     <div>
+      <CardKicker>Comprueba lo que entendiste</CardKicker>
       <CardTitle>{payload.question}</CardTitle>
-      <ul className="mt-4 space-y-3">
-        {payload.options.map((option) => {
+
+      <ul className="space-y-3">
+        {payload.options.map((option, position) => {
           const isChosen = chosen === option.id;
           const isCorrect = option.id === payload.correctOptionId;
-          const reveal = chosen !== null && (isChosen || isCorrect);
+          const state =
+            chosen === null ? 'idle' : isCorrect ? 'correct' : isChosen ? 'wrong' : 'idle';
           return (
             <li key={option.id}>
-              <button
-                type="button"
+              <Option
+                letter={LETTERS[position] ?? '?'}
+                text={option.text}
+                state={state}
                 disabled={chosen !== null}
-                onClick={() => choose(option.id)}
-                className={cn(
-                  'focus-ring flex min-h-[56px] w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-base transition-colors duration-150 ease-pulse',
-                  reveal && isCorrect && 'border-ok bg-ok/15 text-white',
-                  reveal && !isCorrect && isChosen && 'border-danger bg-danger/15 text-white',
-                  !reveal && 'border-white/20 bg-white/5 text-white/90',
-                )}
-              >
-                {reveal ? (
-                  isCorrect ? (
-                    <Check className="h-5 w-5 shrink-0 text-ok" strokeWidth={2.5} aria-hidden="true" />
-                  ) : (
-                    <X className="h-5 w-5 shrink-0 text-danger" strokeWidth={2.5} aria-hidden="true" />
-                  )
-                ) : (
-                  <span aria-hidden="true" className="h-5 w-5 shrink-0 rounded-full border-2 border-white/30" />
-                )}
-                <span className="min-w-0">{option.text}</span>
-              </button>
+                onClick={() => {
+                  if (chosen) return;
+                  setChosen(option.id);
+                  onInteracted();
+                }}
+              />
             </li>
           );
         })}
       </ul>
+
       {chosen ? (
-        <p className={cn('mt-4 text-base', correct ? 'text-ok' : 'text-white/80')}>
+        <p
+          className="reading-enter mt-6 rounded-xl px-4 py-3.5 text-[17px] leading-relaxed"
+          style={{
+            backgroundColor: correct ? 'var(--ok-soft)' : 'var(--warn-soft)',
+            color: 'var(--reading-ink)',
+          }}
+        >
           {correct
             ? (payload.feedbackCorrect ?? 'Correcto.')
             : (payload.feedbackWrong ?? 'No era esa. La correcta esta marcada arriba.')}
@@ -205,24 +295,20 @@ function PollCard({
 
   return (
     <div>
+      <CardKicker>No hay respuesta correcta</CardKicker>
       <CardTitle>{payload.question}</CardTitle>
-      <p className="mb-4 text-sm text-white/50">No hay respuesta correcta: queremos tu opinion.</p>
       <ul className="space-y-3">
-        {payload.options.map((option) => (
+        {payload.options.map((option, position) => (
           <li key={option.id}>
-            <button
-              type="button"
+            <Option
+              letter={LETTERS[position] ?? '?'}
+              text={option.text}
+              state={chosen === option.id ? 'chosen' : 'idle'}
               onClick={() => {
                 setChosen(option.id);
                 onInteracted();
               }}
-              className={cn(
-                'focus-ring flex min-h-[56px] w-full items-center rounded-lg border px-4 py-3 text-left text-base',
-                chosen === option.id ? 'border-primary bg-primary/25 text-white' : 'border-white/20 bg-white/5 text-white/90',
-              )}
-            >
-              {option.text}
-            </button>
+            />
           </li>
         ))}
       </ul>
@@ -263,50 +349,53 @@ function FillGapCard({
     if (next.every((slot) => slot !== null)) onInteracted();
   }
 
-  function clear(position: number) {
-    const next = [...filled];
-    next[position] = null;
-    setFilled(next);
-  }
-
   return (
     <div>
-      <CardTitle>Completa la frase</CardTitle>
-      <p className="text-lg leading-loose text-white/90">
+      <CardKicker>Completa la frase</CardKicker>
+
+      <p className="text-[22px] leading-[2] lg:text-[26px]" style={{ color: 'var(--reading-ink)' }}>
         {segments.map((segment, position) => (
           <span key={`${segment}-${position}`}>
             {segment}
             {position < gapCount ? (
               <button
                 type="button"
-                onClick={() => clear(position)}
+                onClick={() => {
+                  const next = [...filled];
+                  next[position] = null;
+                  setFilled(next);
+                }}
                 disabled={filled[position] === null}
-                className={cn(
-                  'focus-ring mx-1 inline-flex min-h-[36px] min-w-[84px] items-center justify-center rounded-md border px-2 align-middle text-base',
-                  filled[position] === null
-                    ? 'border-dashed border-white/40 text-white/40'
-                    : complete && allCorrect
-                      ? 'border-ok bg-ok/15 text-white'
-                      : complete
-                        ? 'border-danger bg-danger/15 text-white'
-                        : 'border-white/40 bg-white/10 text-white',
-                )}
+                className="focus-ring mx-1.5 inline-flex min-h-[42px] min-w-[110px] items-center justify-center rounded-lg border-2 px-3 align-middle text-[19px]"
+                style={{
+                  borderStyle: filled[position] === null ? 'dashed' : 'solid',
+                  borderColor: complete
+                    ? allCorrect
+                      ? 'var(--ok)'
+                      : 'var(--danger)'
+                    : filled[position] === null
+                      ? 'var(--reading-line)'
+                      : 'var(--brand-primary)',
+                  backgroundColor: complete ? (allCorrect ? 'var(--ok-soft)' : 'var(--danger-soft)') : 'transparent',
+                  color: filled[position] === null ? 'var(--reading-muted)' : 'var(--reading-ink)',
+                }}
               >
-                {filled[position] ?? '_____'}
+                {filled[position] ?? ' '}
               </button>
             ) : null}
           </span>
         ))}
       </p>
 
-      <ul className="mt-6 flex flex-wrap gap-2">
+      <ul className="mt-8 flex flex-wrap gap-2.5">
         {bank.map((word) => (
           <li key={word}>
             <button
               type="button"
               disabled={used.has(word)}
               onClick={() => place(word)}
-              className="focus-ring min-h-[44px] rounded-full border border-white/20 bg-white/5 px-4 text-base text-white disabled:opacity-30"
+              className="focus-ring min-h-[46px] rounded-full border px-5 text-[17px] transition-all duration-150 ease-pulse hover:-translate-y-px hover:shadow-card disabled:translate-y-0 disabled:opacity-25 disabled:shadow-none"
+              style={{ borderColor: 'var(--reading-line)', color: 'var(--reading-ink)' }}
             >
               {word}
             </button>
@@ -315,7 +404,13 @@ function FillGapCard({
       </ul>
 
       {complete ? (
-        <p className={cn('mt-5 text-base', allCorrect ? 'text-ok' : 'text-white/80')}>
+        <p
+          className="reading-enter mt-6 rounded-xl px-4 py-3.5 text-[17px]"
+          style={{
+            backgroundColor: allCorrect ? 'var(--ok-soft)' : 'var(--warn-soft)',
+            color: 'var(--reading-ink)',
+          }}
+        >
           {allCorrect ? 'Asi es.' : 'Revisa: toca un hueco para vaciarlo y vuelve a intentarlo.'}
         </p>
       ) : null}

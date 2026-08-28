@@ -66,6 +66,53 @@ export function listRoles(): Promise<RoleRow[]> {
   return apiFetch<RoleRow[]>('/roles', { method: 'GET' });
 }
 
+/** Catalogo global de permisos, agrupable por categoria para la matriz de roles. */
+export interface PermissionRow {
+  code: string;
+  category: string;
+  description: string;
+}
+
+export function listPermissions(): Promise<PermissionRow[]> {
+  return apiFetch<PermissionRow[]>('/roles/permissions', { method: 'GET' });
+}
+
+export function createRole(body: { code: string; name: string; permissionCodes: string[] }): Promise<RoleRow> {
+  return apiFetch<RoleRow>('/roles', { method: 'POST', body });
+}
+
+export function updateRole(
+  id: string,
+  body: { name?: string; active?: boolean; permissionCodes?: string[] },
+): Promise<RoleRow> {
+  return apiFetch<RoleRow>(`/roles/${id}`, { method: 'PATCH', body });
+}
+
+export function deleteRole(id: string): Promise<void> {
+  return apiFetch<void>(`/roles/${id}`, { method: 'DELETE' });
+}
+
+/** Excepciones individuales sobre el rol. Reemplaza el conjunto completo. */
+export function setUserOverrides(
+  userId: string,
+  overrides: Array<{ permissionCode: string; granted: boolean }>,
+): Promise<unknown> {
+  return apiFetch(`/users/${userId}/overrides`, { method: 'POST', body: { overrides } });
+}
+
+export interface UserDetail extends UserRow {
+  overrides: Array<{ granted: boolean; permission: { code: string } }>;
+  analystScopes: Array<{
+    id: string;
+    process: { id: string; code: string; name: string } | null;
+    area: { id: string; code: string; name: string } | null;
+  }>;
+}
+
+export function getUser(id: string): Promise<UserDetail> {
+  return apiFetch<UserDetail>(`/users/${id}`, { method: 'GET' });
+}
+
 // ─────────────────────────── Usuarios ───────────────────────────
 
 export interface UserRow {

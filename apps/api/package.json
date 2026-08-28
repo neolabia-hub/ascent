@@ -13,6 +13,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:rls": "tsx scripts/apply-rls.ts",
     "db:verify-rls": "tsx scripts/verify-rls.ts"
   },

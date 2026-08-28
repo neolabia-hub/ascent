@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { SlidersHorizontal } from 'lucide-react';
+import { ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { CatalogManager, type CatalogManagerProps } from '@/components/config/catalog-manager';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -54,12 +54,20 @@ export default function ConfiguracionPage() {
           <h1 className="font-display text-[28px] font-semibold text-ink-900">Configuracion</h1>
           <p className="mt-1 text-sm text-ink-500">Catalogos y preferencias del tenant. Todo parametrizable, nada en codigo.</p>
         </div>
-        <Link href="/configuracion/preferencias">
-          <Button variant="outline">
-            <SlidersHorizontal size={16} />
-            Preferencias y marca
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/configuracion/roles">
+            <Button variant="outline">
+              <ShieldCheck size={16} />
+              Roles y permisos
+            </Button>
+          </Link>
+          <Link href="/configuracion/preferencias">
+            <Button variant="outline">
+              <SlidersHorizontal size={16} />
+              Preferencias y marca
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">

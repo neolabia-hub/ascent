@@ -61,7 +61,10 @@ export class PlayerService {
         status: enrollment.status,
         blockedAt: enrollment.blockedAt,
         blockedReason: enrollment.blockedReason,
+        activityId: enrollment.activityVersion.activity.id,
         activityName: enrollment.activityVersion.activity.name,
+        activityDescription: enrollment.activityVersion.activity.description,
+        activityType: enrollment.activityVersion.activity.activityType,
         versionNumber: enrollment.activityVersion.versionNumber,
         passingScore: enrollment.activityVersion.passingScore,
         estimatedMinutes: enrollment.activityVersion.estimatedMinutes,
@@ -248,7 +251,17 @@ export class PlayerService {
             versionNumber: true,
             passingScore: true,
             estimatedMinutes: true,
-            activity: { select: { name: true } },
+            // La identidad de la actividad viaja para que la portada de la ficha sea LA MISMA que
+            // la del catalogo: si cada pantalla dibujara la suya, la persona no reconoceria que
+            // esta entrando a lo que acaba de pulsar.
+            activity: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                activityType: { select: { code: true, name: true, colorHex: true } },
+              },
+            },
           },
         },
       },

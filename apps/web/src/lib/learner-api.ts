@@ -57,7 +57,10 @@ export interface HistoryItem {
   offering: {
     code: string;
     scheduledDate: string | null;
-    activityVersion: { versionNumber: number; activity: { id: string; name: string } };
+    activityVersion: {
+      versionNumber: number;
+      activity: { id: string; name: string; activityType: { code: string; name: string; colorHex: string | null } };
+    };
   } | null;
 }
 
@@ -119,7 +122,10 @@ export interface OpenEnrollment {
     status: EnrollmentStatus;
     blockedAt: string | null;
     blockedReason: string | null;
+    activityId: string;
     activityName: string;
+    activityDescription: string | null;
+    activityType: { code: string; name: string; colorHex: string | null };
     versionNumber: number;
     passingScore: Score;
     estimatedMinutes: number | null;

@@ -163,3 +163,30 @@ page.getByRole('radio', { name: 'Marcar opcion 1 como correcta' })
 Leccion general: cuando un e2e no encuentra por donde agarrar un campo, la salida NO es un
 `nth(0)` sobre `input` — es apoyarse en el nombre accesible del elemento vecino, que ademas es lo
 que usa un lector de pantalla.
+
+### 2026-08-27 — NUNCA correr `next build` con el servidor de desarrollo levantado
+Sintoma: la aplicacion abre pero se queda en "Cargando..." para siempre. En el log del servidor
+web, todo el JavaScript y el CSS responden 404:
+```
+GET /_next/static/chunks/main-app.js       404
+GET /_next/static/chunks/app/login/page.js 404
+GET /_next/static/css/app/layout.css       404
+GET /login                                 200
+```
+El HTML llega, React no hidrata, y lo unico que se ve es el render inicial.
+
+Causa: `next build` y `next dev` comparten el directorio `.next`. El build pisa los chunks que
+el dev server esta sirviendo; si ademas el build falla a mitad (en Windows aparece como
+`uncaughtException Error: spawn UNKNOWN`), `.next` queda inconsistente y el dev server sirve 404
+hasta que se limpie.
+
+Arreglo:
+```
+# detener el dev server primero
+Remove-Item -Recurse -Force apps/web/.next
+pnpm --filter @neo-pulse/web dev
+```
+Y en el navegador, recarga forzada (Ctrl+Shift+R): los 404 quedan cacheados.
+
+Regla: para verificar un build, se BAJA el dev server antes. Si hace falta comprobar ambos, usar
+`next build` con `--distDir` aparte.

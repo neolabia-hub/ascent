@@ -1,18 +1,24 @@
 'use client';
 
-import { CircleUser, GraduationCap, House, Repeat2, type LucideIcon } from 'lucide-react';
+import { CircleUser, GraduationCap, House, Repeat2, Search, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { getMyProgress, type MyProgress } from '@/lib/learner-api';
+import { useTenant } from '@/components/providers/tenant-provider';
 import { cn } from '@/components/ui/cn';
-import { StreakPill } from '@/components/ui/streak-pill';
+import { CommandPalette } from './command-palette';
+import { LearnerTopbar } from './learner-topbar';
 import { useLearnerProfile } from './learner-session';
 
 /**
- * El chrome del aprendiz: cabecera minima y barra INFERIOR de cuatro destinos
- * (skill pulse-ui, seccion 2). Sin barra lateral y sin migas de pan: el 80% de esta gente entra
- * desde un telefono, muchas veces con guantes puestos, y necesita el pulgar cerca de todo.
+ * El chrome del aprendiz, en las DOS superficies donde se usa.
+ *
+ * En telefono manda la barra INFERIOR: el pulgar no llega arriba y mucha de esta gente trabaja
+ * con guantes. En escritorio esa misma barra abajo se ve como una app de movil estirada, asi que
+ * a partir de `lg` pasa a ser un carril lateral y el contenido se ensancha.
+ *
+ * Es la misma aplicacion, no dos: cambia la disposicion, no las pantallas ni las rutas.
  */
 
 interface NavItem {
@@ -35,16 +41,13 @@ function greeting(now: Date): string {
   return 'Buenas noches';
 }
 
-/** Nombre de pila: "JUAN CARLOS PEREZ GOMEZ" en una cabecera de telefono no cabe ni sirve. */
-function firstName(fullName: string): string {
-  const first = fullName.trim().split(/\s+/)[0] ?? '';
-  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
-}
 
 export function LearnerShell({ children }: { children: ReactNode }) {
   const profile = useLearnerProfile();
+  const tenant = useTenant();
   const pathname = usePathname();
   const [progress, setProgress] = useState<MyProgress | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Se relee al cambiar de pantalla: al volver de una leccion la racha puede haber avanzado.
   useEffect(() => {
@@ -61,31 +64,94 @@ export function LearnerShell({ children }: { children: ReactNode }) {
     };
   }, [pathname]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
+
   return (
-    <div className="learner-surface flex min-h-screen flex-col bg-paper">
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex h-14 w-full max-w-md items-center justify-between px-5">
-          <div className="min-w-0">
-            <p className="text-xs text-ink-500">{greeting(new Date())}</p>
-            <p className="truncate font-display text-base font-semibold text-ink-900">
-              {firstName(profile.fullName)}
-            </p>
+    <div className="learner-surface min-h-screen bg-paper lg:flex">
+      {/* Carril lateral: solo escritorio. */}
+      <aside className="hidden w-[248px] shrink-0 border-r border-line bg-surface lg:flex lg:flex-col">
+        <div className="flex items-center gap-2.5 px-5 py-5">
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-white"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+          >
+            {tenant.name.charAt(0).toUpperCase()}
           </div>
-          {progress ? <StreakPill days={progress.currentStreak} /> : null}
+          <span className="truncate font-display text-sm font-semibold text-ink-900">{tenant.name}</span>
         </div>
-      </header>
 
-      <main className="flex-1 pb-24">
-        <div className="mx-auto w-full max-w-md px-5 py-6">{children}</div>
-      </main>
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className="focus-ring mx-3 mb-3 flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink-500 transition-colors duration-150 hover:border-line-strong hover:text-ink-700"
+        >
+          <Search className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+          <span className="flex-1 text-left">Buscar</span>
+          <kbd className="rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
+        </button>
 
+        <nav aria-label="Navegacion principal" className="flex-1 space-y-0.5 px-3">
+          {NAV_ITEMS.map((item) => {
+            const active = isActive(item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'focus-ring flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-150 ease-pulse',
+                  active ? 'bg-primary-soft font-medium text-ink-900' : 'text-ink-500 hover:text-ink-900',
+                )}
+              >
+                <Icon
+                  className="h-4 w-4 shrink-0"
+                  strokeWidth={active ? 2 : 1.75}
+                  style={active ? { color: 'var(--brand-primary)' } : undefined}
+                  aria-hidden="true"
+                />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Saludo a la izquierda, avisos y cuenta a la derecha: donde la gente los busca. */}
+        <LearnerTopbar
+          fullName={profile.fullName}
+          email={profile.email}
+          streak={progress?.currentStreak ?? null}
+          greeting={greeting(new Date())}
+          onSearch={() => setPaletteOpen(true)}
+        />
+
+        <main className="flex-1 pb-24 lg:pb-10">
+          <div className="mx-auto w-full max-w-md px-5 py-6 lg:max-w-[1100px] lg:px-10 lg:py-10">{children}</div>
+        </main>
+      </div>
+
+      {/* Barra inferior: solo movil. */}
       <nav
         aria-label="Navegacion principal"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         <ul className="mx-auto flex w-full max-w-md items-stretch">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const active = isActive(item.href);
             const Icon = item.icon;
             return (
               <li key={item.href} className="flex-1">
@@ -110,6 +176,8 @@ export function LearnerShell({ children }: { children: ReactNode }) {
           })}
         </ul>
       </nav>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

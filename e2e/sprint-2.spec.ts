@@ -57,14 +57,18 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await page.locator('#a-process').selectOption({ index: 1 });
     await page.getByRole('button', { name: 'Crear actividad' }).click();
     await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
-    await expect(page.getByRole('button', { name: /Version 1/ })).toBeVisible();
 
-    // 3. Contenido: una leccion.
+    // 3. Contenido: una leccion. La formacion es una ficha con pestanas; el contenido vive en la
+    // suya (reestructuracion de la autoria, 2026-08-27).
+    await page.getByRole('button', { name: 'Contenido', exact: true }).click();
     await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
-    await page.locator('#c-type').selectOption('LESSON');
+    // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
+    await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
     await page.locator('#c-title').fill('Bienvenida');
     // Se resuelve el value real de la opcion: `label` no admite expresiones regulares y el
     // texto incluye el conteo de tarjetas.
+    // Paso 2: se reutiliza una leccion de la biblioteca en vez de crear una nueva.
+    await page.getByRole('radio', { name: 'Traer de la biblioteca' }).click();
     const lessonValue = await page
       .locator('#c-lesson option', { hasText: `Bienvenida E2E ${suffix}` })
       .first()
@@ -81,17 +85,22 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await expect(page.getByText('Version 1 publicada')).toBeVisible();
 
     // 5. La version publicada es inmutable: ya no se puede agregar contenido.
-    await expect(page.getByText(/es inmutable/)).toBeVisible();
+    // El rotulo cambio al reestructurar la ficha ("publicada e inmutable"): se afirma el concepto.
+    await expect(page.getByText(/inmutable/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agregar contenido' })).toHaveCount(0);
 
     // 6. Editar lo publicado crea la version 2 en borrador.
     await page.getByRole('button', { name: 'Nueva version' }).click();
     await expect(page.getByText('Version 2 creada en borrador')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Version 2/ })).toBeVisible();
+
+    // El historial de versiones vive en su pestana desde la reestructuracion de la autoria.
+    await page.getByRole('button', { name: 'Versiones', exact: true }).click();
+    await expect(page.getByText('Version 2').first()).toBeVisible();
 
     // 7. La version 1 sigue publicada y con su contenido intacto.
-    await page.getByRole('button', { name: /Version 1/ }).click();
-    await expect(page.getByText(/es inmutable/)).toBeVisible();
+    await page.getByText('Version 1', { exact: true }).click();
+    await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+    await expect(page.getByText(/inmutable/)).toBeVisible();
     await expect(page.getByText('Bienvenida')).toBeVisible();
   });
 });

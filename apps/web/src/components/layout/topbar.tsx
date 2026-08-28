@@ -1,9 +1,70 @@
 'use client';
 
-import { Bell, ChevronDown, LogOut } from 'lucide-react';
+import {
+  Bell,
+  BookOpen,
+  CalendarDays,
+  ChartColumn,
+  CheckSquare,
+  ChevronDown,
+  ClipboardList,
+  House,
+  LogOut,
+  Search,
+  Settings,
+  Target,
+  Users,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { getInbox, logout, markNotificationRead, type InboxItem } from '@/lib/api';
+import { listUsers } from '@/lib/admin-api';
+import { listActivities } from '@/lib/catalog-api';
 import { cn } from '@/components/ui/cn';
+import { CommandPalette, type Command } from './command-palette';
+
+/** Destinos del panel. Mismo buscador que el aprendiz, contenidos distintos. */
+const ADMIN_COMMANDS: Command[] = [
+  { id: 'a-inicio', label: 'Inicio', href: '/inicio', icon: House, group: 'Ir a' },
+  { id: 'a-formaciones', label: 'Formaciones', href: '/contenido-formativo', icon: BookOpen, group: 'Ir a' },
+  { id: 'a-convocatorias', label: 'Convocatorias', href: '/convocatorias', icon: CalendarDays, group: 'Ir a' },
+  { id: 'a-asignaciones', label: 'Asignaciones', href: '/asignaciones', icon: Target, group: 'Ir a' },
+  { id: 'a-plan', label: 'Plan anual', href: '/plan', icon: ClipboardList, group: 'Ir a' },
+  { id: 'a-usuarios', label: 'Usuarios', href: '/usuarios', icon: Users, group: 'Ir a' },
+  { id: 'a-roles', label: 'Roles y permisos', href: '/configuracion/roles', icon: Settings, group: 'Ir a' },
+  { id: 'a-aprobaciones', label: 'Aprobaciones', href: '/aprobaciones', icon: CheckSquare, group: 'Ir a' },
+  { id: 'a-reportes', label: 'Reportes', href: '/reportes', icon: ChartColumn, group: 'Ir a' },
+];
+
+/**
+ * Lo que se busca de verdad en el panel: una formacion concreta o una persona concreta.
+ *
+ * Si una de las dos consultas falla por permisos —un analista sin `users:manage`— se devuelve lo
+ * que si se pudo traer en vez de dejar el buscador vacio.
+ */
+async function loadAdminCommands(): Promise<Command[]> {
+  const [activities, users] = await Promise.all([
+    listActivities({ pageSize: 50 }).catch(() => ({ items: [] })),
+    listUsers({ active: 'true', pageSize: 50 }).catch(() => ({ items: [] })),
+  ]);
+  return [
+    ...activities.items.map((activity) => ({
+      id: `act-${activity.id}`,
+      label: activity.name,
+      hint: activity.activityType.name,
+      href: `/contenido-formativo/${activity.id}`,
+      icon: BookOpen,
+      group: 'Formaciones',
+    })),
+    ...users.items.map((user) => ({
+      id: `usr-${user.id}`,
+      label: user.fullName,
+      hint: user.jobTitle.name,
+      href: '/usuarios',
+      icon: Users,
+      group: 'Personas',
+    })),
+  ];
+}
 
 function useOutsideClick(ref: RefObject<HTMLElement>, onOutside: () => void) {
   useEffect(() => {
@@ -166,13 +227,49 @@ export interface TopbarProps {
 }
 
 export function Topbar({ breadcrumb, userFullName }: TopbarProps) {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-surface px-6">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6">
       <div className="min-w-0 text-sm text-ink-500">{breadcrumb}</div>
+
+      {/*
+        Buscar es la accion mas repetida de quien administra: con doscientas formaciones y
+        seiscientas personas, recorrer listas es el cuello de botella real del dia a dia.
+      */}
+      <button
+        type="button"
+        onClick={() => setPaletteOpen(true)}
+        className="focus-ring hidden min-w-[220px] items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink-500 transition-colors duration-150 hover:border-line-strong hover:text-ink-700 md:flex"
+      >
+        <Search className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+        <span className="flex-1 text-left">Buscar</span>
+        <kbd className="rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
+      </button>
+
       <div className="flex items-center gap-2">
         <NotificationsMenu />
         <UserMenu userFullName={userFullName} />
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        staticCommands={ADMIN_COMMANDS}
+        loadCommands={loadAdminCommands}
+        placeholder="Buscar una formacion, una persona o ir a una pantalla"
+      />
     </header>
   );
 }

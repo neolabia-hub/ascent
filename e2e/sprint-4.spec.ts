@@ -57,9 +57,14 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
   await page.getByRole('button', { name: 'Crear actividad' }).click();
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
+  // La formacion es una ficha con pestanas: el contenido vive en la suya.
+  await page.getByRole('button', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
-  await page.locator('#c-type').selectOption('LESSON');
+  // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
+  await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
   await page.locator('#c-title').fill('La pildora');
+  // Paso 2: se reutiliza una leccion de la biblioteca en vez de crear una nueva.
+  await page.getByRole('radio', { name: 'Traer de la biblioteca' }).click();
   const lessonValue = await page
     .locator('#c-lesson option', { hasText: `Leccion ${pillName}` })
     .first()
@@ -114,12 +119,14 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     await expect(page.getByText(pillName)).toBeVisible();
 
     // 6. El reproductor: dos tarjetas, y el quiz exige responder antes de dejar avanzar.
-    await page.getByRole('button', { name: /Empezar|Continuar/ }).click();
+    // La accion principal va primera en el DOM; las partes de la derecha repiten el rotulo.
+    await page.getByRole('button', { name: /Empezar|Continuar/ }).first().click();
     await page.waitForURL('**/contenido/**', { timeout: 20_000 });
-    await expect(page.getByText('Antes de mover la estiba')).toBeVisible();
+    // El titulo tambien aparece en el panel de contenido (oculto en movil): basta el primero.
+    await expect(page.getByText('Antes de mover la estiba').first()).toBeVisible();
     await page.getByRole('button', { name: 'Siguiente' }).click();
 
-    await expect(page.getByText('Que revisas antes de mover la estiba?')).toBeVisible();
+    await expect(page.getByText('Que revisas antes de mover la estiba?').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Terminar' })).toBeDisabled();
     await page.getByRole('button', { name: 'Que la carga este centrada' }).click();
     await page.getByRole('button', { name: 'Terminar' }).click();

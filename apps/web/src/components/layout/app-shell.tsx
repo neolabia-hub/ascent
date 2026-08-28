@@ -13,10 +13,10 @@ import { Topbar } from './topbar';
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   inicio: 'Inicio',
-  'contenido-formativo': 'Contenido formativo',
+  'contenido-formativo': 'Formaciones',
   convocatorias: 'Convocatorias',
   plan: 'Plan',
-  personas: 'Personas',
+  usuarios: 'Usuarios',
   aprobaciones: 'Aprobaciones',
   reportes: 'Reportes',
   configuracion: 'Configuracion',

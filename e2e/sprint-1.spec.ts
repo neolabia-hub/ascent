@@ -18,8 +18,8 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await expect(page.locator('aside')).toContainText('TRANSPRENSA');
 
     // Navegacion a las secciones del sprint.
-    await page.getByRole('link', { name: 'Personas' }).click();
-    await expect(page.getByRole('heading', { name: 'Personas' })).toBeVisible();
+    await page.getByRole('link', { name: 'Usuarios' }).click();
+    await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Configuracion' }).click();
     await expect(page.getByRole('heading', { name: 'Configuracion' })).toBeVisible();
@@ -52,7 +52,7 @@ test.describe('Sprint 1 — administracion del tenant', () => {
 
   test('personas: crear una y recibir la contrasena generada una sola vez', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto('/personas');
+    await page.goto('/usuarios');
 
     const suffix = unique();
     const document = `77${suffix}`;
@@ -81,7 +81,7 @@ test.describe('Sprint 1 — administracion del tenant', () => {
 
   test('carga masiva: las filas validas entran aunque otra falle', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto('/personas');
+    await page.goto('/usuarios');
 
     const suffix = unique();
     const csv = [

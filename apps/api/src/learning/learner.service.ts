@@ -121,7 +121,18 @@ export class LearnerService {
             code: true,
             scheduledDate: true,
             activityVersion: {
-              select: { versionNumber: true, activity: { select: { id: true, name: true } } },
+              select: {
+                versionNumber: true,
+                // El tipo viaja para que la portada del historial sea la misma que la del
+                // catalogo: la identidad visual de una formacion no puede cambiar de pantalla.
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    activityType: { select: { code: true, name: true, colorHex: true } },
+                  },
+                },
+              },
             },
           },
         },

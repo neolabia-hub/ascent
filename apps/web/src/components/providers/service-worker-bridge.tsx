@@ -22,6 +22,20 @@ export function ServiceWorkerBridge() {
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
 
+    // En DESARROLLO no se registra, y si quedo uno registrado se da de baja.
+    //
+    // El worker cachea el armazon para que la aplicacion abra sin senal, que es justo lo que
+    // arruina el trabajo del dia: cambias una pantalla, recargas, y el navegador te sigue
+    // sirviendo la anterior desde el cache. Depurar eso cuesta horas y parece un fallo del
+    // codigo. Sin senal solo hay que funcionar en produccion.
+    if (process.env.NODE_ENV !== 'production') {
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .catch(() => undefined);
+      return;
+    }
+
     const sendAuth = () => {
       const token = getAccessToken();
       navigator.serviceWorker.controller?.postMessage({ type: 'AUTH', token });

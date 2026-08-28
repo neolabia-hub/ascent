@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type TextareaHTMLAttributes } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
+  ArrowLeft,
   BarChart3,
   ChevronDown,
   ChevronUp,
@@ -39,6 +40,7 @@ import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
@@ -205,22 +207,13 @@ function shuffle<T>(items: T[]): T[] {
   return arr;
 }
 
-function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      className={cn(
-        'focus-ring w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-300',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
 export default function LessonEditorPage() {
   const params = useParams<{ id: string }>();
   const lessonId = params.id;
   const router = useRouter();
+  // Cuando se llega desde una formacion, el editor sabe volver a ella: de otro modo el autor
+  // acaba en la biblioteca de lecciones sin saber como regresar a lo que estaba armando.
+  const backTo = useSearchParams().get('volverA');
   const { showToast } = useToast();
 
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
@@ -387,8 +380,8 @@ export default function LessonEditorPage() {
         title="Leccion no encontrada"
         description="Puede que haya sido eliminada o que el enlace este incorrecto."
         action={
-          <Button variant="outline" onClick={() => router.push('/lecciones')}>
-            Volver a lecciones
+          <Button variant="outline" onClick={() => router.push(backTo ?? '/lecciones')}>
+            {backTo ? 'Volver a la formacion' : 'Volver a lecciones'}
           </Button>
         }
       />
@@ -397,6 +390,16 @@ export default function LessonEditorPage() {
 
   return (
     <div>
+      {backTo ? (
+        <button
+          type="button"
+          onClick={() => router.push(backTo)}
+          className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700"
+        >
+          <ArrowLeft size={14} />
+          Volver a la formacion
+        </button>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <input

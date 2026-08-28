@@ -14,8 +14,9 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityCover } from '@/components/modules/activity-cover';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
-import { Table, TablePagination, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
+import { TablePagination } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 
 const MODALITY_LABEL: Record<Modality, string> = {
@@ -164,64 +165,53 @@ export default function ContenidoFormativoPage() {
           />
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <THead>
-                <Tr>
-                  <Th>Actividad</Th>
-                  <Th>Tipo</Th>
-                  <Th>Proceso</Th>
-                  <Th>Modalidad</Th>
-                  <Th>Estado</Th>
-                  <Th className="w-24 text-right">Accion</Th>
-                </Tr>
-              </THead>
-              <TBody>
-                {data.items.map((activity) => {
-                  const state = versionState(activity.versions);
-                  return (
-                    <Tr key={activity.id}>
-                      <Td>
-                        <div className="font-medium text-ink-900">{activity.name}</div>
-                        <div className="font-mono text-xs text-ink-500">{activity.code}</div>
-                      </Td>
-                      <Td>
-                        <span className="inline-flex items-center gap-2 text-ink-700">
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ backgroundColor: activity.activityType.colorHex ?? 'var(--ink-300)' }}
-                          />
-                          {activity.activityType.name}
-                        </span>
-                      </Td>
-                      <Td className="text-ink-700">{activity.process.name}</Td>
-                      <Td className="text-ink-500">{MODALITY_LABEL[activity.modality]}</Td>
-                      <Td>
-                        <StatusPill kind={state.kind} label={state.label} />
-                      </Td>
-                      <Td className="text-right">
-                        <Link href={`/contenido-formativo/${activity.id}`}>
-                          <Button variant="ghost" size="sm">
-                            Abrir
-                          </Button>
-                        </Link>
-                      </Td>
-                    </Tr>
-                  );
-                })}
-              </TBody>
-            </Table>
+        // Tarjetas y no tabla: una formacion se reconoce por su portada mucho antes que por su
+        // fila, y el administrador ve las MISMAS portadas que ve su gente. Una tabla obliga a
+        // leer; un catalogo se reconoce.
+        <div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {data.items.map((activity, index) => {
+              const state = versionState(activity.versions);
+              return (
+                <Link
+                  key={activity.id}
+                  href={`/contenido-formativo/${activity.id}`}
+                  style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
+                  className="focus-ring animate-card-in block overflow-hidden rounded-xl border border-line bg-surface transition-shadow duration-150 ease-pulse hover:shadow-card-hover"
+                >
+                  <ActivityCover
+                    seed={activity.id}
+                    colorHex={activity.activityType.colorHex}
+                    label={activity.activityType.name}
+                  />
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="line-clamp-2 font-display text-base font-semibold leading-snug text-ink-900">
+                        {activity.name}
+                      </h3>
+                      <StatusPill kind={state.kind} label={state.label} />
+                    </div>
+                    <p className="mt-2 truncate text-sm text-ink-500">
+                      {activity.process.name} · {MODALITY_LABEL[activity.modality]}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[11px] text-ink-300">{activity.code}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
-          <TablePagination
-            from={from}
-            to={to}
-            total={data.total}
-            canPrevious={page > 1}
-            canNext={to < data.total}
-            onPrevious={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => p + 1)}
-          />
+
+          <div className="card mt-4">
+            <TablePagination
+              from={from}
+              to={to}
+              total={data.total}
+              canPrevious={page > 1}
+              canNext={to < data.total}
+              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => p + 1)}
+            />
+          </div>
         </div>
       )}
 

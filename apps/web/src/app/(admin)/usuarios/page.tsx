@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Download, KeyRound, Pencil, Plus, Search, Upload, UserRound } from 'lucide-react';
+import { Copy, Download, KeyRound, Pencil, Plus, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
   createUser,
@@ -17,6 +17,7 @@ import {
   type UserRow,
   type UsersPage,
 } from '@/lib/admin-api';
+import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -53,7 +54,7 @@ function apiErrorText(error: unknown): string {
   return 'Ocurrio un error. Intenta de nuevo.';
 }
 
-export default function PersonasPage() {
+export default function UsuariosPage() {
   const { showToast } = useToast();
 
   // Filtros y datos
@@ -68,6 +69,8 @@ export default function PersonasPage() {
   // Drawer crear/editar
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
+  /** Persona cuyas excepciones de permiso se estan revisando. */
+  const [permissionsFor, setPermissionsFor] = useState<UserRow | null>(null);
   const [form, setForm] = useState<CreateUserBody>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -212,7 +215,7 @@ export default function PersonasPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-[28px] font-semibold text-ink-900">Personas</h1>
+          <h1 className="font-display text-[28px] font-semibold text-ink-900">Usuarios</h1>
           <p className="mt-1 text-sm text-ink-500">Colaboradores del tenant: cuentas, cargos, areas y acceso.</p>
         </div>
         <div className="flex gap-2">
@@ -294,6 +297,15 @@ export default function PersonasPage() {
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => openEdit(user)} aria-label={`Editar ${user.fullName}`}>
                           <Pencil size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPermissionsFor(user)}
+                          aria-label={`Permisos de ${user.fullName}`}
+                          title="Permisos y excepciones"
+                        >
+                          <ShieldCheck size={14} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => resetPassword(user)} aria-label={`Nueva contrasena para ${user.fullName}`} title="Generar nueva contrasena">
                           <KeyRound size={14} />
@@ -527,6 +539,14 @@ export default function PersonasPage() {
           ) : null}
         </div>
       </Drawer>
+
+      <UserPermissionsDrawer
+        user={permissionsFor}
+        open={permissionsFor !== null}
+        onOpenChange={(open) => {
+          if (!open) setPermissionsFor(null);
+        }}
+      />
     </div>
   );
 }
