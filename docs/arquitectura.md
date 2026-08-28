@@ -226,6 +226,8 @@ packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 | Filtrar datos personales a terceros | Sentry configurado sin datos personales |
 | Leer la formacion de otro en un telefono compartido | Al cerrar sesion se borran el cache sin senal y la cola pendiente del dispositivo |
 | Perder el avance de alguien por un token vencido | La cola de reenvio usa el token vigente que le pasa la pagina, no el que se guardo horas antes; un rechazo por sesion caducada CONSERVA el envio en vez de descartarlo |
+| Que alguien lea los archivos de otra empresa | Los archivos se sirven por URL FIRMADA: pedirla exige sesion y comprueba el tenant; usarla no, porque una etiqueta `<img>` o `<video>` no puede autenticarse. La firma ata clave + caducidad + secreto del servidor, y se compara en tiempo constante |
+| Dar por visto un video que nadie vio | Con archivo propio se cuentan los SEGUNDOS DISTINTOS reproducidos —adelantar deja huecos y no suma— y el avance se bloquea hasta el minimo exigido. Con video de otra plataforma no se puede medir y se registra como declaracion, dicho en pantalla |
 
 ---
 
@@ -297,6 +299,8 @@ Honesta y priorizada:
 | El cache sin senal guarda lo que la persona **ya visito**; no descarga por adelantado las lecciones que tiene asignadas | Quien nunca abrio la pildora con senal no puede cursarla sin senal | Cuando se sepa el peso real del contenido de Transprensa: es una precarga al entrar a los pendientes |
 | Los videos y documentos no se cachean para uso sin senal | Un video de 3 minutos multiplica lo que se guarda en el telefono. La leccion de tarjetas —el formato principal— si funciona sin senal | Segun el peso del contenido real |
 | Sin notificaciones push: el aviso de pildora sale por correo y bandeja in-app | El recordatorio llega, pero no al bloqueo de pantalla | Exige claves VAPID y permiso del usuario; se decide con el cliente |
+| **Un video de YouTube/Vimeo no se puede verificar**: queda como declaracion de la persona | Media: para formacion que deba sostenerse ante un auditor conviene SUBIR el video, no enlazarlo | Se puede cerrar integrando la API del reproductor de YouTube (da estado y posicion). Mientras tanto, la pantalla lo dice y la recomendacion es subir el archivo |
+| Publicar una version NUEVA no mueve a quien ya estaba inscrito, y la convocatoria sigue apuntando a la version vieja | Media: el administrador publica v2 y el aprendiz sigue viendo v1, sin explicacion en pantalla | Es correcto por diseno (politica de migracion, regla de oro 4), pero falta que la convocatoria pueda apuntar a la version nueva y que la UI lo explique |
 | La franja horaria del aviso se deduce en cada pasada de los ultimos 60 dias de eventos (tope 5.000) | Suficiente para el piloto | Con miles de personas, materializar la hora en una columna |
 | Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
 | Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |

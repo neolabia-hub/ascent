@@ -190,3 +190,43 @@ Y en el navegador, recarga forzada (Ctrl+Shift+R): los 404 quedan cacheados.
 
 Regla: para verificar un build, se BAJA el dev server antes. Si hace falta comprobar ambos, usar
 `next build` con `--distDir` aparte.
+
+### 2026-08-27 — Ningun archivo subido se veia: 401 en `<img>` y `<video>`
+Sintoma: se sube un video o una imagen, el administrador la ve listada, pero en pantalla no
+aparece nada. En la consola del navegador, `GET /v1/media/file/...` devuelve **401**.
+
+Causa: el endpoint que sirve archivos exigia la cabecera `Authorization`, y una etiqueta HTML
+(`<img>`, `<video>`, `<iframe>`) NO puede enviarla — el token vive en memoria y solo lo adjunta
+`apiFetch`. La cookie de refresco tampoco viaja: su `path` es `/v1/auth`. Resultado: **todo el
+material subido estaba roto desde siempre** (imagenes de tarjetas, videos y documentos), no solo
+un caso.
+
+Arreglo (patron de URL prefirmada, el que ya prescribe CLAUDE.md 11):
+- `GET /v1/media/sign?key=...` — **exige sesion**, comprueba que la clave sea del tenant de quien
+  pide y devuelve una ruta firmada con caducidad de 1 hora.
+- `GET /v1/media/file/:key?e=<caducidad>&t=<firma>` — **publico pero firmado**. Valida HMAC con
+  comparacion de tiempo constante, y saca el tenant del prefijo de la clave (que la firma acaba
+  de garantizar). Sin sesion no hay contexto de empresa, por eso se usa `forTenant(...)` y no
+  `scoped`.
+- En el frontend, `mediaUrl()` (sincrono) se sustituye por `useMediaUrl()` y por los componentes
+  `<MediaImage>` / `<MediaVideo>`: resolver la firma es asincrono y una funcion no puede esperar.
+
+Secreto: `MEDIA_URL_SECRET`. Si no esta, reusa `REFRESH_TOKEN_PEPPER`. **En produccion hay que
+fijarlo**, igual que el pepper.
+
+Comprobacion rapida de que sigue bien (debe dar 200 sin token, y fallar con la firma tocada):
+```
+# 1. pedir firma con sesion   2. descargar SIN cabecera de autorizacion
+curl -H "Authorization: Bearer $TOKEN" "$API/media/sign?key=$KEY"
+curl -i "$API/media/file/$KEY_URLENCODED?e=...&t=..."
+```
+
+### 2026-08-27 — Formaciones de demostracion con video
+`node scripts/demo-video.mjs "<ruta del mp4>"` crea dos formaciones publicadas, convocadas y
+asignadas: una con video ENLAZADO (YouTube) y otra con video SUBIDO. Va por la API, no por
+Prisma, a proposito: recorre los mismos endpoints que la interfaz, asi que si algo esta roto para
+el administrador, el script se rompe igual.
+
+Es idempotente PASO A PASO (publicar, convocar, asignar), no "todo o nada". La primera version se
+saltaba la formacion entera si la actividad ya existia, y un fallo a mitad dejaba formaciones que
+existian pero no le aparecian a nadie.

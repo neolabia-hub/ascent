@@ -65,6 +65,9 @@ export class PlayerService {
         activityName: enrollment.activityVersion.activity.name,
         activityDescription: enrollment.activityVersion.activity.description,
         activityType: enrollment.activityVersion.activity.activityType,
+        activityModality: enrollment.activityVersion.activity.modality,
+        processName: enrollment.activityVersion.activity.process.name,
+        normNames: enrollment.activityVersion.activity.norms.map((row) => row.norm.name),
         versionNumber: enrollment.activityVersion.versionNumber,
         passingScore: enrollment.activityVersion.passingScore,
         estimatedMinutes: enrollment.activityVersion.estimatedMinutes,
@@ -259,7 +262,12 @@ export class PlayerService {
                 id: true,
                 name: true,
                 description: true,
+                modality: true,
                 activityType: { select: { code: true, name: true, colorHex: true } },
+                // El proceso y la norma son lo que hace de esto EVIDENCIA y no un video suelto.
+                // El colaborador tenia derecho a verlo y no lo tenia en ninguna pantalla.
+                process: { select: { name: true } },
+                norms: { select: { norm: { select: { name: true } } } },
               },
             },
           },

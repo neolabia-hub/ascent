@@ -90,9 +90,18 @@ Derivadas en runtime: --brand-primary-soft (10% sobre superficie), --brand-prima
   area. Header simple con saludo y pastilla de racha.
 - Todo es TARJETA (radio 24): "Pendientes" arriba (con due date y barra de progreso fina),
   luego "Tu repaso de hoy" (pildora de 3-5 min, un tap), luego historial.
-- Player de tarjetas: pantalla completa, fondo --ink-900 SIEMPRE (inmersivo), progreso como
-  segmentos arriba (patron stories), swipe/tap para avanzar, texto 18-20, un solo foco por
-  tarjeta. Boton primario grande abajo (52px).
+- Player de tarjetas: SUPERFICIE DE LECTURA clara y calida (`.reading-surface`), NO fondo negro.
+  Se cambio el 2026-08-27: el negro a pantalla completa es el patron "stories" de una red social,
+  y una tarjeta de formacion hay que entenderla, no consumirla; ademas cansa a los tres minutos.
+  Columna de 720px, titulares 28-34, cuerpo 19/1.72 (`.reading-body`), cada tarjeta entra con
+  `.reading-enter`. Progreso = linea de 3px pegada al BORDE SUPERIOR de la ventana, no una barra
+  dentro del contenido. Panel de contenido a la DERECHA en escritorio (formacion entera, con la
+  parte actual desplegada). Boton primario grande abajo (52px). Swipe para avanzar en movil.
+- Examenes: una pregunta por pantalla, opciones como tarjetas de 60px con letra A/B/C al
+  principio, estado correcto/incorrecto con color de fondo, no solo icono.
+- Barra superior del aprendiz: saludo a la izquierda; buscador, avisos y menu de cuenta a la
+  derecha. La racha vive en el menu de cuenta. El REPRODUCTOR no lleva barra ni carril: mientras
+  se cursa, cada elemento de navegacion es una invitacion a irse. La FICHA de la formacion si.
 - Examenes: una pregunta por pantalla, opciones como tarjetas seleccionables 56px, feedback
   inmediato solo si la politica lo permite.
 

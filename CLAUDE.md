@@ -960,6 +960,8 @@ neo-pulse/
 | 40 | **El plan aprobado no se edita**; reprogramar un renglón lo marca como RESCHEDULED | Sus renglones ya obligan a personas reales; editarlo en silencio reescribiría el pasado |
 | 41 | **Un envío encolado sin señal devuelve 503, nunca un éxito fingido.** El service worker guarda el avance y lo reintenta, pero la pantalla dice la verdad ("lo guardaremos al recuperar señal") | Devolver un 202 con la forma que espera la interfaz le mentiría al usuario sobre su propio registro formativo y rompería el código que lee la respuesta. Solo se encola el AVANCE (acumulativo e idempotente): la entrega de un examen y el repaso devuelven nota y mueven estado, y hacerlos a espaldas de la persona es peor que pedirle señal |
 | 42 | **A dónde entra cada persona se decide por PERMISOS, no por nombre de rol ni por dispositivo**: quien solo tiene `enrollments:read_own` entra a la superficie del aprendiz | Los roles son configurables por empresa; los permisos no. Mandar al panel a quien tiene un solo permiso es mandarlo a una pantalla donde todo está prohibido |
+| 43 | **Los archivos se sirven por URL FIRMADA, no con el token de sesión.** Una ruta pide la firma (con sesión, comprobando el tenant); otra sirve el archivo validando HMAC + caducidad | Una etiqueta `<img>`, `<video>` o `<iframe>` no puede enviar la cabecera de autorización. Exigirla hacía que NINGÚN archivo subido se viera (401). La alternativa —abrir el endpoint— dejaría los archivos de una empresa al alcance de quien adivine una clave |
+| 44 | **Solo se EXIGE ver un video cuando el archivo es propio.** Del video alojado se miden los segundos distintos reproducidos y el avance se bloquea hasta el mínimo; de un embebido de YouTube/Vimeo se registra como DECLARACIÓN de la persona, y se dice en pantalla | La plataforma no controla el reproductor de un tercero y no sabe si le dieron a reproducir. Fingir que lo comprueba es peor que reconocerlo: este registro tiene que sostenerse ante un auditor. Se miden segundos distintos y no la posición máxima, porque arrastrar la barra al final daría el video por visto en dos segundos |
 
 ---
 
@@ -1105,6 +1107,7 @@ REDIS_URL=redis://...
 JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
 REFRESH_TOKEN_SECRET=...
+MEDIA_URL_SECRET=...              # firma de las URL de archivos (si falta, reusa el pepper de refresco)
 R2_ACCOUNT_ID=... / R2_ACCESS_KEY_ID=... / R2_SECRET_ACCESS_KEY=... / R2_BUCKET_NAME=neo-pulse-files
 RESEND_API_KEY=... / RESEND_FROM_EMAIL=noreply@neopulse.app
 ANTHROPIC_API_KEY=...            # generación de borradores (AIAdapter)

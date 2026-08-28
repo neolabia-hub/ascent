@@ -144,8 +144,12 @@ export default function ActividadDetallePage() {
   useEffect(() => {
     if (!selectedVersionId) return;
     setVersion(null);
-    void getVersion(selectedVersionId).then(setVersion).catch(() => undefined);
-  }, [selectedVersionId]);
+    void getVersion(selectedVersionId)
+      .then(setVersion)
+      // Se avisa en vez de tragarselo: un fallo silencioso aqui dejaba la pestana de contenido
+      // cargando para siempre y sin explicacion.
+      .catch(() => showToast({ kind: 'danger', title: 'No se pudo cargar el contenido de esta version' }));
+  }, [selectedVersionId, showToast]);
 
   useEffect(() => {
     void me()
@@ -153,7 +157,17 @@ export default function ActividadDetallePage() {
       .catch(() => undefined);
   }, []);
 
-  const isDraft = version?.status === 'DRAFT';
+  /**
+   * El estado de la version sale del LISTADO que ya trae la actividad, no del detalle que se
+   * pide aparte.
+   *
+   * Antes dependia de `version`, que es una segunda peticion: si esa peticion iba lenta o
+   * fallaba, `version` se quedaba en null y desaparecian LOS DOS botones de la cabecera —
+   * "Publicar version" y "Nueva version"—, dejando la pantalla sin ninguna accion posible y sin
+   * decir por que. Las acciones principales no pueden depender de una peticion secundaria.
+   */
+  const selectedSummary = activity?.versions.find((row) => row.id === selectedVersionId) ?? null;
+  const isDraft = selectedSummary?.status === 'DRAFT';
 
   const refreshVersion = useCallback(async () => {
     if (!selectedVersionId) return;
@@ -317,7 +331,11 @@ export default function ActividadDetallePage() {
             </Button>
           ) : null}
           {isDraft ? (
-            <Button onClick={() => setPublishOpen(true)} disabled={!version || version.contents.length === 0}>
+            // Se cuenta con el detalle si esta, y si no con el conteo que ya trae el listado.
+            <Button
+              onClick={() => setPublishOpen(true)}
+              disabled={(version?.contents.length ?? selectedSummary?._count?.contents ?? 0) === 0}
+            >
               {canPublish ? 'Publicar version' : 'Enviar a aprobacion'}
             </Button>
           ) : null}

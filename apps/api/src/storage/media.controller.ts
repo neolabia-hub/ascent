@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { PackageKind } from '@prisma/client';
 import type { Response } from 'express';
-import { CurrentUser, RequirePermissions } from '../common/decorators.js';
+import { CurrentUser, Public, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { detectType } from './magic-bytes.js';
@@ -73,6 +73,20 @@ export class MediaController {
     return created;
   }
 
+  /**
+   * Firma temporal para una clave de almacenamiento.
+   *
+   * Esta SI exige sesion, y ahi esta el reparto: quien pide la firma se identifica y se comprueba
+   * que el archivo sea de SU empresa; quien luego descarga con la firma ya no necesita
+   * identificarse, que es lo unico que permite usarla en un `<img>` o un `<video>`.
+   */
+  @Get('sign')
+  sign(@Query('key') key: string | undefined, @CurrentUser() user: AuthUser) {
+    if (!key) throw new BadRequestException({ code: 'KEY_REQUIRED', field: 'key' });
+    if (!key.startsWith(`${user.tenantId}/`)) throw new NotFoundException({ code: 'FILE_NOT_FOUND' });
+    return { url: this.storage.signPath(key) };
+  }
+
   /** URL de acceso al paquete (firmada en produccion, ruta interna en desarrollo). */
   @Get(':packageId/url')
   async url(@Param('packageId', ParseUUIDPipe) packageId: string) {
@@ -85,16 +99,36 @@ export class MediaController {
   }
 
   /**
-   * Sirve el archivo en desarrollo (almacenamiento local). Exige sesion: el aislamiento del
-   * tenant viene del prefijo de la clave, que se compara con el tenant del usuario.
+   * Sirve el archivo (almacenamiento local en desarrollo).
+   *
+   * ES PUBLICO PERO FIRMADO, y no por comodidad: una etiqueta `<img>`, `<video>` o un `<iframe>`
+   * NO puede enviar la cabecera de autorizacion, asi que exigir el token aqui hacia que ningun
+   * archivo subido se viera nunca —imagenes de tarjetas, videos y documentos devolvian 401 y la
+   * pantalla se quedaba en blanco—. Es el patron de URL prefirmada que ya prescribe CLAUDE.md 11.
+   *
+   * Lo que protege el acceso es la firma: caduca, va atada a ESA clave concreta y no se puede
+   * fabricar sin el secreto del servidor. La clave sigue llevando el prefijo del tenant, asi que
+   * una firma de una empresa no sirve para los archivos de otra.
    */
+  @Public()
   @Get('file/:key')
-  async file(@Param('key') key: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async file(
+    @Param('key') key: string,
+    @Query('e') expiresAt: string | undefined,
+    @Query('t') signature: string | undefined,
+    @Res() res: Response,
+  ) {
     const storageKey = decodeURIComponent(key);
-    if (!storageKey.startsWith(`${user.tenantId}/`)) {
+    if (!this.storage.verifySignature(storageKey, expiresAt, signature)) {
       throw new NotFoundException({ code: 'FILE_NOT_FOUND' });
     }
-    const pkg = await this.prisma.scoped.contentPackage.findFirst({
+
+    // Sin sesion no hay tenant en el contexto: se toma del prefijo de la clave, que es justo lo
+    // que la firma acaba de garantizar que nadie ha manipulado.
+    const tenantId = storageKey.split('/')[0] ?? '';
+    if (!/^[0-9a-f-]{36}$/.test(tenantId)) throw new NotFoundException({ code: 'FILE_NOT_FOUND' });
+
+    const pkg = await this.prisma.forTenant(tenantId).contentPackage.findFirst({
       where: { storageKey },
       select: { mimeType: true, originalName: true },
     });

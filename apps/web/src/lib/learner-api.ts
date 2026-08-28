@@ -126,6 +126,10 @@ export interface OpenEnrollment {
     activityName: string;
     activityDescription: string | null;
     activityType: { code: string; name: string; colorHex: string | null };
+    activityModality: 'PRESENCIAL' | 'VIRTUAL' | 'HIBRIDA';
+    processName: string;
+    /** Normas a las que tributa. Vacio = no tributa a ninguna. */
+    normNames: string[];
     versionNumber: number;
     passingScore: Score;
     estimatedMinutes: number | null;

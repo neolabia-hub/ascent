@@ -26,7 +26,6 @@ import { ApiError } from '@/lib/api';
 import {
   duplicateLesson,
   getLesson,
-  mediaUrl,
   saveLessonCards,
   updateLesson,
   uploadMedia,
@@ -40,6 +39,7 @@ import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { MediaImage, MediaVideo } from '@/components/ui/media';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -666,9 +666,8 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
             <div className="space-y-2">
               {payload.mediaKey ? (
                 <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- medio dinamico subido por el usuario */}
-                  <img
-                    src={mediaUrl(payload.mediaKey)}
+                  <MediaImage
+                    storageKey={payload.mediaKey}
                     alt=""
                     className="h-16 w-16 rounded-md border border-line object-cover"
                   />
@@ -707,7 +706,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
           <Field htmlFor="v-file" label="Archivo de video" hint="Sube un archivo o pega una URL externa abajo (uno de los dos).">
             {payload.mediaKey ? (
               <div className="flex items-center gap-3">
-                <video src={mediaUrl(payload.mediaKey)} className="h-16 w-28 rounded-md border border-line object-cover" muted />
+                <MediaVideo storageKey={payload.mediaKey} className="h-16 w-28 rounded-md border border-line object-cover" muted />
                 <Button variant="ghost" size="sm" onClick={() => patch({ mediaKey: null })}>
                   Quitar video
                 </Button>
@@ -930,8 +929,7 @@ function CardPreview({ payload }: { payload: CardPayloadClient }) {
         <div className="flex w-full flex-col gap-4">
           {payload.title ? <h2 className="font-display text-xl font-semibold text-white">{payload.title}</h2> : null}
           {payload.mediaKey ? (
-            // eslint-disable-next-line @next/next/no-img-element -- medio dinamico subido por el usuario
-            <img src={mediaUrl(payload.mediaKey)} alt="" className="w-full rounded-lg object-cover" style={{ maxHeight: 220 }} />
+            <MediaImage storageKey={payload.mediaKey} alt="" className="w-full rounded-lg object-cover" style={{ maxHeight: 220 }} />
           ) : null}
           <p className="text-[18px] leading-relaxed text-white/90">{payload.body || 'Cuerpo de la tarjeta...'}</p>
           {payload.caption ? <p className="text-xs text-white/50">{payload.caption}</p> : null}
@@ -943,7 +941,7 @@ function CardPreview({ payload }: { payload: CardPayloadClient }) {
         <div className="flex w-full flex-col gap-3">
           {payload.title ? <h2 className="font-display text-lg font-semibold text-white">{payload.title}</h2> : null}
           {payload.mediaKey ? (
-            <video src={mediaUrl(payload.mediaKey)} controls className="w-full rounded-lg" style={{ maxHeight: 300 }} />
+            <MediaVideo storageKey={payload.mediaKey} controls className="w-full rounded-lg" style={{ maxHeight: 300 }} />
           ) : (
             <div className="flex h-40 w-full items-center justify-center rounded-lg bg-white/10">
               <Play className="h-10 w-10 text-white/70" strokeWidth={1.5} />

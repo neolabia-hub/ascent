@@ -24,6 +24,7 @@ import {
   type EnrollmentContent,
   type OpenEnrollment,
 } from '@/lib/learner-api';
+import { LearnerShell } from '@/components/layout/learner-shell';
 import { ActivityCover } from '@/components/modules/activity-cover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -39,6 +40,12 @@ const ICON_BY_TYPE: Record<ContentType, LucideIcon> = {
   SURVEY: ClipboardCheck,
   SCORM: BookOpen,
   LINK: Link2,
+};
+
+const MODALITY_LABEL: Record<'PRESENCIAL' | 'VIRTUAL' | 'HIBRIDA', string> = {
+  PRESENCIAL: 'Presencial',
+  VIRTUAL: 'Virtual',
+  HIBRIDA: 'Hibrida',
 };
 
 const LABEL_BY_TYPE: Record<ContentType, string> = {
@@ -160,21 +167,16 @@ export default function EnrollmentPage() {
   }
 
   return (
-    <main className="learner-surface min-h-screen bg-paper pb-16">
-      <header className="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-5 lg:px-8">
-          <Link
-            href="/hoy"
-            aria-label="Volver"
-            className="focus-ring -ml-2 flex h-10 w-10 items-center justify-center rounded-full text-ink-700"
-          >
-            <ArrowLeft className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-          </Link>
-          <p className="truncate text-sm text-ink-500">Tu formacion</p>
-        </div>
-      </header>
+    <LearnerShell>
+      <Link
+        href="/hoy"
+        className="focus-ring mb-4 inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-700"
+      >
+        <ArrowLeft className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+        Volver a mis pendientes
+      </Link>
 
-      <div className="mx-auto max-w-5xl px-5 py-6 lg:px-8 lg:py-10">
+      <div>
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-10">
           {/* Columna izquierda: de que va esto. */}
           <section className="animate-card-in">
@@ -205,6 +207,40 @@ export default function EnrollmentPage() {
                 </p>
               </div>
             </div>
+
+            {/*
+              SOBRE ESTA FORMACION. Las plataformas de mercado ponen aqui estrellas e inscritos,
+              que sirven para decidir una compra. Aqui nadie elige: la induccion es obligatoria.
+              Lo que si necesita saber quien la cursa es de donde sale y para que cuenta —a que
+              proceso pertenece y a que norma tributa—, que es justo lo que convierte esto en
+              evidencia y no en un video suelto. Ese dato existia y solo lo veia el administrador.
+            */}
+            <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border border-line bg-surface p-5">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Proceso</dt>
+                <dd className="mt-1 text-sm text-ink-900">{enrollment.processName}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Modalidad</dt>
+                <dd className="mt-1 text-sm text-ink-900">{MODALITY_LABEL[enrollment.activityModality]}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Nota minima</dt>
+                <dd className="mt-1 text-sm tabular-nums text-ink-900">
+                  {toScore(enrollment.passingScore) ?? '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Version</dt>
+                <dd className="mt-1 text-sm tabular-nums text-ink-900">{enrollment.versionNumber}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Norma a la que tributa</dt>
+                <dd className="mt-1 text-sm text-ink-900">
+                  {enrollment.normNames.length > 0 ? enrollment.normNames.join(' · ') : 'No tributa a ninguna norma'}
+                </dd>
+              </div>
+            </dl>
 
             {blocked ? (
               <section className="mt-4 rounded-xl border border-danger/40 bg-danger-soft p-5">
@@ -310,6 +346,6 @@ export default function EnrollmentPage() {
           </section>
         </div>
       </div>
-    </main>
+    </LearnerShell>
   );
 }

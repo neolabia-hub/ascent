@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
@@ -82,6 +82,12 @@ export class R2StorageAdapter implements StorageAdapter {
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly adapter: StorageAdapter;
+  /**
+   * Secreto de las firmas de medios. Reusa el pepper de refresco si no hay uno propio: en
+   * desarrollo evita un paso de configuracion, y en produccion ambos son secretos del servidor.
+   */
+  private readonly mediaSecret =
+    process.env.MEDIA_URL_SECRET ?? process.env.REFRESH_TOKEN_PEPPER ?? 'neo-pulse-dev-media-secret';
 
   constructor() {
     if (process.env.R2_BUCKET_NAME && process.env.R2_ACCESS_KEY_ID) {
@@ -108,6 +114,39 @@ export class StorageService {
 
   getSignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
     return this.adapter.getSignedUrl(key, expiresInSeconds);
+  }
+
+  /**
+   * FIRMA DE ACCESO A UN ARCHIVO.
+   *
+   * Existe porque una etiqueta `<img>`, `<video>` o un `<iframe>` no puede mandar la cabecera de
+   * autorizacion. La alternativa —abrir el endpoint— dejaria los archivos de una empresa al
+   * alcance de cualquiera que adivinara una clave.
+   *
+   * La firma ata TRES cosas: la clave exacta, el momento de caducidad y el secreto del servidor.
+   * Cambiar cualquiera de las dos primeras invalida la tercera, asi que no se puede reutilizar
+   * una firma para otro archivo ni estirarle la vida.
+   */
+  signPath(key: string, expiresInSeconds = 3600): string {
+    const expiresAt = Date.now() + expiresInSeconds * 1000;
+    const signature = this.sign(key, String(expiresAt));
+    return `/v1/media/file/${encodeURIComponent(key)}?e=${expiresAt}&t=${signature}`;
+  }
+
+  verifySignature(key: string, expiresAt: string | undefined, signature: string | undefined): boolean {
+    if (!expiresAt || !signature) return false;
+    const expiry = Number(expiresAt);
+    if (!Number.isFinite(expiry) || expiry < Date.now()) return false;
+
+    const expected = this.sign(key, expiresAt);
+    // Comparacion de tiempo constante: una comparacion normal filtra el secreto byte a byte.
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  private sign(key: string, expiresAt: string): string {
+    return createHmac('sha256', this.mediaSecret).update(`${key}:${expiresAt}`).digest('hex');
   }
 
   delete(key: string): Promise<void> {

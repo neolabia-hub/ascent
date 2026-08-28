@@ -2,7 +2,7 @@
 
 import { Check, RotateCw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { mediaUrl } from '@/lib/catalog-api';
+import { MediaImage, MediaVideo } from '@/components/ui/media';
 import type { CardPayload } from '@/lib/learner-api';
 import { cn } from '@/components/ui/cn';
 
@@ -76,9 +76,8 @@ function TextImageCard({ payload }: { payload: Extract<CardPayload, { cardType: 
       {payload.title ? <CardTitle>{payload.title}</CardTitle> : null}
       {payload.mediaKey ? (
         <figure className="mb-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={mediaUrl(payload.mediaKey)}
+          <MediaImage
+            storageKey={payload.mediaKey}
             alt={payload.caption ?? ''}
             className="w-full rounded-xl object-cover"
             style={{ maxHeight: '46vh' }}
@@ -101,7 +100,7 @@ function VideoShortCard({ payload }: { payload: Extract<CardPayload, { cardType:
     <div>
       {payload.title ? <CardTitle>{payload.title}</CardTitle> : null}
       {payload.mediaKey ? (
-        <video src={mediaUrl(payload.mediaKey)} controls playsInline className="w-full rounded-xl bg-black" />
+        <MediaVideo storageKey={payload.mediaKey} controls playsInline className="w-full rounded-xl bg-black" />
       ) : embed ? (
         <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
           <iframe
@@ -419,7 +418,7 @@ function FillGapCard({
 }
 
 /** YouTube y Vimeo solo se dejan embeber por su URL de reproductor. */
-function toEmbedUrl(url: string): string | null {
+export function toEmbedUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.hostname.includes('youtube.com')) {

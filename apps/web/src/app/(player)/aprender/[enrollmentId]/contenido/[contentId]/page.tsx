@@ -3,7 +3,7 @@
 import { Check, Lock, Play, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { mediaUrl } from '@/lib/catalog-api';
+import { useMediaUrl } from '@/lib/use-media-url';
 import {
   getContent,
   openEnrollment,
@@ -13,7 +13,7 @@ import {
   type OpenEnrollment,
   type ProgressInput,
 } from '@/lib/learner-api';
-import { LessonCardView, requiresInteraction } from '@/components/modules/learner/lesson-cards';
+import { LessonCardView, requiresInteraction, toEmbedUrl } from '@/components/modules/learner/lesson-cards';
 import { cn } from '@/components/ui/cn';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -519,9 +519,48 @@ function MediaRunner({
   saving: boolean;
   onDone: (pct: number) => Promise<void>;
 }) {
+  /**
+   * SEGUNDOS DISTINTOS realmente vistos, no la posicion maxima alcanzada.
+   *
+   * La diferencia es el fondo del asunto: si se guardara la posicion maxima, arrastrar la barra
+   * hasta el final daria el video por visto en dos segundos. Marcando cada segundo por el que
+   * pasa la reproduccion, saltar hacia adelante deja huecos y el porcentaje no sube.
+   */
+  const watchedSeconds = useRef<Set<number>>(new Set());
   const [watched, setWatched] = useState(0);
   const type = detail.content.type;
-  const source = detail.package ? mediaUrl(detail.package.storageKey) : null;
+  // La firma se resuelve contra el servidor: una etiqueta no puede autenticarse por si sola.
+  const source = useMediaUrl(detail.package?.storageKey);
+
+  /**
+   * Un VIDEO puede venir de dos sitios y hay que atender los dos: archivo subido al
+   * almacenamiento de la empresa, o enlace a YouTube/Vimeo. Antes solo se dibujaba el archivo, y
+   * un video enlazado terminaba mostrando "este contenido no tiene material cargado".
+   *
+   * La diferencia importa para la evidencia: del archivo propio se sabe el porcentaje REAL visto;
+   * de un enlace embebido no —el reproductor es de otro— y por eso ahi la confirmacion es de la
+   * persona, igual que en un documento.
+   */
+  const externalUrl =
+    typeof (detail.content.config as { externalUrl?: unknown } | null)?.externalUrl === 'string'
+      ? String((detail.content.config as { externalUrl?: string }).externalUrl)
+      : null;
+  const embed = !source && externalUrl ? toEmbedUrl(externalUrl) : null;
+
+  /**
+   * Video PROPIO frente a video AJENO, y de ahi sale todo lo demas.
+   *
+   * Del archivo alojado en la empresa se puede medir lo que se vio de verdad y por tanto se puede
+   * EXIGIR. De un embebido de YouTube no: el reproductor es de otra plataforma y la nuestra no
+   * sabe si le dieron a reproducir. Fingir que lo comprueba seria peor que reconocerlo, porque
+   * este registro tiene que sostenerse ante un auditor.
+   */
+  const ownedVideo = type === 'VIDEO' && Boolean(source);
+  const minWatchPct = (() => {
+    const raw = (detail.content.config as { minWatchPct?: unknown } | null)?.minWatchPct;
+    return typeof raw === 'number' && raw > 0 && raw <= 100 ? Math.round(raw) : 90;
+  })();
+  const meetsMinimum = watched >= minWatchPct;
 
   return (
     <>
@@ -537,10 +576,35 @@ function MediaRunner({
               className="w-full rounded-xl bg-black"
               onTimeUpdate={(event) => {
                 const element = event.currentTarget;
-                if (!element.duration) return;
-                setWatched((current) => Math.max(current, Math.round((element.currentTime / element.duration) * 100)));
+                if (!element.duration || !Number.isFinite(element.duration)) return;
+                watchedSeconds.current.add(Math.floor(element.currentTime));
+                setWatched(Math.min(100, Math.round((watchedSeconds.current.size / element.duration) * 100)));
               }}
             />
+          ) : null}
+
+          {type === 'VIDEO' && !source && embed ? (
+            <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+              <iframe
+                src={embed}
+                title={detail.content.title}
+                className="h-full w-full"
+                allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          ) : null}
+
+          {type === 'VIDEO' && !source && !embed && externalUrl ? (
+            <a
+              href={externalUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="focus-ring block rounded-xl border px-4 py-3 text-center underline"
+              style={{ borderColor: 'var(--reading-line)' }}
+            >
+              Ver el video
+            </a>
           ) : null}
 
           {type === 'DOCUMENT' && source ? (
@@ -568,7 +632,7 @@ function MediaRunner({
             </a>
           ) : null}
 
-          {!source && type !== 'LINK' ? (
+          {!source && !embed && !externalUrl && type !== 'LINK' ? (
             <p className="text-base opacity-70">Este contenido no tiene material cargado.</p>
           ) : null}
         </div>
@@ -576,16 +640,41 @@ function MediaRunner({
 
       <footer className="shrink-0 px-6 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-4 lg:px-10">
         <div className="mx-auto w-full max-w-[720px]">
+          {/*
+            Con video PROPIO no hay boton de confianza: el paso se habilita cuando el porcentaje
+            realmente visto llega al minimo que exige la formacion. Con video de otra plataforma
+            no se puede medir —el reproductor es suyo— y entonces se dice, en vez de fingir rigor.
+          */}
+          {ownedVideo && !meetsMinimum ? (
+            <div className="mb-3">
+              <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: 'var(--reading-line)' }}>
+                <div
+                  className="h-full rounded-full transition-[width] duration-300 ease-pulse"
+                  style={{ width: `${Math.min(100, (watched / minWatchPct) * 100)}%`, backgroundColor: 'var(--brand-accent)' }}
+                />
+              </div>
+              <p className="mt-2 text-sm" style={{ color: 'var(--reading-muted)' }}>
+                Llevas <span className="tabular-nums">{watched}%</span> visto. Se habilita al{' '}
+                <span className="tabular-nums">{minWatchPct}%</span>. Adelantar no cuenta.
+              </p>
+            </div>
+          ) : null}
+
           <Button
             size="lg"
             className="w-full"
             loading={saving}
-            onClick={() => void onDone(type === 'VIDEO' ? watched : 100)}
+            disabled={ownedVideo && !meetsMinimum}
+            onClick={() => void onDone(ownedVideo ? watched : 100)}
           >
-            {type === 'VIDEO' ? 'Ya lo vi' : 'Ya lo lei'}
+            {type === 'VIDEO' ? (ownedVideo ? 'Terminar' : 'Confirmo que lo vi') : 'Ya lo lei'}
           </Button>
-          {type === 'VIDEO' ? (
-            <p className="mt-2 text-center text-sm opacity-60">Llevas {watched}% del video.</p>
+
+          {type === 'VIDEO' && !ownedVideo ? (
+            <p className="mt-2.5 text-center text-sm" style={{ color: 'var(--reading-muted)' }}>
+              Este video esta alojado fuera y la plataforma no puede comprobar que lo hayas visto:
+              queda registrado como declaracion tuya.
+            </p>
           ) : null}
         </div>
       </footer>
