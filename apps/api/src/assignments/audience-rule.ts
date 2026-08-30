@@ -16,6 +16,7 @@ export interface PersonProfile {
   jobTitleTypeId: string;
   areaId: string;
   regionalId: string | null;
+  serviceId: string | null;
   employmentType: string;
   roadActor: string | null;
 }
@@ -56,6 +57,14 @@ function facetsOf(rule: AudienceRule): Facet[] {
     facets.push({
       where: { regionalId: { in: rule.regionalIds } },
       matches: (p) => p.regionalId !== null && rule.regionalIds.includes(p.regionalId),
+    });
+  }
+  if (rule.serviceIds.length > 0) {
+    facets.push({
+      where: { serviceId: { in: rule.serviceIds } },
+      // Quien no tiene servicio puesto NO entra: no se adivina. Una empresa que no use servicios
+      // simplemente no usa este criterio, y todo lo demas le sigue funcionando igual.
+      matches: (p) => p.serviceId !== null && rule.serviceIds.includes(p.serviceId),
     });
   }
   if (rule.employmentTypes.length > 0) {

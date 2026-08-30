@@ -30,6 +30,8 @@ export const audienceRuleSchema = z
     jobTitleTypeIds: z.array(z.string().uuid()).max(50).default([]),
     areaIds: z.array(z.string().uuid()).max(200).default([]),
     regionalIds: z.array(z.string().uuid()).max(100).default([]),
+    /** Linea de servicio. Solo alcanza a quien la tenga puesta: no es obligatoria en la persona. */
+    serviceIds: z.array(z.string().uuid()).max(50).default([]),
     employmentTypes: z.array(employmentTypeSchema).max(4).default([]),
     roadActors: z.array(roadActorSchema).max(5).default([]),
   })
@@ -147,11 +149,17 @@ export const createAssignmentSchema = z
     jobTitleIds: z.array(z.string().uuid()).max(300).default([]),
     areaIds: z.array(z.string().uuid()).max(200).default([]),
     regionalIds: z.array(z.string().uuid()).max(100).default([]),
+    /** Linea de servicio. Solo alcanza a quien la tenga puesta: no es obligatoria en la persona. */
+    serviceIds: z.array(z.string().uuid()).max(50).default([]),
     dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').nullable().optional(),
   })
   .superRefine((value, ctx) => {
     const total =
-      value.userIds.length + value.jobTitleIds.length + value.areaIds.length + value.regionalIds.length;
+      value.userIds.length +
+      value.jobTitleIds.length +
+      value.areaIds.length +
+      value.regionalIds.length +
+      value.serviceIds.length;
     if (total === 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['userIds'], message: 'Elige a quien asignar.' });
     }

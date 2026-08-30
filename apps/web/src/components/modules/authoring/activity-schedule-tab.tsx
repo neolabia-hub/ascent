@@ -3,9 +3,10 @@
 import { CalendarDays, CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { listCatalog, listUsers, type CatalogRow, type UserRow } from '@/lib/admin-api';
+import { listCatalog, listPickableUsers, type CatalogRow, type PickableUser } from '@/lib/admin-api';
 import {
   createOffering,
+  isOutdatedVersion,
   listOfferings,
   type ExecutedBy,
   type OfferingKind,
@@ -46,7 +47,7 @@ export function ActivityScheduleTab({
 }) {
   const { showToast } = useToast();
   const [rows, setRows] = useState<OfferingListItem[] | null>(null);
-  const [people, setPeople] = useState<UserRow[]>([]);
+  const [people, setPeople] = useState<PickableUser[]>([]);
   const [regionals, setRegionals] = useState<CatalogRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -82,9 +83,9 @@ export function ActivityScheduleTab({
 
   useEffect(() => {
     void load();
-    void listUsers({ active: 'true', pageSize: 200 })
-      .then((page) => setPeople(page.items))
-      .catch(() => undefined);
+    // `listUsers({ pageSize: 200 })` devolvia 422 SIEMPRE (el servidor topa en 100) y el catch
+    // vacio lo escondia: el desplegable salia sin nadie dentro y parecia que no habia personas.
+    void listPickableUsers().then(setPeople).catch(() => undefined);
     void listCatalog('regionals').then(setRegionals).catch(() => undefined);
   }, [load]);
 
@@ -243,7 +244,7 @@ export function ActivityScheduleTab({
                   <option value="">Externo o sin definir</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.fullName} — {person.area.name}
+                      {person.fullName} — {person.area?.name ?? "sin area"}
                     </option>
                   ))}
                 </Select>
@@ -360,6 +361,18 @@ export function ActivityScheduleTab({
                     {` · ${offering._count.enrollments} inscritos`}
                     {offering.projectedCount !== null ? ` de ${offering.projectedCount} proyectados` : ''}
                   </p>
+                  {/*
+                    Es EL sitio donde se nota: se acaba de publicar una version desde la pestana de
+                    al lado y esta convocatoria sigue entregando la anterior.
+                  */}
+                  {isOutdatedVersion(offering.activityVersion) &&
+                  offering.status !== 'COMPLETED' &&
+                  offering.status !== 'CANCELLED' ? (
+                    <p className="mt-1 text-xs font-medium text-warn">
+                      Entrega la version {offering.activityVersion.versionNumber}. Hay una mas nueva: abrela para
+                      actualizarla.
+                    </p>
+                  ) : null}
                 </div>
                 <StatusPill kind={offering.status === 'PUBLISHED' ? 'ok' : offering.status === 'DRAFT' ? 'neutral' : 'info'} label={statusLabel(offering.status)} />
               </Link>

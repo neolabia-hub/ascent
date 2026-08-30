@@ -2,7 +2,7 @@
 
 import { UserPlus, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { listCatalog, listUsers, type CatalogRow, type UserRow } from '@/lib/admin-api';
+import { listCatalog, listPickableUsers, type CatalogRow, type PickableUser } from '@/lib/admin-api';
 import { createAssignments, listAssignments, type AssignmentRow } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -32,14 +32,28 @@ export function ActivityAudienceTab({ activityId, activityName }: { activityId: 
   const { showToast } = useToast();
   const [rows, setRows] = useState<AssignmentRow[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [catalogs, setCatalogs] = useState<{ jobTitles: CatalogRow[]; areas: CatalogRow[]; regionals: CatalogRow[] } | null>(null);
-  const [people, setPeople] = useState<UserRow[]>([]);
+  const [catalogs, setCatalogs] = useState<{
+    jobTitles: CatalogRow[];
+    areas: CatalogRow[];
+    regionals: CatalogRow[];
+    services: CatalogRow[];
+  } | null>(null);
+  const [people, setPeople] = useState<PickableUser[]>([]);
+  const [peopleError, setPeopleError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [form, setForm] = useState<{ jobTitleIds: string[]; areaIds: string[]; regionalIds: string[]; userIds: string[]; dueAt: string }>({
+  const [form, setForm] = useState<{
+    jobTitleIds: string[];
+    areaIds: string[];
+    regionalIds: string[];
+    serviceIds: string[];
+    userIds: string[];
+    dueAt: string;
+  }>({
     jobTitleIds: [],
     areaIds: [],
     regionalIds: [],
+    serviceIds: [],
     userIds: [],
     dueAt: '',
   });
@@ -56,16 +70,46 @@ export function ActivityAudienceTab({ activityId, activityName }: { activityId: 
 
   useEffect(() => {
     void load();
-    void Promise.all([listCatalog('job-titles'), listCatalog('areas'), listCatalog('regionals')])
-      .then(([jobTitles, areas, regionals]) => setCatalogs({ jobTitles, areas, regionals }))
+    void Promise.all([
+      listCatalog('job-titles'),
+      listCatalog('areas'),
+      listCatalog('regionals'),
+      listCatalog('services'),
+    ])
+      .then(([jobTitles, areas, regionals, services]) => setCatalogs({ jobTitles, areas, regionals, services }))
       .catch(() => undefined);
-    void listUsers({ active: 'true', pageSize: 200 })
-      .then((page) => setPeople(page.items))
-      .catch(() => undefined);
+    // Antes esto pedia `listUsers({ pageSize: 200 })` y el servidor topa en 100: devolvia 422
+    // SIEMPRE, y el `catch` vacio lo escondia. El selector salia sin nadie dentro para todo el
+    // mundo, tambien para el administrador, y sin una sola pista de por que.
+    void listPickableUsers()
+      .then(setPeople)
+      .catch(() => setPeopleError('No se pudo cargar la lista de personas.'));
   }, [load]);
 
+  /**
+   * Las personas que se ofrecen, acotadas por los criterios YA elegidos.
+   *
+   * Sin esto, elegir "cargo: Auxiliar logistico" y abrir la lista de personas mostraba las 116 de
+   * la empresa, y habia que saberse de memoria quien es auxiliar. Con criterios puestos, la lista
+   * ES la respuesta; sin ninguno, se muestran todas porque no hay nada que acotar.
+   *
+   * Se cruzan igual que en el servidor (Y entre dimensiones) para que lo que ves aqui sea lo que
+   * va a pasar alli.
+   */
+  const peopleShown = people.filter((person) => {
+    if (form.jobTitleIds.length > 0 && !form.jobTitleIds.includes(person.jobTitle?.id ?? '')) return false;
+    if (form.areaIds.length > 0 && !form.areaIds.includes(person.area?.id ?? '')) return false;
+    if (form.regionalIds.length > 0 && !form.regionalIds.includes(person.regional?.id ?? '')) return false;
+    if (form.serviceIds.length > 0 && !form.serviceIds.includes(person.service?.id ?? '')) return false;
+    return true;
+  });
+
   const nothingChosen =
-    form.jobTitleIds.length === 0 && form.areaIds.length === 0 && form.regionalIds.length === 0 && form.userIds.length === 0;
+    form.jobTitleIds.length === 0 &&
+    form.areaIds.length === 0 &&
+    form.regionalIds.length === 0 &&
+    form.serviceIds.length === 0 &&
+    form.userIds.length === 0;
 
   const assign = async () => {
     setBusy(true);
@@ -75,10 +119,11 @@ export function ActivityAudienceTab({ activityId, activityName }: { activityId: 
         jobTitleIds: form.jobTitleIds,
         areaIds: form.areaIds,
         regionalIds: form.regionalIds,
+        serviceIds: form.serviceIds,
         userIds: form.userIds,
         dueAt: form.dueAt || null,
       });
-      setForm({ jobTitleIds: [], areaIds: [], regionalIds: [], userIds: [], dueAt: '' });
+      setForm({ jobTitleIds: [], areaIds: [], regionalIds: [], serviceIds: [], userIds: [], dueAt: '' });
       await load();
       showToast({
         kind: 'success',
@@ -131,11 +176,28 @@ export function ActivityAudienceTab({ activityId, activityName }: { activityId: 
                 onChange={(regionalIds) => setForm({ ...form, regionalIds })}
               />
             </Field>
-            <Field htmlFor="q-people" label="A personas concretas">
+            <Field htmlFor="q-services" label="A un servicio" hint="Solo alcanza a quien lo tenga puesto en su ficha.">
+              <MultiSelect
+                id="q-services"
+                placeholder="Ningun servicio"
+                options={catalogs.services.map((row) => ({ id: row.id, label: row.name }))}
+                value={form.serviceIds}
+                onChange={(serviceIds) => setForm({ ...form, serviceIds })}
+              />
+            </Field>
+            <Field
+              htmlFor="q-people"
+              label="A personas concretas"
+              hint={peopleError ?? undefined}
+            >
               <MultiSelect
                 id="q-people"
                 placeholder="Nadie en particular"
-                options={people.map((person) => ({ id: person.id, label: person.fullName, hint: person.jobTitle.name }))}
+                options={peopleShown.map((person) => ({
+                  id: person.id,
+                  label: person.fullName,
+                  hint: person.jobTitle?.name ?? undefined,
+                }))}
                 value={form.userIds}
                 onChange={(userIds) => setForm({ ...form, userIds })}
               />

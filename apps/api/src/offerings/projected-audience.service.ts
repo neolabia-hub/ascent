@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-export type ProjectedSource = 'RULES' | 'ACTIVITY_JOB_TITLES' | 'NONE';
+export type ProjectedSource = 'OBLIGATIONS' | 'RULES' | 'NONE';
 
 export interface ProjectedAudience {
   count: number;
@@ -23,9 +23,17 @@ export interface ProjectedPeople extends ProjectedAudience {
  * cobertura, y un denominador escrito a mano convierte el indicador en opinion.
  *
  * Orden de derivacion:
- *   1. los requisitos activos que exigen esa actividad (su audiencia es la respuesta exacta),
- *   2. si no hay requisitos, los cargos a los que la actividad esta dirigida,
+ *   1. quienes YA estan obligados a esa actividad —vengan de un requisito o de una asignacion
+ *      hecha a mano en la pestana Quienes—: es la respuesta exacta, porque proyectado y obligado
+ *      son la misma gente;
+ *   2. si todavia no hay ninguna obligacion, a quienes alcanzarian los requisitos activos (sirve
+ *      antes de que el motor las materialice);
  *   3. si tampoco, cero — y la pantalla pide ajustarlo a mano CON justificacion.
+ *
+ * Antes habia un paso intermedio que miraba los CARGOS de la ficha de la actividad, y se quito
+ * (Decision #59): obligaba a elegir los cargos dos veces —en la ficha para el numero y en Quienes
+ * para la obligacion— y las dos listas se separaban en cuanto alguien cambiaba una sola. El
+ * denominador ahora sale del mismo sitio que la obligacion, asi que no pueden discrepar.
  *
  * Si la convocatoria es de una regional, el alcance se acota a esa regional: una jornada en Neiva
  * no le promete nada a Barranquilla.
@@ -50,6 +58,26 @@ export class ProjectedAudienceService {
     };
     const scope = regionalId ? ' en la regional de la convocatoria' : '';
 
+    // 1. Los ya obligados. Se acota a la regional de la convocatoria como todo lo demas.
+    const obliged = await this.findUserIds({
+      ...eligible,
+      assignments: {
+        some: {
+          targetType: 'ACTIVITY',
+          targetId: activityId,
+          status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE', 'COMPLETED'] },
+        },
+      },
+    });
+    if (obliged.length > 0) {
+      return {
+        userIds: obliged,
+        count: obliged.length,
+        source: 'OBLIGATIONS',
+        detail: `Personas ya obligadas a esta formacion${scope}.`,
+      };
+    }
+
     const rules = await this.prisma.scoped.assignmentRule.findMany({
       where: { active: true, targetType: 'ACTIVITY', targetId: activityId, audience: { active: true } },
       select: { audienceId: true },
@@ -69,25 +97,11 @@ export class ProjectedAudienceService {
       };
     }
 
-    const jobTitles = await this.prisma.scoped.activityJobTitle.findMany({
-      where: { activityId },
-      select: { jobTitleId: true },
-    });
-    if (jobTitles.length > 0) {
-      const userIds = await this.findUserIds({ ...eligible, jobTitleId: { in: jobTitles.map((j) => j.jobTitleId) } });
-      return {
-        userIds,
-        count: userIds.length,
-        source: 'ACTIVITY_JOB_TITLES',
-        detail: `Personas en los cargos a los que va dirigida la actividad${scope}.`,
-      };
-    }
-
     return {
       userIds: [],
       count: 0,
       source: 'NONE',
-      detail: 'La actividad no tiene requisitos ni cargos destino: ajusta los proyectados con justificacion.',
+      detail: 'Nadie esta obligado a esta formacion todavia: asignala en Quienes, o ajusta los proyectados con justificacion.',
     };
   }
 

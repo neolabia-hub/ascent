@@ -70,6 +70,7 @@ export default function AsignacionesPage() {
   const [jobTitles, setJobTitles] = useState<CatalogRow[]>([]);
   const [areas, setAreas] = useState<CatalogRow[]>([]);
   const [regionals, setRegionals] = useState<CatalogRow[]>([]);
+  const [services, setServices] = useState<CatalogRow[]>([]);
 
   const [rules, setRules] = useState<AssignmentRuleRow[] | null>(null);
   const [audiences, setAudiences] = useState<AudienceRow[] | null>(null);
@@ -81,7 +82,13 @@ export default function AsignacionesPage() {
   const [ruleOpen, setRuleOpen] = useState(false);
   const [ruleForm, setRuleForm] = useState({ audienceId: '', targetId: '', trigger: 'ON_HIRE' as RuleTrigger, dueDays: '-1', everyMonths: '' });
   const [audienceOpen, setAudienceOpen] = useState(false);
-  const [audienceForm, setAudienceForm] = useState({ name: '', jobTitleIds: [] as string[], areaIds: [] as string[], regionalIds: [] as string[] });
+  const [audienceForm, setAudienceForm] = useState({
+    name: '',
+    jobTitleIds: [] as string[],
+    areaIds: [] as string[],
+    regionalIds: [] as string[],
+    serviceIds: [] as string[],
+  });
   const [audiencePreview, setAudiencePreview] = useState<{ count: number; reachesEveryone: boolean } | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignForm, setAssignForm] = useState({ targetId: '', jobTitleId: '', areaId: '', dueAt: '' });
@@ -91,6 +98,7 @@ export default function AsignacionesPage() {
     void listCatalog('job-titles').then((rows) => setJobTitles(rows.filter((row) => row.active)));
     void listCatalog('areas').then((rows) => setAreas(rows.filter((row) => row.active)));
     void listCatalog('regionals').then((rows) => setRegionals(rows.filter((row) => row.active)));
+    void listCatalog('services').then((rows) => setServices(rows.filter((row) => row.active)));
   }, []);
 
   const loadTab = useCallback(async () => {
@@ -167,6 +175,7 @@ export default function AsignacionesPage() {
           jobTitleIds: audienceForm.jobTitleIds,
           areaIds: audienceForm.areaIds,
           regionalIds: audienceForm.regionalIds,
+          serviceIds: audienceForm.serviceIds,
         }),
       );
     } catch {
@@ -188,11 +197,12 @@ export default function AsignacionesPage() {
           jobTitleIds: audienceForm.jobTitleIds,
           areaIds: audienceForm.areaIds,
           regionalIds: audienceForm.regionalIds,
+          serviceIds: audienceForm.serviceIds,
         },
       });
       showToast({ kind: 'success', title: 'Audiencia creada' });
       setAudienceOpen(false);
-      setAudienceForm({ name: '', jobTitleIds: [], areaIds: [], regionalIds: [] });
+      setAudienceForm({ name: '', jobTitleIds: [], areaIds: [], regionalIds: [], serviceIds: [] });
       await loadTab();
     } catch {
       showToast({ kind: 'danger', title: 'No se pudo crear la audiencia' });
@@ -712,6 +722,22 @@ export default function AsignacionesPage() {
               {regionals.map((regional) => (
                 <option key={regional.id} value={regional.id}>
                   {regional.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field htmlFor="a-service" label="Servicio" hint="Solo alcanza a quien lo tenga puesto en su ficha.">
+            <Select
+              id="a-service"
+              value={audienceForm.serviceIds[0] ?? ''}
+              onChange={(event) =>
+                setAudienceForm({ ...audienceForm, serviceIds: event.target.value ? [event.target.value] : [] })
+              }
+            >
+              <option value="">Cualquiera</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
                 </option>
               ))}
             </Select>

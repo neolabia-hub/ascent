@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AssignmentRule, Prisma } from '@prisma/client';
 import { recurrenceSchema, type Recurrence } from '@neo-pulse/shared';
+import { AuditService } from '../common/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import { AudiencesService } from './audiences.service.js';
@@ -54,6 +55,7 @@ export class RequirementEngineService {
     private readonly prisma: PrismaService,
     private readonly audiences: AudiencesService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Pasada completa del tenant (cron). */
@@ -121,11 +123,31 @@ export class RequirementEngineService {
   }
 
   /** Igual que `syncPerson` pero sin tumbar el flujo que la llamo si algo falla. */
+  /**
+   * Genera las obligaciones de una persona SIN tumbar la operacion que la creo.
+   *
+   * Tragarse el error es deliberado: dar de alta a alguien no puede fallar porque el motor falle.
+   * Lo que NO puede quedarse dentro es la noticia. Antes la unica huella era una linea de log, que
+   * en la practica es no enterarse: la persona quedaba creada, sin obligaciones y sin nada que
+   * mirar despues. Ahora queda una fila de auditoria, que es donde se buscan las cosas raras.
+   */
   async syncPersonSafely(tenantId: string, userId: string): Promise<void> {
     try {
       await this.syncPerson(tenantId, userId);
     } catch (error) {
-      this.logger.error(`No se pudieron generar las obligaciones de ${userId}`, error as Error);
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(`No se pudieron generar las obligaciones de ${userId}: ${reason}`, error as Error);
+      await this.audit
+        .record({
+          tenantId,
+          userId,
+          action: 'OBLIGATIONS_SYNC_FAILED',
+          resourceType: 'users',
+          resourceId: userId,
+          newValues: { reason },
+        })
+        // Si hasta la auditoria falla, no se puede hacer mas que no empeorarlo.
+        .catch(() => undefined);
     }
   }
 

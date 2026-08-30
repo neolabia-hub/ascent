@@ -12,7 +12,7 @@ import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ELIGIBLE_MEMBER, singleJobTitleOf } from './audience-rule.js';
+import { buildAudienceWhere, ELIGIBLE_MEMBER, singleJobTitleOf } from './audience-rule.js';
 import { AudiencesService } from './audiences.service.js';
 import { endOfDay, type CalendarDate } from './due-date.js';
 import { RequirementEngineService } from './requirement-engine.service.js';
@@ -254,14 +254,41 @@ export class AssignmentsService {
     const tenantId = this.prisma.currentTenantId;
     await this.assertTargetExists(input.targetType, input.targetId);
 
-    const orConditions: Prisma.UserWhereInput[] = [];
-    if (input.userIds.length > 0) orConditions.push({ id: { in: input.userIds } });
-    if (input.jobTitleIds.length > 0) orConditions.push({ jobTitleId: { in: input.jobTitleIds } });
-    if (input.areaIds.length > 0) orConditions.push({ areaId: { in: input.areaIds } });
-    if (input.regionalIds.length > 0) orConditions.push({ regionalId: { in: input.regionalIds } });
+    // Los CRITERIOS se cruzan (Y), las personas sueltas se SUMAN (O).
+    //
+    // Antes todo iba en un solo OR, y eso convertia "auxiliares logisticos DE Antioquia" en
+    // "todos los auxiliares logisticos del pais MAS todo el mundo de Antioquia": la formacion le
+    // caia a cientos de personas que nadie quiso obligar, y quien la creo no tenia forma de
+    // notarlo hasta que le llegaran las quejas.
+    //
+    // Se reutiliza `buildAudienceWhere` en vez de escribir el filtro otra vez: es la misma
+    // pregunta que resuelven las audiencias, y dos implementaciones acabarian discrepando
+    // (Decision #37).
+    const hasCriteria =
+      input.jobTitleIds.length > 0 ||
+      input.areaIds.length > 0 ||
+      input.regionalIds.length > 0 ||
+      input.serviceIds.length > 0;
+
+    const reach: Prisma.UserWhereInput[] = [];
+    if (hasCriteria) {
+      reach.push(
+        buildAudienceWhere({
+          match: 'ALL',
+          jobTitleIds: input.jobTitleIds,
+          jobTitleTypeIds: [],
+          areaIds: input.areaIds,
+          regionalIds: input.regionalIds,
+          serviceIds: input.serviceIds,
+          employmentTypes: [],
+          roadActors: [],
+        }),
+      );
+    }
+    if (input.userIds.length > 0) reach.push({ ...ELIGIBLE_MEMBER, id: { in: input.userIds } });
 
     const candidates = await this.prisma.scoped.user.findMany({
-      where: { ...ELIGIBLE_MEMBER, OR: orConditions },
+      where: reach.length === 1 ? reach[0] : { OR: reach },
       select: { id: true, email: true },
     });
 

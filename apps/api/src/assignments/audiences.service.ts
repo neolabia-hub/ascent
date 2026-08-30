@@ -17,6 +17,7 @@ const PERSON_SELECT = {
   jobTitleId: true,
   areaId: true,
   regionalId: true,
+  serviceId: true,
   employmentType: true,
   roadActor: true,
   jobTitle: { select: { jobTitleTypeId: true } },
@@ -223,6 +224,7 @@ export class AudiencesService {
       jobTitleTypeId: user.jobTitle.jobTitleTypeId,
       areaId: user.areaId,
       regionalId: user.regionalId,
+      serviceId: user.serviceId,
       employmentType: user.employmentType,
       roadActor: user.roadActor,
     };

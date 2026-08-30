@@ -32,6 +32,8 @@ export interface CatalogRow {
   parentId?: string | null;
   responsibleUserId?: string | null;
   areaId?: string | null;
+  area?: { id: string; name: string } | null;
+  responsible?: { id: string; fullName: string } | null;
 }
 
 export function listCatalog(key: CatalogKey): Promise<CatalogRow[]> {
@@ -109,8 +111,46 @@ export interface UserDetail extends UserRow {
   }>;
 }
 
+/** Personas para un SELECTOR: nombre y cargo, nada mas. Ver users.controller.ts. */
+export interface PickableUser {
+  id: string;
+  fullName: string;
+  jobTitle: { id: string; name: string } | null;
+  area: { id: string; name: string } | null;
+  regional: { id: string; name: string } | null;
+  service: { id: string; name: string } | null;
+}
+
+export function listPickableUsers(): Promise<PickableUser[]> {
+  return apiFetch<PickableUser[]>('/users/pickable', { method: 'GET' });
+}
+
 export function getUser(id: string): Promise<UserDetail> {
   return apiFetch<UserDetail>(`/users/${id}`, { method: 'GET' });
+}
+
+/**
+ * ALCANCE: sobre que trabaja esta persona. Reemplaza el conjunto completo.
+ *
+ * Por AREA alcanza todos los procesos que cuelgan de ella (una jefatura); por PROCESO, solo ese
+ * (quien responde por uno). Ver api/src/common/analyst-scope.ts y la Decision #57.
+ *
+ * Todo vacio NO es "no ve nada": es "sin restriccion", que es como esta el administrador. Tener
+ * alcance es lo que restringe.
+ */
+export function setAnalystScopes(
+  userId: string,
+  scope: { processIds: string[]; areaIds: string[] },
+): Promise<unknown> {
+  return apiFetch(`/users/${userId}/analyst-scopes`, {
+    method: 'POST',
+    body: {
+      scopes: [
+        ...scope.areaIds.map((areaId) => ({ areaId })),
+        ...scope.processIds.map((processId) => ({ processId })),
+      ],
+    },
+  });
 }
 
 // ─────────────────────────── Usuarios ───────────────────────────
@@ -125,6 +165,7 @@ export interface UserRow {
   emailKind: 'PERSONAL' | 'CORPORATE';
   mustChangePassword: boolean;
   hiredAt: string | null;
+  birthDate: string | null;
   employmentType: string;
   roadActor: string | null;
   active: boolean;
@@ -133,6 +174,7 @@ export interface UserRow {
   jobTitle: { id: string; code: string; name: string };
   area: { id: string; code: string; name: string };
   regional: { id: string; code: string; name: string } | null;
+  service: { id: string; code: string; name: string } | null;
   role: { id: string; code: string; name: string };
 }
 
@@ -153,8 +195,10 @@ export interface CreateUserBody {
   jobTitleId: string;
   areaId: string;
   regionalId?: string | null;
+  serviceId?: string | null;
   roleCode?: 'ADMIN' | 'ANALISTA' | 'USUARIO';
   hiredAt?: string | null;
+  birthDate?: string | null;
   employmentType?: string;
   roadActor?: string | null;
 }
@@ -233,7 +277,7 @@ export async function downloadImportTemplate(): Promise<void> {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'plantilla-usuarios.csv';
+  link.download = 'plantilla-usuarios.xlsx';
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -285,6 +329,8 @@ export interface TenantSettings {
   passingScoreDefault: number;
   maxAttemptsDefault: number;
   retryWaitHours: number;
+  /** Minimo de video visto que exige la empresa cuando la formacion no dice otra cosa. */
+  minWatchPctDefault: number;
   pillCadencePerWeek: number;
   notificationWeeklyCap: number;
   streakFreezesMax: number;

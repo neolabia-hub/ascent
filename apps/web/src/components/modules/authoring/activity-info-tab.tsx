@@ -1,14 +1,15 @@
 'use client';
 
-import { Info, Save } from 'lucide-react';
+import { Info, Save, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { listCatalog, listUsers, type CatalogRow, type UserRow } from '@/lib/admin-api';
+import { listCatalog, listPickableUsers, type CatalogRow, type PickableUser } from '@/lib/admin-api';
 import { updateActivity, type ActivityDetail, type Modality } from '@/lib/catalog-api';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Select } from '@/components/ui/select';
+import { PersonPicker } from '@/components/ui/person-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
@@ -49,7 +50,8 @@ export function ActivityInfoTab({
     regionals: CatalogRow[];
     jobTitles: CatalogRow[];
   } | null>(null);
-  const [people, setPeople] = useState<UserRow[]>([]);
+  const [people, setPeople] = useState<PickableUser[]>([]);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -79,9 +81,9 @@ export function ActivityInfoTab({
       )
       .catch(() => showToast({ kind: 'danger', title: 'No se pudieron cargar los catalogos' }));
 
-    void listUsers({ active: 'true', pageSize: 200 })
-      .then((page) => setPeople(page.items))
-      .catch(() => undefined);
+    // `listUsers({ pageSize: 200 })` devolvia 422 SIEMPRE (el servidor topa en 100) y el catch
+    // vacio lo escondia: el desplegable salia sin nadie dentro y parecia que no habia personas.
+    void listPickableUsers().then(setPeople).catch(() => undefined);
   }, [showToast]);
 
   const save = useCallback(async () => {
@@ -95,9 +97,6 @@ export function ActivityInfoTab({
         responsibleUserId: form.responsibleUserId || null,
         modality: form.modality,
         normIds: form.normIds,
-        serviceIds: form.serviceIds,
-        regionalIds: form.regionalIds,
-        jobTitleIds: form.jobTitleIds,
       });
       await onSaved();
       showToast({ kind: 'success', title: 'Ficha guardada' });
@@ -110,15 +109,18 @@ export function ActivityInfoTab({
 
   if (!catalogs) return <Skeleton className="h-96 w-full" />;
 
-  /** El cargo se lee mejor con su tipo al lado: "Conductor (Operativo)". */
-  const jobTitleOptions = catalogs.jobTitles.map((row) => ({
-    id: row.id,
-    label: row.name,
-    hint: row.jobTitleType?.name,
-  }));
+  /**
+   * Candidatos a responsable: la gente del AREA a la que pertenece el proceso elegido.
+   *
+   * Un desplegable con las 116 personas de la empresa obliga a saberse de memoria quien lleva
+   * SARLAFT. Si el proceso todavia no cuelga de un area —o el area no tiene gente— se ofrecen
+   * todas: es mejor una lista larga que una vacia, que es lo que parece un error.
+   */
+  const areaDelProceso = catalogs.processes.find((row) => row.id === form.processId)?.areaId ?? null;
+
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
       <div className="space-y-6">
         <section className="card p-6">
           <h2 className="font-display text-lg font-semibold text-ink-900">Informacion basica</h2>
@@ -143,22 +145,17 @@ export function ActivityInfoTab({
 
               <Field
                 htmlFor="i-responsible"
-                label="Responsable del proceso"
-                hint="Normalmente el jefe del area. Recibe los avisos de incumplimiento."
+                label="Responsable"
+                hint="Se hereda del proceso al crear la formacion. Se puede cambiar aqui; recibe los avisos de incumplimiento."
               >
-                <Select
+                <PersonPicker
                   id="i-responsible"
                   disabled={!canEdit}
-                  value={form.responsibleUserId}
-                  onChange={(event) => setForm({ ...form, responsibleUserId: event.target.value })}
-                >
-                  <option value="">Sin responsable asignado</option>
-                  {people.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.fullName} — {person.area.name}
-                    </option>
-                  ))}
-                </Select>
+                  people={people}
+                  suggestedAreaId={areaDelProceso}
+                  value={form.responsibleUserId || null}
+                  onChange={(personId) => setForm({ ...form, responsibleUserId: personId ?? '' })}
+                />
               </Field>
             </div>
 
@@ -212,17 +209,16 @@ export function ActivityInfoTab({
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
               />
             </Field>
-          </div>
-        </section>
-
-        <section className="card p-6">
-          <h2 className="font-display text-lg font-semibold text-ink-900">Alcance y dirigido a</h2>
-          <p className="mb-5 mt-1 text-sm text-ink-500">
-            A que norma tributa y a quienes aplica. De aqui salen los reportes por norma y la matriz de competencia.
-          </p>
-
-          <div className="space-y-4">
-            <Field htmlFor="i-norms" label="Norma aplicable" hint="Una formacion puede tributar a varias.">
+            {/*
+              La norma vive AQUI y no en su propia tarjeta: es un campo mas de la ficha, y un
+              contenedor entero para un solo desplegable hacia parecer que decidia algo. No decide:
+              clasifica.
+            */}
+            <Field
+              htmlFor="i-norms"
+              label="Norma aplicable"
+              hint="Solo clasifica, para poder decir despues cuanta formacion tributa a cada norma. No decide a quien se le exige."
+            >
               <MultiSelect
                 id="i-norms"
                 disabled={!canEdit}
@@ -230,45 +226,6 @@ export function ActivityInfoTab({
                 options={catalogs.norms.map((row) => ({ id: row.id, label: row.name }))}
                 value={form.normIds}
                 onChange={(normIds) => setForm({ ...form, normIds })}
-              />
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field htmlFor="i-services" label="Servicios">
-                <MultiSelect
-                  id="i-services"
-                  disabled={!canEdit}
-                  placeholder="Todos los servicios"
-                  options={catalogs.services.map((row) => ({ id: row.id, label: row.name }))}
-                  value={form.serviceIds}
-                  onChange={(serviceIds) => setForm({ ...form, serviceIds })}
-                />
-              </Field>
-
-              <Field htmlFor="i-regionals" label="Regionales">
-                <MultiSelect
-                  id="i-regionals"
-                  disabled={!canEdit}
-                  placeholder="Todas las regionales"
-                  options={catalogs.regionals.map((row) => ({ id: row.id, label: row.name }))}
-                  value={form.regionalIds}
-                  onChange={(regionalIds) => setForm({ ...form, regionalIds })}
-                />
-              </Field>
-            </div>
-
-            <Field
-              htmlFor="i-jobtitles"
-              label="Dirigido a (cargos)"
-              hint="Sugiere a quien conviene asignarla. La obligacion real se crea en la pestana Quienes."
-            >
-              <MultiSelect
-                id="i-jobtitles"
-                disabled={!canEdit}
-                placeholder="Todos los cargos"
-                options={jobTitleOptions}
-                value={form.jobTitleIds}
-                onChange={(jobTitleIds) => setForm({ ...form, jobTitleIds })}
               />
             </Field>
           </div>
@@ -284,10 +241,35 @@ export function ActivityInfoTab({
         ) : null}
       </div>
 
-      <aside className="card h-fit p-5">
+      {/*
+        LA AYUDA, guardada detras de un boton.
+        Explica algo que se entiende una vez y no hace falta volver a leer, asi que ocupar un
+        tercio de la pantalla para siempre le cobra a todo el mundo lo que solo necesita quien
+        llega nuevo. Se abre cuando se pide, y se queda abierta mientras dure la sesion.
+      */}
+      {!helpOpen ? (
+        <button
+          type="button"
+          onClick={() => setHelpOpen(true)}
+          aria-label="Donde quedo cada dato"
+          title="Donde quedo cada dato"
+          className="focus-ring h-fit rounded-full border border-line bg-surface p-2.5 text-ink-500 transition-colors duration-150 hover:border-info hover:text-info"
+        >
+          <Info size={18} strokeWidth={1.75} />
+        </button>
+      ) : (
+      <aside className="card h-fit w-[320px] p-5">
         <div className="flex items-start gap-2">
           <Info size={16} className="mt-0.5 shrink-0 text-info" strokeWidth={1.75} />
           <h3 className="font-display text-sm font-semibold text-ink-900">Donde quedo cada dato</h3>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(false)}
+            aria-label="Ocultar la ayuda"
+            className="focus-ring ml-auto -mr-1 -mt-1 rounded p-1 text-ink-500 hover:text-ink-900"
+          >
+            <X size={15} strokeWidth={2} />
+          </button>
         </div>
         <p className="mt-2 text-sm text-ink-500">
           El formulario de una sola hoja se partio en dos, y la razon es que la mitad de los datos NO cambian
@@ -318,6 +300,7 @@ export function ActivityInfoTab({
           </div>
         </dl>
       </aside>
+      )}
     </div>
   );
 }

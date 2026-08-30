@@ -16,6 +16,7 @@ const conductor: PersonProfile = {
   jobTitleTypeId: TIPO_OPERATIVO,
   areaId: AREA_LOGISTICA,
   regionalId: REGIONAL_NEIVA,
+  serviceId: null,
   employmentType: 'DIRECTO',
   roadActor: 'CONDUCTOR',
 };
@@ -25,6 +26,7 @@ const analista: PersonProfile = {
   jobTitleTypeId: TIPO_ADMINISTRATIVO,
   areaId: AREA_GESTION_HUMANA,
   regionalId: null,
+  serviceId: null,
   employmentType: 'CONTRATISTA',
   roadActor: null,
 };
