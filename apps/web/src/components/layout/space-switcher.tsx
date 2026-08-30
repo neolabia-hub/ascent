@@ -107,15 +107,20 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
 
       <span className="hidden font-medium sm:inline">{label}</span>
 
-      {to === 'learner' && total > 0 ? (
-        <span
-          className={cn(
-            'ml-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums animate-card-in',
-            urgente ? 'bg-danger text-white' : 'bg-ink-900/10 text-ink-700',
-          )}
-        >
-          {total > 9 ? '9+' : total}
+      {/*
+        UN NUMERO SOLO CUANDO HAY ALGO VENCIDO, y un punto cuando solo hay pendientes.
+        Se probo con numero siempre y quedaba pegado al numero de la campana: dos cifras rojas
+        juntas se leen como el mismo dato, y el cliente pregunto —con razon— si no sobraba una. No
+        sobra, pero tienen pesos distintos y la pantalla tiene que decirlo: la campana cuenta lo
+        que no has LEIDO, esto cuenta lo que no has HECHO. Tener formacion pendiente es lo normal;
+        tenerla vencida es lo que hay que mirar hoy, y solo eso merece una cifra.
+      */}
+      {to === 'learner' && urgente ? (
+        <span className="ml-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-semibold tabular-nums text-white animate-card-in">
+          {overdue > 9 ? '9+' : overdue}
         </span>
+      ) : to === 'learner' && total > 0 ? (
+        <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-card-in" aria-hidden="true" />
       ) : null}
     </Link>
   );

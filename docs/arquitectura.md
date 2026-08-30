@@ -88,7 +88,72 @@ Los guards evaluan **codigos de permiso** (`catalog:publish`, `users:manage`). E
 existe `if (rol === 'ADMIN')`. Consecuencia practica: el administrador puede ajustar que hace
 cada rol desde la interfaz, sin desarrollo.
 
-Los permisos efectivos = permisos del rol + concesiones individuales − revocaciones individuales.
+Los permisos efectivos = permisos del rol + concesiones individuales − revocaciones individuales,
+**mas `enrollments:read_own`, que se concede siempre y a todos** (Decision #65): ver la formacion
+propia no es una capacidad que alguien conceda, es consecuencia de existir en la plataforma. Se
+suma DESPUES de las revocaciones, asi que tampoco se puede retirar, y en el cajon de permisos
+aparece como "Toda persona lo tiene", sin botones — ofrecer "Retirar" sobre algo que el servidor
+concede igual seria una mentira silenciosa.
+
+### 3.1 El ALCANCE: que parte de la empresa es suya
+
+Permiso y alcance son **dos preguntas distintas** y por eso viven en sitios distintos: el permiso
+dice *que puede hacer* (`catalog:manage_draft`), el alcance dice *sobre que parte de la empresa*.
+Fundirlos obligaria a duplicar cada permiso de lectura del producto —`catalog:read_all` /
+`catalog:read_scope`— y a mantener los dos sincronizados a mano para siempre.
+
+**La tabla.** `analyst_scopes`: una fila por persona con **`process_id` o `area_id`**. Puede tener
+varias de cada tipo, y de los dos tipos a la vez.
+
+**La regla, en una linea: TENER FILAS ES LO QUE RESTRINGE.** Sin filas se ve el tenant entero —asi
+es como el administrador no tiene restriccion—; con filas, solo eso. Es una regla que **falla
+abierto**, y hay que tenerlo presente: "no configurado" y "ve todo" son indistinguibles en la base.
+
+**Como se resuelve** (`permission.service.ts`, al iniciar sesion). Las filas se convierten en **una
+lista de procesos**: las de proceso tal cual; las de area, en todos los procesos que cuelgan de esa
+area **y de sus subareas** (`areas.parent_id`, recorrido en memoria). En la sesion viaja
+`scopeProcessIds`; el area, hecho su trabajo, desaparece.
+
+| Forma | Que alcanza | Para quien |
+|---|---|---|
+| Por **PROCESO** | exactamente ese | quien lleva SARLAFT, trabaje donde trabaje |
+| Por **AREA** | todos los procesos de esa area y sus subareas, **incluidos los que se creen manana** | la jefatura de un area con varios procesos |
+
+Por eso `processes.area_id` **no es decoracion**: es lo unico que da contenido al alcance por area.
+Un proceso sin area no lo ve ninguna jefatura de area y nada lo avisaba, asi que desde el
+2026-08-30 el area es **obligatoria** al crear un proceso y los antiguos sin ella se marcan.
+
+> Que "Comercial" exista como AREA y como PROCESO no es un conflicto: el area dice donde trabaja
+> una persona, el proceso dice de que trata una capacitacion. Se resuelve poniendo el proceso
+> Comercial en el area Comercial.
+
+**Donde se aplica.** Catalogo, convocatorias y plan (lectura), y como compuerta de ESCRITURA al
+crear o **mover** algo de proceso. Lectura fuera de alcance: 404, no 403 —un 403 sobre un id
+confirma que ese id existe—. Escritura: 403 **con explicacion**, porque el proceso lo eligio quien
+llama en un desplegable que ya vio. Pedir un proceso ajeno por filtro devuelve **lista vacia**: ni
+mentir mostrando lo suyo bajo otro rotulo, ni confirmar que el otro existe.
+
+**Donde se configura, y por que en dos sitios.**
+
+| Pantalla | Para que |
+|---|---|
+| **Gestiona**, en el alta y la edicion de la persona | El momento en que se decide todo lo demas de esa persona. Dos opciones —toda la empresa, o solo lo que le marques— y dos listas: areas y procesos |
+| **Permisos** de la persona | El ajuste fino posterior, junto a las concesiones y revocaciones individuales |
+
+Las dos escriben la MISMA tabla y **reemplazan el conjunto completo**. Que la simple no supiera
+representar todos los casos costo un fallo real: asumia que un alcance de area era siempre "su
+propia area", asi que guardar cualquier cambio de la ficha reescribia el alcance de quien lo
+tuviera sobre otra area. Hoy marca areas y procesos igual que Permisos, asi que no hay estado que
+no sepa mostrar. **Y no deja guardar "acotado" sin marcar nada**: cero filas significa ver todo, o
+sea lo contrario de lo que se acaba de pedir.
+
+**Lo que el alcance NO acota todavia: las PERSONAS.** Quien tiene alcance sigue viendo a todos los
+usuarios y sus reportes. No es un olvido, es una decision pendiente: acotar personas por area
+rompe al analista cuya formacion cruza areas —SARLAFT se le exige a comercial, cartera y
+logistica—, que no podria ver el avance de sus propios obligados. Lo propuesto (sin construir) es
+filtro por area **por defecto y quitable** en Personas, recorte de reportes **por proceso** (que ya
+funciona) y restriccion dura solo donde se decide SOBRE la persona, que es un permiso y no un
+alcance.
 
 ---
 
@@ -195,12 +260,27 @@ Nada de esto mira el NOMBRE de un rol (Decision #19): un cliente puede llamar "A
 que gestiona y funciona igual. `managesAnything` se define por descarte —tener algun permiso que
 no sea "lo mio"— para que no haya que ampliar una lista cada vez que el producto crece.
 
+**La bandeja es UNA y lleva las dos naturalezas.** Desde que quien administra tambien se forma,
+el mismo buzon recibe "tienes una formacion nueva" (lo haces tu) y "alguien agoto sus intentos"
+(trabajo sobre otro). No se parte en dos bandejas —la persona es una sola, y mirar en dos sitios es
+como se pierde un aviso—: cada aviso lleva su etiqueta, **Tu formacion** o **Gestion**
+(`lib/notification-kind.ts`). Un tipo de evento que no este en el mapa **no se etiqueta**:
+inventarle una naturaleza seria una suposicion con aspecto de dato.
+
+| Evento | A quien | Etiqueta |
+|---|---|---|
+| `ASSIGNMENT_CREATED`, `PLAN_ASSIGNMENTS_CREATED`, `ENROLLED` | a la persona obligada | Tu formacion |
+| `ATTEMPTS_EXHAUSTED` | responsable del proceso + jefatura del area | Gestion |
+| `APPROVAL_REQUESTED` | a quien tiene `approvals:decide` | Gestion |
+| `OFFERING_PUBLISHED` | al instructor ("vas a dictarla") | Gestion |
+
 **El contador cuenta PENDIENTES, no avisos.** Son dos senales distintas y estan a dos centimetros
 una de otra en la barra: la campana cuenta lo que no has leido y se apaga al leerlo; el conmutador
 cuenta lo que te falta por HACER y no se apaga hasta que lo haces. Si contara avisos, bajaria a
-cero sin que nadie se hubiera capacitado. Cuando algo esta vencido, el numero se pinta en rojo
-—pero no el boton entero: al lado de la campana, dos bloques rojos pegados se leen como el mismo
-dato—.
+cero sin que nadie se hubiera capacitado. **Cifra solo cuando algo esta VENCIDO**; con pendientes al dia, un punto y nada mas. Con numero
+siempre quedaba pegado al numero de la campana y los dos se leian como el mismo dato: tener
+formacion pendiente es lo normal, tenerla vencida es lo que hay que mirar hoy, y solo eso merece
+una cifra. El rojo va en el contador, nunca en el boton entero.
 
 ---
 

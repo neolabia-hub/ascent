@@ -78,13 +78,17 @@ export default function UsuariosPage() {
   /**
    * Alcance de la persona que se esta creando o editando. Ver el campo "Gestiona".
    *
-   * `custom` es el cuarto caso y existe por un fallo real: este cajon asumia que un alcance de
-   * AREA era siempre "su propia area", asi que al guardar escribia el area DE LA PERSONA. Si
-   * alguien le habia dado en Permisos alcance sobre otra area —o sobre dos—, editarle el telefono
-   * se lo reescribia sin decir nada. Ahora, cuando el alcance no cabe en las tres opciones
-   * simples, se muestra tal cual y guardar aqui NO lo toca.
+   * DOS OPCIONES Y DOS LISTAS, no cuatro casos. La version anterior tenia una opcion por forma de
+   * alcance ("su area", "estos procesos") y se quedaba corta en cuanto la realidad no encajaba:
+   * alcance sobre OTRA area, sobre dos, o sobre un area Y un proceso a la vez —todo eso lo permite
+   * el modelo y lo permite el cajon de Permisos—. Lo que no cabia aparecia como "a medida", que no
+   * se podia editar aqui y encima se leia distinto segun el caso: confuso, y por debajo se estaba
+   * reescribiendo el alcance al guardar cualquier otra cosa de la ficha.
+   *
+   * Ahora se marca lo mismo que en Permisos —areas y procesos, con sus dos listas— asi que este
+   * cajon representa CUALQUIER alcance y no hay estado que no sepa mostrar.
    */
-  const [scopeKind, setScopeKind] = useState<'all' | 'area' | 'processes' | 'custom'>('all');
+  const [scopeKind, setScopeKind] = useState<'all' | 'scoped'>('all');
   const [scopeProcessIds, setScopeProcessIds] = useState<string[]>([]);
   const [scopeAreaIds, setScopeAreaIds] = useState<string[]>([]);
 
@@ -148,8 +152,25 @@ export default function UsuariosPage() {
    * Otra vez por permiso y no por nombre: "Administrador" en un cliente puede llamarse "Lider de
    * formacion" en el siguiente.
    */
-  const defaultScopeFor = (roleCode: string | undefined): 'all' | 'area' =>
-    (rolePermissions[roleCode ?? ''] ?? []).includes('users:manage') ? 'all' : 'area';
+  const defaultScopeFor = (roleCode: string | undefined): 'all' | 'scoped' =>
+    (rolePermissions[roleCode ?? ''] ?? []).includes('users:manage') ? 'all' : 'scoped';
+
+  /**
+   * Pasar a "solo lo que le marques" SUGIERE su area, marcandola en la lista.
+   *
+   * Es el caso de nueve de cada diez y ahorra dos clics, pero se ve marcada y se puede quitar: una
+   * sugerencia visible no es lo mismo que una decision tomada por detras —que es lo que hacia la
+   * version anterior, escribiendo el area de la persona sin que apareciera en ningun sitio—.
+   *
+   * Vive en una funcion porque hay dos caminos hasta aqui —elegir el rol y marcar la opcion— y en
+   * la primera version solo uno de los dos sugeria nada.
+   */
+  const acotar = () => {
+    if (scopeKind !== 'scoped' && scopeAreaIds.length === 0 && scopeProcessIds.length === 0 && form.areaId) {
+      setScopeAreaIds([form.areaId]);
+    }
+    setScopeKind('scoped');
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -190,14 +211,11 @@ export default function UsuariosPage() {
         const processIds = detail.analystScopes
           .map((row) => row.process?.id)
           .filter((id): id is string => Boolean(id));
-        // "Solo su area" es UNA area y ademas la suya. Cualquier otra cosa —otra area, o dos— es
-        // un alcance a medida que este cajon sabe mostrar pero no sabe editar.
-        const soloSuArea = areaIds.length === 1 && areaIds[0] === user.area.id;
+        // Se muestra lo que hay, sin interpretarlo: tener filas es lo que restringe, y da igual
+        // si son de area, de proceso o de las dos cosas.
         setScopeAreaIds(areaIds);
         setScopeProcessIds(processIds);
-        setScopeKind(
-          areaIds.length > 0 ? (soloSuArea ? 'area' : 'custom') : processIds.length > 0 ? 'processes' : 'all',
-        );
+        setScopeKind(areaIds.length > 0 || processIds.length > 0 ? 'scoped' : 'all');
       })
       .catch(() => {
         setScopeKind('all');
@@ -226,13 +244,10 @@ export default function UsuariosPage() {
       }
       // El alcance va DESPUES de crear a la persona porque necesita su id, y solo si el rol lo usa:
       // mandarlo para un aprendiz escribiria filas que ninguna consulta va a mirar.
-      // Con alcance A MEDIDA no se escribe nada: guardar el telefono no puede reescribir un
-      // alcance que este cajon no sabe representar. Se cambia desde Permisos, o eligiendo aqui
-      // otra de las tres opciones a proposito.
-      if (roleManages && scopeKind !== 'custom') {
+      if (roleManages) {
         await setAnalystScopes(userId, {
-          areaIds: scopeKind === 'area' && form.areaId ? [form.areaId] : [],
-          processIds: scopeKind === 'processes' ? scopeProcessIds : [],
+          areaIds: scopeKind === 'scoped' ? scopeAreaIds : [],
+          processIds: scopeKind === 'scoped' ? scopeProcessIds : [],
         });
       }
       setDrawerOpen(false);
@@ -306,8 +321,11 @@ export default function UsuariosPage() {
       form.email.includes('@') &&
       form.jobTitleId !== '' &&
       form.areaId !== '' &&
-      (editing !== null || form.documentNumber.trim().length >= 5),
-    [form, editing],
+      (editing !== null || form.documentNumber.trim().length >= 5) &&
+      // "Acotado" sin nada marcado escribiria CERO filas, y sin filas se ve todo: seria dar
+      // acceso completo justo cuando se acaba de pedir lo contrario. No se puede guardar asi.
+      !(roleManages && scopeKind === 'scoped' && scopeAreaIds.length === 0 && scopeProcessIds.length === 0),
+    [form, editing, roleManages, scopeKind, scopeAreaIds, scopeProcessIds],
   );
 
   const from = data ? (data.page - 1) * data.pageSize + 1 : 0;
@@ -517,7 +535,8 @@ export default function UsuariosPage() {
                   // Al cambiar de rol se propone el alcance habitual de ese rol, sin imponerlo:
                   // sigue pudiendose elegir cualquiera de los tres.
                   if (!editing) {
-                    setScopeKind(defaultScopeFor(roleCode));
+                    if (defaultScopeFor(roleCode) === 'scoped') acotar();
+                    else setScopeKind('all');
                   }
                 }}
               >
@@ -554,45 +573,62 @@ export default function UsuariosPage() {
                     description="Sin restriccion. Es lo normal para un administrador."
                   />
                   <ScopeOption
-                    checked={scopeKind === 'area'}
-                    onSelect={() => setScopeKind('area')}
-                    title={selectedAreaName ? `Solo su area (${selectedAreaName})` : 'Solo su area'}
-                    description="Todos los procesos que cuelguen de esa area. Si manana entra uno nuevo, lo ve solo."
-                    disabled={!form.areaId}
-                    disabledHint="Elige primero el area."
+                    checked={scopeKind === 'scoped'}
+                    onSelect={acotar}
+                    title="Solo lo que le marques"
+                    description="Areas completas, procesos sueltos, o las dos cosas."
                   />
-                  {/*
-                    ALCANCE A MEDIDA. Solo aparece si de verdad existe, y aparece SELECCIONADO:
-                    es lo que la persona tiene ahora. Elegir otra opcion lo sustituye —eso es un
-                    acto deliberado—, pero guardar sin tocarlo lo deja intacto.
-                  */}
-                  {scopeKind === 'custom' ? (
-                    <ScopeOption
-                      checked
-                      onSelect={() => setScopeKind('custom')}
-                      title={
-                        scopeAreaIds.length === 1
-                          ? `Otra area: ${areas.find((a) => a.id === scopeAreaIds[0])?.name ?? 'sin nombre'}`
-                          : `A medida: ${scopeAreaIds.length} areas`
-                      }
-                      description="Configurado en Permisos. Guardar aqui no lo cambia; para tocarlo, abre Permisos o elige otra opcion."
-                    />
-                  ) : null}
-                  <ScopeOption
-                    checked={scopeKind === 'processes'}
-                    onSelect={() => setScopeKind('processes')}
-                    title="Solo estos procesos"
-                    description="Exactamente los que marques, aunque trabaje en otra area."
-                  />
-                  {scopeKind === 'processes' ? (
-                    <div className="pl-6">
-                      <MultiSelect
-                        id="u-scope-processes"
-                        placeholder="Ningun proceso marcado"
-                        options={processes.map((row) => ({ id: row.id, label: row.name }))}
-                        value={scopeProcessIds}
-                        onChange={setScopeProcessIds}
-                      />
+
+                  {scopeKind === 'scoped' ? (
+                    <div className="space-y-3 rounded-lg border border-line bg-paper/60 p-3">
+                      {/*
+                        DOS LISTAS Y NO UNA ELECCION ENTRE DOS: el modelo permite las dos a la vez
+                        —quien lleva toda el area de SGI y ademas el proceso SARLAFT de otra— y el
+                        cajon de Permisos ya lo permitia. Que aqui no se pudiera era lo que dejaba
+                        alcances "a medida" imposibles de editar desde la ficha.
+                      */}
+                      <div>
+                        <p className="mb-1.5 text-xs font-medium text-ink-700">
+                          Areas completas
+                          {selectedAreaName ? <span className="font-normal text-ink-500"> · la suya es {selectedAreaName}</span> : null}
+                        </p>
+                        <MultiSelect
+                          id="u-scope-areas"
+                          placeholder="Ninguna area marcada"
+                          options={areas.map((row) => ({ id: row.id, label: row.name }))}
+                          value={scopeAreaIds}
+                          onChange={setScopeAreaIds}
+                        />
+                        <p className="mt-1 text-xs text-ink-500">
+                          Ve todos los procesos que cuelguen de esas areas — tambien los que se creen manana.
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="mb-1.5 text-xs font-medium text-ink-700">Procesos sueltos</p>
+                        <MultiSelect
+                          id="u-scope-processes"
+                          placeholder="Ningun proceso marcado"
+                          options={processes.map((row) => ({ id: row.id, label: row.name }))}
+                          value={scopeProcessIds}
+                          onChange={setScopeProcessIds}
+                        />
+                        <p className="mt-1 text-xs text-ink-500">
+                          Exactamente estos, aunque cuelguen de otra area o la persona trabaje en otra.
+                        </p>
+                      </div>
+
+                      {/*
+                        SIN NADA MARCADO NO SE ACOTA NADA: la regla del servidor es "sin filas = ve
+                        todo", asi que guardar "acotado" y vacio daria acceso a TODA la empresa,
+                        justo lo contrario de lo que se acaba de pedir. Se dice aqui y se bloquea
+                        el guardado.
+                      */}
+                      {scopeAreaIds.length === 0 && scopeProcessIds.length === 0 ? (
+                        <p role="alert" className="rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+                          Marca al menos un area o un proceso. Sin nada marcado no se acota nada: veria toda la empresa.
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

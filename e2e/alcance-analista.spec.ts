@@ -60,8 +60,17 @@ test.describe('Alcance del analista', () => {
 
     // GESTIONA: el alcance se da AQUI, al crear, sin tener que ir despues a otro cajon.
     // Solo sale porque el rol elegido concede permisos de gestion; con "Usuario" no aparece.
-    await expect(page.getByText('Toda la empresa')).toBeVisible();
-    await page.getByRole('radio', { name: /Solo estos procesos/ }).check();
+    await expect(page.getByText('Toda la empresa', { exact: true })).toBeVisible();
+    await page.getByRole('radio', { name: /Solo lo que le marques/ }).check();
+
+    // Al acotar, la pantalla SUGIERE su area marcandola. Este analista gestiona un proceso
+    // suelto y nada de su area, asi que la sugerencia se quita: es una propuesta, no una
+    // decision, y la prueba comprueba justo que se puede deshacer.
+    await page.locator('#u-scope-areas').click();
+    await page.getByRole('listbox').getByRole('option', { name: 'Logistica', exact: true }).click();
+    await page.locator('#u-scope-areas').click();
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+
     await page.locator('#u-scope-processes').click();
     await page.getByRole('option', { name: SUYO, exact: true }).click();
     // Se cierra el desplegable y se ESPERA a que desaparezca: mientras la lista se pliega, el

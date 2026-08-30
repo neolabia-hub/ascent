@@ -63,6 +63,32 @@ entero de rojo cuando hay algo vencido lo dejaba **pegado a la campana, que tamb
 rojo**, y los dos se leian como el mismo dato. Ahora el rojo esta solo en el contador y el borde lo
 insinua.
 
+### El alcance, editable de verdad desde la ficha
+
+Lo encontro el cliente probando: cambias el alcance de area en Permisos, dice que se aplico —y se
+aplico—, pero al abrir Editar el campo sigue igual; con los procesos si cuadraba. La causa era que
+"Solo su area" asumia que un alcance de area era SIEMPRE la propia area de la persona: miraba si
+HABIA filas, nunca cuales, y al guardar escribia el area de la persona. **Guardar un telefono
+reescribia el alcance.**
+
+El primer arreglo mostro ese caso como "a medida" y no lo tocaba al guardar. Al probarlo con el
+cliente quedo claro que seguia siendo confuso —"otra area", "2 areas", y sin poder cambiarlo ahi—,
+asi que el campo pasa a ser **lo mismo que en Permisos**: dos opciones (toda la empresa / solo lo
+que le marques) y **dos listas**, areas y procesos, que se pueden marcar a la vez. Ya no hay
+alcance que la ficha no sepa representar.
+
+Dos detalles que importan:
+- Al acotar se **sugiere su area**, marcada y quitable. Sugerencia visible, no decision por detras.
+- **No deja guardar "acotado" sin marcar nada**: cero filas significa ver todo, o sea lo contrario
+  de lo que se acaba de pedir. Esa trampa estaba a un clic.
+
+### El contador del conmutador, otra vez
+
+El cliente pregunto lo obvio mirandolo: el conmutador decia 9+ y la campana 9, y las nueve eran de
+formacion. ¿Sobra uno? No sobra —uno cuenta lo no leido y el otro lo no hecho— pero se veian
+iguales. Ahora el conmutador **solo lleva cifra cuando hay algo VENCIDO**; con pendientes al dia,
+un punto. Tener formacion pendiente es normal; tenerla vencida es lo que hay que mirar hoy.
+
 ### Verificado
 
 `tsc`, `eslint` y `nest build` en verde; **172/172** unitarias; **16/16 e2e** (uno nuevo: ida y
