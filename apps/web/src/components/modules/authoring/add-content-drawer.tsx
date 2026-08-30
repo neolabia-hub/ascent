@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ClipboardCheck, FileText, Layers, Link2, Package, Upload, Video } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, FileText, Layers, Link2, Package, Presentation, Upload, Video } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ChangeEvent } from 'react';
 import {
@@ -9,9 +9,11 @@ import {
   createLesson,
   listAssessments,
   listQuestionCategories,
+  presentationCapabilities,
   listLessons,
   updateAssessmentDraft,
   uploadMedia,
+  uploadPresentation,
   type AssessmentListItem,
   type ContentType,
   type LessonListItem,
@@ -21,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
 import { Drawer } from '@/components/ui/drawer';
 import { Field } from '@/components/ui/field';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
@@ -52,9 +55,27 @@ interface TypeMeta {
 
 const TYPES: TypeMeta[] = [
   { type: 'LESSON', label: 'Leccion en tarjetas', description: 'El formato principal. De 5 a 15 tarjetas de menos de 5 minutos.', icon: Layers },
-  { type: 'DOCUMENT', label: 'Documento', description: 'PDF, Word, Excel o presentacion. Se lee en visor y queda registrada la lectura.', icon: FileText },
-  { type: 'VIDEO', label: 'Video', description: 'Archivo subido, o enlace de YouTube o Vimeo. Registra el porcentaje visto.', icon: Video },
+  {
+    type: 'PRESENTATION',
+    label: 'Presentacion',
+    description:
+      'PowerPoint o PDF. Se convierte en diapositivas y se reproduce dentro de la plataforma: se registra cual vio y cuanto tiempo.',
+    icon: Presentation,
+  },
+  {
+    type: 'VIDEO',
+    label: 'Video',
+    description: 'Archivo subido o enlace de YouTube: se mide lo que la persona ve de verdad. Otros enlaces quedan como declaracion suya.',
+    icon: Video,
+  },
   { type: 'ASSESSMENT', label: 'Evaluacion', description: 'Examen con nota, intentos y bloqueo al agotarlos.', icon: ClipboardCheck },
+  {
+    type: 'DOCUMENT',
+    label: 'Documento de apoyo',
+    description:
+      'Manual, politica o instructivo para consultar. No es una leccion: se lee en visor y solo queda la confirmacion de la persona.',
+    icon: FileText,
+  },
   { type: 'LINK', label: 'Enlace externo', description: 'Un recurso que vive fuera de la plataforma.', icon: Link2 },
   {
     type: 'SURVEY',
@@ -91,6 +112,7 @@ export function AddContentDrawer({
   const [type, setType] = useState<ContentType | null>(null);
   const [mode, setMode] = useState<Mode>('new');
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [isRequired, setIsRequired] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -104,18 +126,26 @@ export function AddContentDrawer({
   const [lessons, setLessons] = useState<LessonListItem[]>([]);
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
   const [categories, setCategories] = useState<QuestionCategory[]>([]);
+  /** null mientras no se sabe; false = este servidor solo convierte PDF. */
+  const [officeReady, setOfficeReady] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setType(null);
     setMode('new');
     setTitle('');
+    setDescription('');
     setLessonId('');
     setAssessmentVersionId('');
     setExternalUrl('');
     setFile(null);
     setIsRequired(true);
     void listLessons('DRAFT').then(setLessons).catch(() => undefined);
+    // Se pregunta al abrir: el campo tiene que decir la verdad ANTES de que alguien elija un
+    // .pptx que este servidor no va a poder convertir.
+    void presentationCapabilities()
+      .then((value) => setOfficeReady(value.office))
+      .catch(() => setOfficeReady(null));
     void listAssessments().then(setAssessments).catch(() => undefined);
     void listQuestionCategories()
       .then((rows) => {
@@ -132,7 +162,13 @@ export function AddContentDrawer({
       const finalTitle = title.trim();
       let newLessonId: string | null = null;
 
-      const body: Parameters<typeof addContent>[1] = { type, title: finalTitle, isRequired, config: {} };
+    const body: Parameters<typeof addContent>[1] = {
+        type,
+        title: finalTitle,
+        description: description.trim() || null,
+        isRequired,
+        config: {},
+      };
 
       if (type === 'LESSON') {
         if (mode === 'new') {
@@ -160,6 +196,13 @@ export function AddContentDrawer({
         }
       }
 
+      // La presentacion no se sube: se CONVIERTE. Tarda, y por eso la pantalla lo avisa antes.
+      if (type === 'PRESENTATION') {
+        if (!file) throw new Error('Falta el archivo');
+        const uploaded = await uploadPresentation(file);
+        body.contentPackageId = uploaded.id;
+      }
+
       if (type === 'DOCUMENT' || (type === 'VIDEO' && file)) {
         if (!file) throw new Error('Falta el archivo');
         const uploaded = await uploadMedia(file, type === 'DOCUMENT' ? 'document' : 'video');
@@ -176,7 +219,9 @@ export function AddContentDrawer({
       if (newLessonId) {
         // Crear una leccion vacia no sirve de nada: lo siguiente es escribir sus tarjetas.
         showToast({ kind: 'success', title: 'Leccion creada', description: 'Ahora escribe sus tarjetas.' });
-        router.push(`/lecciones/${newLessonId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}`)}`);
+        router.push(
+          `/lecciones/${newLessonId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}&formacion=${activityId}`,
+        );
         return;
       }
       showToast({ kind: 'success', title: 'Contenido agregado' });
@@ -194,7 +239,7 @@ export function AddContentDrawer({
     if (!type || title.trim().length < 2) return false;
     if (type === 'LESSON') return mode === 'new' || Boolean(lessonId);
     if (type === 'ASSESSMENT') return mode === 'new' ? Boolean(categoryId) : Boolean(assessmentVersionId);
-    if (type === 'DOCUMENT') return Boolean(file);
+    if (type === 'DOCUMENT' || type === 'PRESENTATION') return Boolean(file);
     if (type === 'VIDEO') return Boolean(file) || externalUrl.trim().startsWith('http');
     if (type === 'LINK') return externalUrl.trim().startsWith('http');
     return true;
@@ -251,6 +296,25 @@ export function AddContentDrawer({
         <div className="space-y-4">
           <Field htmlFor="c-title" label="Titulo" required hint="Es lo que vera el colaborador en la lista.">
             <Input id="c-title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />
+          </Field>
+
+          {/*
+            La descripcion la lee quien cursa, en el reproductor, justo debajo del contenido. No
+            es la descripcion de la formacion: es de ESTA parte. Sin ella el aprendiz ve un video
+            sin saber que va a ver ni por que se lo exigen.
+          */}
+          <Field
+            htmlFor="c-description"
+            label="Descripcion"
+            hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
+          >
+            <Textarea
+              id="c-description"
+              rows={3}
+              value={description}
+              maxLength={2000}
+              onChange={(event) => setDescription(event.target.value)}
+            />
           </Field>
 
           {(type === 'LESSON' || type === 'ASSESSMENT') && (
@@ -348,8 +412,52 @@ export function AddContentDrawer({
             </Field>
           ) : null}
 
+          {type === 'PRESENTATION' ? (
+            <>
+              <Field
+                htmlFor="c-slides"
+                label="Presentacion"
+                required
+                hint={
+                  officeReady === false
+                    ? 'Este servidor solo acepta PDF. Exportala desde PowerPoint (Archivo, Guardar como, PDF): el resultado es identico.'
+                    : 'PowerPoint (.pptx, .ppt), OpenDocument (.odp) o PDF.'
+                }
+              >
+                <label
+                  htmlFor="c-slides"
+                  className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-6 text-sm text-ink-500 hover:border-primary"
+                >
+                  <Upload size={18} strokeWidth={1.75} />
+                  {file ? <span className="text-ink-900">{file.name}</span> : <span>Elegir la presentacion</span>}
+                </label>
+                <input
+                  id="c-slides"
+                  type="file"
+                  className="sr-only"
+                  accept={officeReady === false ? '.pdf' : '.pdf,.ppt,.pptx,.odp'}
+                  onChange={onFile}
+                />
+              </Field>
+              {/*
+                Se advierte ANTES de subir, no despues: quien elige este formato tiene que saber
+                que pierde, y que a cambio la plataforma puede registrar que se vio.
+              */}
+              <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+                Cada diapositiva se convierte en una imagen y se reproduce dentro de la plataforma, asi que queda registrado
+                cual vio cada persona y cuanto tiempo. Se pierden las animaciones, los videos incrustados y los
+                hipervinculos. La conversion tarda unos segundos.
+              </p>
+            </>
+          ) : null}
+
           {type === 'DOCUMENT' ? (
-            <Field htmlFor="c-file" label="Archivo" required hint="PDF, Word, Excel o presentacion.">
+            <Field
+              htmlFor="c-file"
+              label="Archivo"
+              required
+              hint="Manual, politica o instructivo. Si lo que quieres es que lo CURSEN, usa Presentacion o Leccion: de un documento solo se registra que la persona confirmo haberlo leido."
+            >
               <label
                 htmlFor="c-file"
                 className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-6 text-sm text-ink-500 hover:border-primary"
@@ -373,7 +481,11 @@ export function AddContentDrawer({
                 </label>
                 <input id="c-video" type="file" className="sr-only" accept="video/*" onChange={onFile} />
               </Field>
-              <Field htmlFor="c-url" label="O enlace de YouTube o Vimeo">
+              <Field
+                htmlFor="c-url"
+                label="O enlace de YouTube o Vimeo"
+                hint="De YouTube se mide lo reproducido, igual que de un archivo propio. De Vimeo y del resto no: quedan como declaracion de la persona."
+              >
                 <Input
                   id="c-url"
                   value={externalUrl}

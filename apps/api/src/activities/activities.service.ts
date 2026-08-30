@@ -7,6 +7,7 @@ import type {
   UpdateActivityInput,
   UpdateContentInput,
 } from '@neo-pulse/shared';
+import { assertScopeAllows, processScopeWhere, scopeAllows } from '../common/analyst-scope.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -36,12 +37,13 @@ export class ActivitiesService {
     private readonly versioning: VersioningService,
   ) {}
 
-  async list(query: ListActivitiesQuery) {
+  async list(actor: AuthUser, query: ListActivitiesQuery) {
     const where: Prisma.ActivityWhereInput = {
       deletedAt: null,
       ...(query.active ? { active: query.active === 'true' } : {}),
       ...(query.activityTypeId ? { activityTypeId: query.activityTypeId } : {}),
-      ...(query.processId ? { processId: query.processId } : {}),
+      // El analista ve SU proceso; el admin (sin alcance) ve todo. Ver common/analyst-scope.ts.
+      ...processScopeWhere(actor.scopeProcessIds, query.processId),
       ...(query.q
         ? {
             OR: [
@@ -64,7 +66,7 @@ export class ActivitiesService {
     return { total, page: query.page, pageSize: query.pageSize, items };
   }
 
-  async getById(id: string) {
+  async getById(actor: AuthUser, id: string) {
     const activity = await this.prisma.scoped.activity.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -89,7 +91,10 @@ export class ActivitiesService {
         },
       },
     });
-    if (!activity) throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+    // 404 y no 403: sobre un id concreto, un 403 confirma que esa capacitacion existe.
+    if (!activity || !scopeAllows(actor.scopeProcessIds, activity.processId)) {
+      throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+    }
     return {
       ...activity,
       norms: activity.norms.map((n) => n.norm),
@@ -101,7 +106,21 @@ export class ActivitiesService {
 
   /** Crea la actividad y su version 1 en borrador, en una sola transaccion. */
   async create(actor: AuthUser, input: CreateActivityInput) {
+    assertScopeAllows(actor.scopeProcessIds, input.processId);
     const tenantId = this.prisma.currentTenantId;
+
+    // Si no se dice quien responde, responde el del PROCESO. Es un paso menos al crear y ademas
+    // la respuesta correcta casi siempre: quien lleva SARLAFT responde por sus capacitaciones.
+    // Se guarda el valor, no la referencia: cambiar el responsable del proceso manana no debe
+    // reescribir en silencio quien respondia por lo que ya existe.
+    let responsibleUserId = input.responsibleUserId ?? null;
+    if (!responsibleUserId) {
+      const process = await this.prisma.scoped.process.findUnique({
+        where: { id: input.processId },
+        select: { responsibleUserId: true },
+      });
+      responsibleUserId = process?.responsibleUserId ?? null;
+    }
 
     const activity = await this.prisma
       .tx(async (tx) => {
@@ -113,7 +132,7 @@ export class ActivitiesService {
             description: input.description ?? null,
             activityTypeId: input.activityTypeId,
             processId: input.processId,
-            responsibleUserId: input.responsibleUserId ?? null,
+            responsibleUserId,
             modality: input.modality,
             tags: input.tags,
             createdBy: actor.id,
@@ -139,14 +158,17 @@ export class ActivitiesService {
       resourceId: activity.id,
       newValues: { code: input.code, name: input.name },
     });
-    return this.getById(activity.id);
+    return this.getById(actor, activity.id);
   }
 
   /** Datos de cabecera de la actividad (nombre, alcance). No toca versiones ni contenido. */
   async update(actor: AuthUser, id: string, input: UpdateActivityInput) {
     const tenantId = this.prisma.currentTenantId;
     const before = await this.prisma.scoped.activity.findFirst({ where: { id, deletedAt: null } });
-    if (!before) throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+    if (!before || !scopeAllows(actor.scopeProcessIds, before.processId)) {
+      throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+    }
+    if (input.processId) assertScopeAllows(actor.scopeProcessIds, input.processId);
 
     await this.prisma.tx(async (tx) => {
       await tx.activity.update({
@@ -175,13 +197,15 @@ export class ActivitiesService {
       oldValues: { name: before.name, modality: before.modality, active: before.active },
       newValues: input,
     });
-    return this.getById(id);
+    return this.getById(actor, id);
   }
 
   /** Baja logica: el historico formativo debe sobrevivir (retencion 20 anos, Decision #16). */
   async softDelete(actor: AuthUser, id: string) {
     const activity = await this.prisma.scoped.activity.findFirst({ where: { id, deletedAt: null } });
-    if (!activity) throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+    if (!activity || !scopeAllows(actor.scopeProcessIds, activity.processId)) {
+      throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+    }
 
     const offerings = await this.prisma.scoped.offering.count({
       where: { activityVersion: { activityId: id } },
@@ -226,6 +250,7 @@ export class ActivitiesService {
         activityVersionId: versionId,
         type: input.type,
         title: input.title,
+        description: input.description ?? null,
         displayOrder: (last?.displayOrder ?? -1) + 1,
         isRequired: input.isRequired,
         config: input.config as Prisma.InputJsonValue,
@@ -255,6 +280,7 @@ export class ActivitiesService {
       where: { id: contentId },
       data: {
         title: input.title,
+        description: input.description,
         isRequired: input.isRequired,
         config: input.config as Prisma.InputJsonValue | undefined,
         lessonId: input.lessonId,

@@ -30,14 +30,14 @@ export class ActivitiesController {
 
   @Get()
   @RequirePermissions('catalog:read')
-  list(@Query() query: Record<string, string>) {
-    return this.activities.list(listActivitiesQuerySchema.parse(query));
+  list(@CurrentUser() actor: AuthUser, @Query() query: Record<string, string>) {
+    return this.activities.list(actor, listActivitiesQuerySchema.parse(query));
   }
 
   @Get(':id')
   @RequirePermissions('catalog:read')
-  getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.activities.getById(id);
+  getById(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.activities.getById(actor, id);
   }
 
   @Post()

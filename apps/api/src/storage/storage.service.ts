@@ -1,5 +1,6 @@
+import { createReadStream, type ReadStream } from 'node:fs';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -10,6 +11,10 @@ import { Injectable, Logger } from '@nestjs/common';
 export interface StorageAdapter {
   put(key: string, body: Buffer, mimeType: string): Promise<void>;
   read(key: string): Promise<Buffer>;
+  /** Tamano en bytes, o null si no existe. Necesario para responder rangos. */
+  size(key: string): Promise<number | null>;
+  /** Lectura por TROZOS. Un video no se puede servir de una sola pieza (ver media.controller). */
+  stream(key: string, range?: { start: number; end: number }): ReadStream;
   getSignedUrl(key: string, expiresInSeconds: number): Promise<string>;
   delete(key: string): Promise<void>;
   readonly isLocal: boolean;
@@ -41,6 +46,16 @@ export class LocalStorageAdapter implements StorageAdapter {
     return readFile(this.pathFor(key));
   }
 
+  async size(key: string): Promise<number | null> {
+    return stat(this.pathFor(key))
+      .then((info) => info.size)
+      .catch(() => null);
+  }
+
+  stream(key: string, range?: { start: number; end: number }): ReadStream {
+    return createReadStream(this.pathFor(key), range);
+  }
+
   async getSignedUrl(key: string): Promise<string> {
     // En local no hay firma: el acceso lo protege el guard de sesion del endpoint.
     return `/v1/media/file/${encodeURIComponent(key)}`;
@@ -68,6 +83,12 @@ export class R2StorageAdapter implements StorageAdapter {
     this.notImplemented();
   }
   read(): Promise<Buffer> {
+    this.notImplemented();
+  }
+  size(): Promise<number | null> {
+    this.notImplemented();
+  }
+  stream(): ReadStream {
     this.notImplemented();
   }
   getSignedUrl(): Promise<string> {
@@ -110,6 +131,14 @@ export class StorageService {
 
   read(key: string): Promise<Buffer> {
     return this.adapter.read(key);
+  }
+
+  size(key: string): Promise<number | null> {
+    return this.adapter.size(key);
+  }
+
+  stream(key: string, range?: { start: number; end: number }): ReadStream {
+    return this.adapter.stream(key, range);
   }
 
   getSignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {

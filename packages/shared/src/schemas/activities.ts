@@ -52,6 +52,8 @@ export type ListActivitiesQuery = z.infer<typeof listActivitiesQuerySchema>;
 export const contentTypeSchema = z.enum([
   'LESSON',
   'VIDEO',
+  // Se convierte a una imagen por diapositiva y se reproduce; por eso NO es un DOCUMENT.
+  'PRESENTATION',
   'DOCUMENT',
   'ASSESSMENT',
   'SURVEY',
@@ -68,6 +70,16 @@ export const contentConfigSchema = z
     minSeconds: z.number().int().min(0).max(7200).optional(),
     /** VIDEO: url externa (YouTube/Vimeo) cuando no es archivo subido. */
     externalUrl: z.string().url().max(500).optional(),
+    /**
+     * Si la persona puede DESCARGAR el archivo original de esta pieza.
+     *
+     * Existe por la presentacion: se convierte a diapositivas para poder medir que se vio, y
+     * entregar ademas el PPT original es una decision del cliente —a veces es material que no
+     * quiere que salga de la plataforma—, no algo que deba pasar por defecto. En un documento de
+     * apoyo es al reves: consultarlo ES para lo que esta, asi que ahi el valor por defecto es que
+     * si se pueda.
+     */
+    allowDownload: z.boolean().optional(),
     /** LINK: destino del recurso externo. */
     href: z.string().url().max(500).optional(),
   })
@@ -77,6 +89,11 @@ export const contentConfigSchema = z
 export const createContentSchema = z.object({
   type: contentTypeSchema,
   title: z.string().min(2).max(200),
+  /**
+   * De que va ESTA pieza. No es la descripcion de la actividad: quien entra a la parte 4 de 7
+   * quiere saber que va a ver ahora, no de que iba la induccion entera.
+   */
+  description: z.string().max(2000).nullable().optional(),
   isRequired: z.boolean().default(true),
   config: contentConfigSchema,
   lessonId: z.string().uuid().nullable().optional(),

@@ -262,6 +262,7 @@ export class VersioningService {
             activityVersionId: created.id,
             type: content.type,
             title: content.title,
+            description: content.description,
             displayOrder: content.displayOrder,
             isRequired: content.isRequired,
             config: content.config as Prisma.InputJsonValue,
@@ -375,6 +376,7 @@ export class VersioningService {
         return Boolean(content.lessonId);
       case 'VIDEO':
         return Boolean(content.contentPackageId) || Boolean(config.externalUrl);
+      case 'PRESENTATION':
       case 'DOCUMENT':
       case 'SCORM':
         return Boolean(content.contentPackageId);
