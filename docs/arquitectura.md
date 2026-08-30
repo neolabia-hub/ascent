@@ -179,6 +179,121 @@ si se confunden.
 
 ---
 
+## 4.6 El plan anual de capacitacion
+
+El plan es una **entidad empresarial propia**, no una vista de las convocatorias: tiene objetivo,
+metas, aprobacion, indicadores y un ciclo de vida. Sus renglones REFERENCIAN convocatorias; el plan
+no posee las capacitaciones, de modo que reprogramar una jornada o partirla en dos sedes no
+reescribe el plan.
+
+### Las dos tablas
+
+| Tabla | Que guarda |
+|---|---|
+| `training_plans` | El programa del ano: `year`, `name`, objetivo, metas, alcance, `status`, quien y cuando aprobo |
+| `plan_items` | Cada renglon: a que `offering` apunta, `planned_month`, su `status` y el `projected_snapshot` congelado |
+
+Un renglon **no** guarda a quien obliga: eso son `assignments` con `source = PLAN` y
+`plan_item_id` apuntando al renglon. Esa columna es la que sostiene la regla de oro 2.
+
+### Los cuatro estados
+
+```
+BORRADOR ──aprobar──> APROBADO ──activar──> EN EJECUCION ──cerrar──> CERRADO
+   │                      │                      │                      │
+   se compone        ya obliga              ya obliga            es la evidencia
+   libremente        a personas             a personas           del ano (final)
+```
+
+- **BORRADOR**: se arma. Agregar, quitar y reordenar renglones no tiene consecuencias para nadie.
+- **APROBAR** hace dos cosas irreversibles y por eso pide `plans:approve` y confirmacion:
+  1. **congela** el proyectado de cada renglon (`projected_snapshot`), que es el DENOMINADOR de la
+     cobertura, y
+  2. **materializa** las obligaciones: crea un `assignment` por persona alcanzada, con vencimiento
+     al ultimo dia del mes programado.
+  No se aprueba un plan vacio ni uno con convocatorias en borrador: sin publicar no hay proyectados
+  que congelar.
+- **EN EJECUCION** es el mismo plan, marcado como el que esta corriendo.
+- **CERRADO**: el ano termino. No admite renglones nuevos, no se edita, no se borra y **no se
+  reabre**: cerrar es exactamente lo que lo convierte en evidencia ante un auditor.
+
+### Materializar: la operacion central
+
+`materialize()` (en `plans.service.ts`) es lo que de verdad hace "aprobar", renglon a renglon, y
+vive aparte porque tambien lo necesita **agregar una jornada a un plan ya aprobado** (Decision #55):
+un renglon que entra en agosto tiene que obligar igual que los que entraron en enero.
+
+Es **idempotente a proposito**: mira que asignaciones ya existen antes de crear. Aprobar dos veces,
+o agregar y reintentar, no puede duplicar obligaciones — duplicarlas corrompe todo indicador de
+cumplimiento.
+
+### Los indicadores, y por que son estables
+
+```
+Cumplimiento = renglones EJECUTADOS / renglones PROGRAMADOS      ← ¿se hizo lo que se dijo?
+Cobertura    = personas CAPACITADAS / proyectado CONGELADO       ← ¿llego a quien tenia que llegar?
+```
+
+Ambos se calculan **exclusivamente** sobre las obligaciones del propio plan (`source = PLAN` +
+`plan_item_id`), nunca sobre las inscripciones de la convocatoria. Es la regla de oro 2: lo que se
+asigne por fuera del plan —una inscripcion voluntaria, una obligacion manual— **no mueve** sus
+numeros. Sin eso, el cumplimiento del ano cambiaria solo porque alguien se inscribio por su cuenta.
+
+El denominador se congela al aprobar por la misma razon: si se recalculara en vivo, contratar gente
+en octubre bajaria el cumplimiento de una jornada que se hizo bien en marzo.
+
+**Quien pregunta ve su parte.** Un analista con alcance no abre "el plan de la empresa con 52
+renglones": abre los suyos, y las metricas se calculan sobre los renglones VISIBLES. Ensenarle el
+62% global junto a sus ocho jornadas seria un numero que no puede explicar ni mover.
+
+### Que se puede cambiar, y cuando
+
+| Accion | Borrador | Aprobado / En ejecucion | Cerrado |
+|---|---|---|---|
+| Agregar renglon | si | si, **con motivo**; nace obligando (#55) | no |
+| Quitar renglon | si (si no genero obligaciones) | no — se **cancela** con motivo | no |
+| Mover de mes | si | si; el renglon pasa a **REPROGRAMADA** | no |
+| Ajustar el proyectado congelado | — | si, con motivo auditado (#56) | no |
+| Corregir nombre / objetivo / metas / alcance | si | si, **con motivo** (#63) | no |
+| Cambiar el ANO | si | **no** (#63) | no |
+| **Borrar el plan** | si | **solo si nadie EMPEZO** (#62) | no |
+
+**Por que el ano no.** Identifica al plan junto al nombre (`@@unique [tenant, year, name]`) y ancla
+el vencimiento de cada renglon al ultimo dia de su mes: cambiarlo despues de aprobar moveria la
+fecha limite de gente que ya tiene la obligacion encima.
+
+**Por que "quien empezo" y no el estado, para borrar** (Decision #62). Lo que hay que proteger no es
+el plan: es lo que la GENTE ya hizo contra el. Un plan aprobado por error el viernes y detectado el
+lunes es un error, no historia, y arrastrarlo todo el ano ensucia el cumplimiento de la empresa
+entera. Pero en cuanto una sola persona abrio una de sus formaciones, ese avance es suyo y borrarlo
+seria borrarselo. La regla vive pura y probada en `plans/plan-deletion.ts`:
+
+```
+CERRADO                          → PLAN_CLOSED_IS_EVIDENCE
+alguien empezo (>= 1 enrollment) → PLAN_HAS_EVIDENCE (dice cuantos son)
+resto                            → se borra, revocando N obligaciones
+```
+
+Borrar **revoca**: las asignaciones `source = PLAN` del plan se borran en la misma transaccion que
+el plan. No pueden quedar huerfanas —apuntan al renglon por clave foranea— ni vivas: una obligacion
+sin plan que la explique es justo lo que el plan existe para evitar. Los renglones caen solos
+(`ON DELETE CASCADE`). Las capacitaciones y convocatorias que el plan referenciaba **no se tocan**.
+
+Exige `plans:approve` y no `plans:manage`: borrar el plan del ano es al menos tan grave como
+aprobarlo.
+
+### Los archivos
+
+| Archivo | Que resuelve |
+|---|---|
+| `api/src/plans/plans.service.ts` | Ciclo de vida, renglones, materializacion, borrado |
+| `api/src/plans/plan-metrics.ts` | Cumplimiento y cobertura, puro |
+| `api/src/plans/plan-deletion.ts` | Que plan se puede borrar y que revoca, puro |
+| `web/app/(admin)/plan/page.tsx` | Listado, crear y eliminar |
+| `web/app/(admin)/plan/[id]/page.tsx` | El plan del ano: cronograma, renglones, indicadores, editar |
+
+---
+
 ## 5. Donde vive cada cosa
 
 ```

@@ -3,18 +3,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Plus } from 'lucide-react';
-import { createPlan, listPlans, type PlanRow, type PlanStatus } from '@/lib/delivery-api';
+import { ClipboardList, Plus, Trash2 } from 'lucide-react';
+import { ApiError } from '@/lib/api';
+import { createPlan, deletePlan, listPlans, type PlanRow, type PlanStatus } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { useCan } from '@/components/providers/session-provider';
 
 const STATUS: Record<PlanStatus, { kind: StatusPillKind; label: string }> = {
   DRAFT: { kind: 'neutral', label: 'BORRADOR' },
@@ -31,6 +34,15 @@ export default function PlanPage() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ year: String(new Date().getFullYear()), name: '', objective: '' });
+  /**
+   * Borrar desde el LISTADO y no solo desde la ficha: los planes que estorban son los de prueba,
+   * y son varios. Obligar a entrar en cada uno para tirarlo es la friccion que hizo que nadie los
+   * limpiara nunca.
+   */
+  const can = useCan();
+  const canDelete = can('plans:approve');
+  const [target, setTarget] = useState<PlanRow | null>(null);
+  const [reason, setReason] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +71,31 @@ export default function PlanPage() {
         kind: 'danger',
         title: 'No se pudo crear el plan',
         description: 'Puede que ya exista uno con ese nombre para el ano.',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const destroy = async () => {
+    if (!target) return;
+    setBusy(true);
+    try {
+      const result = await deletePlan(target.id, reason.trim() ? { justification: reason.trim() } : {});
+      showToast({
+        kind: 'success',
+        title: 'Plan eliminado',
+        description:
+          result.revokedAssignments > 0 ? `Se revocaron ${result.revokedAssignments} obligaciones suyas.` : undefined,
+      });
+      setTarget(null);
+      await load();
+    } catch (error) {
+      // El servidor explica POR QUE no se puede ("ya hay N personas que empezaron"): esa frase es
+      // la respuesta, no un error tecnico que haya que traducir a "algo salio mal".
+      showToast({
+        kind: 'danger',
+        title: error instanceof ApiError && error.message ? error.message : 'No se pudo eliminar el plan',
       });
     } finally {
       setBusy(false);
@@ -107,7 +144,7 @@ export default function PlanPage() {
                   <Th className="text-right">Renglones</Th>
                   <Th>Aprobado</Th>
                   <Th>Estado</Th>
-                  <Th className="w-24 text-right">Accion</Th>
+                  <Th className="w-40 text-right">Accion</Th>
                 </Tr>
               </THead>
               <TBody>
@@ -121,11 +158,28 @@ export default function PlanPage() {
                       <StatusPill kind={STATUS[plan.status].kind} label={STATUS[plan.status].label} />
                     </Td>
                     <Td className="text-right">
-                      <Link href={`/plan/${plan.id}`}>
-                        <Button variant="ghost" size="sm">
-                          Abrir
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/plan/${plan.id}`}>
+                          <Button variant="ghost" size="sm">
+                            Abrir
+                          </Button>
+                        </Link>
+                        {/* El plan CERRADO no ofrece borrar: cerrarlo es lo que lo hizo evidencia. */}
+                        {canDelete && plan.status !== 'CLOSED' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger"
+                            aria-label={`Eliminar ${plan.name}`}
+                            onClick={() => {
+                              setReason('');
+                              setTarget(plan);
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </Button>
+                        ) : null}
+                      </div>
                     </Td>
                   </Tr>
                 ))}
@@ -134,6 +188,55 @@ export default function PlanPage() {
           </div>
         </div>
       )}
+
+      <Drawer
+        open={target !== null}
+        onOpenChange={(next) => (next ? null : setTarget(null))}
+        title={target ? `Eliminar "${target.name}"` : 'Eliminar el plan'}
+        description="Desaparece el plan con todos sus renglones. Las capacitaciones y convocatorias que referencia NO se tocan."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setTarget(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={destroy}
+              loading={busy}
+              disabled={target !== null && target.status !== 'DRAFT' && reason.trim().length < 10}
+            >
+              <Trash2 size={16} />
+              Eliminar el plan
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {target && target.status !== 'DRAFT' ? (
+            <>
+              <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+                Este plan ya fue aprobado: si creo obligaciones, se revocan y desaparecen de la bandeja de esas personas.
+                Si alguna ya empezo su formacion, no se podra borrar — ese avance es suyo.
+              </p>
+              <Field
+                htmlFor="d-reason"
+                label="Por que se elimina"
+                required
+                hint="Queda en la auditoria: hubo gente a la que ya se le anuncio esta formacion."
+              >
+                <Textarea
+                  id="d-reason"
+                  rows={2}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Minimo 10 caracteres"
+                />
+              </Field>
+            </>
+          ) : (
+            <p className="text-sm text-ink-700">Esta en borrador: nunca obligo a nadie, asi que se borra sin consecuencias.</p>
+          )}
+        </div>
+      </Drawer>
 
       <Drawer
         open={open}

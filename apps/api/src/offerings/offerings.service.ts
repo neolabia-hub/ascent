@@ -102,7 +102,12 @@ export class OfferingsService {
       this.prisma.scoped.offering.findMany({
         where,
         select: OFFERING_LIST_SELECT,
-        orderBy: [{ scheduledDate: 'desc' }, { code: 'desc' }],
+        // NULLS LAST explicito, y no el orden que regala Postgres: en DESC las fechas nulas van
+        // PRIMERAS, asi que las convocatorias sin fecha (borradores, cursos permanentes) se
+        // quedaban con la primera pagina entera. Con 52 sin fecha y un tope de 100, una
+        // convocatoria recien publicada CAIA FUERA de la lista y el plan no podia engancharla:
+        // el sintoma era otra vez "no aparece", y la causa estaba a dos capas de distancia.
+        orderBy: [{ scheduledDate: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }, { code: 'desc' }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),

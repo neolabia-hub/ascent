@@ -261,3 +261,42 @@ test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan',
   await expect(page).toHaveURL(new RegExp(`${planUrl}$`));
   await expect(page.getByText(`Plan ida y vuelta ${suffix}`)).toBeVisible();
 });
+
+/**
+ * BORRAR Y CORREGIR EL PLAN.
+ *
+ * Hasta ahora un plan no se podia tirar de ninguna forma, y eso convertia cada ensayo en un
+ * renglon permanente del listado. La frontera nueva no es el estado del plan sino si alguien
+ * EMPEZO: aqui se cubre el borrador —que nunca obligo a nadie— de punta a punta, incluida la
+ * correccion de la cabecera, que existia en la API y no la llamaba ninguna pantalla.
+ */
+test('un plan en borrador se corrige y se elimina desde el listado', async ({ page }) => {
+  await loginAsAdmin(page);
+  const suffix = unique();
+  const nombre = `Plan desechable ${suffix}`;
+  const corregido = `Plan corregido ${suffix}`;
+
+  await page.goto('/plan');
+  await page.getByRole('button', { name: 'Nuevo plan' }).click();
+  await page.locator('#p-name').fill(nombre);
+  await page.getByRole('button', { name: 'Crear plan' }).click();
+  await page.waitForURL('**/plan/**', { timeout: 20_000 });
+
+  // 1. Corregir la cabecera. En borrador se puede cambiar hasta el ano, y sin pedir motivo.
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await page.locator('#e-name').fill(corregido);
+  await page.locator('#e-objective').fill('Objetivo escrito despues de crear el plan.');
+  await page.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByText('Plan actualizado')).toBeVisible();
+  await expect(page.getByRole('heading', { name: corregido })).toBeVisible();
+
+  // 2. Eliminarlo desde el LISTADO, que es donde estorban los planes de prueba.
+  await page.goto('/plan');
+  await expect(page.getByText(corregido)).toBeVisible();
+  await page.getByRole('button', { name: `Eliminar ${corregido}` }).click();
+  // En borrador el cajon no pide motivo: nunca obligo a nadie.
+  await expect(page.getByText('Esta en borrador: nunca obligo a nadie', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Eliminar el plan' }).click();
+  await expect(page.getByText('Plan eliminado')).toBeVisible();
+  await expect(page.getByText(corregido)).toHaveCount(0);
+});

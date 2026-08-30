@@ -20,6 +20,64 @@ un diario, no una referencia.
 
 ---
 
+## 2026-08-29 (noche) — Cinco sesiones confirmadas, y el plan que ya se puede tirar
+
+### Lo primero: el trabajo tiene puntos de retorno
+
+Los **118 archivos sin confirmar** de cinco sesiones estan en **nueve commits tematicos** (entorno,
+esquema, convocatorias, presentacion, reproductor, alcance, plan, audiencias, personas, docs), cada
+uno revisable y reversible por separado. Donde un fichero llevaba cambios de dos temas, lo dice su
+mensaje. **El repositorio NO tiene remoto**: los commits viven solo en este disco.
+
+### Borrar y corregir un plan (Decisiones #62 y #63)
+
+Era el pendiente numero uno y ya esta. Lo que se discutio y cambio la forma del arreglo: **la
+frontera no es el ESTADO del plan, es si alguien EMPEZO**.
+
+- Borrador → se borra.
+- Aprobado o en ejecucion **sin que nadie haya abierto nada** → se borra, revocando sus
+  obligaciones, con motivo, y diciendo en pantalla cuantas antes de pulsar.
+- Con alguien que ya empezo → no. Ese avance es de una persona.
+- Cerrado → nunca.
+
+La regla vive pura en `plans/plan-deletion.ts` (9 pruebas). Se borra desde el LISTADO ademas de
+desde la ficha, porque los planes que estorban son los de prueba y son varios.
+
+Y la **cabecera** se corrige aunque este aprobado, con motivo: nombre, objetivo, metas y alcance son
+texto, y lo que obliga a la gente son los renglones. El endpoint existia desde el Sprint 3 y
+**ninguna pantalla lo llamaba**. El ANO solo en borrador: ancla el vencimiento de cada renglon.
+
+### Un fallo latente que destapo la prueba
+
+La convocatoria recien publicada **no aparecia** en el desplegable del plan. Nada que ver con lo de
+arriba: el cajon pide 100 y el servidor ordenaba por fecha DESC, que en Postgres pone los NULOS
+primero — 52 convocatorias sin fecha ocupaban la cabeza y la nueva caia en la posicion 103. Misma
+familia que los cinco de la sesion anterior: el sintoma es "no aparece" y la causa esta lejos. En
+el RUNBOOK, con el conteo que lo caza.
+
+### Lo que se hablo y NO se construyo
+
+- **El pendiente del alcance por area sobre PERSONAS esta mal planteado.** Acotar las personas al
+  area del analista le romperia su propio indicador: una formacion de SARLAFT se le exige a
+  comercial, cartera y logistica, asi que quien la administra tiene que poder ver a esa gente. Lo
+  propuesto en su lugar: en Personas, filtro por area **por defecto y quitable**; en reportes,
+  recortar por lo que administra (procesos, que ya funciona) y no por area; restriccion dura solo
+  donde se decide SOBRE la persona, y eso es un permiso, no un alcance. **Sin decidir.**
+- **El responsable no se congela en la VERSION.** Al crear una capacitacion ya se copia por valor
+  el del proceso (`activities.service.ts`), asi que cambiar el responsable del proceso no reescribe
+  lo existente — eso ya funciona. Pero `activity_versions` no guarda responsable: si alguien edita
+  la actividad, la v1 publicada en marzo pasa a mostrar al nuevo. Propuesto: congelarlo al publicar,
+  y que las NOTIFICACIONES sigan yendo al responsable vigente. **Sin construir.**
+- **Anular un plan aprobado por error cuando ya hay gente empezando.** Hoy no hay salida: o se
+  cancela renglon a renglon, o se cierra — y "cerrado" significa otra cosa. Es un hueco de estado.
+
+### Verificado
+
+`tsc`, `eslint` y `nest build` en verde; **165/165 unitarias** (9 nuevas de la regla de borrado);
+**15/15 e2e**, incluido el caso nuevo de corregir y eliminar un plan en borrador.
+
+---
+
 ## 2026-08-29 — Alcance, plan vivo, a quien se le exige, y cinco fallos que escondian datos
 
 Sesion larga. Empezo por el alcance del Analista y acabo destapando una familia de fallos que

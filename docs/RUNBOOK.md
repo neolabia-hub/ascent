@@ -833,3 +833,31 @@ La propuesta ademas quita las palabras de relleno, que se comian las que disting
 "Sistema de Gestion Integral"     -> SISTEMA_GESTION_INTEGRAL   (antes: SISTEMA_DE_GESTION)
 "Prevencion del lavado de activos" -> PREVENCION_LAVADO_ACTIVOS
 ```
+
+---
+
+## La convocatoria recien publicada NO aparece en el plan (2026-08-29)
+
+**Sintoma.** Se publica una convocatoria, se abre el plan, "Usar una que ya existe" — y no esta en
+el desplegable. Ninguna pantalla dice nada: la lista se ve llena, con otras convocatorias.
+
+**Como reconocerlo.** No falla por permisos ni por alcance (el administrador tambien lo ve). Falla
+solo cuando la base ya tiene volumen: con pocas convocatorias no ocurre nunca, y por eso aparecio
+sola despues de 40 corridas de e2e. Lo caza un conteo:
+
+```
+docker exec neo-pulse-postgres psql -U neopulse -d neopulse \
+  -c "select count(*) filter (where scheduled_date is null) nulos, count(*) from offerings;"
+```
+
+**Causa.** El cajon pide `listOfferings({ pageSize: 100 })` y el servidor ordenaba por
+`scheduledDate desc`. En Postgres, DESC pone los NULOS PRIMERO: las convocatorias sin fecha
+—borradores, formaciones permanentes— ocupaban la cabeza de la lista. Con 52 sin fecha mas 50 con
+fecha posterior, la recien publicada caia en la posicion 103 de una pagina de 100.
+
+**Arreglo.** `orderBy` explicito con `nulls: 'last'` y `createdAt desc` como desempate
+(`offerings.service.ts`). Lo recien creado va arriba, que es lo que espera quien acaba de crearlo.
+
+**La leccion, que se repite.** El sintoma vuelve a ser "esta vacio / no aparece" y la causa vuelve a
+estar lejos: un orden por defecto que nadie eligio. Cuando una lista con tope no encuentra algo que
+acaba de crearse, mirar el ORDEN antes que el filtro.

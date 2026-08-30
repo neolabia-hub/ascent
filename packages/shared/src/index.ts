@@ -180,6 +180,7 @@ export {
   addPlanItemSchema,
   updatePlanItemSchema,
   approvePlanSchema,
+  deletePlanSchema,
   listPlansQuerySchema,
 } from './schemas/plans.js';
 export type {
@@ -188,6 +189,7 @@ export type {
   AddPlanItemInput,
   UpdatePlanItemInput,
   ApprovePlanInput,
+  DeletePlanInput,
   ListPlansQuery,
 } from './schemas/plans.js';
 

@@ -3,6 +3,7 @@ import {
   addPlanItemSchema,
   approvePlanSchema,
   createTrainingPlanSchema,
+  deletePlanSchema,
   listPlansQuerySchema,
   updatePlanItemSchema,
   updateTrainingPlanSchema,
@@ -41,6 +42,16 @@ export class PlansController {
   @RequirePermissions('plans:manage')
   update(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.plans.update(actor, id, updateTrainingPlanSchema.parse(body));
+  }
+
+  /**
+   * Borrar el plan. `plans:approve` y no `plans:manage`: puede revocar de una vez las
+   * obligaciones de mucha gente, y eso pesa lo mismo que crearlas.
+   */
+  @Delete(':id')
+  @RequirePermissions('plans:approve')
+  remove(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.plans.remove(actor, id, deletePlanSchema.parse(body));
   }
 
   @Post(':id/items')

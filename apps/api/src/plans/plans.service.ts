@@ -4,6 +4,7 @@ import type {
   AddPlanItemInput,
   ApprovePlanInput,
   CreateTrainingPlanInput,
+  DeletePlanInput,
   ListPlansQuery,
   UpdatePlanItemInput,
   UpdateTrainingPlanInput,
@@ -12,6 +13,7 @@ import { offeringScopeWhere } from '../common/analyst-scope.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { decidePlanDeletion, deletionNeedsJustification } from './plan-deletion.js';
 import { ProjectedAudienceService } from '../offerings/projected-audience.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { computePlanMetrics, type PlanItemFacts } from './plan-metrics.js';
@@ -159,31 +161,135 @@ export class PlansService {
     return this.getById(actor, plan.id);
   }
 
+  /**
+   * La CABECERA del plan se corrige aunque este aprobado, con motivo.
+   *
+   * Antes cualquier cambio quedaba congelado al aprobar, y eso protegia de mas: nombre, objetivo,
+   * metas y alcance son texto descriptivo —lo que obliga a la gente son los renglones—, asi que
+   * bloquearlos no defendia ninguna obligacion; solo dejaba puesto todo el ano un nombre mal
+   * escrito. Lo que si sigue cerrado es el plan CERRADO, que ya es la evidencia del ano.
+   *
+   * El ANO es otra cosa: identifica al plan junto al nombre y ancla el vencimiento de cada
+   * renglon al ultimo dia de su mes. Cambiarlo despues de aprobar moveria la fecha limite de
+   * gente que ya tiene la obligacion encima, asi que solo se toca en borrador.
+   */
   async update(actor: AuthUser, id: string, input: UpdateTrainingPlanInput) {
     const plan = await this.requirePlan(id);
-    this.assertEditable(plan.status);
+    if (plan.status === 'CLOSED') {
+      throw new ConflictException({
+        code: 'PLAN_CLOSED',
+        message: 'El plan cerrado es la evidencia del ano: ya no se edita.',
+      });
+    }
+    if (plan.status !== 'DRAFT') {
+      if (!input.justification) {
+        throw new ConflictException({
+          code: 'PLAN_JUSTIFICATION_REQUIRED',
+          message: 'El plan ya esta aprobado: para corregir su cabecera hay que decir por que.',
+        });
+      }
+      if (input.year !== undefined && input.year !== plan.year) {
+        throw new ConflictException({
+          code: 'PLAN_YEAR_LOCKED',
+          message: 'El ano de un plan aprobado no se cambia: moveria el vencimiento de obligaciones ya vigentes.',
+        });
+      }
+    }
 
-    await this.prisma.scoped.trainingPlan.update({
-      where: { id },
-      data: {
-        name: input.name,
-        objective: input.objective,
-        goals: input.goals,
-        scope: input.scope,
-        updatedBy: actor.id,
-        version: { increment: 1 },
-      },
-    });
+    await this.prisma.scoped.trainingPlan
+      .update({
+        where: { id },
+        data: {
+          year: plan.status === 'DRAFT' ? input.year : undefined,
+          name: input.name,
+          objective: input.objective,
+          goals: input.goals,
+          scope: input.scope,
+          updatedBy: actor.id,
+          version: { increment: 1 },
+        },
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException({ code: 'DUPLICATE_PLAN', message: 'Ya existe un plan con ese nombre para el ano.' });
+        }
+        throw error;
+      });
     await this.audit.record({
       tenantId: this.prisma.currentTenantId,
       userId: actor.id,
       action: 'PLAN_UPDATED',
       resourceType: 'training_plans',
       resourceId: id,
-      oldValues: { name: plan.name, objective: plan.objective },
+      oldValues: { name: plan.name, year: plan.year, objective: plan.objective, status: plan.status },
       newValues: input,
     });
     return this.getById(actor, id);
+  }
+
+  /**
+   * BORRAR el plan entero. La decision vive en `plan-deletion.ts`, pura y probada; aqui solo se
+   * reunen los hechos y se ejecuta.
+   *
+   * Cuando el plan ya obligaba a alguien, borrarlo REVOCA esas obligaciones: se borran sus
+   * asignaciones (source = PLAN) en la misma transaccion. No se pueden dejar huerfanas —apuntan
+   * al renglon por clave foranea— y tampoco vivas: una obligacion sin plan que la explique es
+   * justo lo que el plan existe para evitar.
+   *
+   * Va con `plans:approve` y no con `plans:manage`: borrar el plan del ano es al menos tan grave
+   * como aprobarlo.
+   */
+  async remove(actor: AuthUser, id: string, input: DeletePlanInput) {
+    const tenantId = this.prisma.currentTenantId;
+    const plan = await this.prisma.scoped.trainingPlan.findUnique({
+      where: { id },
+      include: { items: { select: { id: true } } },
+    });
+    if (!plan) throw new NotFoundException({ code: 'PLAN_NOT_FOUND' });
+
+    const itemIds = plan.items.map((item) => item.id);
+    const assignments = itemIds.length
+      ? await this.prisma.scoped.assignment.findMany({
+          where: { planItemId: { in: itemIds }, source: 'PLAN' },
+          select: { id: true },
+        })
+      : [];
+    // "Empezar" es haber abierto la formacion: la inscripcion solo nace cuando la persona entra.
+    // Con una basta para bloquear, pero se cuentan todas para poder DECIR cuantas son, que es lo
+    // que hace entendible el rechazo en pantalla.
+    const started = assignments.length
+      ? await this.prisma.scoped.enrollment.count({ where: { assignmentId: { in: assignments.map((a) => a.id) } } })
+      : 0;
+
+    const verdict = decidePlanDeletion({ status: plan.status, obligations: assignments.length, started });
+    if (!verdict.allowed) {
+      throw new ConflictException({ code: verdict.code, message: verdict.message });
+    }
+    if (deletionNeedsJustification(plan.status) && !input.justification) {
+      throw new ConflictException({
+        code: 'PLAN_JUSTIFICATION_REQUIRED',
+        message: 'El plan ya fue aprobado: para borrarlo hay que decir por que.',
+      });
+    }
+
+    await this.prisma.tx(async (tx) => {
+      if (assignments.length > 0) {
+        await tx.assignment.deleteMany({ where: { id: { in: assignments.map((a) => a.id) } } });
+      }
+      // Los renglones caen con el plan (onDelete: Cascade en plan_items.plan_id).
+      await tx.trainingPlan.delete({ where: { id } });
+    });
+
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'PLAN_DELETED',
+      resourceType: 'training_plans',
+      resourceId: id,
+      oldValues: { year: plan.year, name: plan.name, status: plan.status, items: itemIds.length },
+      newValues: { revokedAssignments: verdict.revokes, justification: input.justification ?? null },
+    });
+    return { ok: true as const, revokedAssignments: verdict.revokes };
   }
 
   // ─────────────────────────── Renglones ───────────────────────────

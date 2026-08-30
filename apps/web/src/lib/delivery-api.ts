@@ -502,6 +502,32 @@ export function createPlan(body: { year: number; name: string; objective?: strin
   return apiFetch('/plans', { method: 'POST', body });
 }
 
+/**
+ * Corregir la cabecera. `justification` es OBLIGATORIA si el plan ya esta aprobado o en
+ * ejecucion, y el `year` solo se acepta en borrador (ancla los vencimientos de los renglones).
+ */
+export function updatePlan(
+  id: string,
+  body: {
+    year?: number;
+    name?: string;
+    objective?: string | null;
+    goals?: string | null;
+    scope?: string | null;
+    justification?: string;
+  },
+): Promise<PlanDetail> {
+  return apiFetch(`/plans/${id}`, { method: 'PATCH', body });
+}
+
+/**
+ * Borrar el plan. El servidor decide si se puede: la frontera no es el estado sino si alguien
+ * EMPEZO alguna formacion suya. Devuelve cuantas obligaciones revoco, para poder decirlo.
+ */
+export function deletePlan(id: string, body: { justification?: string } = {}): Promise<{ ok: true; revokedAssignments: number }> {
+  return apiFetch(`/plans/${id}`, { method: 'DELETE', body: { confirm: true, ...body } });
+}
+
 /** `justification` es obligatoria si el plan ya esta aprobado o en ejecucion (Decision #55). */
 export function addPlanItem(
   planId: string,

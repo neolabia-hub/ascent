@@ -20,8 +20,34 @@ export const createTrainingPlanSchema = z.object({
 });
 export type CreateTrainingPlanInput = z.infer<typeof createTrainingPlanSchema>;
 
-export const updateTrainingPlanSchema = createTrainingPlanSchema.omit({ year: true }).partial();
+/**
+ * Editar la CABECERA del plan: nombre, objetivo, metas y alcance.
+ *
+ * Se puede con el plan YA APROBADO, con motivo. Son texto descriptivo —lo que obliga a la gente
+ * son los renglones, no el objetivo redactado en enero—, asi que congelarlos no protegia ninguna
+ * obligacion: solo obligaba a convivir todo el ano con un nombre mal escrito.
+ *
+ * El ANO si es estructural: identifica el plan junto al nombre y ancla el vencimiento de cada
+ * renglon al ultimo dia de su mes. Por eso solo se cambia en borrador.
+ */
+export const updateTrainingPlanSchema = createTrainingPlanSchema.partial().extend({
+  /** OBLIGATORIA si el plan ya esta aprobado o en ejecucion. En borrador seria ruido. */
+  justification: z.string().min(10).max(500).optional(),
+});
 export type UpdateTrainingPlanInput = z.infer<typeof updateTrainingPlanSchema>;
+
+/**
+ * BORRAR el plan. Que se puede borrar y que no lo decide `plans/plan-deletion.ts` en el
+ * servidor: la frontera no es el estado del plan, es si alguien EMPEZO.
+ *
+ * `confirm` explicito porque puede revocar de una vez las obligaciones de mucha gente; la
+ * pantalla dice cuantas antes de pulsar.
+ */
+export const deletePlanSchema = z.object({
+  confirm: z.literal(true),
+  justification: z.string().min(10).max(500).optional(),
+});
+export type DeletePlanInput = z.infer<typeof deletePlanSchema>;
 
 export const addPlanItemSchema = z.object({
   offeringId: z.string().uuid(),

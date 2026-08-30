@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarRange, CheckCircle2, ClipboardList, Layers, Link2, Plus, Rows3, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, CalendarRange, CheckCircle2, ClipboardList, Layers, Link2, Pencil, Plus, Rows3, Search, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
   activatePlan,
@@ -11,9 +11,11 @@ import {
   adjustProjected,
   approvePlan,
   closePlan,
+  deletePlan,
   getPlan,
   listOfferings,
   removePlanItem,
+  updatePlan,
   updatePlanItem,
   type OfferingListItem,
   type PlanDetail,
@@ -158,6 +160,11 @@ export default function PlanDetallePage() {
   const canApprove = can('plans:approve');
 
   const [plan, setPlan] = useState<PlanDetail | null>(null);
+  /** Cabecera y borrado: dos cajones porque son dos decisiones de distinto peso. */
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ year: '', name: '', objective: '', goals: '', scope: '', justification: '' });
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
   const [offerings, setOfferings] = useState<OfferingListItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<PlanView>('capacitacion');
@@ -361,6 +368,78 @@ export default function PlanDetallePage() {
     }
   };
 
+  const openEdit = () => {
+    if (!plan) return;
+    setEditForm({
+      year: String(plan.year),
+      name: plan.name,
+      objective: plan.objective ?? '',
+      goals: plan.goals ?? '',
+      scope: plan.scope ?? '',
+      justification: '',
+    });
+    setEditOpen(true);
+  };
+
+  const saveHeader = async () => {
+    if (!plan) return;
+    setBusy(true);
+    try {
+      await updatePlan(id, {
+        // El ano solo viaja en borrador: despues el servidor lo rechaza, y mandarlo seria
+        // ofrecer en pantalla algo que no va a pasar.
+        ...(plan.status === 'DRAFT' ? { year: Number(editForm.year) } : {}),
+        name: editForm.name.trim(),
+        objective: editForm.objective.trim() || null,
+        goals: editForm.goals.trim() || null,
+        scope: editForm.scope.trim() || null,
+        ...(plan.status === 'DRAFT' ? {} : { justification: editForm.justification.trim() }),
+      });
+      showToast({ kind: 'success', title: 'Plan actualizado' });
+      setEditOpen(false);
+      await load();
+    } catch (error) {
+      showToast({
+        kind: 'danger',
+        title:
+          error instanceof ApiError && error.code === 'DUPLICATE_PLAN'
+            ? 'Ya existe un plan con ese nombre para el ano'
+            : error instanceof ApiError && error.code === 'PLAN_YEAR_LOCKED'
+              ? 'El ano de un plan aprobado no se cambia'
+              : 'No se pudo actualizar el plan',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Borrar el plan. La pantalla NO decide si se puede —eso vive en el servidor— pero si tiene que
+   * traducir su negativa: "ya hay gente que empezo" no es un error tecnico, es la razon por la que
+   * ese plan ya es de otros.
+   */
+  const destroy = async () => {
+    setBusy(true);
+    try {
+      const result = await deletePlan(id, deleteReason.trim() ? { justification: deleteReason.trim() } : {});
+      showToast({
+        kind: 'success',
+        title: 'Plan eliminado',
+        description:
+          result.revokedAssignments > 0
+            ? `Se revocaron ${result.revokedAssignments} obligaciones que habian nacido de el.`
+            : undefined,
+      });
+      router.push('/plan');
+    } catch (error) {
+      showToast({
+        kind: 'danger',
+        title: error instanceof ApiError && error.message ? error.message : 'No se pudo eliminar el plan',
+      });
+      setBusy(false);
+    }
+  };
+
   const changeStatus = async (next: 'ACTIVE' | 'CLOSED') => {
     setBusy(true);
     try {
@@ -467,6 +546,30 @@ export default function PlanDetallePage() {
           {plan.status === 'ACTIVE' && canApprove ? (
             <Button variant="ghost" onClick={() => changeStatus('CLOSED')} loading={busy}>
               Cerrar el ano
+            </Button>
+          ) : null}
+          {/*
+            CORREGIR Y BORRAR. El plan cerrado no ofrece ninguna de las dos: es la evidencia del
+            ano. Borrar pide el permiso de aprobar —puede revocar las obligaciones de mucha gente— y
+            quien puede se entera de si se puede al abrir el cajon, no despues de un 409 seco.
+          */}
+          {plan.status !== 'CLOSED' ? (
+            <Button variant="ghost" onClick={openEdit}>
+              <Pencil size={16} />
+              Editar
+            </Button>
+          ) : null}
+          {plan.status !== 'CLOSED' && canApprove ? (
+            <Button
+              variant="ghost"
+              className="text-danger"
+              onClick={() => {
+                setDeleteReason('');
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 size={16} />
+              Eliminar
             </Button>
           ) : null}
         </div>
@@ -741,6 +844,160 @@ export default function PlanDetallePage() {
                 rows={2}
                 value={attachForm.justification}
                 onChange={(event) => setAttachForm({ ...attachForm, justification: event.target.value })}
+                placeholder="Minimo 10 caracteres"
+              />
+            </Field>
+          ) : null}
+        </div>
+      </Drawer>
+
+      {/*
+        CORREGIR LA CABECERA. Nombre, objetivo, metas y alcance son texto: lo que obliga a la
+        gente son los renglones. Por eso se pueden corregir con el plan aprobado, diciendo por
+        que. El ANO no: ancla el vencimiento de cada renglon al ultimo dia de su mes, y moverlo
+        despues de aprobar cambiaria la fecha limite de gente que ya tiene la obligacion encima.
+      */}
+      <Drawer
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        title="Editar el plan"
+        description={
+          plan.status === 'DRAFT'
+            ? 'Esta en borrador: se puede cambiar todo, incluido el ano.'
+            : 'El plan ya esta aprobado: se corrige la cabecera, con motivo. Sus renglones no se tocan aqui.'
+        }
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={saveHeader}
+              loading={busy}
+              disabled={editForm.name.trim().length < 3 || (plan.status !== 'DRAFT' && editForm.justification.trim().length < 10)}
+            >
+              Guardar
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {plan.status === 'DRAFT' ? (
+            <Field htmlFor="e-year" label="Ano" required>
+              <Input
+                id="e-year"
+                type="number"
+                min={2000}
+                max={2100}
+                value={editForm.year}
+                onChange={(event) => setEditForm({ ...editForm, year: event.target.value })}
+              />
+            </Field>
+          ) : null}
+          <Field htmlFor="e-name" label="Nombre" required>
+            <Input
+              id="e-name"
+              value={editForm.name}
+              onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+              maxLength={160}
+            />
+          </Field>
+          <Field htmlFor="e-objective" label="Objetivo">
+            <Textarea
+              id="e-objective"
+              rows={3}
+              maxLength={4000}
+              value={editForm.objective}
+              onChange={(event) => setEditForm({ ...editForm, objective: event.target.value })}
+            />
+          </Field>
+          <Field htmlFor="e-goals" label="Metas">
+            <Textarea
+              id="e-goals"
+              rows={3}
+              maxLength={4000}
+              value={editForm.goals}
+              onChange={(event) => setEditForm({ ...editForm, goals: event.target.value })}
+            />
+          </Field>
+          <Field htmlFor="e-scope" label="Alcance">
+            <Textarea
+              id="e-scope"
+              rows={3}
+              maxLength={4000}
+              value={editForm.scope}
+              onChange={(event) => setEditForm({ ...editForm, scope: event.target.value })}
+            />
+          </Field>
+          {plan.status !== 'DRAFT' ? (
+            <Field
+              htmlFor="e-reason"
+              label="Por que se corrige"
+              required
+              hint="Queda en la auditoria. El plan ya fue aprobado por alguien con lo que decia antes."
+            >
+              <Textarea
+                id="e-reason"
+                rows={2}
+                value={editForm.justification}
+                onChange={(event) => setEditForm({ ...editForm, justification: event.target.value })}
+                placeholder="Minimo 10 caracteres"
+              />
+            </Field>
+          ) : null}
+        </div>
+      </Drawer>
+
+      {/*
+        BORRAR. La consecuencia se dice ANTES y en castellano, con la cifra: "se van a revocar 34
+        obligaciones" es lo unico que permite decidir. Si el servidor se niega porque alguien ya
+        empezo, su mensaje se muestra tal cual: explica de quien es ese avance.
+      */}
+      <Drawer
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Eliminar el plan"
+        description="Desaparece el plan con todos sus renglones. Las capacitaciones y convocatorias que referencia NO se tocan."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={destroy}
+              loading={busy}
+              disabled={plan.status !== 'DRAFT' && deleteReason.trim().length < 10}
+            >
+              <Trash2 size={16} />
+              Eliminar el plan
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {metrics.assigned > 0 ? (
+            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+              Este plan creo <strong>{metrics.assigned} obligaciones</strong>: al borrarlo se revocan y desaparecen de la
+              bandeja de esas personas. Si alguna ya empezo su formacion, el plan no se puede borrar — ese avance es suyo.
+            </p>
+          ) : (
+            <p className="text-sm text-ink-700">
+              Todavia no obliga a nadie{plan.status === 'DRAFT' ? ': esta en borrador' : ''}. Se borra sin consecuencias
+              para ninguna persona.
+            </p>
+          )}
+          {plan.status !== 'DRAFT' ? (
+            <Field
+              htmlFor="d-reason"
+              label="Por que se elimina"
+              required
+              hint="Queda en la auditoria: hubo gente a la que ya se le anuncio esta formacion."
+            >
+              <Textarea
+                id="d-reason"
+                rows={2}
+                value={deleteReason}
+                onChange={(event) => setDeleteReason(event.target.value)}
                 placeholder="Minimo 10 caracteres"
               />
             </Field>
