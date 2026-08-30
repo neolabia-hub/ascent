@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
+  adjustProjectedSchema,
   cancelOfferingSchema,
   createOfferingSchema,
   enrollOfferingSchema,
   listOfferingsQuerySchema,
+  migrateOfferingVersionSchema,
   publishOfferingSchema,
   updateOfferingSchema,
 } from '@neo-pulse/shared';
@@ -27,14 +29,14 @@ export class OfferingsController {
 
   @Get()
   @RequirePermissions('offerings:read')
-  list(@Query() query: Record<string, string>) {
-    return this.offerings.list(listOfferingsQuerySchema.parse(query));
+  list(@CurrentUser() actor: AuthUser, @Query() query: Record<string, string>) {
+    return this.offerings.list(actor, listOfferingsQuerySchema.parse(query));
   }
 
   @Get(':id')
   @RequirePermissions('offerings:read')
-  getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.offerings.getById(id);
+  getById(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.offerings.getById(actor, id);
   }
 
   @Get(':id/projected')
@@ -47,6 +49,13 @@ export class OfferingsController {
   @RequirePermissions('offerings:read')
   roster(@Param('id', ParseUUIDPipe) id: string) {
     return this.offerings.roster(id);
+  }
+
+  /** Que pasaria si se apuntara a la version vigente: a cuantos mueve y a cuantos no. */
+  @Get(':id/version-upgrade')
+  @RequirePermissions('offerings:read')
+  versionUpgrade(@Param('id', ParseUUIDPipe) id: string) {
+    return this.offerings.versionUpgrade(id);
   }
 
   @Post()
@@ -83,6 +92,28 @@ export class OfferingsController {
     );
   }
 
+  /**
+   * Ajustar los proyectados mueve el DENOMINADOR de la cobertura, asi que pasa por la misma
+   * compuerta que publicar: quien no tiene `offerings:publish` lo PROPONE con su motivo.
+   */
+  @Post(':id/adjust-projected')
+  @RequirePermissions('offerings:manage')
+  adjustProjected(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const input = adjustProjectedSchema.parse(body);
+    return this.approvals.requestOrExecute(
+      actor,
+      'offerings:publish',
+      {
+        entityType: APPROVAL_ENTITY_OFFERING,
+        entityId: id,
+        action: 'EDIT_PUBLISHED',
+        payload: { intent: 'ADJUST_PROJECTED', projectedCount: input.projectedCount, reason: input.reason },
+        justification: input.reason,
+      },
+      () => this.offerings.adjustProjected(actor, id, input),
+    );
+  }
+
   @Post(':id/cancel')
   @RequirePermissions('offerings:manage')
   cancel(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
@@ -98,6 +129,28 @@ export class OfferingsController {
         justification: input.cancelledReason,
       },
       () => this.offerings.cancel(actor, id, input),
+    );
+  }
+
+  /**
+   * Apuntar la convocatoria a la version vigente. Mueve a gente ya citada, asi que pasa por la
+   * misma compuerta que publicar: quien no tiene `offerings:publish` lo PROPONE con justificacion.
+   */
+  @Post(':id/migrate-version')
+  @RequirePermissions('offerings:manage')
+  migrateVersion(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const input = migrateOfferingVersionSchema.parse(body);
+    return this.approvals.requestOrExecute(
+      actor,
+      'offerings:publish',
+      {
+        entityType: APPROVAL_ENTITY_OFFERING,
+        entityId: id,
+        action: 'EDIT_PUBLISHED',
+        payload: { intent: 'MIGRATE_VERSION', targetVersionId: input.targetVersionId, confirm: true },
+        justification: input.justification ?? 'Solicitud de actualizacion a la version vigente.',
+      },
+      () => this.offerings.migrateVersion(actor, id, input),
     );
   }
 

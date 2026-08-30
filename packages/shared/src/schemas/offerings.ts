@@ -128,6 +128,23 @@ export const publishOfferingSchema = z
   });
 export type PublishOfferingInput = z.infer<typeof publishOfferingSchema>;
 
+/**
+ * AJUSTAR los proyectados de una convocatoria YA PUBLICADA (Decision #56).
+ *
+ * Publicar los congela (regla de oro 3) y esa regla se queda: el denominador de la cobertura debe
+ * ser dato, no opinion. Lo que faltaba era la valvula que la propia regla anuncia —"ajuste manual
+ * solo con justificacion auditada"— para el caso que pasa siempre: se congelaron 45 y entraron
+ * siete personas al area en marzo, asi que el 100% de cobertura seria mentira.
+ *
+ * El motivo es OBLIGATORIO y no tiene valor por defecto: si nadie escribe por que, dentro de un
+ * ano nadie va a saber si el numero se corrigio o se maquillo.
+ */
+export const adjustProjectedSchema = z.object({
+  projectedCount: z.number().int().min(0).max(100000),
+  reason: z.string().min(10).max(500),
+});
+export type AdjustProjectedInput = z.infer<typeof adjustProjectedSchema>;
+
 export const cancelOfferingSchema = z.object({
   cancelledReason: z.string().min(10).max(500),
 });
@@ -150,3 +167,24 @@ export const enrollOfferingSchema = z
     }
   });
 export type EnrollOfferingInput = z.infer<typeof enrollOfferingSchema>;
+
+/**
+ * APUNTAR LA CONVOCATORIA A OTRA VERSION.
+ *
+ * Publicar la v2 de una formacion NO tocaba a nadie: la convocatoria seguia colgada de la v1
+ * (ya RETIRADA) y el aprendiz seguia viendo contenido viejo sin que nadie se enterara. Mover la
+ * convocatoria es un acto deliberado y con consecuencias sobre gente ya citada, por eso:
+ *
+ *  - la version destino se manda EXPLICITA (`targetVersionId`): si alguien publica una v3
+ *    mientras la pantalla estaba abierta, esto falla en vez de mover a una version que el
+ *    administrador nunca vio;
+ *  - a quien mueve y a quien no lo decide la POLITICA DE MIGRACION que se eligio al publicar la
+ *    version destino (`FINISH_OLD`, `MOVE_NOT_STARTED`, `RESTART_NEW`), no esta llamada. La
+ *    politica ya es una decision tomada y auditada; repetirla aqui permitiria contradecirla.
+ */
+export const migrateOfferingVersionSchema = z.object({
+  targetVersionId: z.string().uuid(),
+  justification: z.string().min(10).max(500).optional(),
+  confirm: z.literal(true),
+});
+export type MigrateOfferingVersionInput = z.infer<typeof migrateOfferingVersionSchema>;

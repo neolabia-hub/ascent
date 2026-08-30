@@ -4,11 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Plus, Search } from 'lucide-react';
-import { ApiError } from '@/lib/api';
-import { listCatalog, type CatalogRow } from '@/lib/admin-api';
 import { listActivities, type ActivityListItem } from '@/lib/catalog-api';
 import {
-  createOffering,
+  isOutdatedVersion,
   listOfferings,
   type OfferingKind,
   type OfferingListItem,
@@ -16,10 +14,9 @@ import {
   type OfferingsPage,
 } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
+import { NewOfferingDrawer } from '@/components/modules/delivery/new-offering-drawer';
 import { Button } from '@/components/ui/button';
-import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,27 +61,8 @@ export default function ConvocatoriasPage() {
   const [data, setData] = useState<OfferingsPage | null>(null);
 
   const [versions, setVersions] = useState<PublishedVersionOption[]>([]);
-  const [regionals, setRegionals] = useState<CatalogRow[]>([]);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    activityVersionId: '',
-    kind: 'EVENT' as OfferingKind,
-    modality: 'PRESENCIAL' as 'PRESENCIAL' | 'VIRTUAL' | 'HIBRIDA',
-    scheduledDate: '',
-    startTime: '08:00',
-    endTime: '12:00',
-    windowStart: '',
-    windowEnd: '',
-    intensityTheoryHours: '',
-    intensityPracticeHours: '',
-    location: '',
-    regionalId: '',
-    capacity: '',
-  });
-
   const load = useCallback(async () => {
     try {
       setData(await listOfferings({ q: q || undefined, status: status || undefined, page }));
@@ -99,48 +77,7 @@ export default function ConvocatoriasPage() {
 
   useEffect(() => {
     void listActivities({ pageSize: 100 }).then((result) => setVersions(publishedVersions(result.items)));
-    void listCatalog('regionals').then((rows) => setRegionals(rows.filter((row) => row.active)));
   }, []);
-
-  const isEvent = form.kind !== 'PERMANENT';
-
-  const create = async () => {
-    setCreating(true);
-    setFormError(null);
-    try {
-      const offering = await createOffering({
-        activityVersionId: form.activityVersionId,
-        kind: form.kind,
-        modality: form.modality,
-        scheduledDate: isEvent ? form.scheduledDate : null,
-        startTime: isEvent ? form.startTime : null,
-        endTime: isEvent ? form.endTime : null,
-        windowStart: form.windowStart || null,
-        windowEnd: form.windowEnd || null,
-        intensityTheoryHours: form.intensityTheoryHours ? Number(form.intensityTheoryHours) : null,
-        intensityPracticeHours: form.intensityPracticeHours ? Number(form.intensityPracticeHours) : null,
-        executedBy: 'PROPIOS',
-        location: form.location || null,
-        regionalId: form.regionalId || null,
-        capacity: form.capacity ? Number(form.capacity) : null,
-      });
-      showToast({ kind: 'success', title: 'Convocatoria creada', description: `Quedo en borrador con el numero ${offering.code}.` });
-      router.push(`/convocatorias/${offering.id}`);
-    } catch (error) {
-      setFormError(
-        error instanceof ApiError && error.code === 'VERSION_NOT_PUBLISHED'
-          ? 'Esa version no esta publicada: publicala antes de programarla.'
-          : 'No se pudo crear la convocatoria. Revisa fecha, lugar y modalidad.',
-      );
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const valid =
-    Boolean(form.activityVersionId) &&
-    (!isEvent || Boolean(form.scheduledDate)) &&
-    (form.modality === 'VIRTUAL' || !isEvent || form.location.trim().length > 0);
 
   const from = data ? (data.page - 1) * data.pageSize + 1 : 0;
   const to = data ? Math.min(data.page * data.pageSize, data.total) : 0;
@@ -240,7 +177,15 @@ export default function ConvocatoriasPage() {
                     </Td>
                     <Td>
                       <div className="font-medium text-ink-900">{offering.activityVersion.activity.name}</div>
-                      <div className="text-xs text-ink-500">{offering.activityVersion.activity.process.name}</div>
+                      <div className="text-xs text-ink-500">
+                        {offering.activityVersion.activity.process.name} · version {offering.activityVersion.versionNumber}
+                      </div>
+                      {/* Se ve desde el listado: si no, hay que abrir una por una para descubrirlo. */}
+                      {isOutdatedVersion(offering.activityVersion) &&
+                      offering.status !== 'COMPLETED' &&
+                      offering.status !== 'CANCELLED' ? (
+                        <div className="mt-1 text-xs font-medium text-warn">Hay una version mas nueva</div>
+                      ) : null}
                     </Td>
                     <Td className="text-ink-700">
                       {offering.scheduledDate ? formatDate(offering.scheduledDate) : 'Permanente'}
@@ -276,146 +221,19 @@ export default function ConvocatoriasPage() {
         </div>
       )}
 
-      <Drawer
+      {/*
+        El formulario vive en un componente propio porque el PLAN tambien lo usa: desde alli se
+        crea la jornada sin salir a esta pantalla. Duplicarlo garantizaba que los dos se
+        separaran en cuanto alguien tocara uno.
+      */}
+      <NewOfferingDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        title="Nueva convocatoria"
-        description="Queda en borrador. Al publicarla se congelan los proyectados y se puede inscribir gente."
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setDrawerOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={create} loading={creating} disabled={!valid}>
-              Crear convocatoria
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <Field htmlFor="o-version" label="Version publicada" required hint="Solo aparece contenido ya publicado.">
-            <Select
-              id="o-version"
-              value={form.activityVersionId}
-              onChange={(event) => setForm({ ...form, activityVersionId: event.target.value })}
-            >
-              <option value="">Seleccionar...</option>
-              {versions.map((version) => (
-                <option key={version.versionId} value={version.versionId}>
-                  {version.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field htmlFor="o-kind" label="Forma" required>
-              <Select id="o-kind" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value as OfferingKind })}>
-                <option value="EVENT">Sesion programada</option>
-                <option value="PERMANENT">Permanente (autoservicio)</option>
-                <option value="HYBRID">Mixta</option>
-              </Select>
-            </Field>
-            <Field htmlFor="o-modality" label="Modalidad" required>
-              <Select
-                id="o-modality"
-                value={form.modality}
-                onChange={(event) => setForm({ ...form, modality: event.target.value as typeof form.modality })}
-              >
-                <option value="PRESENCIAL">Presencial</option>
-                <option value="VIRTUAL">Virtual</option>
-                <option value="HIBRIDA">Hibrida</option>
-              </Select>
-            </Field>
-          </div>
-
-          {isEvent ? (
-            <>
-              <div className="grid grid-cols-3 gap-3">
-                <Field htmlFor="o-date" label="Fecha" required>
-                  <Input
-                    id="o-date"
-                    type="date"
-                    value={form.scheduledDate}
-                    onChange={(event) => setForm({ ...form, scheduledDate: event.target.value })}
-                  />
-                </Field>
-                <Field htmlFor="o-start" label="Inicio">
-                  <Input id="o-start" type="time" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} />
-                </Field>
-                <Field htmlFor="o-end" label="Fin">
-                  <Input id="o-end" type="time" value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field htmlFor="o-theory" label="Horas teoricas" hint="El desglose lo exige el PESV y suma para BPM.">
-                  <Input
-                    id="o-theory"
-                    type="number"
-                    min={0}
-                    step="0.5"
-                    value={form.intensityTheoryHours}
-                    onChange={(event) => setForm({ ...form, intensityTheoryHours: event.target.value })}
-                  />
-                </Field>
-                <Field htmlFor="o-practice" label="Horas practicas">
-                  <Input
-                    id="o-practice"
-                    type="number"
-                    min={0}
-                    step="0.5"
-                    value={form.intensityPracticeHours}
-                    onChange={(event) => setForm({ ...form, intensityPracticeHours: event.target.value })}
-                  />
-                </Field>
-              </div>
-            </>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <Field htmlFor="o-wstart" label="Disponible desde">
-                <Input id="o-wstart" type="date" value={form.windowStart} onChange={(event) => setForm({ ...form, windowStart: event.target.value })} />
-              </Field>
-              <Field htmlFor="o-wend" label="Disponible hasta">
-                <Input id="o-wend" type="date" value={form.windowEnd} onChange={(event) => setForm({ ...form, windowEnd: event.target.value })} />
-              </Field>
-            </div>
-          )}
-
-          {isEvent && form.modality !== 'VIRTUAL' ? (
-            <Field htmlFor="o-location" label="Lugar" required>
-              <Input id="o-location" value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} maxLength={200} />
-            </Field>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field htmlFor="o-regional" label="Regional" hint="Si la eliges, los proyectados se acotan a esa sede.">
-              <Select id="o-regional" value={form.regionalId} onChange={(event) => setForm({ ...form, regionalId: event.target.value })}>
-                <option value="">Todas</option>
-                {regionals.map((regional) => (
-                  <option key={regional.id} value={regional.id}>
-                    {regional.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field htmlFor="o-capacity" label="Cupo">
-              <Input
-                id="o-capacity"
-                type="number"
-                min={1}
-                value={form.capacity}
-                onChange={(event) => setForm({ ...form, capacity: event.target.value })}
-              />
-            </Field>
-          </div>
-
-          {formError ? (
-            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
-              {formError}
-            </p>
-          ) : null}
-        </div>
-      </Drawer>
+        onCreated={(offering) => {
+          showToast({ kind: 'success', title: 'Convocatoria creada', description: `Quedo en borrador con el numero ${offering.code}.` });
+          router.push(`/convocatorias/${offering.id}`);
+        }}
+      />
     </div>
   );
 }

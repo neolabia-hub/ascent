@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Send, UserPlus, Users, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, UserPlus, Users, XCircle } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
   cancelOffering,
@@ -11,7 +11,9 @@ import {
   enrollOffering,
   getOffering,
   getRoster,
+  migrateOfferingVersion,
   publishOffering,
+  type MigrationPolicyCode,
   type OfferingDetail,
   type OfferingStatus,
   type RosterRow,
@@ -33,6 +35,20 @@ const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string
   IN_PROGRESS: { kind: 'warn', label: 'EN CURSO' },
   COMPLETED: { kind: 'ok', label: 'EJECUTADA' },
   CANCELLED: { kind: 'danger', label: 'CANCELADA' },
+};
+
+/**
+ * QUE LE PASA A LA GENTE al apuntar la convocatoria a la version nueva. La politica se eligio al
+ * PUBLICAR esa version y aqui solo se explica: quien autoriza tiene que leer la consecuencia en
+ * castellano, no el nombre de un enum.
+ */
+const MIGRATION_EFFECT: Record<MigrationPolicyCode, string> = {
+  FINISH_OLD:
+    'Quien ya estaba inscrito TERMINA en la version anterior. La version nueva la veran solo quienes se inscriban de aqui en adelante.',
+  MOVE_NOT_STARTED:
+    'Pasan a la version nueva quienes todavia no han abierto nada. Quien ya empezo termina en la anterior, para no quitarle el avance.',
+  RESTART_NEW:
+    'Todos los que no han cerrado pasan a la version nueva y vuelven a empezar. Lo ya completado no se toca.',
 };
 
 function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
@@ -59,6 +75,8 @@ export default function ConvocatoriaDetallePage() {
   const [adjustReason, setAdjustReason] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [migrateOpen, setMigrateOpen] = useState(false);
+  const [migrateReason, setMigrateReason] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -136,6 +154,39 @@ export default function ConvocatoriaDetallePage() {
     }
   };
 
+  const migrate = async () => {
+    const target = offering?.versionUpgrade.target;
+    if (!target) return;
+    setBusy(true);
+    try {
+      const result = await migrateOfferingVersion(id, target.id, migrateReason.trim() || undefined);
+      showToast(
+        result.executed
+          ? {
+              kind: 'success',
+              title: `Convocatoria actualizada a la version ${target.versionNumber}`,
+              description: 'Se aplico la politica de migracion que se eligio al publicarla.',
+            }
+          : { kind: 'info', title: 'Enviada a aprobacion', description: 'Un administrador debe autorizar el cambio.' },
+      );
+      setMigrateOpen(false);
+      setMigrateReason('');
+      await load();
+    } catch (error) {
+      // Publicaron otra version mientras esta pantalla estaba abierta: se recarga en vez de mover
+      // a la gente a algo que nadie reviso.
+      const superseded = error instanceof ApiError && error.code === 'VERSION_SUPERSEDED';
+      showToast({
+        kind: 'danger',
+        title: superseded ? 'Se publico otra version mientras decidias' : 'No se pudo actualizar',
+        description: superseded ? 'Revisa la nueva antes de mover a los inscritos.' : undefined,
+      });
+      if (superseded) await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const complete = async () => {
     setBusy(true);
     try {
@@ -155,6 +206,7 @@ export default function ConvocatoriaDetallePage() {
   const state = STATUS_LABEL[offering.status];
   const isDraft = offering.status === 'DRAFT';
   const isOpen = offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS';
+  const upgrade = offering.versionUpgrade;
 
   return (
     <div>
@@ -201,6 +253,33 @@ export default function ConvocatoriaDetallePage() {
           ) : null}
         </div>
       </div>
+
+      {/*
+        LA VERSION NUEVA NO SE APLICA SOLA. Publicar la v2 de una formacion dejaba esta
+        convocatoria colgada de la v1 sin decirlo en ninguna parte: el administrador creia haber
+        actualizado el contenido y el aprendiz seguia viendo el anterior. Se avisa aqui, con la
+        consecuencia escrita, y se actualiza a proposito.
+      */}
+      {upgrade.available && upgrade.target ? (
+        <div className="mb-6 rounded-lg border border-warn/30 bg-warn-soft p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-display text-sm font-semibold text-ink-900">
+                Hay una version mas nueva: version {upgrade.target.versionNumber}
+              </p>
+              <p className="mt-1 text-sm text-ink-700">
+                Esta convocatoria sigue entregando la version {upgrade.current.versionNumber}. Quien la curse hoy vera el
+                contenido anterior hasta que la actualices.
+              </p>
+              <p className="mt-1 text-sm text-ink-500">{MIGRATION_EFFECT[upgrade.target.migrationPolicy]}</p>
+            </div>
+            <Button onClick={() => setMigrateOpen(true)}>
+              <ArrowUpCircle size={16} />
+              Actualizar a la version {upgrade.target.versionNumber}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
@@ -357,6 +436,81 @@ export default function ConvocatoriaDetallePage() {
             </Field>
           ) : null}
         </div>
+      </Drawer>
+
+      {/*
+        Antes de mover a nadie se ensena A CUANTOS mueve y a cuantos no, en numeros que suman el
+        total de inscritos. Autorizar un cambio sobre gente citada sin ver a cuantos afecta es
+        firmar en blanco.
+      */}
+      <Drawer
+        open={migrateOpen}
+        onOpenChange={setMigrateOpen}
+        title={`Actualizar a la version ${upgrade.target?.versionNumber ?? ''}`}
+        description="La politica de migracion la fijo quien publico esa version; aqui solo se aplica."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setMigrateOpen(false)}>
+              Volver
+            </Button>
+            <Button onClick={migrate} loading={busy}>
+              Actualizar
+            </Button>
+          </div>
+        }
+      >
+        {upgrade.available && upgrade.target && upgrade.enrollments ? (
+          <div className="space-y-4">
+            <div className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+              {MIGRATION_EFFECT[upgrade.target.migrationPolicy]}
+            </div>
+
+            <dl className="grid gap-2 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink-700">Pasan a la version {upgrade.target.versionNumber}</dt>
+                <dd className="font-display text-lg font-semibold tabular-nums text-ink-900">{upgrade.enrollments.moving}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink-500">Siguen en la version {upgrade.current.versionNumber}</dt>
+                <dd className="tabular-nums text-ink-700">{upgrade.enrollments.keepOldVersion}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink-500">Ya cerradas (no se tocan nunca)</dt>
+                <dd className="tabular-nums text-ink-700">{upgrade.enrollments.frozen}</dd>
+              </div>
+              {upgrade.enrollments.alreadyOnTarget > 0 ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-ink-500">Ya estaban en la nueva</dt>
+                  <dd className="tabular-nums text-ink-700">{upgrade.enrollments.alreadyOnTarget}</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            {upgrade.enrollments.conflicted > 0 ? (
+              <p className="rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
+                {upgrade.enrollments.conflicted}{' '}
+                {upgrade.enrollments.conflicted === 1 ? 'persona se queda' : 'personas se quedan'} donde esta: ya{' '}
+                {upgrade.enrollments.conflicted === 1 ? 'tiene' : 'tienen'} otra inscripcion abierta de esa misma version en
+                otra convocatoria. Moverla dejaria dos y el avance no sabria a cual ir.
+              </p>
+            ) : null}
+
+            <p className="text-sm text-ink-500">
+              El avance de quien se mueve no se borra: queda apuntando a los contenidos de la version anterior, deja de
+              contar y sigue disponible para auditoria.
+            </p>
+
+            <Field
+              htmlFor="m-reason"
+              label="Justificacion"
+              hint="Queda en la auditoria. Obligatoria si necesitas aprobacion del administrador."
+            >
+              <Input id="m-reason" value={migrateReason} onChange={(event) => setMigrateReason(event.target.value)} maxLength={500} />
+            </Field>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-500">Esta convocatoria ya esta en la version vigente.</p>
+        )}
       </Drawer>
 
       <Drawer

@@ -1,5 +1,10 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { cancelOfferingSchema, publishOfferingSchema } from '@neo-pulse/shared';
+import {
+  adjustProjectedSchema,
+  cancelOfferingSchema,
+  migrateOfferingVersionSchema,
+  publishOfferingSchema,
+} from '@neo-pulse/shared';
 import { ApprovalsService } from '../approvals/approvals.service.js';
 import { OfferingsService } from './offerings.service.js';
 
@@ -25,6 +30,17 @@ export class OfferingApprovalRegistrar implements OnModuleInit {
       const intent = (payload as { intent?: unknown }).intent;
       if (intent === 'CANCEL') {
         await this.offerings.cancel(approver, entityId, cancelOfferingSchema.parse(payload));
+        return;
+      }
+      if (intent === 'ADJUST_PROJECTED') {
+        await this.offerings.adjustProjected(approver, entityId, adjustProjectedSchema.parse(payload));
+        return;
+      }
+      if (intent === 'MIGRATE_VERSION') {
+        // La version destino viaja en el payload: se aprueba MOVER A ESA, no "a la ultima". Si
+        // entre la solicitud y la decision se publico otra, el servicio lo rechaza en vez de
+        // ejecutar algo que el Admin no autorizo.
+        await this.offerings.migrateVersion(approver, entityId, migrateOfferingVersionSchema.parse(payload));
         return;
       }
       await this.offerings.publish(approver, entityId, publishOfferingSchema.parse({ ...payload, confirm: true }));

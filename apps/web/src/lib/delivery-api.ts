@@ -16,13 +16,43 @@ export type ExecutedBy = 'PROPIOS' | 'TEMPORALES' | 'ARL' | 'EPS' | 'OTROS';
 export interface OfferingActivityRef {
   id: string;
   versionNumber: number;
+  /** RETIRED = se publico una version posterior y esta convocatoria quedo atras. */
+  status: 'DRAFT' | 'PUBLISHED' | 'RETIRED';
   activity: {
     id: string;
     code: string;
     name: string;
+    /** Version vigente de la formacion. Si no coincide con la de arriba, esto esta desactualizado. */
+    currentVersionId: string | null;
     activityType: { code: string; name: string; colorHex: string | null };
     process: { id: string; code: string; name: string };
   };
+}
+
+/** Una convocatoria colgada de una version que ya no es la vigente. */
+export function isOutdatedVersion(ref: OfferingActivityRef): boolean {
+  return ref.activity.currentVersionId !== null && ref.activity.currentVersionId !== ref.id;
+}
+
+export type MigrationPolicyCode = 'FINISH_OLD' | 'RESTART_NEW' | 'MOVE_NOT_STARTED';
+
+/**
+ * Que pasaria al apuntar la convocatoria a la version vigente. Se pide ANTES de ofrecer el
+ * boton: mover a gente ya citada exige saber a cuantos afecta.
+ */
+export interface VersionUpgrade {
+  available: boolean;
+  reason: 'UP_TO_DATE' | 'OFFERING_CLOSED' | 'NO_PUBLISHED_TARGET' | null;
+  current: { id: string; versionNumber: number; status: string };
+  target: { id: string; versionNumber: number; publishedAt: string | null; migrationPolicy: MigrationPolicyCode } | null;
+  enrollments: {
+    total: number;
+    moving: number;
+    keepOldVersion: number;
+    frozen: number;
+    alreadyOnTarget: number;
+    conflicted: number;
+  } | null;
 }
 
 export interface OfferingListItem {
@@ -53,7 +83,7 @@ export interface OfferingsPage {
 
 export interface ProjectedAudience {
   count: number;
-  source: 'RULES' | 'ACTIVITY_JOB_TITLES' | 'NONE';
+  source: 'OBLIGATIONS' | 'RULES' | 'NONE';
   detail: string;
 }
 
@@ -73,6 +103,7 @@ export interface OfferingDetail extends Omit<OfferingListItem, '_count'> {
   obligedCount: number;
   derivedProjected: ProjectedAudience;
   planItems: Array<{ id: string; plannedMonth: number; status: string; plan: { id: string; name: string; year: number; status: string } }>;
+  versionUpgrade: VersionUpgrade;
   _count: { enrollments: number };
 }
 
@@ -139,12 +170,45 @@ export function publishOffering(
   return apiFetch(`/offerings/${id}/publish`, { method: 'POST', body: { ...body, confirm: true } });
 }
 
+/**
+ * AJUSTAR los proyectados de una convocatoria ya publicada, con motivo (Decision #56).
+ *
+ * Devuelve `GatedResult` como publicar y cancelar: quien no tiene `offerings:publish` no recibe
+ * un 403 sino una solicitud enviada al administrador, y la pantalla tiene que decir cual de las
+ * dos cosas paso.
+ */
+export function adjustProjected(
+  id: string,
+  body: { projectedCount: number; reason: string },
+): Promise<GatedResult<OfferingDetail>> {
+  return apiFetch(`/offerings/${id}/adjust-projected`, { method: 'POST', body });
+}
+
 export function cancelOffering(id: string, cancelledReason: string): Promise<GatedResult<OfferingDetail>> {
   return apiFetch(`/offerings/${id}/cancel`, { method: 'POST', body: { cancelledReason } });
 }
 
 export function completeOffering(id: string): Promise<OfferingDetail> {
   return apiFetch(`/offerings/${id}/complete`, { method: 'POST' });
+}
+
+export function getVersionUpgrade(id: string): Promise<VersionUpgrade> {
+  return apiFetch(`/offerings/${id}/version-upgrade`, { method: 'GET' });
+}
+
+/**
+ * La version destino se manda EXPLICITA: es la que el administrador vio en pantalla. Si mientras
+ * decidia se publico otra, el servidor rechaza en vez de mover a la gente a algo no revisado.
+ */
+export function migrateOfferingVersion(
+  id: string,
+  targetVersionId: string,
+  justification?: string,
+): Promise<GatedResult<OfferingDetail>> {
+  return apiFetch(`/offerings/${id}/migrate-version`, {
+    method: 'POST',
+    body: { targetVersionId, justification, confirm: true },
+  });
 }
 
 export interface RosterRow {
@@ -173,6 +237,8 @@ export interface AudienceRule {
   jobTitleTypeIds: string[];
   areaIds: string[];
   regionalIds: string[];
+  /** Linea de servicio. Solo alcanza a quien la tenga puesta en su ficha. */
+  serviceIds: string[];
   employmentTypes: string[];
   roadActors: string[];
 }
@@ -183,6 +249,7 @@ export const EMPTY_RULE: AudienceRule = {
   jobTitleTypeIds: [],
   areaIds: [],
   regionalIds: [],
+  serviceIds: [],
   employmentTypes: [],
   roadActors: [],
 };
@@ -329,6 +396,7 @@ export function createAssignments(body: {
   jobTitleIds?: string[];
   areaIds?: string[];
   regionalIds?: string[];
+  serviceIds?: string[];
   dueAt?: string | null;
 }): Promise<{ created: number; skipped: number }> {
   return apiFetch('/assignments', { method: 'POST', body: { targetType: 'ACTIVITY', ...body } });
@@ -392,6 +460,7 @@ export interface PlanItemRow {
     projectedCount: number | null;
     regional: { id: string; name: string } | null;
     activityVersion: {
+      id: string;
       versionNumber: number;
       activity: {
         id: string;
@@ -433,8 +502,23 @@ export function createPlan(body: { year: number; name: string; objective?: strin
   return apiFetch('/plans', { method: 'POST', body });
 }
 
-export function addPlanItem(planId: string, body: { offeringId: string; plannedMonth: number; notes?: string | null }): Promise<PlanDetail> {
+/** `justification` es obligatoria si el plan ya esta aprobado o en ejecucion (Decision #55). */
+export function addPlanItem(
+  planId: string,
+  body: { offeringId: string; plannedMonth: number; notes?: string | null; justification?: string },
+): Promise<PlanDetail> {
   return apiFetch(`/plans/${planId}/items`, { method: 'POST', body });
+}
+
+/**
+ * Mover el mes de un renglon es REPROGRAMAR: el servidor lo marca RESCHEDULED solo, para que el
+ * indicador distinga lo que se movio de lo que se cumplio en su mes.
+ */
+export function updatePlanItem(
+  itemId: string,
+  body: { plannedMonth?: number; notes?: string | null; status?: 'PLANNED' | 'CANCELLED' },
+): Promise<PlanItemRow> {
+  return apiFetch(`/plans/items/${itemId}`, { method: 'PATCH', body });
 }
 
 export function removePlanItem(itemId: string): Promise<{ ok: true }> {
