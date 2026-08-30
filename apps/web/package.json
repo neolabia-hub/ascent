@@ -8,7 +8,8 @@
     "start": "next start -p 3100",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "dev:mirar": "next dev -p 3200"
+    "dev:mirar": "next dev -p 3200",
+    "start:mirar": "next start -p 3200"
   },
   "dependencies": {
     "next": "14.2.15",

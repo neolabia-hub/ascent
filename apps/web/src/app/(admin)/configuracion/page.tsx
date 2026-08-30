@@ -32,7 +32,19 @@ const SECTIONS: Section[] = [
         label: 'Area responsable',
         kind: 'select',
         optionsFrom: 'areas',
-        hint: 'Quien tenga alcance sobre esa area vera este proceso. Vacio = proceso suelto, solo se ve dandolo por su nombre.',
+        /**
+         * OBLIGATORIA desde el 2026-08-30. Un proceso sin area no lo ve NINGUNA jefatura de area
+         * —su alcance se resuelve buscando los procesos que cuelgan de ella— y nada lo avisaba:
+         * el proceso existia, la jefatura entraba y su catalogo salia sin el. El sintoma volvia a
+         * ser "no aparece" con la causa a dos pantallas de distancia.
+         *
+         * El area del proceso y el area de las personas se llaman igual y NO son lo mismo: la de
+         * la persona dice donde trabaja; la del proceso dice de quien es ese sistema de gestion.
+         * Que "Comercial" exista como area y como proceso es correcto y se resuelve poniendo el
+         * proceso Comercial en el area Comercial.
+         */
+        required: true,
+        hint: 'Quien tenga alcance sobre esa area vera este proceso. Si el proceso lleva el nombre de un area, es esa misma.',
       },
       {
         key: 'responsibleUserId',

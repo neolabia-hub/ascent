@@ -882,3 +882,31 @@ DESINCRONIZADA: `user_birth_date` figuraba como fallida y `user_service` ni siqu
 aunque las dos columnas existian (se aplicaron a mano en su sesion). Se arreglo con
 `prisma migrate resolve --applied <nombre>` para cada una, con el usuario owner. Si `migrate
 deploy` se queja de que una columna "already exists", es esto: resolver, no re-aplicar.
+
+### "No pudimos conectar con el servidor" al abrir la aplicacion (2026-08-30)
+
+**Casi siempre es uno de estos dos, y ninguno es un fallo del producto:**
+
+1. **Se abrio el 3100.** Los puertos 3100 (web) y 3002 (api) son de las PRUEBAS: Playwright los
+   levanta al empezar la suite y los tumba al terminar. Fuera de una corrida no hay nadie
+   escuchando. El stack para mirar es **3200 / 3012**.
+2. **El stack de mirar estaba en modo desarrollo y recompilando.** `next dev` y `nest start
+   --watch` rehacen el bundle cada vez que cambia un archivo del repo; durante esos segundos la
+   pantalla no responde. Trabajar en el codigo mientras alguien mira la aplicacion garantiza el
+   error.
+
+**Arreglo (2026-08-30):** `scripts/mirar.ps1` ahora levanta en **produccion por defecto** —compila
+una vez (~1 min) y sirve codigo ya compilado, sin vigilar archivos—, y antes de arrancar **para lo
+que hubiera vivo en 3200/3012**, porque dos servidores en el mismo puerto dan un fallo que no se
+parece a nada: el segundo arranca, no escucha, y la pantalla dice que no hay conexion.
+
+```
+.\scripts\mirar.ps1          # estable. No se cae aunque se trabaje en el repo o corran las pruebas
+.\scripts\mirar.ps1 -Dev     # recompila al guardar; util solo mientras se esta programando
+```
+
+El precio del modo estable: un cambio nuevo no aparece hasta volver a ejecutar el script.
+
+**Ojo con `NEXT_PUBLIC_API_URL`:** Next lo **incrusta al compilar**, no lo lee al arrancar. Por eso
+el build vive dentro del script, con el entorno ya puesto. Si se compila fuera, la web sale
+apuntando al 3002 (el de las pruebas) y el sintoma es exactamente el mismo mensaje.

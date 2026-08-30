@@ -21,6 +21,7 @@ import { listUsers } from '@/lib/admin-api';
 import { listActivities } from '@/lib/catalog-api';
 import { cn } from '@/components/ui/cn';
 import { CommandPalette, type Command } from './command-palette';
+import { KIND_LABEL, notificationKind } from '@/lib/notification-kind';
 import { SpaceSwitcher } from './space-switcher';
 
 /** Destinos del panel. Mismo buscador que el aprendiz, contenidos distintos. */
@@ -82,6 +83,21 @@ function useOutsideClick(ref: RefObject<HTMLElement>, onOutside: () => void) {
 function formatRelative(iso: string): string {
   const date = new Date(iso);
   return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+}
+
+function KindChip({ eventType }: { eventType: string }) {
+  const kind = notificationKind(eventType);
+  if (!kind) return null;
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        kind === 'formacion' ? 'bg-primary-soft text-primary' : 'bg-info-soft text-info',
+      )}
+    >
+      {KIND_LABEL[kind]}
+    </span>
+  );
 }
 
 function NotificationsMenu() {
@@ -170,6 +186,9 @@ function NotificationsMenu() {
                     !item.readAt && 'bg-info-soft',
                   )}
                 >
+                  <span className="mb-1 flex items-center gap-2">
+                    <KindChip eventType={item.eventType} />
+                  </span>
                   <span className="text-sm font-medium text-ink-900">{item.subject}</span>
                   <span className="line-clamp-2 text-xs text-ink-500">{item.body}</span>
                   <span className="mt-0.5 text-[11px] text-ink-300">{formatRelative(item.createdAt)}</span>

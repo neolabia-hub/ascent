@@ -249,7 +249,19 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                     {extraColumn.key === 'jobTitleTypeId'
                       ? (row.jobTitleType?.name ?? '—')
                       : extraColumn.key === 'areaId'
-                        ? (row.area?.name ?? '—')
+                        ? (row.area?.name ?? (
+                            // Sin area, este proceso es invisible para toda jefatura de area. Es
+                            // una tarea de un clic, no una advertencia decorativa: se ofrece
+                            // hacerla, pero se DICE la consecuencia, que es lo que nadie sabia.
+                            <button
+                              type="button"
+                              onClick={() => openEdit(row)}
+                              title="Sin area, ninguna jefatura de area ve este proceso en su catalogo"
+                              className="focus-ring rounded bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn underline decoration-dotted underline-offset-4"
+                            >
+                              Sin area
+                            </button>
+                          ))
                         : extraColumn.key === 'responsibleUserId'
                           ? (row.responsible?.fullName ?? (
                               // Un hueco que se puede llenar de un clic no es una advertencia: es

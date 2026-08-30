@@ -11,6 +11,7 @@ import { clearOfflineData } from '@/components/providers/service-worker-bridge';
 import { cn } from '@/components/ui/cn';
 import { StreakPill } from '@/components/ui/streak-pill';
 import { managesAnything } from '@/lib/landing';
+import { KIND_LABEL, notificationKind } from '@/lib/notification-kind';
 import { SpaceSwitcher } from './space-switcher';
 
 /**
@@ -32,6 +33,21 @@ function useOutsideClick(onOutside: () => void) {
     return () => document.removeEventListener('mousedown', handler);
   }, [onOutside]);
   return ref;
+}
+
+function KindChip({ eventType }: { eventType: string }) {
+  const kind = notificationKind(eventType);
+  if (!kind) return null;
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        kind === 'formacion' ? 'bg-primary-soft text-primary' : 'bg-info-soft text-info',
+      )}
+    >
+      {KIND_LABEL[kind]}
+    </span>
+  );
 }
 
 function Notifications() {
@@ -103,6 +119,14 @@ function Notifications() {
             <ul className="max-h-[60vh] overflow-y-auto">
               {items.slice(0, 8).map((item) => (
                 <li key={item.id} className={cn('border-b border-line px-4 py-3 last:border-0', !item.readAt && 'bg-primary-soft/40')}>
+                  {/*
+                    DE QUE SOMBRERO ES el aviso. La bandeja es una sola —la persona tambien— pero
+                    "tienes una formacion nueva" y "alguien agoto sus intentos" no son la misma
+                    clase de cosa: una la haces tu, la otra es trabajo sobre otro.
+                  */}
+                  <div className="mb-1 flex items-center gap-2">
+                    <KindChip eventType={item.eventType} />
+                  </div>
                   <p className="text-sm font-medium text-ink-900">{item.subject}</p>
                   <p className="mt-0.5 line-clamp-2 text-sm text-ink-500">{item.body}</p>
                   <p className="mt-1 text-xs text-ink-300">
