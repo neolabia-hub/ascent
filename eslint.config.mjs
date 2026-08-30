@@ -11,6 +11,8 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/.next/**',
+      // Segunda carpeta de build: la del stack de mirar (scripts/mirar.ps1). Generada, no se revisa.
+      '**/.next-mirar/**',
       '**/.turbo/**',
       '**/node_modules/**',
       '**/coverage/**',

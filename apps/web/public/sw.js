@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * SERVICE WORKER de NEO PULSE (Sprint 4). Escrito a mano y sin dependencias a proposito: lo que
  * se cachea aqui son datos de formacion de una persona identificada, y esa decision no se delega

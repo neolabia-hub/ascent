@@ -19,6 +19,7 @@
     "db:rls": "pnpm --filter @neo-pulse/api db:rls",
     "db:seed": "pnpm --filter @neo-pulse/api db:seed",
     "db:seed:demo": "pnpm --filter @neo-pulse/api db:seed:demo",
+    "db:verify-rls": "pnpm --filter @neo-pulse/api db:verify-rls",
     "db:studio": "pnpm --filter @neo-pulse/api prisma:studio",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

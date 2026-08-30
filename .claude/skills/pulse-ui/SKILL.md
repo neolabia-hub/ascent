@@ -94,20 +94,63 @@ Derivadas en runtime: --brand-primary-soft (10% sobre superficie), --brand-prima
   Se cambio el 2026-08-27: el negro a pantalla completa es el patron "stories" de una red social,
   y una tarjeta de formacion hay que entenderla, no consumirla; ademas cansa a los tres minutos.
   Columna de 720px, titulares 28-34, cuerpo 19/1.72 (`.reading-body`), cada tarjeta entra con
-  `.reading-enter`. Progreso = linea de 3px pegada al BORDE SUPERIOR de la ventana, no una barra
-  dentro del contenido. Panel de contenido a la DERECHA en escritorio (formacion entera, con la
-  parte actual desplegada). Boton primario grande abajo (52px). Swipe para avanzar en movil.
+  `.reading-enter`. Progreso de la PIEZA = linea de 3px bajo la barra superior, no una barra
+  dentro del contenido. Boton primario grande (52px). Swipe para avanzar en movil.
+- REPRODUCTOR EN ESCRITORIO, tres columnas (cambio del 2026-08-28, Decision #49):
+  `[carril 64px] [escenario] [indice 340px]`. El carril de la app se presenta PLEGADO a iconos y
+  se despliega a mano (nunca al pasar el raton: abrirlo solo empuja el contenido mientras alguien
+  lee). La barra superior de 64px lleva el nombre de la FORMACION —no el de la parte—, el avance
+  total y la salida. El indice va a la DERECHA: al plegarlo el escenario crece hacia ese lado y su
+  borde izquierdo no se mueve; a la izquierda, mostrarlo desplazaria el video de sitio.
+  Solo se desplaza el ESCENARIO: la raiz es `h-screen overflow-hidden`, nunca `min-h-screen`.
+- Renglon del indice: cuadro de 36px con el icono del TIPO, titulo, y debajo que es y CUANTO es en
+  la unidad de su tipo ("Leccion · 8 tarjetas · 5 min", "Presentacion · 11 diapositivas",
+  "Evaluacion · nota minima 90%"). Nunca inventar minutos que no se conocen. Completado = verde
+  `--ok`; el ACTUAL = `--brand-primary` + barra de acento a la izquierda; bloqueado = candado al
+  40%. Nunca el mismo tono para "hecho" y "aqui estas".
+- MANDO DEL REPRODUCTOR DE DIAPOSITIVAS: una sola pieza redondeada centrada bajo la lamina
+  —atras, pista continua, posicion, adelante—, no un boton de ancho completo. La pista se
+  PREVISUALIZA al pasar por encima (la lamina asoma sobre el cursor con su numero): sin eso, una
+  pista continua obliga a ir de una en una. En la ultima lamina la flecha de avanzar SE CONVIERTE
+  en el boton de cierre dentro del mismo mando, con el latido de apertura; nunca un segundo boton
+  al lado.
+- UN INDICADOR DE AVANCE POR PREGUNTA, y solo uno. El anillo del indice dice cuanto se lleva de la
+  FORMACION y late al completar una parte; dentro del escenario, cada tipo ensena su avance en su
+  propia unidad (pista en presentacion, riel de tramos en leccion, relleno del boton en video).
+  Tres barras midiendo lo mismo informan menos, no mas.
+- BOTON: la profundidad es de oficio, no decorativa —realce interior arriba, elevacion al pasar,
+  hundido real al pulsar (`--shadow-btn`, `--shadow-btn-hover`, `--shadow-btn-active`)—.
+  `Button.meterPct` convierte el boton en su propio medidor cuando la accion todavia no esta
+  disponible: se rellena con el avance y se abre con un latido al llegar.
+- La barra superior del reproductor va `flush`: sin borde ni fondo propios. Solo lleva borde donde
+  el contenido pasa POR DEBAJO de ella.
+- Paneles laterales: `.scroll-hidden` (se desplazan, no ensenan barra).
+- Las pestanas del escenario son PASTILLAS con icono, alineadas a la izquierda con el contenido,
+  sin linea divisoria: entre el escenario y ellas va un degradado que se apaga. El material multimedia
+  lleva alto acotado (68vh) para que un video vertical no ocupe tres pantallas.
+- Debajo del escenario, pestanas FIJAS con contenido de la pieza actual: Resumen (de que va, que
+  se exige para darla por vista, de que proceso y norma sale) y Material de apoyo (los documentos
+  de la formacion). Fijas para que se aprenda donde esta cada cosa; su contenido cambia con la
+  pieza para que no sean los datos de la formacion repetidos siete veces.
+- En MOVIL no hay carril ni indice: la barra superior se queda (titulo y salida) y el contenido
+  ocupa el ancho. La inmersion sigue siendo la regla donde la pantalla no da para mas.
 - Examenes: una pregunta por pantalla, opciones como tarjetas de 60px con letra A/B/C al
-  principio, estado correcto/incorrecto con color de fondo, no solo icono.
+  principio, estado correcto/incorrecto con color de fondo, no solo icono. El examen SI se
+  presenta a pantalla completa, sin indice ni material a la vista (Decision #50): mide, y tener el
+  contenido al lado lo convertiria en un examen a libro abierto. La encuesta de satisfaccion, que
+  no mide a nadie, si ira bajo el contenido como una pestana mas.
 - Barra superior del aprendiz: saludo a la izquierda; buscador, avisos y menu de cuenta a la
-  derecha. La racha vive en el menu de cuenta. El REPRODUCTOR no lleva barra ni carril: mientras
-  se cursa, cada elemento de navegacion es una invitacion a irse. La FICHA de la formacion si.
+  derecha. La racha vive en el menu de cuenta. El REPRODUCTOR lleva barra y carril propios desde
+  el 2026-08-28 —ver arriba—: no los del resto de la aplicacion, sino unos reducidos a lo que hace
+  falta para saber donde se esta. La regla vieja ("ningun elemento de navegacion mientras se
+  cursa") costaba mas de lo que ahorraba en una formacion de siete partes.
 - Examenes: una pregunta por pantalla, opciones como tarjetas seleccionables 56px, feedback
   inmediato solo si la politica lo permite.
 
 #### Como esta implementado (Sprint 4) — respetarlo al agregar pantallas
-- Tres grupos de rutas: `(admin)` panel, `(learner)` barra inferior + cabecera, `(player)` sin
-  chrome. Los dos ultimos comparten sesion via `LearnerSession`; el player NO lleva barra.
+- Tres grupos de rutas: `(admin)` panel, `(learner)` barra inferior + cabecera, `(player)` con
+  su chrome propio (`components/modules/learner/player-chrome.tsx`). Los tres comparten sesion;
+  el player monta la suya, no la del grupo `(learner)`.
 - El modo oscuro se activa SOLO bajo `.learner-surface` (clase en la raiz de cada pantalla del
   aprendiz), nunca en `:root`: el admin se presenta en claro y no debe cambiar de color porque el
   portatil de turno tenga el sistema en oscuro. Toda pantalla nueva del aprendiz lleva esa clase.
