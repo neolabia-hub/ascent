@@ -58,6 +58,9 @@ export function notificationHref(item: {
   if (eventType === 'ENROLLED' && referenceType === 'enrollments' && referenceId) {
     return `/aprender/${referenceId}`;
   }
+  if (eventType === 'ASSIGNMENT_CREATED' && referenceType === 'activities' && referenceId) {
+    return `/mi-formacion?actividad=${referenceId}`;
+  }
   if (eventType === 'ASSIGNMENT_CREATED' || eventType === 'PLAN_ASSIGNMENTS_CREATED' || eventType === 'ENROLLED') {
     return '/mi-formacion';
   }

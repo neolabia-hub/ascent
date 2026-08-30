@@ -2,7 +2,8 @@
 
 import { GraduationCap } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatDate } from '@/lib/format';
 import { getHistory, getPending, toScore, type HistoryItem, type PendingItem } from '@/lib/learner-api';
 import { ActivityCard } from '@/components/modules/learner/activity-card';
@@ -21,7 +22,23 @@ import { StatusPill } from '@/components/ui/status-pill';
  */
 type Tab = 'pendiente' | 'historial';
 
+/**
+ * `?actividad=<id>` llega desde un aviso ("se te asigno X"). Sin eso, pulsar el aviso dejaba a la
+ * persona delante de doce tarjetas para buscar la que le acababan de nombrar.
+ *
+ * Suspense porque `useSearchParams` obliga a ello en el App Router: sin el, la pagina entera se
+ * renderiza en cliente y se pierde el prerender.
+ */
 export default function MyLearningPage() {
+  return (
+    <Suspense fallback={<CardsSkeleton />}>
+      <MyLearning />
+    </Suspense>
+  );
+}
+
+function MyLearning() {
+  const destacada = useSearchParams().get('actividad');
   const [tab, setTab] = useState<Tab>('pendiente');
   const [pending, setPending] = useState<PendingItem[] | null>(null);
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
@@ -63,7 +80,7 @@ export default function MyLearningPage() {
         </TabButton>
       </div>
 
-      {tab === 'pendiente' ? <PendingList items={pending} /> : <HistoryList items={history} />}
+      {tab === 'pendiente' ? <PendingList items={pending} highlight={destacada} /> : <HistoryList items={history} />}
     </div>
   );
 }
@@ -85,7 +102,16 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
-function PendingList({ items }: { items: PendingItem[] | null }) {
+function PendingList({ items, highlight }: { items: PendingItem[] | null; highlight?: string | null }) {
+  const marcada = useRef<HTMLDivElement>(null);
+
+  // Se lleva la vista hasta ella. En un telefono, la que buscas puede estar tres pantallas abajo.
+  useEffect(() => {
+    if (highlight && marcada.current) {
+      marcada.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlight, items]);
+
   if (items === null) return <CardsSkeleton />;
   if (items.length === 0) {
     return (
@@ -98,9 +124,18 @@ function PendingList({ items }: { items: PendingItem[] | null }) {
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((item, index) => (
-        <ActivityCard key={item.assignmentId} item={item} index={index} />
-      ))}
+      {items.map((item, index) => {
+        const esLaDelAviso = highlight === item.activityId;
+        return (
+          <div
+            key={item.assignmentId}
+            ref={esLaDelAviso ? marcada : undefined}
+            className={cn('rounded-2xl transition-shadow duration-300', esLaDelAviso && 'ring-2 ring-primary ring-offset-2 ring-offset-paper')}
+          >
+            <ActivityCard item={item} index={index} />
+          </div>
+        );
+      })}
     </div>
   );
 }

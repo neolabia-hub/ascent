@@ -329,8 +329,10 @@ export class AssignmentsService {
         recipientEmail: user.email,
         subject: 'Tienes una formacion asignada',
         body: `Se te asigno: ${title}.`,
-        referenceType: 'assignments',
-        referenceId: null,
+        // A la FORMACION concreta, no al modulo: "tienes una formacion asignada" y aterrizar
+        // en una lista de doce es obligar a buscar lo que el aviso acaba de nombrar.
+        referenceType: 'activities',
+        referenceId: input.targetId,
       });
     }
 

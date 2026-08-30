@@ -165,7 +165,7 @@ export default function UsuariosPage() {
    * la primera version solo uno de los dos sugeria nada.
    */
   const acotar = () => {
-    if (scopeKind !== 'scoped' && scopeAreaIds.length === 0 && scopeProcessIds.length === 0 && form.areaId) {
+    if (scopeAreaIds.length === 0 && scopeProcessIds.length === 0 && form.areaId) {
       setScopeAreaIds([form.areaId]);
     }
     setScopeKind('scoped');
@@ -628,12 +628,22 @@ export default function UsuariosPage() {
                       {/*
                         SIN NADA MARCADO NO SE ACOTA NADA: la regla del servidor es "sin filas = ve
                         todo", asi que guardar "acotado" y vacio daria acceso a TODA la empresa,
-                        justo lo contrario de lo que se acaba de pedir. Se dice aqui y se bloquea
-                        el guardado.
+                        justo lo contrario de lo que se acaba de pedir. Impide guardar, asi que se
+                        dice como los demas errores del formulario y no con un bloque de color
+                        propio: un aviso ambar mas es ruido que se aprende a ignorar.
+
+                        Y si se quita SU area, se dice la consecuencia concreta —dejara de ver lo
+                        suyo— sin impedir nada: es legitimo (quien lleva SARLAFT desde Gestion
+                        Humana no administra su area) pero casi nunca es lo que se queria.
                       */}
                       {scopeAreaIds.length === 0 && scopeProcessIds.length === 0 ? (
-                        <p role="alert" className="rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+                        <p role="alert" className="text-xs text-danger">
                           Marca al menos un area o un proceso. Sin nada marcado no se acota nada: veria toda la empresa.
+                        </p>
+                      ) : form.areaId && !scopeAreaIds.includes(form.areaId) ? (
+                        <p className="text-xs text-ink-500">
+                          No administrara nada de {areas.find((a) => a.id === form.areaId)?.name ?? 'su area'}, que es
+                          donde trabaja. Correcto si gestiona lo de otra area.
                         </p>
                       ) : null}
                     </div>

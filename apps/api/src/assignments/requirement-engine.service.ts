@@ -328,8 +328,10 @@ export class RequirementEngineService {
         recipientEmail: user.email,
         subject: items.length === 1 ? 'Tienes una formacion asignada' : `Tienes ${items.length} formaciones asignadas`,
         body: `Se te asigno: ${titles.join(', ')}${extra}.`,
-        referenceType: 'assignments',
-        referenceId: null,
+        // A la FORMACION concreta cuando es UNA. Si el ciclo asigno varias de golpe no hay una
+        // sola a la que llevar, y el aviso lleva a Mi formacion, que es donde estan todas.
+        referenceType: 'activities',
+        referenceId: items.length === 1 ? (items[0]?.targetId ?? null) : null,
       });
     }
   }
