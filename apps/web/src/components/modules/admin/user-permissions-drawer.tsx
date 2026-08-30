@@ -287,7 +287,15 @@ export function UserPermissionsDrawer({
                 {rows.map((permission) => {
                   const fromRole = rolePermissions.has(permission.code);
                   const state = states[permission.code] ?? 'inherited';
-                  const effective = state === 'granted' || (state === 'inherited' && fromRole);
+                  /**
+                   * "Ver lo mio" lo tiene TODO EL MUNDO y no se puede retirar (Decision #65): el
+                   * servidor lo concede despues de los overrides. Se muestra igual —quien
+                   * configura tiene que poder ver que existe— pero sin los tres botones, porque
+                   * ofrecer "Retirar" sobre algo que el servidor va a conceder igual es la clase
+                   * de mentira silenciosa que este producto ya pago varias veces.
+                   */
+                  const siempreConcedido = permission.code === 'enrollments:read_own';
+                  const effective = siempreConcedido || state === 'granted' || (state === 'inherited' && fromRole);
 
                   return (
                     <li key={permission.code} className="rounded-lg border border-line p-3">
@@ -295,7 +303,7 @@ export function UserPermissionsDrawer({
                         <div className="min-w-0">
                           <p className="text-sm text-ink-900">{permission.description}</p>
                           <p className="mt-0.5 text-xs text-ink-500">
-                            El rol {fromRole ? 'lo concede' : 'no lo concede'} ·{' '}
+                            {siempreConcedido ? 'Toda persona lo tiene' : `El rol ${fromRole ? 'lo concede' : 'no lo concede'}`} ·{' '}
                             <span className={cn('font-medium', effective ? 'text-ok' : 'text-ink-500')}>
                               {effective ? 'Puede hacerlo' : 'No puede'}
                             </span>
@@ -303,6 +311,11 @@ export function UserPermissionsDrawer({
                         </div>
                       </div>
 
+                      {siempreConcedido ? (
+                        <p className="mt-2 text-xs text-ink-500">
+                          Su propia formacion la ve siempre: es un registro suyo, y ademas legal. No se retira.
+                        </p>
+                      ) : (
                       <div className="mt-2 flex gap-1" role="radiogroup" aria-label={permission.description}>
                         <StateButton
                           active={state === 'inherited'}
@@ -327,6 +340,7 @@ export function UserPermissionsDrawer({
                           hint={!fromRole ? 'El rol no lo concede' : undefined}
                         />
                       </div>
+                      )}
                     </li>
                   );
                 })}

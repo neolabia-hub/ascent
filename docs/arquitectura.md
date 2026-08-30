@@ -169,6 +169,41 @@ detalle, una impugnacion no se puede defender.
 
 ---
 
+## 4.4 Las dos superficies, y quien pasa de una a otra
+
+El producto tiene dos caras con vocabulario, densidad y chrome distintos: el **panel** (`(admin)`)
+y la **formacion propia** (`(learner)`). No es una cuestion de estilo: quien administra recorre
+listas y compara cifras; quien se forma hace una cosa a la vez.
+
+**Pero la misma persona es las dos.** El jefe de SGI programa la formacion de la empresa y ademas
+tiene que hacer su reinduccion. Hasta la Decision #65 eso no se podia: no habia un solo enlace del
+panel a `/hoy`, y el rol Analista ni siquiera tenia `enrollments:read_own`.
+
+**Una sola cuenta, siempre.** `users` es unico por (tenant, documento): una persona es una cedula.
+Una segunda cuenta "de aprendiz" exigiria inventar un documento, y ese documento falso entra en la
+matriz de competencia, en el denominador del plan y en la constancia que firma el auditor.
+
+**Como se resuelve.**
+
+| Pieza | Que hace |
+|---|---|
+| `permission.service.ts` | Concede `enrollments:read_own` a TODOS, despues de los overrides: no se hereda del rol y no se puede retirar |
+| `lib/landing.ts` | `isLearnerOnly` decide donde aterriza cada quien; `managesAnything` decide quien ve el camino de vuelta |
+| `layout/space-switcher.tsx` | El control de la barra superior, con el contador de lo pendiente |
+
+Nada de esto mira el NOMBRE de un rol (Decision #19): un cliente puede llamar "Asistente" al suyo
+que gestiona y funciona igual. `managesAnything` se define por descarte —tener algun permiso que
+no sea "lo mio"— para que no haya que ampliar una lista cada vez que el producto crece.
+
+**El contador cuenta PENDIENTES, no avisos.** Son dos senales distintas y estan a dos centimetros
+una de otra en la barra: la campana cuenta lo que no has leido y se apaga al leerlo; el conmutador
+cuenta lo que te falta por HACER y no se apaga hasta que lo haces. Si contara avisos, bajaria a
+cero sin que nadie se hubiera capacitado. Cuando algo esta vencido, el numero se pinta en rojo
+—pero no el boton entero: al lado de la campana, dos bloques rojos pegados se leen como el mismo
+dato—.
+
+---
+
 ## 4.5 El motor de obligaciones
 
 Es el unico componente que **crea trabajo por su cuenta**, asi que su diseno se rige por tres

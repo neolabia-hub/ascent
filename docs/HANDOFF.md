@@ -20,6 +20,64 @@ un diario, no una referencia.
 
 ---
 
+## 2026-08-30 — Quien administra tambien se forma
+
+### El hueco
+
+Las formaciones son para todos, tambien para quien las programa. Pero las dos superficies estaban
+**incomunicadas**: ni un solo enlace del panel a `/hoy`, y el rol Analista **no tenia
+`enrollments:read_own`** — no podia ver su propia formacion ni escribiendo la URL. El
+administrador si podia, pero tampoco tenia por donde llegar.
+
+### Lo que se decidio (Decision #65)
+
+**Una sola cuenta y un conmutador**, no dos usuarios ni una pregunta en el login.
+
+- **Dos cuentas era imposible y ademas daninno**: `users` es unico por (tenant, documento). La
+  segunda cuenta exigiria un documento inventado, y ese documento falso entra en la matriz de
+  competencia, infla el denominador de cobertura del plan y sale impreso en la constancia.
+- **Preguntar el rol al entrar** interroga a la persona cuando menos sabe y rompe los enlaces de
+  correo, que apuntan directo al reproductor.
+- El conmutador **no cambia permisos**: cambia de sitio.
+
+`enrollments:read_own` se concede ahora a TODOS en el servidor, **despues de los overrides**, asi
+que tampoco se puede retirar. Se resuelve ahi y no en el catalogo de roles para que funcione en
+cualquier cliente: el que llame "Asistente" a su rol que gestiona no tiene que acordarse de marcar
+ninguna casilla. En el cajon de permisos ese permiso aparece como *"Toda persona lo tiene"*, sin
+los tres botones — ofrecer "Retirar" sobre algo que el servidor concede igual seria una mentira
+silenciosa de las que este producto ya pago varias veces.
+
+El camino de vuelta (aprendiz → panel) solo se ofrece a quien administra algo, y eso se decide por
+**descarte de permisos** (`managesAnything`), no por una lista que habria que ampliar cada vez que
+el producto crece, ni por el nombre del rol.
+
+### El contador: pendientes, no avisos
+
+La duda era si el numero debia contar notificaciones o formacion pendiente. **No es lo mismo y por
+eso conviven**: la campana cuenta lo no leido y se apaga al leerlo; el conmutador cuenta lo que
+falta por HACER y no se apaga hasta que se hace. Un contador de avisos llegaria a cero sin que
+nadie se hubiera capacitado.
+
+Al verlo en pantalla salio un problema de diseno que no se veia en el codigo: pintar el boton
+entero de rojo cuando hay algo vencido lo dejaba **pegado a la campana, que tambien tiene su punto
+rojo**, y los dos se leian como el mismo dato. Ahora el rojo esta solo en el contador y el borde lo
+insinua.
+
+### Verificado
+
+`tsc`, `eslint` y `nest build` en verde; **172/172** unitarias; **16/16 e2e** (uno nuevo: ida y
+vuelta entre las dos superficies). Y a ojo, en la aplicacion real de `mirar.ps1`, con capturas de
+las dos barras.
+
+### Lo que queda de esto
+
+- El **rol Analista del seed** sigue sin `enrollments:read_own` en su lista, y da igual porque el
+  servidor lo concede; pero si algun dia se quita la regla implicita, hay que acordarse.
+- El conmutador del panel no distingue **vencidas de pendientes** en el numero: solo cambia de
+  color. Con el detalle en el tooltip basta por ahora.
+
+---
+
 ## 2026-08-29 (noche) — Cinco sesiones confirmadas, y el plan que ya se puede tirar
 
 ### Lo primero: el trabajo tiene puntos de retorno

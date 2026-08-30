@@ -10,6 +10,8 @@ import { useLearnerProfile } from './learner-session';
 import { clearOfflineData } from '@/components/providers/service-worker-bridge';
 import { cn } from '@/components/ui/cn';
 import { StreakPill } from '@/components/ui/streak-pill';
+import { managesAnything } from '@/lib/landing';
+import { SpaceSwitcher } from './space-switcher';
 
 /**
  * Barra superior del aprendiz: buscar, avisos y quien soy.
@@ -272,6 +274,13 @@ export function LearnerTopbar({
           nadie. Sigue siendo PRIVADA (Decision #23): es la propia, jamas la de otro.
         */}
         {streak !== null ? <StreakPill days={streak} className="animate-card-in hidden sm:inline-flex" /> : null}
+
+        {/*
+          LA VUELTA AL PANEL, solo para quien administra algo. Para el 95% del personal operativo
+          esta superficie es la unica que existe y una puerta de mas seria una pantalla prohibida
+          a un clic. Se decide por permisos, nunca por el nombre del rol.
+        */}
+        {managesAnything(profile.permissions) ? <SpaceSwitcher to="admin" /> : null}
 
         <Notifications />
         <UserMenu fullName={profile.fullName} email={profile.email} />

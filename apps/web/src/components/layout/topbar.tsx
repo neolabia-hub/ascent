@@ -21,6 +21,7 @@ import { listUsers } from '@/lib/admin-api';
 import { listActivities } from '@/lib/catalog-api';
 import { cn } from '@/components/ui/cn';
 import { CommandPalette, type Command } from './command-palette';
+import { SpaceSwitcher } from './space-switcher';
 
 /** Destinos del panel. Mismo buscador que el aprendiz, contenidos distintos. */
 const ADMIN_COMMANDS: Command[] = [
@@ -259,6 +260,13 @@ export function Topbar({ breadcrumb, userFullName }: TopbarProps) {
       </button>
 
       <div className="flex items-center gap-2">
+        {/*
+          QUIEN ADMINISTRA TAMBIEN SE FORMA. Va antes de la campana y del nombre porque es
+          navegacion —lleva a otro sitio— y no un desplegable de la barra; y lleva el contador de
+          lo que le falta POR HACER, que es lo unico que consigue que su propia formacion no sea
+          siempre lo ultimo de la lista.
+        */}
+        <SpaceSwitcher to="learner" />
         <NotificationsMenu />
         <UserMenu userFullName={userFullName} />
       </div>

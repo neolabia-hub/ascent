@@ -33,6 +33,17 @@ export class PermissionService {
       if (o.granted) effective.add(code);
       else effective.delete(code);
     }
+
+    // TODA PERSONA ES APRENDIZ (Decision #65). "Ver lo tuyo" no es una capacidad que alguien
+    // conceda: es consecuencia de existir en la plataforma. Se agrega DESPUES de los overrides,
+    // asi que tampoco se puede revocar — quitarselo a alguien seria esconderle su propio
+    // historial de formacion, que es un registro suyo y ademas legal.
+    //
+    // Se resuelve aqui y no en el catalogo de roles a proposito: el cliente que llame
+    // "Asistente" a su rol que gestiona no tiene que acordarse de marcarle esta casilla, y
+    // ningun tenant puede quedarse con analistas que no pueden hacer su propia capacitacion.
+    effective.add("enrollments:read_own" as PermissionCode);
+
     return effective;
   }
 

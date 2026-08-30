@@ -159,3 +159,27 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     await expect(empty.or(session)).toBeVisible({ timeout: 20_000 });
   });
 });
+
+/**
+ * QUIEN ADMINISTRA TAMBIEN SE FORMA (Decision #65).
+ *
+ * Las dos superficies estaban incomunicadas: ni un solo enlace del panel a la formacion propia, y
+ * el rol Analista ni siquiera tenia permiso para verla. Esto comprueba el camino de ida y vuelta,
+ * que es lo unico que hace que la formacion de quien gestiona deje de ser invisible.
+ */
+test('quien administra llega a su propia formacion y vuelve al panel', async ({ page }) => {
+  await loginAsAdmin(page);
+  await page.goto('/inicio');
+
+  // Ida: el conmutador vive en la barra superior, no escondido en un menu.
+  const aFormacion = page.getByRole('link', { name: /Mi formacion/ });
+  await expect(aFormacion).toBeVisible();
+  await aFormacion.click();
+  await page.waitForURL('**/hoy', { timeout: 20_000 });
+
+  // Vuelta: solo aparece para quien administra algo, y este usuario lo hace.
+  const alPanel = page.getByRole('link', { name: /panel de administracion/i });
+  await expect(alPanel).toBeVisible();
+  await alPanel.click();
+  await page.waitForURL('**/inicio', { timeout: 20_000 });
+});

@@ -22,3 +22,18 @@ export function isLearnerOnly(permissions: readonly string[]): boolean {
 export function landingFor(permissions: readonly string[]): string {
   return isLearnerOnly(permissions) ? LEARNER_HOME : ADMIN_HOME;
 }
+
+/**
+ * ¿Esta persona administra ALGO, sea cual sea el nombre de su rol?
+ *
+ * Se define por descarte —tiene algun permiso que no sea "lo mio"— y no por una lista de permisos
+ * de gestion, que habria que ampliar cada vez que el producto crece y que se quedaria vieja en
+ * silencio. Un cliente puede llamar "Asistente" o "Coordinador HSE" a su rol que gestiona; lo que
+ * decide es lo que ese rol CONCEDE (Decision #19).
+ *
+ * Se usa para ofrecer el camino de vuelta al panel desde la superficie del aprendiz: quien solo
+ * tiene su formacion no debe ver una puerta a una pantalla donde todo esta prohibido.
+ */
+export function managesAnything(permissions: readonly string[]): boolean {
+  return permissions.some((permission) => !LEARNER_ONLY_PERMISSIONS.has(permission));
+}
