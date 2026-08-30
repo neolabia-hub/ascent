@@ -55,6 +55,21 @@ comprueba en un minuto.
 
 ---
 
+### Dos decisiones sobre los avisos, cerradas
+
+**Pulsar un aviso lo marca leido, en las dos barras.** En la del aprendiz faltaba: se entraba al
+aviso y el contador seguia contandolo, asi que la campana marcaba tres cuando ya se habian visto
+los tres. **No se borran**: un aviso es el registro de algo que paso y, en el caso que lo destapo
+—una obligacion retirada—, es la unica traza que explica por que alguien creia tener esa formacion.
+Que deje de reclamar atencion es distinto de que desaparezca. El panel gana ademas el "marcar todo
+leido" que solo tenia el aprendiz, y que hace mas falta ahi porque es donde se acumulan.
+
+**Abrir un aviso NO inicia la formacion, a proposito.** Inscribirse crea un `enrollment` con estado
+ENROLLED enlazado a la obligacion, y eso **mueve el indicador de INSCRITOS del plan** y ocupa cupo
+de la convocatoria. Iniciar por el hecho de mirar de que se trata pondria a contar como empezada la
+formacion de alguien que no ha hecho nada. Se ensena la tarjeta con su boton: mirar es gratis,
+empezar es un acto.
+
 ### LO QUE SIGUE: asignaciones, tipos de formacion y convocatorias
 
 Se hablo entero y **no se construyo nada**. Esto es el terreno, para no volver a levantarlo.

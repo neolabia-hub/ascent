@@ -16,7 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { getInbox, logout, markNotificationRead, type InboxItem } from '@/lib/api';
+import { getInbox, logout, markAllNotificationsRead, markNotificationRead, type InboxItem } from '@/lib/api';
 import { listUsers } from '@/lib/admin-api';
 import { listActivities } from '@/lib/catalog-api';
 import { cn } from '@/components/ui/cn';
@@ -169,8 +169,22 @@ function NotificationsMenu() {
 
       {open ? (
         <div className="card absolute right-0 top-11 z-50 w-80 overflow-hidden animate-card-in">
-          <div className="border-b border-line px-4 py-3">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-sm font-semibold text-ink-900">Notificaciones</p>
+            {/* Lo tenia el aprendiz y no el panel, que es justo donde mas se acumulan. */}
+            {unread > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })));
+                  setUnread(0);
+                  void markAllNotificationsRead();
+                }}
+                className="focus-ring text-xs text-ink-500 hover:text-ink-900"
+              >
+                Marcar todo leido
+              </button>
+            ) : null}
           </div>
           <div className="max-h-80 overflow-y-auto">
             {loading ? (

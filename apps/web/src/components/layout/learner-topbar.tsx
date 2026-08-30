@@ -4,7 +4,7 @@ import { Bell, ChevronDown, LogOut, Search, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { getInbox, logout, markAllNotificationsRead, type InboxItem } from '@/lib/api';
+import { getInbox, logout, markAllNotificationsRead, markNotificationRead, type InboxItem } from '@/lib/api';
 import { getMyProgress } from '@/lib/learner-api';
 import { useLearnerProfile } from './learner-session';
 import { clearOfflineData } from '@/components/providers/service-worker-bridge';
@@ -144,7 +144,24 @@ function Notifications() {
                       —y el que no, se queda como texto, que es honesto—.
                     */}
                     {destino ? (
-                      <Link href={destino} onClick={() => setOpen(false)} className="focus-ring block px-4 py-3 hover:bg-paper">
+                      <Link
+                        href={destino}
+                        /*
+                          ABRIRLO ES HABERLO LEIDO. Aqui faltaba: se podia entrar al aviso y el
+                          contador seguia contandolo, asi que la campana marcaba tres cuando ya se
+                          habian visto los tres. No se BORRA —un aviso es el registro de algo que
+                          paso y es la unica traza que explica por que alguien creia tener esa
+                          formacion— pero deja de reclamar atencion.
+                        */
+                        onClick={() => {
+                          setOpen(false);
+                          if (!item.readAt) {
+                            setUnread((actual) => Math.max(0, actual - 1));
+                            void markNotificationRead(item.id);
+                          }
+                        }}
+                        className="focus-ring block px-4 py-3 hover:bg-paper"
+                      >
                         {contenido}
                       </Link>
                     ) : (
