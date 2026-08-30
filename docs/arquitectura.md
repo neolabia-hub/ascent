@@ -109,6 +109,26 @@ se toca.
 **Verificado:** tras editar la leccion de la version 2, la de la version 1 conserva sus tarjetas
 originales.
 
+**Publicar la version nueva no arrastra a nadie por su cuenta.** La convocatoria sigue colgada de
+la version que entregaba, y se apunta a la nueva con un acto deliberado (`migrate-version`) que
+avisa en pantalla, ensena a cuantos afecta y pasa por la misma compuerta que publicar. Entonces
+—y solo entonces— se aplica la **politica de migracion** que se eligio al publicar esa version:
+
+| Politica | Quien pasa a la version nueva |
+|---|---|
+| `FINISH_OLD` | Nadie de los ya inscritos; solo quienes se inscriban despues |
+| `MOVE_NOT_STARTED` (por defecto) | Quien no ha abierto nada. Se comprueba por HECHOS (sin avance ni intentos), no por el rotulo del estado |
+| `RESTART_NEW` | Todo el que no haya cerrado; vuelve a empezar |
+
+Dos frenos que **ninguna** politica levanta: una ejecucion cerrada (completada, aprobada,
+reprobada, retirada o vencida) no cambia de version nunca, y quien ya tiene otra ejecucion abierta
+de la version destino se queda donde esta —moverlo dejaria dos ejecuciones suyas de la misma
+version y el avance no sabria en cual guardarse—. El avance del que se mueve **no se borra**:
+queda apuntando a los contenidos de la version anterior, deja de contar (la completitud se calcula
+contra los contenidos de la version de la ejecucion) y sigue disponible para auditoria.
+
+La regla vive aparte y probada en `apps/api/src/offerings/version-migration.ts`.
+
 ### 4.2 Preguntas y examenes
 Editar una pregunta crea una version nueva. Cada intento guarda **que preguntas cayeron, en que
 orden y con que opciones**, apuntando a la version que se sirvio.
@@ -196,6 +216,62 @@ apps/web/
 packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 ```
 
+### Una presentacion se convierte; no se sirve
+
+Subir un PPT y entregarlo tal cual seria lo comodo y no dejaria evidencia de nada: en un visor la
+persona hace scroll y la plataforma no sabe si leyo. Por eso una presentacion pasa por un
+conversor y se reproduce como una secuencia de imagenes, que si se puede medir (ver *Presentacion*
+en el glosario).
+
+```
+PPT/PPTX/ODP --LibreOffice--> PDF --pdf.js + lienzo nativo--> N imagenes WebP --> manifiesto
+                                ^
+                        un PDF entra por aqui
+```
+
+- **El PDF es el camino que siempre esta disponible**: se rasteriza en proceso con `pdfjs-dist` y
+  `@napi-rs/canvas`, sin binarios del sistema. **PPT/PPTX/ODP exigen LibreOffice** en modo consola;
+  si no esta, la pantalla lo dice ANTES de que alguien elija el archivo
+  (`GET /media/presentation/capabilities`) y la salida es exportar a PDF, que es un clic.
+- **WebP, no PNG.** Una diapositiva lleva fotos y degradados: en PNG pesaba 1,4 MB cada una —doce
+  megas por una presentacion de once—, y eso en un telefono en carretera no se abre.
+- **El original se guarda igual.** Es el documento que entrego la ARL o el proveedor y una
+  auditoria puede pedirlo tal cual; lo que se reproduce son siempre las diapositivas.
+- **Las diapositivas no son paquetes propios.** Cuelgan de la clave del original
+  (`<clave>.slides/NNN.webp`) y su lista vive en el `manifest` del paquete padre. Eso obliga a
+  decidir a mano si una clave se sirve: la regla vive en `storage/slide-storage.ts`, pura y
+  probada, porque es una frontera de seguridad.
+- **Se completa viendolas todas.** No hay barra que arrastrar, asi que un umbral por debajo del
+  100% no significaria nada. La regla esta en `learning/progress-rules.ts`.
+
+### El reproductor: tres columnas y una sola cosa que se desplaza
+
+Lo que ve quien cursa en escritorio, desde el 2026-08-28 (Decision #49):
+
+```
+[ carril 64px ] [           escenario            ] [ indice 340px ]
+   iconos,        video / diapositivas / tarjetas    la formacion
+   plegado        + accion + pestanas                entera
+                  ^ lo unico que se desplaza
+```
+
+- **La raiz es `h-screen overflow-hidden`, no `min-h-screen`.** Es lo que hace que bajar a leer el
+  resumen no se lleve por delante la barra y el indice, que son justo lo que hay que tener a la
+  vista mientras se cursa.
+- **El indice va a la derecha** para que al plegarlo el escenario crezca hacia ese lado y su borde
+  izquierdo no se mueva. A la izquierda, mostrarlo u ocultarlo desplazaria el video de sitio.
+- **El indice dice el TAMANO de cada parte en la unidad de su tipo** —8 tarjetas, 11 diapositivas,
+  5 min— y nunca inventa minutos: de un video subido no se conoce la duracion hasta reproducirlo,
+  y un numero redondo inventado es peor que no decir nada. Los datos salen de
+  `openEnrollment`, que cuenta las tarjetas de la leccion y las diapositivas del manifiesto.
+- **Debajo del escenario, pestanas fijas con contenido de la pieza actual:** Resumen (de que va,
+  que se exige para darla por vista, de que proceso y norma sale) y Material de apoyo (los
+  documentos de la formacion, por URL firmada). Fijas para que se aprenda donde esta cada cosa;
+  su contenido cambia con la pieza para que no sean los datos de la formacion repetidos.
+- **La evaluacion NO usa este armazon** (Decision #50): se rinde a pantalla completa, sin indice ni
+  material a la vista. Un examen con el contenido al lado es un examen a libro abierto.
+- En **movil** no hay carril ni indice: queda la barra superior con el titulo y la salida.
+
 ### Archivos que conviene conocer
 
 | Archivo | Por que importa |
@@ -206,6 +282,12 @@ packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 | `approvals/approvals.service.ts` | La compuerta del flujo del analista |
 | `learning/completion.service.ts` | Cierra el ciclo ejecucion -> obligacion -> cobertura del plan |
 | `engagement/nudge.ts` | El limite entre recordar y hostigar. Funcion pura, probada aparte |
+| `offerings/version-migration.ts` | El limite entre actualizar el contenido y borrarle el avance a alguien. Funcion pura, probada aparte |
+| `storage/slide-converter.service.ts` | Convierte una presentacion en diapositivas. Los dos caminos (PDF siempre; Office solo con LibreOffice) y por que |
+| `storage/slide-storage.ts` | Que imagen de una presentacion se puede servir con una firma valida. Frontera de seguridad. Funcion pura, probada aparte |
+| `learning/progress-rules.ts` | Cuando una pieza cuenta como cumplida y que queda escrito de ella. Funcion pura, probada aparte |
+| `web: modules/learner/player-chrome.tsx` | El armazon del reproductor: carril plegable, barra superior y contencion del desplazamiento |
+| `web: modules/learner/course-index.tsx` | El indice de la formacion y las reglas de a donde se puede saltar |
 | `apps/web/public/sw.js` | Que se guarda en el telefono y que se reintenta sin senal |
 | `prisma/sql/rls.sql` | Las politicas de la base de datos |
 | `.claude/skills/pulse-ui/SKILL.md` | El contrato de diseno de toda la interfaz |
@@ -227,7 +309,10 @@ packages/shared/src/schemas/   Contratos Zod: fuente unica de la verdad
 | Leer la formacion de otro en un telefono compartido | Al cerrar sesion se borran el cache sin senal y la cola pendiente del dispositivo |
 | Perder el avance de alguien por un token vencido | La cola de reenvio usa el token vigente que le pasa la pagina, no el que se guardo horas antes; un rechazo por sesion caducada CONSERVA el envio en vez de descartarlo |
 | Que alguien lea los archivos de otra empresa | Los archivos se sirven por URL FIRMADA: pedirla exige sesion y comprueba el tenant; usarla no, porque una etiqueta `<img>` o `<video>` no puede autenticarse. La firma ata clave + caducidad + secreto del servidor, y se compara en tiempo constante |
-| Dar por visto un video que nadie vio | Con archivo propio se cuentan los SEGUNDOS DISTINTOS reproducidos —adelantar deja huecos y no suma— y el avance se bloquea hasta el minimo exigido. Con video de otra plataforma no se puede medir y se registra como declaracion, dicho en pantalla |
+| Servir un archivo cualquiera acertando una clave bajo la carpeta de una presentacion | Las diapositivas no estan registradas una a una: se autorizan comprobando que el paquete padre existe, es de esta empresa y que esa imagen figura DE VERDAD en su manifiesto. Una clave inventada bajo esa carpeta no se sirve |
+| Que el nombre de un archivo subido llegue a la linea de comandos | LibreOffice recibe el archivo a convertir como argumento. El nombre se reescribe antes (`safeTempName`): sin separadores de ruta, comillas ni nada fuera de `a-z0-9._-` |
+| Ejecutar lo que venga dentro de un PDF subido | El rasterizado corre con `isEvalSupported: false` y sin fuentes del sistema |
+| Dar por visto un video que nadie vio | Con archivo propio **y con YouTube** (a traves de su API de reproductor) se cuentan los SEGUNDOS DISTINTOS reproducidos —adelantar deja huecos y no suma— y el avance se bloquea hasta el minimo exigido. Donde no se puede medir se registra como declaracion, dicho en pantalla, y el avance viaja marcado (`MEASURED` / `DECLARED`) para que el auditor sepa como se supo |
 
 ---
 
@@ -277,6 +362,10 @@ Decidido y analizado en `docs/03-infraestructura-produccion.md`. En resumen:
 - Copias de seguridad diarias con copia fuera del servidor, y **restauracion probada** antes de
   salir a produccion.
 
+- **La imagen de la API necesita LibreOffice** si se quiere aceptar PowerPoint: sin el, solo se
+  podran subir presentaciones en PDF y la pantalla lo dira. En Debian/Ubuntu basta
+  `libreoffice-impress` (arrastra bastante; es el precio de convertir PPTX en el servidor).
+
 **Lo que falta antes de desplegar:** el adaptador de R2 (hoy lanza un error explicito a proposito,
 para que sea imposible desplegar sin completarlo), la definicion de contenedores de produccion,
 los guiones de despliegue y respaldo, el dominio con subdominios comodin, y el monitoreo de
@@ -299,9 +388,13 @@ Honesta y priorizada:
 | El cache sin senal guarda lo que la persona **ya visito**; no descarga por adelantado las lecciones que tiene asignadas | Quien nunca abrio la pildora con senal no puede cursarla sin senal | Cuando se sepa el peso real del contenido de Transprensa: es una precarga al entrar a los pendientes |
 | Los videos y documentos no se cachean para uso sin senal | Un video de 3 minutos multiplica lo que se guarda en el telefono. La leccion de tarjetas —el formato principal— si funciona sin senal | Segun el peso del contenido real |
 | Sin notificaciones push: el aviso de pildora sale por correo y bandeja in-app | El recordatorio llega, pero no al bloqueo de pantalla | Exige claves VAPID y permiso del usuario; se decide con el cliente |
-| **Un video de YouTube/Vimeo no se puede verificar**: queda como declaracion de la persona | Media: para formacion que deba sostenerse ante un auditor conviene SUBIR el video, no enlazarlo | Se puede cerrar integrando la API del reproductor de YouTube (da estado y posicion). Mientras tanto, la pantalla lo dice y la recomendacion es subir el archivo |
-| Publicar una version NUEVA no mueve a quien ya estaba inscrito, y la convocatoria sigue apuntando a la version vieja | Media: el administrador publica v2 y el aprendiz sigue viendo v1, sin explicacion en pantalla | Es correcto por diseno (politica de migracion, regla de oro 4), pero falta que la convocatoria pueda apuntar a la version nueva y que la UI lo explique |
+| Un video de **Vimeo o de cualquier otro enlace** que no sea YouTube no se puede verificar: queda como declaracion de la persona | Baja: YouTube —el caso real del cliente— ya se mide desde el 2026-08-27; para el resto, la pantalla lo dice y la recomendacion es subir el archivo | Cada plataforma exige su propio SDK. Se cierra cuando exista una formacion que de verdad viva en Vimeo |
+| Al migrar una convocatoria a la version nueva, un examen **ya aprobado sigue aprobado**: la version N+1 hereda el mismo `assessment_version_id` | Baja: es lo correcto mientras el examen no cambie. Si cambia, es otra version de evaluacion y hay que volver a rendirlo | Nada que hacer hoy; se documenta para que nadie lo lea como un fallo de `RESTART_NEW` |
 | La franja horaria del aviso se deduce en cada pasada de los ultimos 60 dias de eventos (tope 5.000) | Suficiente para el piloto | Con miles de personas, materializar la hora en una columna |
+| Las **diapositivas** de una presentacion no se cachean para uso sin senal, como los videos y documentos | Una presentacion de 20 diapositivas en WebP pesa poco comparada con un video, pero sigue siendo peso en el telefono | Con el mismo criterio que el video: segun el peso del contenido real |
+| La imagen de produccion de la API todavia no incluye LibreOffice | Sin el, PPT/PPTX/ODP se rechazan con un mensaje que dice que suban el PDF. No rompe nada, limita | Al definir los contenedores de produccion |
+| No hay prueba de navegador que cubra una PRESENTACION | Baja: se verifico a mano de punta a punta el 2026-08-28 (subir, convertir, publicar, migrar y reproducir 6 diapositivas), pero nada impide que una regresion pase sin que salte | Exige un PDF de prueba en el repositorio; el generador esta escrito y cabe en un script del seed |
+| La LECCION de tarjetas no lleva las pestanas de Resumen y Material: la pila ocupa el alto de la pantalla | Baja: la descripcion de una leccion no tiene donde mostrarse hoy | Cuando se decida donde va sin pelear con la lectura de la pila: probablemente un desplegable en la barra superior, no una franja debajo |
 | Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
 | Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |
 | SCORM sin motor | Solo importa si el cliente tiene contenido comprado en ese formato | Segun respuesta del cliente |

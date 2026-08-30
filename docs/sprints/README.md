@@ -31,4 +31,5 @@ Para saber **como funciona el sistema hoy**, usar la documentacion viva:
 | `docs/glosario.md` | Que significa cada concepto del negocio (actividad, convocatoria, asignacion, plan, cobertura...) |
 | `docs/arquitectura.md` | Como esta construido: aislamiento, inmutabilidad, seguridad, calidad, deuda tecnica |
 | `docs/RUNBOOK.md` | Como se opera: comandos, credenciales, incidentes y lecciones. Solo se anade |
+| `docs/HANDOFF.md` | En que iba, que quedo a medias y con que continuar. Diario de sesiones |
 | `CLAUDE.md` | El modelo completo y las decisiones irreversibles |

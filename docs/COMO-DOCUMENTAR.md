@@ -21,7 +21,7 @@ codigo, lo cuenta el codigo (y sus comentarios, que si viven pegados a el).
 
 ---
 
-## 2. Los cinco documentos y que va en cada uno
+## 2. Los seis documentos y que va en cada uno
 
 | Documento | Que contiene | Naturaleza |
 |---|---|---|
@@ -29,7 +29,14 @@ codigo, lo cuenta el codigo (y sus comentarios, que si viven pegados a el).
 | `docs/glosario.md` | Que significa cada concepto del negocio, con ejemplos de Transprensa | Viva |
 | `docs/arquitectura.md` | Como esta construido HOY: aislamiento, inmutabilidad, seguridad, calidad, deuda | Viva |
 | `docs/RUNBOOK.md` | Como se opera: comandos, credenciales, **incidentes y lecciones** | Solo se ANADE |
+| `docs/HANDOFF.md` | **En que iba, que quedo a medias y con que continuar.** Diario de sesiones | Se anexa por arriba |
 | `docs/sprints/NN-*.md` | Que se hizo en un sprint y como se verifico | Historica: envejece |
+
+RUNBOOK y HANDOFF se parecen y no son lo mismo: el RUNBOOK guarda lo que hay que **saber para
+operar** (un comando, una credencial, una trampa que costo una tarde) y sirve dentro de un ano; el
+HANDOFF guarda **en que punto se quedo el trabajo** y sirve, sobre todo, manana. Si dudas: ¿lo
+volveria a necesitar alguien que no estuvo en esa sesion? RUNBOOK. ¿Solo sirve para retomar el
+hilo? HANDOFF.
 
 Y los de referencia que no se tocan salvo correccion: `docs/00-brief-crudo.md` (lo que dijo el
 cliente, literal), `docs/research/` (las investigaciones con sus fuentes),
@@ -54,6 +61,7 @@ cliente, literal), `docs/research/` (las investigaciones con sus fuentes),
 | Se **cierra un sprint** | `docs/sprints/NN-*.md` nuevo + estado en `CLAUDE.md` seccion 0 |
 | Se **descubre deuda tecnica** | Tabla de deuda de `arquitectura.md`, con criticidad honesta |
 | Se decide **no hacer algo** | Se escribe igual, con el por que. Lo descartado explica el diseno tanto como lo hecho |
+| **Termina una sesion de trabajo** | Entrada nueva arriba en `HANDOFF.md`: que se hizo, como se verifico (resultados reales) y que queda abierto |
 
 ---
 

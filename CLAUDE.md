@@ -17,7 +17,14 @@
 > - `docs/arquitectura.md` — cómo está construido HOY: aislamiento entre empresas, las tres
 >   reglas de inmutabilidad, dónde vive cada cosa, seguridad, calidad y deuda técnica.
 >
+> ### Por decidir
+> - `docs/ideas-producto.md` — ideas de producto NO comprometidas, con veredicto honesto de cada
+>   una (incluido "no lo haría" y por qué). Consúltalo antes de proponer funcionalidad nueva:
+>   varias ya están modeladas sin construir, y otras están descartadas con razón.
+>
 > ### Histórico
+> - `docs/HANDOFF.md` — **DIARIO DE SESIONES.** En qué iba esto, qué quedó a medias y con qué
+>   continuar. Se anexa por arriba (lo más reciente primero). Léelo al empezar una sesión.
 > - `docs/sprints/` — BITÁCORA por sprint: qué se construyó, por qué, cómo se
 >   verificó y qué quedó pendiente. Es historia: envejece a propósito.
 > - `docs/00-brief-crudo.md` — transcripción LITERAL de lo que dictó el cliente. Solo se ANEXA.
@@ -43,7 +50,9 @@
 
 ## 0. Estado del Proyecto
 
-**Fase actual:** Arquitectura — Pre-código.
+**Fase actual:** Construcción. Sprints 0 a 4 terminados; entre el 4 y el 5 se están cerrando
+huecos del contenido y la entrega (medios por URL firmada, medición de YouTube, actualizar una
+convocatoria a la versión nueva, presentaciones convertidas a diapositivas). Ver `docs/HANDOFF.md`.
 
 **Completado:**
 - [x] Brief del cliente capturado (3 bloques)
@@ -69,8 +78,12 @@
       privada y puntos, PWA instalable con service worker propio (cache + cola de reenvío en
       IndexedDB), cadencia de píldoras con tope semanal, y cierre del ciclo ejecución → obligación
       → cobertura del plan (`docs/sprints/04-*.md`)
+- [x] **Entre el 4 y el 5** — archivos servidos por URL firmada, medición real de los videos de
+      YouTube, la convocatoria puede apuntar a la versión vigente, la **presentación** como tipo
+      de contenido propio, y el **reproductor con chrome propio** (carril plegable, índice de la
+      formación e información de la pieza). Decisiones #43 a #51; diario en `docs/HANDOFF.md`
 
-**Pendiente antes de Sprint 0:**
+**Pendiente de confirmar con el cliente:**
 - [ ] Validar con Transprensa: contenido exacto de la constancia/certificado y firmantes
 - [ ] Confirmar si Transprensa compra contenido SCORM hoy (decide si el runtime entra en F2)
 - [ ] Confirmar umbral SARLAFT aplicable (Res. 4607/2026) contra la Circular Única
@@ -210,6 +223,19 @@ SNAPSHOT en la versión publicada. Cambiar el setting NO reinterpreta exámenes 
 
 ### 3.2 Catálogos por tenant (todos CRUD desde UI, `UNIQUE(tenant_id, code)`)
 
+**Área vs. Proceso** (Decisión #57), porque se parecen y no son lo mismo:
+
+| | Área | Proceso |
+|---|---|---|
+| Responde | ¿Dónde trabaja esta PERSONA? | ¿De qué trata esta CAPACITACIÓN? |
+| Cuelga de | `users.area_id` | `activities.process_id` |
+| Ejemplo | Logística, Comercial, SGI | SST, PESV, SARLAFT, BASC |
+| Anida | sí (`areas.parent_id`) | vía su área (`processes.area_id`) |
+
+Un proceso pertenece a un área: SARLAFT y SST cuelgan de SGI y siguen teniendo responsables
+distintos. Por eso el alcance sobre un ÁREA alcanza todos sus procesos (la jefatura de SGI ve cómo
+va todo lo suyo) y el alcance sobre un PROCESO alcanza solo ese (el de SARLAFT no ve SST).
+
 ```
 areas          Unidad organizacional de PERSONAS (Logística, Comercial, Gestión Humana...).
 processes      Sistema de gestión / proceso que ORIGINA la formación. Seed Transprensa:
@@ -261,9 +287,13 @@ ROLES (autorización SIEMPRE por permisos, nunca por nombre de rol en el código
 ```
 Una VERSIÓN de actividad se compone de ÍTEMS ordenados (activity_contents):
   LESSON     Lección de tarjetas (el formato principal; editor propio, sección 3.5)
+  PRESENTATION Presentación (PDF/PPT/PPTX/ODP) CONVERTIDA a una imagen por diapositiva y
+             reproducida dentro del producto: se registra qué diapositiva vio y cuánto tiempo.
+             Se completa viéndolas TODAS (decisión #47)
   VIDEO      Subido (R2) o embebido YouTube/Vimeo; registra % visto; puede exigirse completo
-  DOCUMENT   PDF/Word/Excel/PPT en visor con registro de lectura. NUNCA publicable como lección
-  ASSESSMENT Evaluación (sección 3.6)
+  DOCUMENT   Material de APOYO (manual, política, instructivo) en visor, con la confirmación de
+             lectura de la persona y nada más. NUNCA publicable como lección
+  ASSESSMENT Evaluación (sección 3.6). Se rinde APARTE, a pantalla completa (decisión #50)
   SURVEY     Encuesta (sección 3.8)
   SCORM      Paquete de terceros — schema-ready desde F1, runtime en F2 (solo SCORM 1.2
              single-SCO, con librería tipo scorm-again; jamás SCORM como formato de autoría)
@@ -391,6 +421,10 @@ CERRADO), aprobado por/fecha. ENTIDAD EMPRESARIAL PROPIA.
 plan_items: renglones que REFERENCIAN convocatorias planificadas (mes programado, proyectados
 congelados). El plan no posee actividades; reprogramar o partir una convocatoria en dos sedes no
 reescribe el plan.
+EDICIÓN DEL PLAN VIVO (Decisión #55): en BORRADOR se agrega y se quita libremente. APROBADO/ACTIVO
+admite AGREGAR jornadas con justificación (nacen obligando) y REPROGRAMAR el mes (marca
+RESCHEDULED); no admite BORRAR renglones —eso es CANCELAR—. CERRADO no admite nada.
+Los proyectados congelados se AJUSTAN con motivo auditado (Decisión #56), nunca en línea.
 MÉTRICAS DEL PLAN (independientes por definición):
   - Cumplimiento del programa = convocatorias ejecutadas / programadas x 100.
   - Cobertura = capacitados / proyectados x 100 (por convocatoria, por proceso, por mes).
@@ -595,8 +629,9 @@ activity_versions               -- INMUTABLE al publicar (copy-on-publish)
   estimated_minutes INT
 
 activity_contents               -- ítems ordenados de la versión
-  id, activity_version_id, type (LESSON|VIDEO|DOCUMENT|ASSESSMENT|SURVEY|SCORM|LINK)
-  title, display_order, is_required, config JSONB      -- min_watch_pct, min_seconds...
+  id, activity_version_id, type (LESSON|PRESENTATION|VIDEO|DOCUMENT|ASSESSMENT|SURVEY|SCORM|LINK)
+  title, description NULL, display_order, is_required, config JSONB   -- min_watch_pct, min_seconds...
+                                                       -- description: editorial, la lee quien cursa
   lesson_id NULL, content_package_id NULL, assessment_version_id NULL, survey_template_id NULL
 
 lessons              id, tenant_id, title, estimated_minutes, status (DRAFT|PUBLISHED)
@@ -605,8 +640,9 @@ lesson_cards         id, lesson_id, card_type (TEXT_IMAGE|VIDEO_SHORT|QUIZ|FLIP|
                      -- F2: HOTSPOT | MATCH
 
 content_packages     -- archivos y video; SCORM schema-ready (runtime F2)
-  id, tenant_id, kind (FILE|VIDEO|SCORM_12|SCORM_2004), storage_key, original_name,
+  id, tenant_id, kind (FILE|VIDEO|PRESENTATION|SCORM_12|SCORM_2004), storage_key, original_name,
   mime_type, size_bytes, checksum, manifest JSONB NULL  -- inmutable; re-subir = paquete nuevo
+                                                        -- PRESENTATION: manifest lista las diapositivas
 
 activity_templates   id, tenant_id NULL (NULL = biblioteca NEO global), name, payload JSONB
                      -- "crear actividad desde plantilla"
@@ -848,9 +884,17 @@ retention_policies   id, tenant_id, record_class (SST_TRAINING|GENERAL_TRAINING|
 
 ## 7. Sistema de Permisos
 
-Evaluación idéntica a SAC-NEO: permisos efectivos = rol + overrides (cache Redis TTL 5 min).
-Guards solo por PERMISOS, nunca por nombre de rol. El Analista además se filtra por
-`analyst_scopes` (sus procesos/áreas).
+Dos preguntas distintas, y hacen falta las dos:
+
+- **QUÉ puede hacer** — permisos efectivos = rol + overrides individuales (conceder / retirar).
+  Guards solo por PERMISOS, nunca por nombre de rol. Cache Redis TTL 5 min (pendiente).
+- **SOBRE QUÉ PARTE de la empresa** — `analyst_scopes`. Se aplica en las consultas de catálogo,
+  convocatorias y plan (`api/src/common/analyst-scope.ts`, Decisión #54). **Tener alcance es lo que
+  restringe**: sin filas se ve todo el tenant; con filas, solo esos procesos. Las filas que traen
+  solo área acotan personas, no el catálogo.
+
+Ambas se editan en el mismo sitio —el cajón de permisos de la persona— porque juzgar una sin la
+otra lleva a errores caros: conceder "publicar" no significa lo mismo en toda la empresa que en SST.
 
 ```
 -- Catálogo y contenido
@@ -961,7 +1005,24 @@ neo-pulse/
 | 41 | **Un envío encolado sin señal devuelve 503, nunca un éxito fingido.** El service worker guarda el avance y lo reintenta, pero la pantalla dice la verdad ("lo guardaremos al recuperar señal") | Devolver un 202 con la forma que espera la interfaz le mentiría al usuario sobre su propio registro formativo y rompería el código que lee la respuesta. Solo se encola el AVANCE (acumulativo e idempotente): la entrega de un examen y el repaso devuelven nota y mueven estado, y hacerlos a espaldas de la persona es peor que pedirle señal |
 | 42 | **A dónde entra cada persona se decide por PERMISOS, no por nombre de rol ni por dispositivo**: quien solo tiene `enrollments:read_own` entra a la superficie del aprendiz | Los roles son configurables por empresa; los permisos no. Mandar al panel a quien tiene un solo permiso es mandarlo a una pantalla donde todo está prohibido |
 | 43 | **Los archivos se sirven por URL FIRMADA, no con el token de sesión.** Una ruta pide la firma (con sesión, comprobando el tenant); otra sirve el archivo validando HMAC + caducidad | Una etiqueta `<img>`, `<video>` o `<iframe>` no puede enviar la cabecera de autorización. Exigirla hacía que NINGÚN archivo subido se viera (401). La alternativa —abrir el endpoint— dejaría los archivos de una empresa al alcance de quien adivine una clave |
-| 44 | **Solo se EXIGE ver un video cuando el archivo es propio.** Del video alojado se miden los segundos distintos reproducidos y el avance se bloquea hasta el mínimo; de un embebido de YouTube/Vimeo se registra como DECLARACIÓN de la persona, y se dice en pantalla | La plataforma no controla el reproductor de un tercero y no sabe si le dieron a reproducir. Fingir que lo comprueba es peor que reconocerlo: este registro tiene que sostenerse ante un auditor. Se miden segundos distintos y no la posición máxima, porque arrastrar la barra al final daría el video por visto en dos segundos |
+| 44 | **Solo se EXIGE ver un video cuando se puede MEDIR.** Del archivo propio —y desde 2026-08-27 también del enlace de YouTube, vía su API de reproductor— se miden los segundos distintos reproducidos y el avance se bloquea hasta el mínimo; donde no se puede medir se registra como DECLARACIÓN de la persona, y se dice en pantalla | La plataforma no controla el reproductor de un tercero, pero YouTube sí expone posición y duración: donde hay forma de comprobarlo, se comprueba. Donde no la hay, fingirlo es peor que reconocerlo, porque este registro tiene que sostenerse ante un auditor. Se miden segundos distintos y no la posición máxima, porque arrastrar la barra al final daría el video por visto en dos segundos |
+| 45 | **Publicar una versión nueva NO reapunta las convocatorias: hay que hacerlo a propósito.** La convocatoria avisa que hay una versión más nueva, muestra a cuántos inscritos movería y a cuántos no, y al actualizar aplica la política de migración que se eligió AL PUBLICAR esa versión. La versión destino viaja explícita: si se publicó otra mientras se decidía, se rechaza (`VERSION_SUPERSEDED`) | Mover a gente ya citada de contenido es un acto con consecuencias, no un efecto colateral de publicar. Antes la política de migración se guardaba y no la leía nadie, y el administrador creía haber actualizado la formación mientras el aprendiz seguía cursando la anterior. Dos frenos que ninguna política levanta: una ejecución cerrada nunca cambia de versión (es evidencia), y quien ya tiene otra ejecución abierta de la versión destino se queda donde está —dos ejecuciones suyas de la misma versión dejarían el avance sin saber a cuál ir—. El avance del que se mueve no se borra: deja de contar solo, y sigue ahí para auditoría |
+| 46 | **El avance registra CÓMO se supo** (`MEASURED` / `DECLARED`), y se conserva en su peor forma: una declaración no asciende a medición porque un envío posterior venga medido | El auditor no pregunta solo el porcentaje, pregunta de dónde salió. Y si una pieza se dio por cumplida con la palabra de la persona, eso es lo que hay que poder decir dentro de dos años |
+| 47 | **Una presentación no se sirve: se CONVIERTE en una imagen por diapositiva** y se reproduce con el reproductor del producto. Es un tipo de contenido propio (`PRESENTATION`), no una variante de `DOCUMENT`, y se completa viéndolas todas. El original se guarda igual, pero no es lo que se reproduce | Un PDF embebido en un visor no permite registrar nada: la persona hace scroll y lo único honesto que se puede afirmar es que confirmó haberlo abierto. Convertida, sí se puede decir qué diapositiva vio y cuánto tiempo, y eso es lo que la vuelve evidencia. Además se ve igual en cualquier teléfono, sin depender del Office de nadie. Se pierden animaciones, videos incrustados e hipervínculos, y se avisa al subir: es la misma limitación que tiene el conversor de Docebo, por la misma razón. Umbral por debajo del 100% no aplica —no hay barra que arrastrar: cada diapositiva se pasa a mano—, así que saltarse la mitad es no haberla visto |
+| 48 | **PowerPoint exige LibreOffice en el servidor y eso se dice ANTES de subir**, no al fallar. El PDF se convierte siempre, sin binarios del sistema | Enterarse de que el servidor no puede convertir un `.pptx` después de esperar la subida entera es la peor forma de enterarse. La pantalla pregunta al abrir el cajón y ofrece la salida real: exportar a PDF desde PowerPoint, que es un clic y da el mismo resultado |
+| 49 | **El reproductor lleva chrome propio en escritorio**: carril de la aplicación plegado a iconos, barra superior con el nombre de la FORMACIÓN y el avance total, e índice de la formación a la DERECHA. En móvil no aparece ninguno de los dos. Solo se desplaza el escenario | La regla anterior —ningún elemento de navegación mientras se cursa, para no invitar a irse— era buena y costaba más de lo que ahorraba: en una formación de siete partes, quien cursa necesita saber dónde está y cuánto le falta, y sin barra la única forma era salirse a mirarlo. Se conserva la intención reduciendo el chrome a lo justo: el carril nace plegado y no se despliega solo, y la barra lleva un título, no un menú. El índice va a la derecha porque al plegarlo el escenario crece hacia ese lado y su borde izquierdo NO se mueve; a la izquierda, mostrarlo u ocultarlo desplazaría el video entero de sitio a mitad de una lección |
+| 50 | **La evaluación se rinde APARTE, a pantalla completa; la encuesta de satisfacción irá bajo el contenido** | No es una diferencia estética: el examen MIDE, y dejar el video o las diapositivas a la vista mientras se responde lo convierte en un examen a libro abierto, que es exactamente lo que no puede ser un registro con nota mínima del 90% que se presenta ante un auditor. Además tiene intentos limitados, bloqueo al agotarlos y cronómetro: es otro modo, y la pantalla debe decirlo. La encuesta de satisfacción no mide a nadie —califica la capacitación y al capacitador—, así que ahí sí es correcto que aparezca debajo del contenido, con la pieza a la vista |
+| 51 | **Una pieza de contenido tiene DESCRIPCIÓN propia**, distinta de la de la actividad, y se muestra junto al contenido en el reproductor | Quien entra a la parte 4 de 7 no quiere saber de qué iba la inducción entera: quiere saber qué va a ver ahora y por qué se lo exigen. Va como columna y no dentro de `config` porque `config` guarda AJUSTES (mínimo de reproducción, segundos mínimos, url externa) y esto es contenido editorial que una persona lee: el día que haya que buscarlo, exportarlo o limitarlo, no debería haber que hurgar dentro de un JSON |
+| 52 | **Cuánto hay que ver de un video lo decide la EMPRESA** (`minWatchPctDefault` en los ajustes del tenant), y una formación concreta puede pedir otra cosa. La cascada es formación → empresa → plataforma, y la resuelve el servidor, que devuelve el número ya resuelto a la pantalla | Estaba clavado en 90 en dos sitios distintos —la regla del servidor y el reproductor—, así que una empresa que capacita en SST y quiere exigir el video entero no tenía forma de pedirlo. Lo resuelve el servidor y no el cliente porque si la pantalla dijera 90 y la regla exigiera 100, la persona vería abrirse el botón y el servidor no le daría la pieza por vista |
+| 53 | **La evaluación tiene ANTESALA dentro del reproductor**, aunque se rinda aparte: allí se dice la nota mínima, los intentos usados y que al agotarlos la formación se bloquea, antes de gastar uno | Una evaluación no es un medio y caía en el reproductor de archivos: terminaba diciendo "este contenido no tiene material cargado" con un botón de "Ya lo leí". Además un examen se empieza a propósito, nunca por inercia: la antesala es donde se dice lo que cuesta |
+| 54 | **El alcance del Analista se APLICA en las consultas, y TENER alcance es lo que restringe.** Un usuario sin filas en `analyst_scopes` ve todo el tenant; uno con filas ve solo esos procesos en catálogo, convocatorias y plan —y las métricas del plan se calculan sobre lo que ve—. En lectura de una ficha ajena se responde 404; al crear o MOVER algo a un proceso ajeno, 403 (`PROCESS_OUT_OF_SCOPE`) | `analyst_scopes` existía desde Sprint 1, se guardaba y no la leía ninguna consulta: un analista de SST abría el catálogo y veía las 52 capacitaciones de toda la empresa. Se resuelve con un dato del usuario y no con un permiso nuevo por módulo (`catalog:read_all`/`read_scope`) porque el alcance no es una capacidad sino un ámbito: fundirlos obliga a duplicar cada permiso de lectura del producto y a mantenerlos sincronizados a mano. Sigue respetando la Decisión #19 —aquí no se mira el nombre del rol en ningún sitio—. El 404 en lectura evita confirmar que un id ajeno existe; el 403 en escritura sí explica, porque el proceso lo eligió quien llama en un desplegable que ya vio. Se cierra también MOVER: sin esa comprobación, el analista de SST cambiaba el proceso de su capacitación a PESV y le dejaba al de PESV un renglón que no pidió |
+| 55 | **Un plan aprobado admite AGREGAR jornadas, con justificación; lo que no admite es BORRAR.** En BORRADOR se agrega sin motivo; en APROBADO/EN EJECUCIÓN el motivo es obligatorio y el renglón nace ya materializado (proyectados congelados + obligaciones creadas); CERRADO no admite nada. Quitar un renglón sigue siendo solo de borrador: después se CANCELA | La Decisión #40 —"el plan aprobado no se edita"— tenía razón en la intención y era demasiado apretada en la práctica: si en agosto abren una regional, esa jornada tiene que entrar en el plan del año. Prohibirlo no evitaba el cambio, lo sacaba del sistema, que es justo lo que el plan existe para impedir. La distinción que importa es otra: AGREGAR no reescribe el pasado, BORRAR sí. Y el renglón nuevo obliga desde que entra, porque un renglón que no genera obligaciones es un adorno en una pantalla que nadie va a cumplir. La convocatoria puede entrar en borrador —el camino natural es crearla desde el propio plan— y al publicarla se sincroniza el `projected_snapshot` del renglón con el número que se acaba de congelar |
+| 56 | **Los proyectados de una convocatoria publicada se AJUSTAN con motivo obligatorio**, desde el propio plan (`POST /offerings/:id/adjust-projected`). Actualiza el número de la convocatoria Y el `projected_snapshot` de sus renglones no ejecutados en planes no cerrados. Pasa por la misma compuerta que publicar: quien no tiene `offerings:publish` lo propone | La regla de oro 3 siempre previó la válvula ("ajuste manual solo con justificación auditada") pero solo existía al publicar, y el caso real es posterior: se congelaron 45 y entraron siete personas en marzo, así que el 100% de cobertura sería mentira. Toca los dos números a propósito: corregir solo el de la convocatoria dejaría la ficha diciendo 52 y el indicador dividiendo por 45, que es peor que no corregir nada porque el error queda escondido. No toca lo EJECUTADO ni los planes CERRADOS: eso es historia (regla de oro 5) |
+| 57 | **ÁREA y PROCESO son cosas distintas y se quedan separadas; lo que se añade es que el proceso CUELGA de un área** (`processes.area_id`, ya en el modelo). El alcance se da sobre un área —y alcanza todos sus procesos, y los de sus subáreas— o sobre un proceso suelto | La duda era razonable porque los dos catálogos se parecen (Logística está en ambos), pero responden preguntas distintas: el **área** es dónde trabaja una PERSONA, el **proceso** es de qué trata una CAPACITACIÓN. Unificarlos rompe el caso más común: una formación de SARLAFT se le exige a comercial, cartera y logística a la vez, así que "SARLAFT" como área sería el par de personas que lo llevan, no su audiencia. Con la jerarquía se resuelve lo que preocupaba sin fusionar nada: la jefatura de SGI recibe alcance sobre el ÁREA SGI y ve SARLAFT, SST y PESV; el responsable de SARLAFT recibe alcance sobre ese PROCESO y no ve los otros, aunque compartan área |
+| 58 | **Lo que la pantalla ofrece se decide por PERMISO, no por rol** (`useCan` sobre los permisos efectivos del perfil). Esconder un botón NO es la seguridad —esa vive en los guards del servidor— sino decir la verdad | El AppShell ya pedía el perfil y se lo guardaba, así que las pantallas enseñaban todos los botones a todo el mundo: el Analista veía "Aprobar plan", un permiso (`plans:approve`) que su rol no tiene, y se enteraba al pulsarlo con un 403 seco. Ofrecer una acción prohibida es prometer algo que no se va a cumplir |
+| 59 | **A quién se le exige se decide en UN solo sitio: la pestaña Quiénes.** De la ficha de la actividad salen los cargos, servicios y regionales; queda solo la NORMA, que es clasificación para indicadores. Y los PROYECTADOS se derivan de quienes ya están obligados, no de un campo aparte | Había que elegir los cargos dos veces —en la ficha para que salieran los proyectados y en Quiénes para crear la obligación— y las dos listas se separaban en cuanto alguien tocaba una: el denominador de la cobertura dejaba de hablar de la misma gente que el numerador. Servicios y regionales de la ficha no decidían nada en absoluto, solo se guardaban. Derivando de las obligaciones, proyectado y obligado son la misma gente por construcción y no pueden discrepar. Los datos viejos NO se borran: el update es parcial y las tablas siguen ahí |
+| 60 | **Los criterios de una asignación se CRUZAN (Y); las personas sueltas se SUMAN (O).** "Auxiliares Y de Antioquia" alcanza solo a los auxiliares de Antioquia. Se reutiliza `buildAudienceWhere`, la misma función que resuelve las audiencias | `createManual` metía todo en un único `OR`, así que "cargo Auxiliar + regional Antioquia" obligaba a todos los auxiliares del país MÁS a todo el mundo de Antioquia. La formación le caía a cientos de personas que nadie quiso obligar, y quien la creó no tenía forma de notarlo hasta que llegaran las quejas. Las audiencias ya lo hacían bien con `match: ALL`: el arreglo es usar esa, no escribir una segunda (Decisión #37) |
+| 61 | **La persona tiene SERVICIO, opcional** (`users.service_id`), y es un criterio más de audiencia y de asignación. Quien no lo tenga puesto no entra por ese criterio: no se adivina | Sin él, "dirigido a almacenamiento" no tenía forma de resolverse a personas. Opcional porque hay clientes que no organizan así a su gente, y una columna obligatoria bloquearía su carga masiva entera por un dato que no usan: quien lo deje vacío simplemente no usa ese criterio y todo lo demás le funciona igual. Va también en la plantilla de carga masiva, junto a `fecha_nacimiento` |
 
 ---
 

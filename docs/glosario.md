@@ -90,6 +90,31 @@ aprobada.
 copia las lecciones a copias inmutables). "Editar" una version publicada en realidad crea la
 version siguiente en borrador, sin tocar la anterior.
 
+**Cuidado con lo que publicar NO hace:** publicar la version 2 no cambia lo que esta entregando
+una convocatoria ya abierta. La convocatoria avisa que hay una version mas nueva y hay que
+**actualizarla a proposito**, porque eso mueve a gente ya citada. Ver *Politica de migracion*.
+
+### Politica de migracion
+**Que es:** la respuesta a *"cuando salga la version nueva, ¿que pasa con los que ya estaban?"*.
+Se elige al **publicar** la version, y se aplica despues, cuando alguien actualiza una
+convocatoria a esa version.
+
+**Las tres opciones:**
+- **Terminan en la anterior** — nadie de los ya inscritos se mueve; la version nueva la ven solo
+  quienes se inscriban despues.
+- **Pasan los que no han empezado** (la de siempre) — quien va a mitad termina con el contenido
+  que ya conocia; quien no ha abierto nada arranca con el nuevo.
+- **Todos vuelven a empezar** — el contenido cambio lo suficiente como para que lo anterior no
+  sirva.
+
+**Lo que ninguna opcion hace, nunca:** tocar una formacion que la persona ya **cerro** (completada,
+aprobada, reprobada, retirada o vencida). Eso es evidencia: dice lo que dijo y no cambia. Y a
+quien se mueve no se le borra el avance viejo: deja de contar, pero sigue registrado.
+
+**Por que se decide al publicar y no al actualizar:** quien publica la version sabe **cuanto
+cambio el contenido**, que es lo unico que responde la pregunta. Quien actualiza una convocatoria
+tres semanas despues, no.
+
 ### Leccion
 **Que es:** una pila de 5 a 15 **tarjetas** que se pasan como historias de Instagram. Es la unidad
 de contenido del producto y dura menos de 5 minutos.
@@ -105,6 +130,38 @@ refuerzo, tarjeta de dos caras, encuesta rapida, y completar la palabra faltante
 
 **Ejemplo:** la leccion "Bienvenida a Transprensa" tiene 8 tarjetas: saludo, mision, una tarjeta
 de dos caras con "que significa PESV", un video de 60 segundos del gerente, y un quiz de refuerzo.
+
+### Presentacion
+**Que es:** una presentacion (PDF, PPT, PPTX u ODP) que al subirla se **convierte en una imagen
+por diapositiva** y se reproduce dentro del producto, una diapositiva a la vez.
+
+**Por que no se sirve el archivo tal cual:** porque un PDF metido en un visor no dice nada. La
+persona hace scroll y la plataforma no sabe si lo leyo, cuanto tiempo estuvo ni hasta donde llego;
+lo unico honesto que se puede registrar es que confirmo haberlo abierto. Convertida en
+diapositivas se puede registrar **cual vio y cuanto tiempo**, y eso es lo que la vuelve evidencia.
+De paso se ve igual en cualquier telefono, sin depender del Office de nadie.
+
+**Que NO es:**
+- No es un **documento**. Un documento se consulta y se declara leido; una presentacion se
+  recorre y se mide. Son dos tipos de contenido distintos, a proposito.
+- No es una **leccion**. Una leccion se escribe en tarjetas, con quiz de refuerzo y encuestas
+  dentro. Una presentacion es material que llego hecho de fuera.
+
+**Para que existe:** el caso real es la ARL que manda su presentacion el dia antes de la
+capacitacion. Pedirle al administrador que la rehaga a tarjetas no va a pasar, y subirla y llamar
+a eso un curso es justo lo que este producto no hace. Convertirla es el punto medio: entra tal
+como llego y sale medible.
+
+**Que se pierde al convertir, y se avisa al subir:** animaciones, videos incrustados e
+hipervinculos. El original se guarda igual —es el documento que entrego el proveedor y una
+auditoria puede pedirlo tal cual—, pero lo que se reproduce son siempre las diapositivas.
+
+**Cuando se da por vista:** cuando se vieron **todas**. A diferencia de un video, aqui no hay
+barra que arrastrar —cada diapositiva se pasa a mano—, asi que un umbral por debajo del 100% no
+significaria nada. El tiempo minimo, si la formacion lo exige, se pide igual.
+
+**Como se llama:** "Presentacion"; en la base es un `activity_contents.type = PRESENTATION` con un
+`content_packages.kind = PRESENTATION` cuyo `manifest` lista las diapositivas.
 
 ### Evaluacion (examen)
 **Que es:** el instrumento que mide si la persona aprendio. Toma preguntas del banco y las sirve
@@ -152,6 +209,12 @@ convocatoria de marzo en Cali y la de agosto en Bogota, sin duplicar el contenid
 - **Evento** (presencial): tiene fecha, instructor y lista de asistencia.
 - **Permanente** (virtual autoservicio): sin fecha; cada quien la hace cuando puede.
 - **Hibrida**: exige cumplir la parte presencial **y** la virtual.
+
+**Cuelga de una version, y ahi se queda hasta que alguien la mueva:** si se publica una version
+nueva de la formacion, la convocatoria sigue entregando la que tenia y lo **avisa en pantalla**.
+Actualizarla es un acto aparte que muestra a cuantos inscritos afecta antes de hacerlo, porque
+cambiarle el contenido a gente ya citada no puede ser un efecto colateral. Ver *Politica de
+migracion*.
 
 ### Asignacion
 **Que es:** la **obligacion** de una persona de realizar algo, con su fecha limite. Existe aunque
