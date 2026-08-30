@@ -638,7 +638,7 @@ export default function UsuariosPage() {
                           value={scopeProcessIds}
                           onChange={setScopeProcessIds}
                         />
-                        <p className="mt-1 text-xs text-ink-500">Solo estos, cuelguen de donde cuelguen.</p>
+                        <p className="mt-1 text-xs text-ink-500">Solo aplica gestion en estos procesos.</p>
                       </div>
 
                       {/*
