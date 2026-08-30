@@ -8,7 +8,6 @@ import {
   listCatalog,
   listPermissions,
   listRoles,
-  setAnalystScopes,
   setUserOverrides,
   type CatalogRow,
   type PermissionRow,
@@ -139,14 +138,6 @@ export function UserPermissionsDrawer({
         (scope.size > 0 ? (scope.size === 1 ? '1 proceso' : scope.size + ' procesos') : '') +
         '. El resto del catalogo, las convocatorias y el plan no existen para esta persona.';
 
-  const toggle = (set: (updater: (previous: Set<string>) => Set<string>) => void, id: string) =>
-    set((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
   /** De que area cuelga el proceso, para que el chip diga a que familia pertenece. */
   const areaNameOf = (process: CatalogRow) =>
     process.areaId ? areas.find((area) => area.id === process.areaId)?.name : undefined;
@@ -164,14 +155,15 @@ export function UserPermissionsDrawer({
     if (!user) return;
     setSaving(true);
     try {
-      // Las dos cosas se guardan juntas porque se decidieron juntas: si el alcance fallara
-      // despues de haber guardado los permisos, la persona quedaria con capacidades nuevas
-      // sobre la empresa entera, que es justo el error que este cajon existe para evitar.
+      // UN DATO, UN EDITOR. Este cajon guarda EXCEPCIONES de permiso y nada mas: el alcance se
+      // edita en la ficha de la persona, donde ya se marcan areas y procesos igual que aqui.
+      // Tenerlo en dos sitios costo un fallo real —la ficha asumia que un alcance de area era
+      // siempre la propia area y lo reescribia al guardar cualquier cosa— y la unica cura de
+      // verdad para eso no es sincronizar mejor: es que solo una pantalla escriba.
       await setUserOverrides(
         user.id,
         Object.entries(states).map(([permissionCode, state]) => ({ permissionCode, granted: state === 'granted' })),
       );
-      await setAnalystScopes(user.id, { processIds: [...scope], areaIds: [...scopeAreas] });
       onOpenChange(false);
       showToast({
         kind: 'success',
@@ -222,55 +214,53 @@ export function UserPermissionsDrawer({
             </div>
 
             {/*
-              DOS FORMAS DE DARLO, y la diferencia es la que pidio el negocio (Decision #57):
-              por AREA para una jefatura que necesita ver como va todo lo suyo, por PROCESO para
-              quien responde por uno solo. SARLAFT y SST cuelgan los dos de SGI y siguen siendo
-              cosas distintas: el de SARLAFT no ve SST, y la jefatura de SGI ve los dos.
+              RESUMEN, NO EDITOR. El alcance se ve aqui porque cambia el significado de todos los
+              permisos de abajo —"puede publicar" no dice lo mismo si solo alcanza a un proceso—,
+              pero se EDITA en la ficha: Editar persona → Gestiona, donde se marcan areas y
+              procesos con las mismas dos listas. Dos editores del mismo dato es lo que produjo el
+              fallo del 2026-08-30, y sincronizarlos mejor no lo cura: lo cura que escriba uno.
             */}
-            <p className="mt-3 text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Por area</p>
-            <p className="mt-0.5 text-xs text-ink-500">
-              Alcanza TODOS los procesos que cuelgan de esa area, y de las areas que cuelgan de ella. Es lo que se le da
-              a una jefatura.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {areas.map((area) => (
-                <ScopeChip
-                  key={area.id}
-                  label={area.name}
-                  on={scopeAreas.has(area.id)}
-                  onToggle={() => toggle(setScopeAreas, area.id)}
-                />
-              ))}
-            </div>
-
-            <p className="mt-4 text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Por proceso</p>
-            <p className="mt-0.5 text-xs text-ink-500">
-              Solo ese proceso. Es lo que se le da a quien responde por uno —el de SARLAFT no tiene por que ver SST—.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {processes.map((process) => (
-                <ScopeChip
-                  key={process.id}
-                  label={process.name}
-                  on={scope.has(process.id)}
-                  onToggle={() => toggle(setScope, process.id)}
-                  hint={areaNameOf(process)}
-                />
-              ))}
-            </div>
-
-            {scope.size + scopeAreas.size > 0 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setScope(new Set());
-                  setScopeAreas(new Set());
-                }}
-                className="focus-ring mt-3 text-xs text-ink-500 underline underline-offset-2 hover:text-ink-700"
-              >
-                Quitar el alcance (que vuelva a ver todo)
-              </button>
+            {scopeAreas.size + scope.size > 0 ? (
+              <div className="mt-3 space-y-2">
+                {scopeAreas.size > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Areas completas</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {areas
+                        .filter((area) => scopeAreas.has(area.id))
+                        .map((area) => (
+                          <span key={area.id} className="rounded-full border border-primary bg-primary-soft px-3 py-1 text-xs font-medium text-ink-900">
+                            {area.name}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
+                {scope.size > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Procesos sueltos</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {processes
+                        .filter((process) => scope.has(process.id))
+                        .map((process) => (
+                          <span
+                            key={process.id}
+                            title={areaNameOf(process) ? `Area: ${areaNameOf(process)}` : undefined}
+                            className="rounded-full border border-primary bg-primary-soft px-3 py-1 text-xs font-medium text-ink-900"
+                          >
+                            {process.name}
+                            {areaNameOf(process) ? <span className="ml-1 font-normal text-ink-500">· {areaNameOf(process)}</span> : null}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
+
+            <p className="mt-3 text-xs text-ink-500">
+              Se cambia en <strong className="font-medium text-ink-700">Editar persona → Gestiona</strong>.
+            </p>
           </section>
 
           <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
@@ -354,33 +344,6 @@ export function UserPermissionsDrawer({
 }
 
 /** Un chip de alcance. Encendido = entra en el alcance; apagado = no. */
-function ScopeChip({
-  label,
-  on,
-  onToggle,
-  hint,
-}: {
-  label: string;
-  on: boolean;
-  onToggle: () => void;
-  hint?: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onToggle}
-      title={hint ? `Area: ${hint}` : undefined}
-      className={cn(
-        'focus-ring rounded-full border px-3 py-1.5 text-xs transition-colors duration-150',
-        on ? 'border-primary bg-primary-soft font-medium text-ink-900' : 'border-line text-ink-500 hover:text-ink-700',
-      )}
-    >
-      {label}
-      {hint ? <span className="ml-1 text-ink-400">· {hint}</span> : null}
-    </button>
-  );
-}
 
 function StateButton({
   active,

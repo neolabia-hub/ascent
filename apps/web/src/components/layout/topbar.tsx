@@ -21,7 +21,8 @@ import { listUsers } from '@/lib/admin-api';
 import { listActivities } from '@/lib/catalog-api';
 import { cn } from '@/components/ui/cn';
 import { CommandPalette, type Command } from './command-palette';
-import { KIND_LABEL, notificationKind } from '@/lib/notification-kind';
+import { useRouter } from 'next/navigation';
+import { KIND_LABEL, notificationHref, notificationKind } from '@/lib/notification-kind';
 import { SpaceSwitcher } from './space-switcher';
 
 /** Destinos del panel. Mismo buscador que el aprendiz, contenidos distintos. */
@@ -101,6 +102,7 @@ function KindChip({ eventType }: { eventType: string }) {
 }
 
 function NotificationsMenu() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<InboxItem[]>([]);
@@ -180,7 +182,20 @@ function NotificationsMenu() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => (item.readAt ? undefined : handleMarkRead(item.id))}
+                  /*
+                    PULSAR UN AVISO LLEVA A SU SITIO, y de paso lo marca leido. Antes solo lo
+                    marcaba: habia que leerlo, entenderlo y buscar a mano lo que nombraba. Si el
+                    aviso no tiene un destino honesto se queda como estaba —marcar y nada mas—,
+                    que es mejor que aterrizar en una lista donde hay que volver a buscar.
+                  */
+                  onClick={() => {
+                    if (!item.readAt) void handleMarkRead(item.id);
+                    const destino = notificationHref(item);
+                    if (destino) {
+                      setOpen(false);
+                      router.push(destino);
+                    }
+                  }}
                   className={cn(
                     'flex w-full flex-col gap-0.5 border-b border-line px-4 py-3 text-left transition-colors duration-150 last:border-b-0 hover:bg-paper',
                     !item.readAt && 'bg-info-soft',

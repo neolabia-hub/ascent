@@ -61,13 +61,13 @@ test.describe('Alcance del analista', () => {
     // GESTIONA: el alcance se da AQUI, al crear, sin tener que ir despues a otro cajon.
     // Solo sale porque el rol elegido concede permisos de gestion; con "Usuario" no aparece.
     await expect(page.getByText('Toda la empresa', { exact: true })).toBeVisible();
-    await page.getByRole('radio', { name: /Solo lo que le marques/ }).check();
+    await page.getByRole('radio', { name: /Solo estas areas y procesos/ }).check();
 
     // Al acotar, la pantalla SUGIERE su area marcandola. Este analista gestiona un proceso
     // suelto y nada de su area, asi que la sugerencia se quita: es una propuesta, no una
     // decision, y la prueba comprueba justo que se puede deshacer.
     await page.locator('#u-scope-areas').click();
-    await page.getByRole('listbox').getByRole('option', { name: 'Logistica', exact: true }).click();
+    await page.getByRole('listbox').getByRole('option', { name: /^Logistica/ }).click();
     await page.locator('#u-scope-areas').click();
     await expect(page.getByRole('listbox')).toHaveCount(0);
 
@@ -91,7 +91,10 @@ test.describe('Alcance del analista', () => {
     await page.getByRole('button', { name: `Permisos de Analista Alcance ${suffix}` }).click();
     const drawer = page.getByRole('dialog').filter({ hasText: 'Alcance' });
     await expect(drawer.getByText('Acotado a 1 proceso', { exact: false })).toBeVisible();
-    await expect(drawer.getByRole('button', { name: SUYO, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    // El cajon de permisos MUESTRA el alcance —cambia el significado de los permisos de abajo—
+    // pero ya NO lo edita: un dato, un editor. Se cambia en la ficha, y el cajon lo dice.
+    await expect(drawer.getByText(SUYO, { exact: false }).first()).toBeVisible();
+    await expect(drawer.getByText('Editar persona', { exact: false })).toBeVisible();
     await drawer.getByRole('button', { name: 'Cancelar' }).click();
 
     // --- Y ahora se entra COMO EL, que es lo unico que demuestra algo.

@@ -11,7 +11,7 @@ import { clearOfflineData } from '@/components/providers/service-worker-bridge';
 import { cn } from '@/components/ui/cn';
 import { StreakPill } from '@/components/ui/streak-pill';
 import { managesAnything } from '@/lib/landing';
-import { KIND_LABEL, notificationKind } from '@/lib/notification-kind';
+import { KIND_LABEL, notificationHref, notificationKind } from '@/lib/notification-kind';
 import { SpaceSwitcher } from './space-switcher';
 
 /**
@@ -117,23 +117,42 @@ function Notifications() {
             </p>
           ) : (
             <ul className="max-h-[60vh] overflow-y-auto">
-              {items.slice(0, 8).map((item) => (
-                <li key={item.id} className={cn('border-b border-line px-4 py-3 last:border-0', !item.readAt && 'bg-primary-soft/40')}>
-                  {/*
-                    DE QUE SOMBRERO ES el aviso. La bandeja es una sola —la persona tambien— pero
-                    "tienes una formacion nueva" y "alguien agoto sus intentos" no son la misma
-                    clase de cosa: una la haces tu, la otra es trabajo sobre otro.
-                  */}
-                  <div className="mb-1 flex items-center gap-2">
-                    <KindChip eventType={item.eventType} />
-                  </div>
-                  <p className="text-sm font-medium text-ink-900">{item.subject}</p>
-                  <p className="mt-0.5 line-clamp-2 text-sm text-ink-500">{item.body}</p>
-                  <p className="mt-1 text-xs text-ink-300">
-                    {new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
-                  </p>
-                </li>
-              ))}
+              {items.slice(0, 8).map((item) => {
+                const destino = notificationHref(item);
+                const contenido = (
+                  <>
+                    {/*
+                      DE QUE SOMBRERO ES el aviso. La bandeja es una sola —la persona tambien— pero
+                      "tienes una formacion nueva" y "alguien agoto sus intentos" no son la misma
+                      clase de cosa: una la haces tu, la otra es trabajo sobre otro.
+                    */}
+                    <div className="mb-1 flex items-center gap-2">
+                      <KindChip eventType={item.eventType} />
+                    </div>
+                    <p className="text-sm font-medium text-ink-900">{item.subject}</p>
+                    <p className="mt-0.5 line-clamp-2 text-sm text-ink-500">{item.body}</p>
+                    <p className="mt-1 text-xs text-ink-300">
+                      {new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </>
+                );
+                return (
+                  <li key={item.id} className={cn('border-b border-line last:border-0', !item.readAt && 'bg-primary-soft/40')}>
+                    {/*
+                      Aqui los avisos ni siquiera se podian pulsar: se leian y habia que ir a
+                      buscar a mano la formacion que nombraban. Ahora el que tiene destino LLEVA
+                      —y el que no, se queda como texto, que es honesto—.
+                    */}
+                    {destino ? (
+                      <Link href={destino} onClick={() => setOpen(false)} className="focus-ring block px-4 py-3 hover:bg-paper">
+                        {contenido}
+                      </Link>
+                    ) : (
+                      <div className="px-4 py-3">{contenido}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

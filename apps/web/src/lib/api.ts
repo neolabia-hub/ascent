@@ -168,6 +168,9 @@ export interface InboxItem {
   eventType: string;
   subject: string;
   body: string;
+  /** A que apunta el aviso. Es lo que permite que al pulsarlo lleve a alguna parte. */
+  referenceType: string | null;
+  referenceId: string | null;
   readAt: string | null;
   createdAt: string;
 }

@@ -139,7 +139,6 @@ export default function UsuariosPage() {
    */
   const MANAGING = ['catalog:manage_draft', 'offerings:manage', 'plans:manage', 'assignments:manage'];
   const roleManages = (rolePermissions[form.roleCode ?? ''] ?? []).some((code: string) => MANAGING.includes(code));
-  const selectedAreaName = areas.find((area) => area.id === form.areaId)?.name;
 
   /**
    * QUE VIENE MARCADO por defecto. Las tres opciones se ofrecen SIEMPRE —cualquier rol puede
@@ -499,7 +498,7 @@ export default function UsuariosPage() {
                 ))}
               </Select>
             </Field>
-            <Field htmlFor="u-area" label="Area" required>
+            <Field htmlFor="u-area" label="Area donde trabaja" required hint="De aqui salen las formaciones que le exigen a ELLA. No es lo que administra.">
               <Select id="u-area" value={form.areaId} onChange={(e) => setForm({ ...form, areaId: e.target.value })}>
                 <option value="">Seleccionar...</option>
                 {areas.map((a) => (
@@ -575,8 +574,8 @@ export default function UsuariosPage() {
                   <ScopeOption
                     checked={scopeKind === 'scoped'}
                     onSelect={acotar}
-                    title="Solo lo que le marques"
-                    description="Areas completas, procesos sueltos, o las dos cosas."
+                    title="Solo estas areas y procesos"
+                    description="Lo que ADMINISTRA. No tiene por que ser donde trabaja: se puede estar en Gestion Humana y llevar SARLAFT."
                   />
 
                   {scopeKind === 'scoped' ? (
@@ -588,19 +587,27 @@ export default function UsuariosPage() {
                         alcances "a medida" imposibles de editar desde la ficha.
                       */}
                       <div>
-                        <p className="mb-1.5 text-xs font-medium text-ink-700">
-                          Areas completas
-                          {selectedAreaName ? <span className="font-normal text-ink-500"> · la suya es {selectedAreaName}</span> : null}
-                        </p>
+                        <p className="mb-1.5 text-xs font-medium text-ink-700">Areas completas</p>
                         <MultiSelect
                           id="u-scope-areas"
                           placeholder="Ninguna area marcada"
-                          options={areas.map((row) => ({ id: row.id, label: row.name }))}
+                          /*
+                            SU area sale rotulada "(donde trabaja)". Sin eso, esta lista y el campo
+                            "Area" de arriba parecen el mismo dato y no lo son: arriba es DONDE
+                            TRABAJA —y de ahi salen las formaciones que le exigen a ella—; aqui es
+                            QUE ADMINISTRA. Marcar SGI no arrastra a Logistica: se toma solo lo
+                            marcado, ni mas ni menos.
+                          */
+                          options={areas.map((row) => ({
+                            id: row.id,
+                            label: row.id === form.areaId ? `${row.name} (donde trabaja)` : row.name,
+                          }))}
                           value={scopeAreaIds}
                           onChange={setScopeAreaIds}
                         />
                         <p className="mt-1 text-xs text-ink-500">
                           Ve todos los procesos que cuelguen de esas areas — tambien los que se creen manana.
+                          Se toma <strong>solo lo marcado</strong>: su area no entra sola.
                         </p>
                       </div>
 

@@ -413,8 +413,11 @@ export class AttemptsService {
         recipientEmail: target.email,
         subject: 'Alguien agoto los intentos de una evaluacion',
         body: `${person?.fullName ?? 'Un colaborador'} (${person?.area.name ?? 'sin area'}) agoto los ${maxAttempts} intentos de ${activity?.name ?? 'una formacion'}. Requiere refuerzo.`,
-        referenceType: 'enrollments',
-        referenceId: attempt.enrollmentId,
+        // Apunta a la FORMACION y no a la inscripcion: la referencia de un aviso existe para
+        // llevar a quien lo lee a donde puede hacer algo, y de una inscripcion ajena no hay
+        // pantalla. El rastro exacto (que inscripcion, que intento) queda en la auditoria.
+        referenceType: 'activities',
+        referenceId: attempt.enrollment.activityVersion.activityId,
       });
     }
     return true;

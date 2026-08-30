@@ -36,3 +36,40 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
   formacion: 'Tu formacion',
   gestion: 'Gestion',
 };
+
+/**
+ * A DONDE LLEVA CADA AVISO al pulsarlo.
+ *
+ * Un aviso que no lleva a ninguna parte obliga a leerlo, entenderlo y buscar a mano lo que
+ * nombra —y con "tienes una formacion nueva" eso son tres pantallas—. Aqui se traduce el par
+ * (evento, referencia) en un destino.
+ *
+ * Devuelve `null` cuando no hay un sitio honesto al que ir. Es mejor que un enlace que aterriza
+ * en una lista donde hay que volver a buscar: un enlace que no cumple ensena a no pulsarlos.
+ */
+export function notificationHref(item: {
+  eventType: string;
+  referenceType: string | null;
+  referenceId: string | null;
+}): string | null {
+  const { eventType, referenceType, referenceId } = item;
+
+  // Lo tuyo: si se sabe la inscripcion, directo al reproductor; si no, a tu formacion.
+  if (eventType === 'ENROLLED' && referenceType === 'enrollments' && referenceId) {
+    return `/aprender/${referenceId}`;
+  }
+  if (eventType === 'ASSIGNMENT_CREATED' || eventType === 'PLAN_ASSIGNMENTS_CREATED' || eventType === 'ENROLLED') {
+    return '/mi-formacion';
+  }
+
+  // Lo que tienes que resolver tu.
+  if (eventType === 'APPROVAL_REQUESTED') return '/aprobaciones';
+  if (eventType === 'OFFERING_PUBLISHED' && referenceType === 'offerings' && referenceId) {
+    return `/convocatorias/${referenceId}`;
+  }
+  if (eventType === 'ATTEMPTS_EXHAUSTED' && referenceType === 'activities' && referenceId) {
+    return `/contenido-formativo/${referenceId}`;
+  }
+
+  return null;
+}

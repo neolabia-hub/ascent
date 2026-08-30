@@ -135,10 +135,20 @@ mentir mostrando lo suyo bajo otro rotulo, ni confirmar que el otro existe.
 
 **Donde se configura, y por que en dos sitios.**
 
-| Pantalla | Para que |
+| Pantalla | Que hace |
 |---|---|
-| **Gestiona**, en el alta y la edicion de la persona | El momento en que se decide todo lo demas de esa persona. Dos opciones —toda la empresa, o solo lo que le marques— y dos listas: areas y procesos |
-| **Permisos** de la persona | El ajuste fino posterior, junto a las concesiones y revocaciones individuales |
+| **Gestiona**, en el alta y la edicion de la persona | **Lo ESCRIBE.** Dos opciones —toda la empresa, o solo estas areas y procesos— y dos listas marcables a la vez |
+| **Permisos** de la persona | **Solo lo MUESTRA**, porque cambia el significado de los permisos que hay debajo. Remite a la ficha para cambiarlo |
+
+**Un dato, un editor** (2026-08-30). Los dos lo escribian y por eso divergieron: la ficha asumia
+que un alcance de area era siempre "su propia area" y lo reescribia al guardar cualquier cosa. La
+cura no es sincronizar mejor las dos pantallas — es que escriba una.
+
+**Las DOS areas de la ficha no son la misma cosa**, y se leen sin preguntarlo: arriba, *Area donde
+trabaja* (`users.area_id`), de la que salen las formaciones que se le exigen a ELLA; abajo, en el
+alcance, las areas que ADMINISTRA — donde la suya, si aparece, sale rotulada "(donde trabaja)". Se
+toma **solo lo marcado**: marcar SGI no arrastra Logistica. Y no se obliga a incluir la suya, porque
+quien trabaja en Gestion Humana y lleva SARLAFT acabaria administrando todo Gestion Humana.
 
 Las dos escriben la MISMA tabla y **reemplazan el conjunto completo**. Que la simple no supiera
 representar todos los casos costo un fallo real: asumia que un alcance de area era siempre "su
