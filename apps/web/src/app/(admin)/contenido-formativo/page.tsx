@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Plus, Search } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import { listCatalog, type CatalogRow } from '@/lib/admin-api';
@@ -34,8 +34,41 @@ function versionState(versions: Array<{ status: string; versionNumber: number }>
   return { kind: 'neutral', label: 'SIN VERSION' };
 }
 
+/** Palabras que no distinguen nada y solo gastan sitio en un codigo. */
+const RELLENO = new Set(['DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y', 'EN', 'PARA', 'A', 'AL', 'CON', 'POR']);
+
+/**
+ * Codigo PROPUESTO a partir del nombre. Mayusculas, sin tildes, sin palabras de relleno.
+ *
+ *   "Manejo defensivo de vehiculos"   -> MANEJO_DEFENSIVO_VEHICULOS
+ *   "Sistema de Gestion Integral"     -> SISTEMA_GESTION_INTEGRAL
+ *
+ * Se quitan "de", "la", "para"... porque sin ellas caben las palabras que de verdad distinguen:
+ * antes "Sistema de Gestion Integral" salia SISTEMA_DE_GESTION y se comia justo la que importaba.
+ *
+ * Sigue siendo una PROPUESTA: si prefieres SGI, lo escribes y no se te vuelve a tocar. Y aqui se
+ * puede proponer porque el codigo de una formacion es solo una etiqueta para buscarla; los codigos
+ * de los CATALOGOS —areas, procesos, cargos— se escriben a mano a proposito: esos si son la clave
+ * con la que casa la carga masiva, y ahi el acierto no puede depender de una heuristica.
+ */
+function sugerirCodigo(nombre: string): string {
+  const palabras = nombre
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9s]/g, ' ')
+    .trim()
+    .split(/s+/)
+    .filter(Boolean);
+  const utiles = palabras.filter((palabra) => !RELLENO.has(palabra));
+  return (utiles.length > 0 ? utiles : palabras).slice(0, 3).join('_').slice(0, 40);
+}
+
 export default function ContenidoFormativoPage() {
   const router = useRouter();
+  const search = useSearchParams();
+  /** A donde volver cuando la capacitacion este lista. Lo pone quien manda aqui, p. ej. el plan. */
+  const volverA = search.get('volverA');
   const { showToast } = useToast();
 
   const [q, setQ] = useState('');
@@ -45,10 +78,11 @@ export default function ContenidoFormativoPage() {
   const [types, setTypes] = useState<CatalogRow[]>([]);
   const [processes, setProcesses] = useState<CatalogRow[]>([]);
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(search.get('nueva') === '1');
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({
+    codeTouched: false,
     code: '',
     name: '',
     description: '',
@@ -71,7 +105,15 @@ export default function ContenidoFormativoPage() {
 
   useEffect(() => {
     void listCatalog('activity-types').then((r) => setTypes(r.filter((t) => t.active)));
-    void listCatalog('processes').then((r) => setProcesses(r.filter((p) => p.active)));
+    void listCatalog('processes').then((rows) => {
+      const activos = rows.filter((row) => row.active);
+      setProcesses(activos);
+      // Si esta persona gestiona UN solo proceso, ese es el suyo y no hay nada que preguntar:
+      // se deja puesto. Con varios no se elige por ella, porque acertar la mitad de las veces es
+      // peor que no elegir: nadie revisa un campo que ya viene lleno.
+      const unico = activos.length === 1 ? activos[0] : null;
+      if (unico) setForm((previo) => ({ ...previo, processId: unico.id }));
+    });
   }, []);
 
   const create = async () => {
@@ -87,7 +129,13 @@ export default function ContenidoFormativoPage() {
         modality: form.modality,
       });
       showToast({ kind: 'success', title: 'Actividad creada', description: 'Se abrio su version 1 en borrador.' });
-      router.push(`/contenido-formativo/${activity.id}`);
+      // `volverA` se arrastra: quien vino del plan a crear la capacitacion tiene que poder
+      // regresar a el cuando la termine, sin acordarse de por donde entro.
+      router.push(
+        volverA
+          ? `/contenido-formativo/${activity.id}?volverA=${encodeURIComponent(volverA)}`
+          : `/contenido-formativo/${activity.id}`,
+      );
     } catch (error) {
       setFormError(
         error instanceof ApiError && error.code === 'DUPLICATE_CODE'
@@ -236,13 +284,27 @@ export default function ContenidoFormativoPage() {
             <Input
               id="a-code"
               value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase(), codeTouched: true })}
               placeholder="IND_GENERAL"
               maxLength={40}
             />
           </Field>
           <Field htmlFor="a-name" label="Nombre" required>
-            <Input id="a-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={200} />
+            <Input
+              id="a-name"
+              value={form.name}
+              onChange={(e) =>
+                setForm((previo) => ({
+                  ...previo,
+                  name: e.target.value,
+                  // El codigo se PROPONE desde el nombre y se deja editar. Escribirlo a mano era un
+                  // paso que nadie sabia como resolver ("¿que pongo aqui?") para un dato que casi
+                  // siempre es el nombre en mayusculas. Si ya lo tocaron, no se pisa.
+                  code: previo.codeTouched ? previo.code : sugerirCodigo(e.target.value),
+                }))
+              }
+              maxLength={200}
+            />
           </Field>
           <Field htmlFor="a-desc" label="Descripcion">
             <textarea

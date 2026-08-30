@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
+  createNextVersion,
   duplicateLesson,
   getLesson,
   saveLessonCards,
@@ -213,7 +214,15 @@ export default function LessonEditorPage() {
   const router = useRouter();
   // Cuando se llega desde una formacion, el editor sabe volver a ella: de otro modo el autor
   // acaba en la biblioteca de lecciones sin saber como regresar a lo que estaba armando.
-  const backTo = useSearchParams().get('volverA');
+  const search = useSearchParams();
+  const backTo = search.get('volverA');
+  /**
+   * De QUE formacion se vino. Sin esto, una leccion publicada solo podia ofrecer "duplicar", que
+   * crea una copia suelta en la biblioteca: el autor editaba algo que nadie iba a ver nunca y la
+   * pantalla no daba ninguna pista de que hacer despues. Sabiendo la formacion se puede ofrecer
+   * lo que de verdad resuelve su problema: crear la version siguiente.
+   */
+  const fromActivityId = search.get('formacion');
   const { showToast } = useToast();
 
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
@@ -296,14 +305,55 @@ export default function LessonEditorPage() {
     }
   };
 
-  const duplicateForEdit = async () => {
+  /**
+   * Copia SUELTA en la biblioteca. Sirve para arrancar una leccion nueva a partir de otra, y
+   * nada mas: la copia no pertenece a ninguna formacion. Por eso solo se ofrece cuando se llego
+   * a esta pantalla desde la biblioteca, y el rotulo lo dice.
+   */
+  const duplicateAsNew = async () => {
     if (!lesson) return;
     setDuplicating(true);
     try {
       const copy = await duplicateLesson(lesson.id);
-      showToast({ kind: 'success', title: 'Leccion duplicada para edicion' });
+      showToast({
+        kind: 'success',
+        title: 'Copia creada en la biblioteca',
+        description: 'Es una leccion nueva e independiente: la original no cambia.',
+      });
       router.push(`/lecciones/${copy.id}`);
     } catch (error) {
+      showToast({ kind: 'danger', title: apiErrorText(error) });
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  /**
+   * LO QUE DE VERDAD QUIERE quien llega aqui desde una formacion y se encuentra la leccion
+   * congelada: cambiar lo que la gente va a cursar. Eso no es duplicar una leccion, es crear la
+   * version siguiente de la FORMACION —que clona sus lecciones como editables— y editarla ahi.
+   *
+   * Se aterriza en la pestana de contenido de la formacion, no en la leccion clonada: la version
+   * nueva puede tener varias lecciones y quien la abre necesita ver cual es cual antes de entrar.
+   */
+  const newActivityVersion = async () => {
+    if (!fromActivityId) return;
+    setDuplicating(true);
+    try {
+      const draft = await createNextVersion(fromActivityId);
+      showToast({
+        kind: 'success',
+        title: `Version ${draft.versionNumber} creada en borrador`,
+        description: 'Sus lecciones ya son editables. La version publicada no se toco.',
+      });
+      router.push(`/contenido-formativo/${fromActivityId}?tab=contenido`);
+    } catch (error) {
+      // Ya habia un borrador: no es un fallo, es que el trabajo estaba empezado. Se lleva alli.
+      if (error instanceof ApiError && error.code === 'DRAFT_ALREADY_EXISTS') {
+        showToast({ kind: 'info', title: 'Ya habia una version en borrador', description: 'Te llevamos a ella.' });
+        router.push(`/contenido-formativo/${fromActivityId}?tab=contenido`);
+        return;
+      }
       showToast({ kind: 'danger', title: apiErrorText(error) });
     } finally {
       setDuplicating(false);
@@ -415,10 +465,17 @@ export default function LessonEditorPage() {
         </div>
         <div className="flex shrink-0 gap-2">
           {isPublished ? (
-            <Button onClick={() => void duplicateForEdit()} loading={duplicating}>
-              <Copy size={16} />
-              Duplicar para editar
-            </Button>
+            fromActivityId ? (
+              <Button onClick={() => void newActivityVersion()} loading={duplicating}>
+                <Plus size={16} />
+                Crear version nueva para editar
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => void duplicateAsNew()} loading={duplicating}>
+                <Copy size={16} />
+                Duplicar como leccion nueva
+              </Button>
+            )
           ) : (
             <>
               <Button variant="ghost" onClick={discard} disabled={!dirty}>
@@ -433,12 +490,37 @@ export default function LessonEditorPage() {
         </div>
       </div>
 
+      {/*
+        SE DICE QUE HACER, no solo que no se puede. El aviso anterior mandaba a "duplicar", que
+        crea una copia suelta en la biblioteca: el autor editaba algo que ninguna formacion usa y
+        se quedaba esperando un boton de publicar que nunca iba a aparecer.
+      */}
       {isPublished ? (
         <div className="mb-4 flex items-start gap-3 rounded-md bg-warn-soft px-4 py-3">
           <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-warn" strokeWidth={1.75} />
-          <p className="text-sm text-warn">
-            Esta leccion pertenece a una version publicada y es inmutable. Duplicala para editarla.
-          </p>
+          <div className="text-sm text-warn">
+            <p className="font-medium">Esta leccion esta publicada y ya no se puede cambiar.</p>
+            {fromActivityId ? (
+              <p className="mt-1">
+                Es lo que congela la evidencia: quien la curso tiene que poder ver siempre lo mismo. Para cambiar el
+                contenido, crea la version siguiente de la formacion —sus lecciones nacen editables— y publicala cuando
+                este lista.
+              </p>
+            ) : (
+              <p className="mt-1">
+                Llegaste desde la biblioteca. Aqui solo puedes sacar una copia independiente; para cambiar lo que cursa
+                la gente, entra a la formacion que la usa y crea su version siguiente.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Y en el borrador se dice el paso que falta: guardar no publica nada. */}
+      {!isPublished && backTo ? (
+        <div className="mb-4 rounded-md bg-info-soft px-4 py-3 text-sm text-info">
+          Estas editando un borrador: los cambios se guardan aqui, pero nadie los vera hasta que{' '}
+          <strong>publiques la version</strong> desde la formacion.
         </div>
       ) : null}
 

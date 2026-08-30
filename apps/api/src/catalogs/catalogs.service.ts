@@ -106,7 +106,16 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
   },
 
   processes: {
-    list: (prisma) => prisma.process.findMany({ orderBy: { displayOrder: 'asc' } }),
+    // El area viaja con el proceso: la pantalla la muestra en la tabla y el alcance por area
+    // se lee de ahi (Decision #57).
+    list: (prisma) =>
+      prisma.process.findMany({
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          area: { select: { id: true, name: true } },
+          responsible: { select: { id: true, fullName: true } },
+        },
+      }),
     findById: (prisma, id) => prisma.process.findUnique({ where: { id } }),
     create: async (prisma, tenantId, body) => {
       const data = processSchema.parse(body);

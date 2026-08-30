@@ -15,7 +15,33 @@ interface Section extends CatalogManagerProps {
 /** Los 8 catalogos parametrizables del tenant (CLAUDE.md 3.2), gobernados por configuracion. */
 const SECTIONS: Section[] = [
   { catalogKey: 'areas', label: 'Areas', singular: 'area', feminine: true, description: 'Unidades organizacionales a las que pertenecen las personas.' },
-  { catalogKey: 'processes', label: 'Procesos', singular: 'proceso', description: 'Sistemas de gestion que originan la formacion (SGI, SST, PESV, SARLAFT...).' },
+  {
+    catalogKey: 'processes',
+    label: 'Procesos',
+    singular: 'proceso',
+    description: 'Sistemas de gestion que originan la formacion (SGI, SST, PESV, SARLAFT...).',
+    /**
+     * De que AREA cuelga este proceso. No es decoracion: es lo que permite que la jefatura del
+     * area vea todos sus procesos mientras cada responsable ve solo el suyo (Decision #57).
+     * SARLAFT y SST pueden colgar los dos de SGI y seguir siendo cosas distintas, con responsables
+     * distintos, que es como funciona de verdad.
+     */
+    extraFields: [
+      {
+        key: 'areaId',
+        label: 'Area responsable',
+        kind: 'select',
+        optionsFrom: 'areas',
+        hint: 'Quien tenga alcance sobre esa area vera este proceso. Vacio = proceso suelto, solo se ve dandolo por su nombre.',
+      },
+      {
+        key: 'responsibleUserId',
+        label: 'Responsable',
+        kind: 'user',
+        hint: 'Quien responde por este proceso. No tiene por que ser el jefe del area: SARLAFT y SST cuelgan de la misma area y los llevan personas distintas.',
+      },
+    ],
+  },
   { catalogKey: 'job-title-types', label: 'Tipos de cargo', singular: 'tipo de cargo', description: 'Clasificacion gruesa de los cargos (administrativo, operativo, comercial).' },
   {
     catalogKey: 'job-titles',

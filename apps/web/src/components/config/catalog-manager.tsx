@@ -7,15 +7,18 @@ import {
   createCatalogRow,
   deleteCatalogRow,
   listCatalog,
+  listPickableUsers,
   updateCatalogRow,
   type CatalogKey,
   type CatalogRow,
+  type PickableUser,
 } from '@/lib/admin-api';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { PersonPicker } from '@/components/ui/person-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
@@ -23,9 +26,9 @@ import { useToast } from '@/components/ui/toast';
 
 /** Campo extra propio de un catalogo (ademas de code/name). */
 export interface ExtraField {
-  key: 'jobTitleTypeId' | 'annualHoursRequired' | 'colorHex';
+  key: 'jobTitleTypeId' | 'annualHoursRequired' | 'colorHex' | 'areaId' | 'responsibleUserId';
   label: string;
-  kind: 'select' | 'number' | 'color';
+  kind: 'select' | 'number' | 'color' | 'user';
   /** Para kind=select: catalogo del que salen las opciones. */
   optionsFrom?: CatalogKey;
   hint?: string;
@@ -41,15 +44,20 @@ export interface CatalogManagerProps {
   extraFields?: ExtraField[];
 }
 
+/**
+ * Los campos extra se guardan POR CLAVE y no cada uno con su propiedad.
+ *
+ * Antes el unico `select` posible escribia siempre en `jobTitleTypeId`, asi que el segundo
+ * catalogo que quiso uno —el area responsable de un proceso— guardaba en el campo del primero:
+ * elegias un area y se iba al tipo de cargo. El mecanismo decia ser generico y no lo era.
+ */
 interface FormState {
   code: string;
   name: string;
-  jobTitleTypeId: string;
-  annualHoursRequired: string;
-  colorHex: string;
+  extra: Record<string, string>;
 }
 
-const EMPTY_FORM: FormState = { code: '', name: '', jobTitleTypeId: '', annualHoursRequired: '', colorHex: '' };
+const EMPTY_FORM: FormState = { code: '', name: '', extra: {} };
 
 const ERROR_MESSAGES: Record<string, string> = {
   DUPLICATE_CODE: 'Ya existe un registro con ese codigo.',
@@ -75,6 +83,7 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogRow | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [people, setPeople] = useState<PickableUser[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CatalogRow | null>(null);
@@ -99,6 +108,9 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
   // Opciones de los selects de campos extra (p. ej. tipos de cargo para el catalogo de cargos).
   useEffect(() => {
     for (const field of extraFields) {
+      if (field.kind === 'user') {
+        void listPickableUsers().then(setPeople).catch(() => undefined);
+      }
       if (field.kind === 'select' && field.optionsFrom) {
         void listCatalog(field.optionsFrom).then((data) =>
           setOptions((prev) => ({ ...prev, [field.key]: data.filter((o) => o.active) })),
@@ -121,9 +133,13 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
     setForm({
       code: row.code,
       name: row.name,
-      jobTitleTypeId: row.jobTitleTypeId ?? '',
-      annualHoursRequired: row.annualHoursRequired ? String(row.annualHoursRequired) : '',
-      colorHex: row.colorHex ?? '',
+      extra: {
+        jobTitleTypeId: row.jobTitleTypeId ?? '',
+        areaId: row.areaId ?? '',
+        responsibleUserId: row.responsibleUserId ?? '',
+        annualHoursRequired: row.annualHoursRequired ? String(row.annualHoursRequired) : '',
+        colorHex: row.colorHex ?? '',
+      },
     });
     setFormError(null);
     setDrawerOpen(true);
@@ -133,11 +149,15 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
     const body: Record<string, unknown> = { name: form.name.trim() };
     if (!editing) body.code = form.code.trim().toUpperCase();
     for (const field of extraFields) {
-      if (field.key === 'jobTitleTypeId' && form.jobTitleTypeId) body.jobTitleTypeId = form.jobTitleTypeId;
-      if (field.key === 'annualHoursRequired') {
-        body.annualHoursRequired = form.annualHoursRequired ? Number(form.annualHoursRequired) : null;
+      const valor = form.extra[field.key] ?? '';
+      if (field.kind === 'number') {
+        body[field.key] = valor ? Number(valor) : null;
+      } else if (field.required) {
+        if (valor) body[field.key] = valor;
+      } else {
+        // Vacio significa "ninguno", y hay que mandarlo: es como se QUITA un area responsable.
+        body[field.key] = valor || null;
       }
-      if (field.key === 'colorHex' && form.colorHex) body.colorHex = form.colorHex;
     }
     return body;
   };
@@ -228,7 +248,21 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                   <Td className="text-ink-500">
                     {extraColumn.key === 'jobTitleTypeId'
                       ? (row.jobTitleType?.name ?? '—')
-                      : (row.annualHoursRequired ?? '—')}
+                      : extraColumn.key === 'areaId'
+                        ? (row.area?.name ?? '—')
+                        : extraColumn.key === 'responsibleUserId'
+                          ? (row.responsible?.fullName ?? (
+                              // Un hueco que se puede llenar de un clic no es una advertencia: es
+                              // una tarea. Se ofrece hacerla en vez de pintar el problema de ambar.
+                              <button
+                                type="button"
+                                onClick={() => openEdit(row)}
+                                className="focus-ring rounded text-ink-500 underline decoration-dotted underline-offset-4 hover:text-ink-900"
+                              >
+                                Asignar
+                              </button>
+                            ))
+                          : (row.annualHoursRequired ?? '—')}
                   </Td>
                 ) : null}
                 <Td>
@@ -310,8 +344,8 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                 <Field key={field.key} htmlFor={`cat-${field.key}`} label={field.label} hint={field.hint} required={field.required}>
                   <Select
                     id={`cat-${field.key}`}
-                    value={form.jobTitleTypeId}
-                    onChange={(e) => setForm({ ...form, jobTitleTypeId: e.target.value })}
+                    value={form.extra[field.key] ?? ''}
+                    onChange={(e) => setForm({ ...form, extra: { ...form.extra, [field.key]: e.target.value } })}
                   >
                     <option value="">Seleccionar...</option>
                     {(options[field.key] ?? []).map((o) => (
@@ -323,6 +357,26 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                 </Field>
               );
             }
+            if (field.kind === 'user') {
+              return (
+                <Field key={field.key} htmlFor={`cat-${field.key}`} label={field.label} hint={field.hint}>
+                  {/*
+                    Se sugieren los del AREA que se acaba de elegir arriba en este mismo cajon, no
+                    los del registro guardado: si estas moviendo el proceso a otra area, los
+                    candidatos que quieres ver son los de la nueva.
+                  */}
+                  <PersonPicker
+                    id={`cat-${field.key}`}
+                    people={people}
+                    suggestedAreaId={form.extra.areaId || null}
+                    value={form.extra[field.key] || null}
+                    onChange={(personId) =>
+                      setForm({ ...form, extra: { ...form.extra, [field.key]: personId ?? '' } })
+                    }
+                  />
+                </Field>
+              );
+            }
             if (field.kind === 'number') {
               return (
                 <Field key={field.key} htmlFor={`cat-${field.key}`} label={field.label} hint={field.hint}>
@@ -331,8 +385,8 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                     type="number"
                     min={1}
                     max={200}
-                    value={form.annualHoursRequired}
-                    onChange={(e) => setForm({ ...form, annualHoursRequired: e.target.value })}
+                    value={form.extra[field.key] ?? ''}
+                    onChange={(e) => setForm({ ...form, extra: { ...form.extra, [field.key]: e.target.value } })}
                   />
                 </Field>
               );
@@ -342,8 +396,8 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                 <input
                   id={`cat-${field.key}`}
                   type="color"
-                  value={form.colorHex || '#1f3a5f'}
-                  onChange={(e) => setForm({ ...form, colorHex: e.target.value })}
+                  value={form.extra[field.key] || '#1f3a5f'}
+                  onChange={(e) => setForm({ ...form, extra: { ...form.extra, [field.key]: e.target.value } })}
                   className="h-10 w-16 cursor-pointer rounded-md border border-line bg-surface p-1"
                 />
               </Field>

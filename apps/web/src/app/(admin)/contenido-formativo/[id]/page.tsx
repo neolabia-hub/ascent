@@ -15,6 +15,7 @@ import {
   Lock,
   Package,
   Plus,
+  Presentation,
   Trash2,
   Users,
   Video,
@@ -32,12 +33,14 @@ import {
   type ActivityDetail,
   type ContentType,
   type MigrationPolicy,
+  type VersionContent,
   type VersionDetail,
 } from '@/lib/catalog-api';
 import { ActivityAudienceTab } from '@/components/modules/authoring/activity-audience-tab';
 import { ActivityInfoTab } from '@/components/modules/authoring/activity-info-tab';
 import { ActivityScheduleTab } from '@/components/modules/authoring/activity-schedule-tab';
 import { AddContentDrawer } from '@/components/modules/authoring/add-content-drawer';
+import { EditContentDrawer } from '@/components/modules/authoring/edit-content-drawer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
 import { Drawer } from '@/components/ui/drawer';
@@ -65,7 +68,8 @@ import { useToast } from '@/components/ui/toast';
 const CONTENT_META: Record<ContentType, { label: string; icon: typeof FileText }> = {
   LESSON: { label: 'Leccion en tarjetas', icon: Layers },
   VIDEO: { label: 'Video', icon: Video },
-  DOCUMENT: { label: 'Documento', icon: FileText },
+  PRESENTATION: { label: 'Presentacion', icon: Presentation },
+  DOCUMENT: { label: 'Documento de apoyo', icon: FileText },
   ASSESSMENT: { label: 'Evaluacion', icon: ClipboardCheck },
   SURVEY: { label: 'Encuesta', icon: ClipboardCheck },
   SCORM: { label: 'Paquete SCORM', icon: Package },
@@ -111,6 +115,7 @@ export default function ActividadDetallePage() {
   const [busy, setBusy] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<VersionContent | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [migrationPolicy, setMigrationPolicy] = useState<MigrationPolicy>('MOVE_NOT_STARTED');
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -297,12 +302,16 @@ export default function ActividadDetallePage() {
 
   return (
     <div>
+      {/*
+        Se vuelve por DONDE SE VINO. Quien llego aqui desde el plan a crear una capacitacion tiene
+        que poder regresar cuando la publique, sin acordarse de la ruta ni pasar por el listado.
+      */}
       <Link
-        href="/contenido-formativo"
+        href={searchParams.get('volverA') ?? '/contenido-formativo'}
         className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700"
       >
         <ArrowLeft size={14} />
-        Formaciones
+        {searchParams.get('volverA')?.startsWith('/plan') ? 'Volver al plan' : 'Formaciones'}
       </Link>
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -439,13 +448,27 @@ export default function ActividadDetallePage() {
                           {!content.isRequired ? ' · opcional' : ''}
                         </p>
                       </div>
+                      {/*
+                        EDITAR, para cualquier tipo. Antes solo la leccion tenia como abrirse: el
+                        video, el documento, el enlace y la evaluacion habia que BORRARLOS y
+                        volver a crearlos para corregir un titulo, y eso ademas les cambiaba el
+                        sitio en el orden.
+                      */}
+                      {isDraft ? (
+                        <Button variant="ghost" size="sm" onClick={() => setEditing(content)}>
+                          Editar
+                        </Button>
+                      ) : null}
                       {content.type === 'LESSON' && content.lessonId ? (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() =>
                             router.push(
-                              `/lecciones/${content.lessonId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}`,
+                              // `formacion` va aparte de `volverA`: con ella, una leccion ya
+                              // publicada puede ofrecer lo que resuelve el problema (crear la
+                              // version siguiente) en vez de una copia suelta en la biblioteca.
+                              `/lecciones/${content.lessonId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}&formacion=${activityId}`,
                             )
                           }
                         >
@@ -573,6 +596,13 @@ export default function ActividadDetallePage() {
           onAdded={refreshVersion}
         />
       ) : null}
+
+      <EditContentDrawer
+        content={editing}
+        open={editing !== null}
+        onOpenChange={(open) => { if (!open) setEditing(null); }}
+        onSaved={refreshVersion}
+      />
 
       <Drawer
         open={publishOpen}

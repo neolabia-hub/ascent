@@ -1,4 +1,5 @@
 import type { PermissionCode } from '@neo-pulse/shared';
+import type { AnalystScope } from './analyst-scope.js';
 
 /** Payload del access token (JWT RS256). */
 export interface JwtPayload {
@@ -16,4 +17,6 @@ export interface AuthUser {
   email: string;
   permissions: Set<PermissionCode>;
   hasPermission: (code: PermissionCode) => boolean;
+  /** Procesos que puede ver. `null` = todos (ver common/analyst-scope.ts). */
+  scopeProcessIds: AnalystScope;
 }

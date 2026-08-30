@@ -18,7 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: JwtPayload): Promise<AuthUser> {
     if (!payload?.sub || !payload?.tenantId) throw new UnauthorizedException();
-    const perms = await this.permissions.getEffectivePermissions(payload.sub, payload.tenantId);
+    const [perms, scopeProcessIds] = await Promise.all([
+      this.permissions.getEffectivePermissions(payload.sub, payload.tenantId),
+      this.permissions.getAnalystScope(payload.sub, payload.tenantId),
+    ]);
     return {
       id: payload.sub,
       tenantId: payload.tenantId,
@@ -26,6 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: payload.email,
       permissions: perms,
       hasPermission: (code) => perms.has(code),
+      scopeProcessIds,
     };
   }
 }

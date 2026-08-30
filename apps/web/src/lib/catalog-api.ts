@@ -8,7 +8,7 @@ import { apiFetch, getAccessToken } from './api';
 
 export type VersionStatus = 'DRAFT' | 'PUBLISHED' | 'RETIRED';
 export type Modality = 'PRESENCIAL' | 'VIRTUAL' | 'HIBRIDA';
-export type ContentType = 'LESSON' | 'VIDEO' | 'DOCUMENT' | 'ASSESSMENT' | 'SURVEY' | 'SCORM' | 'LINK';
+export type ContentType = 'LESSON' | 'VIDEO' | 'PRESENTATION' | 'DOCUMENT' | 'ASSESSMENT' | 'SURVEY' | 'SCORM' | 'LINK';
 export type MigrationPolicy = 'FINISH_OLD' | 'RESTART_NEW' | 'MOVE_NOT_STARTED';
 
 export interface VersionSummary {
@@ -63,6 +63,7 @@ export interface VersionContent {
   id: string;
   type: ContentType;
   title: string;
+  description: string | null;
   displayOrder: number;
   isRequired: boolean;
   config: Record<string, unknown>;
@@ -160,7 +161,7 @@ export function discardDraft(versionId: string) {
 
 export function addContent(
   versionId: string,
-  body: { type: ContentType; title: string; isRequired?: boolean; config?: Record<string, unknown>; lessonId?: string | null; contentPackageId?: string | null; assessmentVersionId?: string | null },
+  body: { type: ContentType; title: string; description?: string | null; isRequired?: boolean; config?: Record<string, unknown>; lessonId?: string | null; contentPackageId?: string | null; assessmentVersionId?: string | null },
 ) {
   return apiFetch<VersionContent>(`/activities/versions/${versionId}/contents`, { method: 'POST', body });
 }
@@ -445,6 +446,54 @@ export async function uploadMedia(file: File, kind = 'media'): Promise<UploadedP
     throw new Error(detail.code === 'UNSUPPORTED_FILE_TYPE' ? 'Tipo de archivo no permitido.' : (detail.title ?? 'Error al subir'));
   }
   return data as UploadedPackage;
+}
+
+/** Una diapositiva ya convertida: imagen propia, no una pagina de un archivo. */
+export interface SlideRef {
+  index: number;
+  key: string;
+  width: number;
+  height: number;
+}
+
+export interface PresentationManifest {
+  slides: SlideRef[];
+  convertedAt: string;
+}
+
+export interface UploadedPresentation extends UploadedPackage {
+  manifest: PresentationManifest;
+}
+
+/**
+ * Sube una presentacion. El servidor la CONVIERTE en una imagen por diapositiva antes de
+ * responder, asi que esta llamada tarda —de 5 a 30 segundos segun el tamano— y la pantalla tiene
+ * que decirlo. A cambio, lo que queda se reproduce y se mide como cualquier otra parte.
+ */
+export async function uploadPresentation(file: File): Promise<UploadedPresentation> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+  const form = new FormData();
+  form.append('file', file);
+  const token = getAccessToken();
+  const response = await fetch(`${apiUrl}/v1/media/presentation`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  const data: unknown = await response.json();
+  if (!response.ok) {
+    // El mensaje del servidor ya explica que hacer (exportar a PDF, partir la presentacion): se
+    // pasa tal cual en vez de sustituirlo por uno generico.
+    const detail = (data ?? {}) as { title?: string; message?: string };
+    throw new Error(detail.message ?? detail.title ?? 'No se pudo convertir la presentacion.');
+  }
+  return data as UploadedPresentation;
+}
+
+/** Si este servidor convierte PowerPoint o solo PDF. Se pregunta ANTES de ofrecer el campo. */
+export function presentationCapabilities(): Promise<{ office: boolean }> {
+  return apiFetch('/media/presentation/capabilities', { method: 'GET' });
 }
 
 /** URL para mostrar un medio ya subido (usa la clave de almacenamiento). */
