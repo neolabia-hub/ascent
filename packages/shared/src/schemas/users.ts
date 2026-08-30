@@ -20,8 +20,12 @@ export const createUserSchema = z.object({
   jobTitleId: z.string().uuid(),
   areaId: z.string().uuid(),
   regionalId: z.string().uuid().nullable().optional(),
+  /** Linea de servicio. Opcional: hay empresas que no organizan asi a su gente. */
+  serviceId: z.string().uuid().nullable().optional(),
   roleCode: z.enum(['ADMIN', 'ANALISTA', 'USUARIO']).default('USUARIO'),
   hiredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').nullable().optional(),
+  /** Opcional: hay empresas que no la piden al vincular. Nunca bloquea un alta. */
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').nullable().optional(),
   employmentType: employmentTypeSchema.default('DIRECTO'),
   roadActor: roadActorSchema.nullable().optional(),
   // Si no viene, el sistema GENERA una contrasena segura (cedula + caracteres) y la devuelve
@@ -64,7 +68,9 @@ export const IMPORT_HEADERS = [
   'cargo',
   'area',
   'regional',
+  'servicio',
   'fecha_ingreso',
+  'fecha_nacimiento',
   'vinculacion',
 ] as const;
 
@@ -76,6 +82,13 @@ export const importRowSchema = z.object({
   cargo: z.string().min(2).max(40), // code del catalogo job_titles
   area: z.string().min(2).max(40), // code del catalogo areas
   regional: z.string().max(40).optional().or(z.literal('')),
+  // Opcionales las dos: un cliente que no las maneje deja la columna vacia y su carga entra igual.
+  servicio: z.string().max(40).optional().or(z.literal('')),
+  fecha_nacimiento: z
+    .string()
+    .regex(/^d{4}-d{2}-d{2}$/)
+    .optional()
+    .or(z.literal('')),
   fecha_ingreso: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

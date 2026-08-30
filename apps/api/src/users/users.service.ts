@@ -25,6 +25,7 @@ const USER_SELECT = {
   emailKind: true,
   mustChangePassword: true,
   hiredAt: true,
+  birthDate: true,
   employmentType: true,
   roadActor: true,
   active: true,
@@ -33,6 +34,7 @@ const USER_SELECT = {
   jobTitle: { select: { id: true, code: true, name: true } },
   area: { select: { id: true, code: true, name: true } },
   regional: { select: { id: true, code: true, name: true } },
+  service: { select: { id: true, code: true, name: true } },
   role: { select: { id: true, code: true, name: true } },
 } satisfies Prisma.UserSelect;
 
@@ -43,6 +45,22 @@ export class UsersService {
     private readonly audit: AuditService,
     private readonly requirements: RequirementEngineService,
   ) {}
+
+  /** Lo minimo para poder elegir a una persona en un selector. Ver el controlador. */
+  async pickable() {
+    return this.prisma.scoped.user.findMany({
+      where: { deletedAt: null, active: true },
+      select: {
+        id: true,
+        fullName: true,
+        jobTitle: { select: { id: true, name: true } },
+        area: { select: { id: true, name: true } },
+        regional: { select: { id: true, name: true } },
+        service: { select: { id: true, name: true } },
+      },
+      orderBy: { fullName: 'asc' },
+    });
+  }
 
   async list(query: ListUsersQuery) {
     const where: Prisma.UserWhereInput = {
@@ -122,8 +140,10 @@ export class UsersService {
         jobTitleId: input.jobTitleId,
         areaId: input.areaId,
         regionalId: input.regionalId ?? null,
+        serviceId: input.serviceId ?? null,
         roleId: role.id,
         hiredAt: input.hiredAt ? new Date(`${input.hiredAt}T00:00:00-05:00`) : null,
+        birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00-05:00`) : null,
         employmentType: input.employmentType,
         roadActor: input.roadActor ?? null,
         createdBy: actor.id,
@@ -178,8 +198,11 @@ export class UsersService {
         jobTitleId: input.jobTitleId,
         areaId: input.areaId,
         regionalId: input.regionalId,
+        serviceId: input.serviceId,
         roleId,
         hiredAt: input.hiredAt === undefined ? undefined : input.hiredAt ? new Date(`${input.hiredAt}T00:00:00-05:00`) : null,
+        birthDate:
+          input.birthDate === undefined ? undefined : input.birthDate ? new Date(`${input.birthDate}T00:00:00-05:00`) : null,
         employmentType: input.employmentType,
         roadActor: input.roadActor,
         active: input.active,

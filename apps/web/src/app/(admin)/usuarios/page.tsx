@@ -6,7 +6,10 @@ import { ApiError } from '@/lib/api';
 import {
   createUser,
   downloadImportTemplate,
+  getUser,
   importUsers,
+  listRoles,
+  setAnalystScopes,
   listCatalog,
   listUsers,
   resetUserPassword,
@@ -18,7 +21,9 @@ import {
   type UsersPage,
 } from '@/lib/admin-api';
 import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/components/ui/cn';
 import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
@@ -65,6 +70,14 @@ export default function UsuariosPage() {
   const [areas, setAreas] = useState<CatalogRow[]>([]);
   const [jobTitles, setJobTitles] = useState<CatalogRow[]>([]);
   const [regionals, setRegionals] = useState<CatalogRow[]>([]);
+  const [services, setServices] = useState<CatalogRow[]>([]);
+  const [processes, setProcesses] = useState<CatalogRow[]>([]);
+  /** Permisos que concede cada rol: con ellos se decide si "Gestiona" tiene sentido. */
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+
+  /** Alcance de la persona que se esta creando o editando. Ver el campo "Gestiona". */
+  const [scopeKind, setScopeKind] = useState<'all' | 'area' | 'processes'>('all');
+  const [scopeProcessIds, setScopeProcessIds] = useState<string[]>([]);
 
   // Drawer crear/editar
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -100,11 +113,40 @@ export default function UsuariosPage() {
     void listCatalog('areas').then((r) => setAreas(r.filter((a) => a.active)));
     void listCatalog('job-titles').then((r) => setJobTitles(r.filter((a) => a.active)));
     void listCatalog('regionals').then((r) => setRegionals(r.filter((a) => a.active)));
+    void listCatalog('processes').then((r) => setProcesses(r.filter((a) => a.active)));
+    void listCatalog('services').then((r) => setServices(r.filter((a) => a.active)));
+    void listRoles()
+      .then((rows) => setRolePermissions(Object.fromEntries(rows.map((row) => [row.code, row.permissionCodes]))))
+      .catch(() => undefined);
   }, []);
+
+  /**
+   * ¿El rol elegido sirve para gestionar algo? Se mira lo que CONCEDE, nunca como se llama.
+   * Para quien solo tiene su propia formacion, "Gestiona" no significa nada y no se muestra.
+   */
+  const MANAGING = ['catalog:manage_draft', 'offerings:manage', 'plans:manage', 'assignments:manage'];
+  const roleManages = (rolePermissions[form.roleCode ?? ''] ?? []).some((code: string) => MANAGING.includes(code));
+  const selectedAreaName = areas.find((area) => area.id === form.areaId)?.name;
+
+  /**
+   * QUE VIENE MARCADO por defecto. Las tres opciones se ofrecen SIEMPRE —cualquier rol puede
+   * legitimamente tener cualquier alcance, y un cliente con un solo analista para toda la empresa
+   * es tan valido como uno con seis— pero lo que viene marcado sin tocar nada si cambia:
+   *
+   *   - un rol que administra la plataforma (`users:manage`) nace sin restriccion,
+   *   - cualquier otro rol que gestione nace acotado a su area.
+   *
+   * Otra vez por permiso y no por nombre: "Administrador" en un cliente puede llamarse "Lider de
+   * formacion" en el siguiente.
+   */
+  const defaultScopeFor = (roleCode: string | undefined): 'all' | 'area' =>
+    (rolePermissions[roleCode ?? ''] ?? []).includes('users:manage') ? 'all' : 'area';
 
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setScopeKind('all');
+    setScopeProcessIds([]);
     setFormError(null);
     setDrawerOpen(true);
   };
@@ -120,28 +162,56 @@ export default function UsuariosPage() {
       jobTitleId: user.jobTitle.id,
       areaId: user.area.id,
       regionalId: user.regional?.id ?? null,
+      serviceId: user.service?.id ?? null,
       roleCode: user.role.code as CreateUserBody['roleCode'],
       hiredAt: user.hiredAt ? user.hiredAt.slice(0, 10) : null,
+      birthDate: user.birthDate ? user.birthDate.slice(0, 10) : null,
       employmentType: user.employmentType,
     });
     setFormError(null);
     setDrawerOpen(true);
+
+    // El alcance vive en su propia tabla, asi que se pide aparte para poder mostrarlo tal como esta.
+    void getUser(user.id)
+      .then((detail) => {
+        const areaScope = detail.analystScopes.some((row) => row.area);
+        const processIds = detail.analystScopes
+          .map((row) => row.process?.id)
+          .filter((id): id is string => Boolean(id));
+        setScopeKind(areaScope ? 'area' : processIds.length > 0 ? 'processes' : 'all');
+        setScopeProcessIds(processIds);
+      })
+      .catch(() => {
+        setScopeKind('all');
+        setScopeProcessIds([]);
+      });
   };
 
   const save = async () => {
     setSaving(true);
     setFormError(null);
     try {
+      let userId: string;
       if (editing) {
         const { documentNumber: _doc, ...rest } = form;
         await updateUser(editing.id, rest);
+        userId = editing.id;
         showToast({ kind: 'success', title: 'Persona actualizada' });
       } else {
         const result = await createUser(form);
+        userId = result.user.id;
         if (result.generatedPassword) {
           setCredential({ name: form.fullName, document: form.documentNumber, password: result.generatedPassword });
         }
         showToast({ kind: 'success', title: 'Persona creada' });
+      }
+      // El alcance va DESPUES de crear a la persona porque necesita su id, y solo si el rol lo usa:
+      // mandarlo para un aprendiz escribiria filas que ninguna consulta va a mirar.
+      if (roleManages) {
+        await setAnalystScopes(userId, {
+          areaIds: scopeKind === 'area' && form.areaId ? [form.areaId] : [],
+          processIds: scopeKind === 'processes' ? scopeProcessIds : [],
+        });
       }
       setDrawerOpen(false);
       await load();
@@ -389,6 +459,14 @@ export default function UsuariosPage() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <Field htmlFor="u-service" label="Servicio" hint="Opcional. Permite dirigir formacion por linea de servicio.">
+              <Select id="u-service" value={form.serviceId ?? ''} onChange={(e) => setForm({ ...form, serviceId: e.target.value || null })}>
+                <option value="">Ninguno</option>
+                {services.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </Select>
+            </Field>
             <Field htmlFor="u-regional" label="Regional">
               <Select id="u-regional" value={form.regionalId ?? ''} onChange={(e) => setForm({ ...form, regionalId: e.target.value || null })}>
                 <option value="">Sin regional</option>
@@ -398,16 +476,91 @@ export default function UsuariosPage() {
               </Select>
             </Field>
             <Field htmlFor="u-role" label="Rol en la plataforma">
-              <Select id="u-role" value={form.roleCode} onChange={(e) => setForm({ ...form, roleCode: e.target.value as CreateUserBody['roleCode'] })}>
+              <Select
+                id="u-role"
+                value={form.roleCode}
+                onChange={(e) => {
+                  const roleCode = e.target.value as CreateUserBody['roleCode'];
+                  setForm({ ...form, roleCode });
+                  // Al cambiar de rol se propone el alcance habitual de ese rol, sin imponerlo:
+                  // sigue pudiendose elegir cualquiera de los tres.
+                  if (!editing) {
+                    setScopeKind(defaultScopeFor(roleCode));
+                  }
+                }}
+              >
                 <option value="USUARIO">Usuario</option>
                 <option value="ANALISTA">Analista</option>
                 <option value="ADMIN">Administrador</option>
               </Select>
             </Field>
           </div>
+
+            {/*
+              GESTIONA — el alcance, decidido donde se decide todo lo demas de la persona.
+              Estaba escondido en el cajon de permisos y habia que ir a buscarlo despues de crearla.
+
+              Tres opciones y no dos, porque "vacio = su area" rompia al administrador: hoy la regla
+              del servidor es "sin filas = ve todo", y es lo que lo mantiene sin restriccion.
+
+              Solo aparece si el ROL ELEGIDO concede algun permiso de gestion, y se mira el permiso,
+              nunca el nombre del rol (Decision #19): manana un cliente llama al suyo "Coordinador
+              HSE" y un `rol === 'ANALISTA'` deja de funcionar sin que nadie se entere.
+            */}
+            {roleManages ? (
+              <Field
+                htmlFor="u-scope"
+                label="Gestiona"
+                hint="Que parte del catalogo, las convocatorias y el plan puede ver y administrar."
+              >
+                <div className="space-y-2">
+                  <ScopeOption
+                    id="u-scope"
+                    checked={scopeKind === 'all'}
+                    onSelect={() => setScopeKind('all')}
+                    title="Toda la empresa"
+                    description="Sin restriccion. Es lo normal para un administrador."
+                  />
+                  <ScopeOption
+                    checked={scopeKind === 'area'}
+                    onSelect={() => setScopeKind('area')}
+                    title={selectedAreaName ? `Solo su area (${selectedAreaName})` : 'Solo su area'}
+                    description="Todos los procesos que cuelguen de esa area. Si manana entra uno nuevo, lo ve solo."
+                    disabled={!form.areaId}
+                    disabledHint="Elige primero el area."
+                  />
+                  <ScopeOption
+                    checked={scopeKind === 'processes'}
+                    onSelect={() => setScopeKind('processes')}
+                    title="Solo estos procesos"
+                    description="Exactamente los que marques, aunque trabaje en otra area."
+                  />
+                  {scopeKind === 'processes' ? (
+                    <div className="pl-6">
+                      <MultiSelect
+                        id="u-scope-processes"
+                        placeholder="Ningun proceso marcado"
+                        options={processes.map((row) => ({ id: row.id, label: row.name }))}
+                        value={scopeProcessIds}
+                        onChange={setScopeProcessIds}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </Field>
+            ) : null}
+
           <div className="grid grid-cols-2 gap-3">
             <Field htmlFor="u-hired" label="Fecha de ingreso" hint="Dispara la induccion previa al inicio.">
               <Input id="u-hired" type="date" value={form.hiredAt ?? ''} onChange={(e) => setForm({ ...form, hiredAt: e.target.value || null })} />
+            </Field>
+            <Field htmlFor="u-birth" label="Fecha de nacimiento" hint="Opcional. No afecta a ninguna obligacion.">
+              <Input
+                id="u-birth"
+                type="date"
+                value={form.birthDate ?? ''}
+                onChange={(e) => setForm({ ...form, birthDate: e.target.value || null })}
+              />
             </Field>
             <Field htmlFor="u-emp" label="Vinculacion">
               <Select id="u-emp" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>
@@ -464,7 +617,7 @@ export default function UsuariosPage() {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Importar personas"
-        description="Archivo CSV o XLSX con la plantilla. Las filas validas se crean aunque otras tengan errores."
+        description="Descarga la plantilla, llenala y subela. Las filas correctas se crean aunque otras fallen."
         footer={
           <div className="flex justify-end">
             <Button variant="ghost" onClick={() => setImportOpen(false)}>Cerrar</Button>
@@ -474,10 +627,10 @@ export default function UsuariosPage() {
         <div className="space-y-4">
           <Button variant="outline" onClick={() => void downloadImportTemplate()}>
             <Download size={16} />
-            Descargar plantilla
+            Descargar plantilla (Excel)
           </Button>
 
-          <Field htmlFor="import-file" label="Archivo" hint="CSV (separado por ; o ,) o XLSX. Maximo 2000 filas.">
+          <Field htmlFor="import-file" label="Archivo" hint="El Excel de la plantilla (.xlsx). Tambien se acepta .csv si lo prefieres.">
             <input
               id="import-file"
               type="file"
@@ -491,6 +644,31 @@ export default function UsuariosPage() {
               className="focus-ring block w-full cursor-pointer rounded-md border border-line bg-surface px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-paper file:px-3 file:py-1 file:text-sm"
             />
           </Field>
+
+          {/*
+            Lo que hay que saber ANTES de subir, no despues de que falle. Cada linea de aqui es una
+            llamada a soporte que no se hace.
+          */}
+          <div className="rounded-lg border border-line bg-paper p-4 text-sm text-ink-700">
+            <p className="font-medium text-ink-900">Como llenarla</p>
+            <ul className="mt-2 space-y-1.5 text-ink-500">
+              <li>
+                <strong className="text-ink-700">Obligatorias:</strong> documento, nombre_completo, correo, cargo y
+                area. El resto se puede dejar vacio.
+              </li>
+              <li>
+                En cargo, area, regional y servicio vale el <strong className="text-ink-700">nombre</strong> o el
+                codigo, como prefieras: "Logistica" y "LOGISTICA" funcionan igual.
+              </li>
+              <li>Las fechas van como AAAA-MM-DD, por ejemplo 2026-09-01.</li>
+              <li>No cambies los encabezados de la primera fila. Maximo 2000 filas.</li>
+              <li>
+                Si algo falla, se te dira <strong className="text-ink-700">la fila y la columna</strong> exactas; lo
+                demas entra igual.
+              </li>
+            </ul>
+            <p className="mt-2 text-xs text-ink-500">La plantilla trae estas mismas instrucciones en su segunda hoja.</p>
+          </div>
 
           {importing ? <Skeleton className="h-24 w-full" /> : null}
 
@@ -548,5 +726,54 @@ export default function UsuariosPage() {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Una opcion de alcance. Es un radio de verdad —no un boton que parece uno— para que el teclado y
+ * el lector de pantalla lo entiendan, y porque las tres opciones son excluyentes: quien gestiona su
+ * area no gestiona ademas "toda la empresa".
+ */
+function ScopeOption({
+  id,
+  checked,
+  onSelect,
+  title,
+  description,
+  disabled,
+  disabledHint,
+}: {
+  id?: string;
+  checked: boolean;
+  onSelect: () => void;
+  title: string;
+  description: string;
+  disabled?: boolean;
+  disabledHint?: string;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      title={disabled ? disabledHint : undefined}
+      className={cn(
+        'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors duration-150',
+        checked ? 'border-primary bg-primary-soft' : 'border-line hover:border-ink-300',
+        disabled && 'cursor-not-allowed opacity-50',
+      )}
+    >
+      <input
+        id={id}
+        type="radio"
+        name="u-scope"
+        className="focus-ring mt-0.5"
+        checked={checked}
+        disabled={disabled}
+        onChange={onSelect}
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-ink-900">{title}</span>
+        <span className="mt-0.5 block text-xs text-ink-500">{description}</span>
+      </span>
+    </label>
   );
 }

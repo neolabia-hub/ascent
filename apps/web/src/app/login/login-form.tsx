@@ -9,10 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
+/**
+ * NO_FOUND y UNREACHABLE son cosas distintas y hay que decirlas distinto.
+ *
+ * Antes cualquier fallo caia en "Empresa no encontrada": si la API estaba reiniciando, si se cayo
+ * el wifi un segundo o si devolvio un 500, la pantalla afirmaba que la empresa NO EXISTE y se
+ * quedaba ahi, sin salida y sin reintentar. Eso es mentir con seguridad sobre lo unico que la
+ * persona no puede comprobar, y desde fuera se ve como "la aplicacion no carga".
+ */
 type BrandingState =
   | { status: 'loading' }
   | { status: 'ready'; tenantSlug: string; branding: TenantBranding }
-  | { status: 'not_found' };
+  | { status: 'not_found' }
+  | { status: 'unreachable' };
 
 function applyBranding(branding: TenantBranding): void {
   document.documentElement.style.setProperty('--brand-primary', branding.primaryColor);
@@ -27,6 +36,8 @@ export function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [retry, setRetry] = useState(0);
+
   useEffect(() => {
     const tenantSlug = resolveTenantSlug(window.location.host, new URLSearchParams(window.location.search));
 
@@ -35,10 +46,13 @@ export function LoginForm() {
         applyBranding(tenant.branding);
         setBrandingState({ status: 'ready', tenantSlug, branding: tenant.branding });
       })
-      .catch(() => {
-        setBrandingState({ status: 'not_found' });
+      .catch((error: unknown) => {
+        // Solo un 404 significa que esa empresa no existe. Todo lo demas es que no se pudo
+        // preguntar, y entonces lo honesto es ofrecer reintentar en vez de dar un veredicto.
+        const notFound = error instanceof ApiError && error.status === 404;
+        setBrandingState({ status: notFound ? 'not_found' : 'unreachable' });
       });
-  }, []);
+  }, [retry]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,6 +107,27 @@ export function LoginForm() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper px-4">
         <p className="text-sm text-ink-700">Empresa no encontrada.</p>
+      </div>
+    );
+  }
+
+  if (brandingState.status === 'unreachable') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-paper px-4 text-center">
+        <div>
+          <p className="text-sm font-medium text-ink-900">No pudimos conectar con el servidor.</p>
+          <p className="mt-1 text-sm text-ink-500">
+            La empresa existe; lo que fallo fue la conexion. Comprueba tu red y vuelve a intentarlo.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            setBrandingState({ status: 'loading' });
+            setRetry((previous) => previous + 1);
+          }}
+        >
+          Reintentar
+        </Button>
       </div>
     );
   }

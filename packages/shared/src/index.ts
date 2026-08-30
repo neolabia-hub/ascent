@@ -107,16 +107,20 @@ export {
   updateOfferingSchema,
   listOfferingsQuerySchema,
   publishOfferingSchema,
+  adjustProjectedSchema,
   cancelOfferingSchema,
   enrollOfferingSchema,
+  migrateOfferingVersionSchema,
 } from './schemas/offerings.js';
 export type {
   CreateOfferingInput,
   UpdateOfferingInput,
   ListOfferingsQuery,
   PublishOfferingInput,
+  AdjustProjectedInput,
   CancelOfferingInput,
   EnrollOfferingInput,
+  MigrateOfferingVersionInput,
 } from './schemas/offerings.js';
 
 export {

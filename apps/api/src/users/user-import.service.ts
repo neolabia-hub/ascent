@@ -32,6 +32,32 @@ export interface ImportResult {
  * errores fila a fila y contrasena inicial generada (cedula + caracteres) devuelta UNA vez
  * para que el admin la distribuya. Todo queda en user_import_batches/rows para auditoria.
  */
+/**
+ * Clave de busqueda tolerante: sin tildes, sin espacios de sobra y en mayusculas.
+ *
+ * El Excel del cliente dice "Logística" y el catalogo guarda el codigo "LOGISTICA": exigirle el
+ * codigo obliga a explicar en la plantilla un concepto que no es suyo, y a que alguien traduzca
+ * 300 filas a mano. Con esto valen las dos cosas y nadie tiene que aprender nada.
+ */
+export function clave(valor: string): string {
+  return valor
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+/** Indice por CODIGO y por NOMBRE, para que el archivo pueda traer cualquiera de los dos. */
+export function indexar(filas: Array<{ id: string; code: string; name: string }>): Map<string, string> {
+  const indice = new Map<string, string>();
+  for (const fila of filas) {
+    indice.set(clave(fila.code), fila.id);
+    // El codigo manda: si un nombre choca con el codigo de otro, no se pisa.
+    if (!indice.has(clave(fila.name))) indice.set(clave(fila.name), fila.id);
+  }
+  return indice;
+}
+
 @Injectable()
 export class UserImportService {
   constructor(
@@ -41,19 +67,76 @@ export class UserImportService {
   ) {}
 
   /** Plantilla CSV descargable (encabezados exactos + una fila de ejemplo). */
-  buildTemplateCsv(): string {
-    const example = [
+  /**
+   * LA PLANTILLA, en XLSX y con sus instrucciones dentro.
+   *
+   * Se cambio de CSV a XLSX por una razon sola: el cliente no sabe fabricar un CSV, y el que
+   * fabrica Excel al "guardar como" sale con el separador de su region, con BOM o con las fechas
+   * traducidas. Un .xlsx se abre, se llena y se sube.
+   *
+   * Las instrucciones van en una SEGUNDA HOJA del propio archivo y no en un correo: el archivo es
+   * lo unico que seguro llega a quien lo llena.
+   */
+  async buildTemplateXlsx(): Promise<Buffer> {
+    const libro = new ExcelJS.Workbook();
+    libro.creator = 'NEO PULSE';
+
+    const hoja = libro.addWorksheet('Personas');
+    hoja.addRow([...IMPORT_HEADERS]);
+    hoja.getRow(1).font = { bold: true };
+    hoja.addRow([
       '1045876321',
       'Maria Fernanda Lopez',
       'maria.lopez@correo.com',
       '3001234567',
-      'AUX_BODEGA',
-      'LOGISTICA',
-      'ANTIOQUIA',
+      'Auxiliar de bodega',
+      'Logistica',
+      'Antioquia',
+      'Almacenamiento',
       '2026-09-01',
+      '1994-03-15',
       'DIRECTO',
+    ]);
+    for (const [indice] of IMPORT_HEADERS.entries()) {
+      hoja.getColumn(indice + 1).width = 22;
+    }
+
+    const ayuda = libro.addWorksheet('Instrucciones');
+    ayuda.getColumn(1).width = 22;
+    ayuda.getColumn(2).width = 14;
+    ayuda.getColumn(3).width = 80;
+    ayuda.addRow(['Columna', 'Obligatoria', 'Que poner']);
+    ayuda.getRow(1).font = { bold: true };
+
+    const filas: Array<[string, string, string]> = [
+      ['documento', 'SI', 'Cedula sin puntos ni espacios. Sera su usuario de ingreso. No puede repetirse.'],
+      ['nombre_completo', 'SI', 'Nombres y apellidos.'],
+      ['correo', 'SI', 'Personal o corporativo. No puede repetirse.'],
+      ['telefono', 'No', 'Celular. Se puede dejar vacio.'],
+      ['cargo', 'SI', 'El NOMBRE o el codigo del cargo, tal como esta en Configuracion. Sirven los dos.'],
+      ['area', 'SI', 'El NOMBRE o el codigo del area. Sirven los dos.'],
+      ['regional', 'No', 'Sede. Vacio si no aplica.'],
+      ['servicio', 'No', 'Linea de servicio (almacenamiento, masivo, paqueteo). Vacio si la empresa no la maneja.'],
+      ['fecha_ingreso', 'No', 'AAAA-MM-DD, por ejemplo 2026-09-01. Dispara la induccion previa al inicio.'],
+      ['fecha_nacimiento', 'No', 'AAAA-MM-DD. No afecta a ninguna obligacion.'],
+      ['vinculacion', 'No', 'DIRECTO, CONTRATISTA, TEMPORAL o EN_MISION. Vacio = DIRECTO.'],
     ];
-    return `${IMPORT_HEADERS.join(';')}\n${example.join(';')}\n`;
+    for (const fila of filas) ayuda.addRow(fila);
+
+    ayuda.addRow([]);
+    ayuda.addRow(['Reglas', '', '']);
+    ayuda.getRow(ayuda.rowCount).font = { bold: true };
+    for (const regla of [
+      'No cambies ni traduzcas los encabezados de la primera hoja: el sistema los busca por ese nombre exacto.',
+      'Maximo 2000 filas por archivo.',
+      'Las filas correctas SE CREAN aunque otras tengan errores: no se pierde el trabajo.',
+      'Al subirlo veras fila por fila que paso, y en las que fallen, que columna esta mal y por que.',
+      'La contrasena la genera el sistema y se muestra UNA vez: guardala en ese momento.',
+    ]) {
+      ayuda.addRow(['', '', regla]);
+    }
+
+    return Buffer.from(await libro.xlsx.writeBuffer());
   }
 
   async import(actor: AuthUser, filename: string, buffer: Buffer): Promise<ImportResult> {
@@ -62,17 +145,19 @@ export class UserImportService {
     if (rawRows.length === 0) throw new BadRequestException({ code: 'EMPTY_FILE' });
     if (rawRows.length > 2000) throw new BadRequestException({ code: 'TOO_MANY_ROWS', max: 2000 });
 
-    // Resolucion de catalogos por code, en un solo viaje.
-    const [jobTitles, areas, regionals, role] = await Promise.all([
-      this.prisma.scoped.jobTitle.findMany({ where: { active: true }, select: { id: true, code: true } }),
-      this.prisma.scoped.area.findMany({ where: { active: true }, select: { id: true, code: true } }),
-      this.prisma.scoped.regional.findMany({ where: { active: true }, select: { id: true, code: true } }),
+    // Resolucion de catalogos en un solo viaje, POR CODIGO O POR NOMBRE.
+    const [jobTitles, areas, regionals, services, role] = await Promise.all([
+      this.prisma.scoped.jobTitle.findMany({ where: { active: true }, select: { id: true, code: true, name: true } }),
+      this.prisma.scoped.area.findMany({ where: { active: true }, select: { id: true, code: true, name: true } }),
+      this.prisma.scoped.regional.findMany({ where: { active: true }, select: { id: true, code: true, name: true } }),
+      this.prisma.scoped.service.findMany({ where: { active: true }, select: { id: true, code: true, name: true } }),
       this.prisma.scoped.role.findFirst({ where: { code: 'USUARIO' }, select: { id: true } }),
     ]);
     if (!role) throw new NotFoundException({ code: 'ROLE_NOT_FOUND', role: 'USUARIO' });
-    const jobTitleByCode = new Map(jobTitles.map((j) => [j.code, j.id]));
-    const areaByCode = new Map(areas.map((a) => [a.code, a.id]));
-    const regionalByCode = new Map(regionals.map((r) => [r.code, r.id]));
+    const jobTitleByCode = indexar(jobTitles);
+    const areaByCode = indexar(areas);
+    const regionalByCode = indexar(regionals);
+    const serviceByCode = indexar(services);
 
     // Duplicados existentes en DB (un solo viaje) y duplicados internos del archivo.
     const documents = rawRows.map((r) => r.values.documento ?? '').filter(Boolean);
@@ -99,6 +184,7 @@ export class UserImportService {
         jobTitleByCode,
         areaByCode,
         regionalByCode,
+        serviceByCode,
         existingDocs,
         existingEmails,
         seenDocs,
@@ -153,6 +239,7 @@ export class UserImportService {
       jobTitleByCode: Map<string, string>;
       areaByCode: Map<string, string>;
       regionalByCode: Map<string, string>;
+      serviceByCode: Map<string, string>;
       existingDocs: Set<string>;
       existingEmails: Set<string>;
       seenDocs: Set<string>;
@@ -165,7 +252,8 @@ export class UserImportService {
     const parsed = importRowSchema.safeParse(values);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      return fail(`${issue?.path.join('.') ?? 'fila'}: ${issue?.message ?? 'invalida'}`);
+      const columna = issue?.path.join('.') ?? 'fila';
+      return fail(`Columna "${columna}": ${issue?.message ?? 'valor invalido'}`);
     }
     const row: ImportRowInput = parsed.data;
 
@@ -175,12 +263,14 @@ export class UserImportService {
     if (ctx.existingEmails.has(row.correo) || ctx.seenEmails.has(row.correo)) {
       return fail('Correo ya existe (en el sistema o repetido en el archivo)');
     }
-    const jobTitleId = ctx.jobTitleByCode.get(row.cargo);
-    if (!jobTitleId) return fail(`Cargo "${row.cargo}" no existe en el catalogo`);
-    const areaId = ctx.areaByCode.get(row.area);
-    if (!areaId) return fail(`Area "${row.area}" no existe en el catalogo`);
-    const regionalId = row.regional ? ctx.regionalByCode.get(row.regional) : null;
-    if (row.regional && !regionalId) return fail(`Regional "${row.regional}" no existe en el catalogo`);
+    const jobTitleId = ctx.jobTitleByCode.get(clave(row.cargo));
+    if (!jobTitleId) return fail(`Columna "cargo": "${row.cargo}" no esta en el catalogo de cargos`);
+    const areaId = ctx.areaByCode.get(clave(row.area));
+    if (!areaId) return fail(`Columna "area": "${row.area}" no esta en el catalogo de areas`);
+    const regionalId = row.regional ? ctx.regionalByCode.get(clave(row.regional)) : null;
+    if (row.regional && !regionalId) return fail(`Columna "regional": "${row.regional}" no esta en el catalogo de regionales`);
+    const serviceId = row.servicio ? ctx.serviceByCode.get(clave(row.servicio)) : null;
+    if (row.servicio && !serviceId) return fail(`Columna "servicio": "${row.servicio}" no esta en el catalogo de servicios`);
 
     const generatedPassword = generateInitialPassword(row.documento);
     let created: { id: string };
@@ -199,6 +289,8 @@ export class UserImportService {
           jobTitleId,
           areaId,
           regionalId,
+          serviceId,
+          birthDate: row.fecha_nacimiento ? new Date(`${row.fecha_nacimiento}T00:00:00-05:00`) : null,
           roleId: ctx.roleId,
           hiredAt: row.fecha_ingreso ? new Date(`${row.fecha_ingreso}T00:00:00-05:00`) : null,
           employmentType: row.vinculacion || 'DIRECTO',

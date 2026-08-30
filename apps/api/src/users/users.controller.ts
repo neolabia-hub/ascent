@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -40,12 +41,33 @@ export class UsersController {
     return this.users.list(listUsersQuerySchema.parse(query));
   }
 
+  /**
+   * LISTA PARA ELEGIR personas, que no es el directorio.
+   *
+   * Existe por dos razones. La primera, que quien asigna una formacion a personas concretas
+   * necesita verlas, y eso es `assignments:manage`, no `users:manage`: pedirle el directorio
+   * completo al Analista para que pueda marcar a tres conductores es darle de mas.
+   * La segunda, que un selector no necesita correo, documento ni rol —solo nombre y de que cargo
+   * es, para distinguir dos personas que se llaman parecido—, y lo que no se manda no se filtra.
+   *
+   * Sin paginar a proposito: un desplegable con "pagina 2" no es un desplegable.
+   */
+  @Get('pickable')
+  @RequirePermissions('assignments:manage')
+  pickable() {
+    return this.users.pickable();
+  }
+
+  /** La plantilla va en XLSX: el cliente abre, llena y sube. Un CSV se lo tendria que fabricar el. */
   @Get('import-template')
   @RequirePermissions('users:import')
-  @Header('Content-Type', 'text/csv; charset=utf-8')
-  @Header('Content-Disposition', 'attachment; filename="plantilla-usuarios.csv"')
-  importTemplate(): string {
-    return this.importer.buildTemplateCsv();
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="plantilla-usuarios.xlsx"')
+  async importTemplate(): Promise<StreamableFile> {
+    // StreamableFile y no el Buffer pelado: devolver un Buffer hace que Nest lo serialice como
+    // JSON ({"type":"Buffer","data":[...]}) y el .xlsx llega corrupto, con el tamano correcto
+    // y sin poder abrirse. Se ve solo al intentar abrirlo.
+    return new StreamableFile(await this.importer.buildTemplateXlsx());
   }
 
   @Get(':id')

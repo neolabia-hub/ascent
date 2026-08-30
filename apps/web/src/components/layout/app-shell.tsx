@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { getPublicTenant, me, refresh, setAccessToken, type MeResponse } from '@/lib/api';
 import { LEARNER_HOME, isLearnerOnly } from '@/lib/landing';
 import { resolveTenantSlug } from '@/lib/tenant';
+import { SessionProvider } from '@/components/providers/session-provider';
 import { TenantProvider, applyTenantBranding, type TenantContextValue } from '@/components/providers/tenant-provider';
 import { ToastProvider } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -136,17 +137,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TenantProvider value={session.tenant}>
-      <ToastProvider>
-        <div className="flex h-screen w-full overflow-hidden bg-paper">
-          <Sidebar userFullName={session.profile.fullName} />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Topbar breadcrumb={breadcrumbFromPathname(pathname)} userFullName={session.profile.fullName} />
-            <main className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-[1280px] px-8 py-8">{children}</div>
-            </main>
+      <SessionProvider value={session.profile}>
+        <ToastProvider>
+          <div className="flex h-screen w-full overflow-hidden bg-paper">
+            <Sidebar userFullName={session.profile.fullName} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <Topbar breadcrumb={breadcrumbFromPathname(pathname)} userFullName={session.profile.fullName} />
+              <main className="flex-1 overflow-y-auto">
+                <div className="mx-auto max-w-[1280px] px-8 py-8">{children}</div>
+              </main>
+            </div>
           </div>
-        </div>
-      </ToastProvider>
+        </ToastProvider>
+      </SessionProvider>
     </TenantProvider>
   );
 }
