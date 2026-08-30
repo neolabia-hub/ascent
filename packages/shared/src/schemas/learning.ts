@@ -16,6 +16,13 @@ export const progressSchema = z.object({
   secondsSpent: z.number().int().min(0).max(86400).default(0),
   /** Ultima tarjeta vista, para retomar donde se quedo. */
   lastCardIndex: z.number().int().min(0).max(100).optional(),
+  /**
+   * COMO se supo el porcentaje: lo MIDIO la plataforma (archivo propio, o YouTube con su
+   * reproductor respondiendo) o lo DECLARO la persona (un documento leido, un video embebido que
+   * no se puede medir). No cambia el calculo; cambia lo que se puede afirmar ante un auditor, y
+   * por eso viaja y se guarda (Decision #44).
+   */
+  evidence: z.enum(['MEASURED', 'DECLARED']).optional(),
 });
 export type ProgressInput = z.infer<typeof progressSchema>;
 

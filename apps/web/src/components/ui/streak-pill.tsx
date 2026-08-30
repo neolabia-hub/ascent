@@ -37,14 +37,20 @@ export function StreakPill({ days, onDark = false, className }: StreakPillProps)
     <span
       aria-label={days === 0 ? 'Sin racha activa' : label}
       className={cn(
-        'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold',
+        'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-transform duration-150 ease-pulse hover:scale-105',
         onDark ? 'bg-white/10 text-white' : 'bg-accent-soft text-ink-900',
         beating && 'animate-pulse-ring',
         className,
       )}
     >
+      {/*
+        La llama RESPIRA mientras hay racha viva; con la racha en cero se queda quieta y gris,
+        porque una llama animada sin racha promete algo que no existe. Es la unica animacion
+        permanente del producto y por eso es lenta: a 2,6 s no distrae de leer, y
+        `prefers-reduced-motion` la detiene.
+      */}
       <Flame
-        className="h-4 w-4"
+        className={cn('h-4 w-4', days > 0 && 'animate-breathe')}
         strokeWidth={1.75}
         style={{ color: days === 0 ? 'var(--ink-300)' : 'var(--brand-accent)' }}
         aria-hidden="true"

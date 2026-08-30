@@ -12,7 +12,7 @@
  */
 import { apiFetch } from './api';
 
-export type ContentType = 'LESSON' | 'VIDEO' | 'DOCUMENT' | 'ASSESSMENT' | 'SURVEY' | 'SCORM' | 'LINK';
+export type ContentType = 'LESSON' | 'VIDEO' | 'PRESENTATION' | 'DOCUMENT' | 'ASSESSMENT' | 'SURVEY' | 'SCORM' | 'LINK';
 export type EnrollmentStatus = 'ENROLLED' | 'IN_PROGRESS' | 'COMPLETED' | 'PASSED' | 'FAILED' | 'WITHDRAWN' | 'EXPIRED';
 export type ProgressStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type AttemptStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'GRADED' | 'EXPIRED';
@@ -98,6 +98,8 @@ export interface EnrollmentContent {
   id: string;
   type: ContentType;
   title: string;
+  /** De que va ESTA parte. La escribe quien arma la formacion; puede faltar. */
+  description: string | null;
   isRequired: boolean;
   config: unknown;
   hasLesson: boolean;
@@ -105,6 +107,10 @@ export interface EnrollmentContent {
   status: ProgressStatus;
   pct: number;
   lastCardIndex: number;
+  /** El tamano de la pieza en la unidad de su tipo. Cada campo es null cuando no aplica. */
+  size: { cards: number | null; slides: number | null; minutes: number | null };
+  /** El archivo, cuando la pieza ES un archivo (documento, presentacion, video subido). */
+  file: { storageKey: string; originalName: string; mimeType: string | null; sizeBytes: number | null } | null;
 }
 
 export interface EnrollmentAttempt {
@@ -172,6 +178,7 @@ export interface ContentDetail {
     id: string;
     type: ContentType;
     title: string;
+    description: string | null;
     config: unknown;
     lessonId: string | null;
     contentPackageId: string | null;
@@ -187,7 +194,15 @@ export interface ContentDetail {
     originalName: string;
     mimeType: string | null;
     sizeBytes: number | null;
+    /** Solo en una PRESENTACION: las diapositivas ya convertidas, en orden. */
+    manifest: { slides: Array<{ index: number; key: string; width: number; height: number }> } | null;
   } | null;
+  /**
+   * Cuanto hay que ver de un video para darlo por visto, YA resuelto en cascada por el servidor
+   * (formacion -> empresa -> plataforma). No se recalcula aqui: si la pantalla y la regla dieran
+   * numeros distintos, la persona veria abrirse el boton y el servidor no le daria la pieza.
+   */
+  minWatchPct: number;
 }
 
 export interface StreakUpdate {
@@ -217,6 +232,8 @@ export interface ProgressInput {
   pct: number;
   secondsSpent: number;
   lastCardIndex?: number;
+  /** COMO se supo: lo midio la plataforma o lo declaro la persona (Decision #44). */
+  evidence?: 'MEASURED' | 'DECLARED';
 }
 
 export function openEnrollment(enrollmentId: string): Promise<OpenEnrollment> {

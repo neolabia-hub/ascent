@@ -23,6 +23,17 @@ import { useToast } from '@/components/ui/toast';
  * si el telefono perdio senal a mitad del examen, los guardados intermedios fallaron y solo la
  * entrega final salva el intento. El contrato del backend acepta justo eso.
  */
+
+/**
+ * Una pregunta por pantalla NO significa una columna de telefono en un monitor de 27 pulgadas.
+ * El examen se rinde tanto desde bodega como desde un escritorio, y esta pantalla se habia
+ * quedado clavada en 448 px mientras el resto de la superficie del aprendiz si crecia.
+ *
+ * La columna se ensancha, pero con tope: una linea de texto de 1400 px no se lee, se recorre. El
+ * patron es el mismo de todas las pantallas de lectura del producto.
+ */
+const SHELL = 'mx-auto w-full max-w-md sm:max-w-xl lg:max-w-2xl';
+
 export default function AttemptPage() {
   const params = useParams<{ enrollmentId: string; attemptId: string }>();
   const router = useRouter();
@@ -108,7 +119,7 @@ export default function AttemptPage() {
   if (!view) {
     return (
       <main className="learner-surface min-h-screen bg-paper px-5 py-6">
-        <div className="mx-auto max-w-md space-y-4">
+        <div className={`${SHELL} space-y-4`}>
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-64 w-full rounded-xl" />
           <Skeleton className="h-[52px] w-full rounded-md" />
@@ -139,7 +150,7 @@ export default function AttemptPage() {
   return (
     <main className="learner-surface flex min-h-screen flex-col bg-paper">
       <header className="shrink-0 border-b border-line bg-surface">
-        <div className="mx-auto flex h-14 max-w-md items-center gap-3 px-5">
+        <div className={`${SHELL} flex h-14 items-center gap-3 px-5 lg:px-0`}>
           <button
             type="button"
             aria-label="Pregunta anterior"
@@ -159,7 +170,7 @@ export default function AttemptPage() {
             </span>
           ) : null}
         </div>
-        <div className="mx-auto flex max-w-md gap-1 px-5 pb-3" aria-hidden="true">
+        <div className={`${SHELL} flex gap-1 px-5 pb-3 lg:px-0`} aria-hidden="true">
           {view.questions.map((row, position) => (
             <span
               key={row.attemptQuestionId}
@@ -176,8 +187,8 @@ export default function AttemptPage() {
         </div>
       </header>
 
-      <section className="flex-1 overflow-y-auto px-5 py-6">
-        <div className="mx-auto max-w-md">
+      <section className="flex-1 overflow-y-auto px-5 py-6 lg:py-10">
+        <div className={SHELL}>
           <QuestionPrompt
             qtype={question.qtype}
             stem={question.stem}
@@ -190,12 +201,16 @@ export default function AttemptPage() {
       </section>
 
       <footer className="shrink-0 border-t border-line bg-surface px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3">
-        <div className="mx-auto max-w-md">
-          <Button size="lg" className="w-full" loading={sending} onClick={() => void next()}>
+        {/*
+          En telefono el boton ocupa el ancho (es el unico gesto de la pantalla); en escritorio se
+          va a la derecha y el aviso se pone a su lado, que es donde se mira antes de entregar.
+        */}
+        <div className={`${SHELL} sm:flex sm:flex-row-reverse sm:items-center sm:justify-between sm:gap-4`}>
+          <Button size="lg" className="w-full sm:w-auto sm:min-w-[220px]" loading={sending} onClick={() => void next()}>
             {isLast ? 'Entregar examen' : 'Siguiente'}
           </Button>
           {isLast && answeredCount < view.questions.length ? (
-            <p className="mt-2 text-center text-sm text-warn">
+            <p className="mt-2 text-center text-sm text-warn sm:mt-0 sm:text-left">
               Te faltan {view.questions.length - answeredCount} sin responder.
             </p>
           ) : null}

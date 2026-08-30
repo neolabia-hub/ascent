@@ -4,12 +4,10 @@ import { CircleUser, GraduationCap, House, Repeat2, Search, type LucideIcon } fr
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { getMyProgress, type MyProgress } from '@/lib/learner-api';
 import { useTenant } from '@/components/providers/tenant-provider';
 import { cn } from '@/components/ui/cn';
 import { CommandPalette } from './command-palette';
 import { LearnerTopbar } from './learner-topbar';
-import { useLearnerProfile } from './learner-session';
 
 /**
  * El chrome del aprendiz, en las DOS superficies donde se usa.
@@ -43,26 +41,9 @@ function greeting(now: Date): string {
 
 
 export function LearnerShell({ children }: { children: ReactNode }) {
-  const profile = useLearnerProfile();
   const tenant = useTenant();
   const pathname = usePathname();
-  const [progress, setProgress] = useState<MyProgress | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
-
-  // Se relee al cambiar de pantalla: al volver de una leccion la racha puede haber avanzado.
-  useEffect(() => {
-    let cancelled = false;
-    getMyProgress()
-      .then((value) => {
-        if (!cancelled) setProgress(value);
-      })
-      .catch(() => {
-        // La racha es un adorno: si falla, la pantalla sigue siendo util sin ella.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -131,13 +112,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Saludo a la izquierda, avisos y cuenta a la derecha: donde la gente los busca. */}
-        <LearnerTopbar
-          fullName={profile.fullName}
-          email={profile.email}
-          streak={progress?.currentStreak ?? null}
-          greeting={greeting(new Date())}
-          onSearch={() => setPaletteOpen(true)}
-        />
+        <LearnerTopbar greeting={greeting(new Date())} onSearch={() => setPaletteOpen(true)} />
 
         <main className="flex-1 pb-24 lg:pb-10">
           <div className="mx-auto w-full max-w-md px-5 py-6 lg:max-w-[1100px] lg:px-10 lg:py-10">{children}</div>

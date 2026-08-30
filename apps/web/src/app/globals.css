@@ -41,6 +41,15 @@
   --radius-full: 9999px;
   --shadow-card: 0 1px 2px rgb(16 20 24 / 0.06), 0 4px 12px rgb(16 20 24 / 0.05);
   --shadow-card-hover: 0 1px 2px rgb(16 20 24 / 0.06), 0 4px 16px rgb(16 20 24 / 0.08);
+  /*
+   * Profundidad del BOTON. El realce interior de arriba es lo que lo separa de un rectangulo de
+   * color: la luz cae desde arriba, asi que el borde superior se aclara. Al pulsar, la sombra se
+   * mete DENTRO y el boton baja: se hunde de verdad, no cambia de tono.
+   */
+  --shadow-btn: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(16 20 24 / 0.16), 0 3px 8px rgb(16 20 24 / 0.1);
+  --shadow-btn-hover: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 2px 4px rgb(16 20 24 / 0.16), 0 8px 18px rgb(16 20 24 / 0.14);
+  --shadow-btn-active: inset 0 2px 4px rgb(16 20 24 / 0.28);
+  --shadow-btn-flat: 0 1px 2px rgb(16 20 24 / 0.06);
 
   /* Motion — el "pulso" */
   --ease-pulse: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -170,6 +179,31 @@
   }
   .card-hover:hover {
     box-shadow: var(--shadow-card-hover);
+  }
+
+  /*
+   * Realce de un renglon dentro de la SUPERFICIE DE LECTURA (indice del reproductor, listas del
+   * aprendiz). No se usa `hover:bg-black/5`: en modo oscuro un velo negro sobre fondo oscuro no
+   * se ve. Al derivarse de `--reading-ink`, el mismo realce funciona en claro y en oscuro.
+   */
+  .reading-row {
+    transition: background-color var(--duration-fast) var(--ease-pulse);
+  }
+  .reading-row:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--reading-ink) 6%, transparent);
+  }
+
+  /*
+   * Desplazamiento SIN barra a la vista. Para paneles laterales donde la barra parte el diseno en
+   * dos y no aporta: el contenido sigue desplazandose con rueda, gesto y teclado, que es lo que
+   * de verdad se usa. No se aplica al contenido principal, donde la barra si orienta.
+   */
+  .scroll-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scroll-hidden::-webkit-scrollbar {
+    display: none;
   }
 
   .focus-ring {

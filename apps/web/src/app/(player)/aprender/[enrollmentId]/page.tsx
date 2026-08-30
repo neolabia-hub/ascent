@@ -10,6 +10,7 @@ import {
   Link2,
   Lock,
   PlayCircle,
+  Presentation,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -35,6 +36,7 @@ import { useToast } from '@/components/ui/toast';
 const ICON_BY_TYPE: Record<ContentType, LucideIcon> = {
   LESSON: BookOpen,
   VIDEO: PlayCircle,
+  PRESENTATION: Presentation,
   DOCUMENT: FileText,
   ASSESSMENT: ClipboardCheck,
   SURVEY: ClipboardCheck,
@@ -51,6 +53,7 @@ const MODALITY_LABEL: Record<'PRESENCIAL' | 'VIRTUAL' | 'HIBRIDA', string> = {
 const LABEL_BY_TYPE: Record<ContentType, string> = {
   LESSON: 'Leccion',
   VIDEO: 'Video',
+  PRESENTATION: 'Presentacion',
   DOCUMENT: 'Documento',
   ASSESSMENT: 'Evaluacion',
   SURVEY: 'Encuesta',

@@ -99,6 +99,26 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, passingScoreDefault: num(e.target.value, 1, 100, 90) })}
               />
             </Field>
+            {/*
+              Cuanto hay que ver de un video para darlo por visto. Vive aqui y no clavado en el
+              codigo porque no es lo mismo un procedimiento de SST —donde la empresa puede exigir
+              el video entero— que una pildora cuyos ultimos segundos son creditos. Una formacion
+              concreta puede pedir otra cosa; esto es lo que rige cuando no lo hace.
+            */}
+            <Field
+              htmlFor="pref-watch"
+              label="Minimo de video visto (%)"
+              hint="Se cuentan los segundos distintos reproducidos: adelantar no suma."
+            >
+              <Input
+                id="pref-watch"
+                type="number"
+                min={50}
+                max={100}
+                value={settings.minWatchPctDefault}
+                onChange={(e) => setSettings({ ...settings, minWatchPctDefault: num(e.target.value, 50, 100, 90) })}
+              />
+            </Field>
             <Field htmlFor="pref-attempts" label="Intentos maximos de evaluacion">
               <Input
                 id="pref-attempts"

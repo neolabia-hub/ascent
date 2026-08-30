@@ -13,6 +13,10 @@ import { Skeleton } from '@/components/ui/skeleton';
  * preguntas reutilizado, ensenar las correctas a todo el mundo equivale a publicar el examen).
  * Por eso `detail` puede llegar vacio y `score` en null: se dibuja lo que haya.
  */
+
+/** Mismo ancho que el examen: se sale de una pantalla y se entra a la otra. */
+const SHELL = 'mx-auto w-full max-w-md sm:max-w-xl lg:max-w-2xl';
+
 export default function AttemptResultPage() {
   const params = useParams<{ enrollmentId: string; attemptId: string }>();
   const router = useRouter();
@@ -49,7 +53,7 @@ export default function AttemptResultPage() {
   if (!review) {
     return (
       <main className="learner-surface min-h-screen bg-paper px-5 py-8">
-        <div className="mx-auto max-w-md space-y-4">
+        <div className={`${SHELL} space-y-4`}>
           <Skeleton className="mx-auto h-24 w-24 rounded-full" />
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-32 w-full rounded-xl" />
@@ -63,7 +67,7 @@ export default function AttemptResultPage() {
 
   return (
     <main className="learner-surface min-h-screen bg-paper px-5 py-8">
-      <div className="mx-auto max-w-md space-y-6">
+      <div className={`${SHELL} space-y-6`}>
         <section className="text-center">
           <div
             className="mx-auto flex h-24 w-24 items-center justify-center rounded-full"

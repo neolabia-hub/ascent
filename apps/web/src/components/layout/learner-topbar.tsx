@@ -2,8 +2,11 @@
 
 import { Bell, ChevronDown, LogOut, Search, UserRound } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { getInbox, logout, markAllNotificationsRead, type InboxItem } from '@/lib/api';
+import { getMyProgress } from '@/lib/learner-api';
+import { useLearnerProfile } from './learner-session';
 import { clearOfflineData } from '@/components/providers/service-worker-bridge';
 import { cn } from '@/components/ui/cn';
 import { StreakPill } from '@/components/ui/streak-pill';
@@ -113,7 +116,7 @@ function Notifications() {
   );
 }
 
-function UserMenu({ fullName, email, streak }: { fullName: string; email: string; streak: number | null }) {
+function UserMenu({ fullName, email }: { fullName: string; email: string }) {
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const ref = useOutsideClick(() => setOpen(false));
@@ -149,11 +152,6 @@ function UserMenu({ fullName, email, streak }: { fullName: string; email: string
           <div className="border-b border-line px-4 py-3">
             <p className="truncate font-display text-sm font-semibold text-ink-900">{fullName}</p>
             <p className="truncate text-xs text-ink-500">{email}</p>
-            {streak !== null ? (
-              <div className="mt-2.5">
-                <StreakPill days={streak} />
-              </div>
-            ) : null}
           </div>
           <Link
             href="/perfil"
@@ -182,26 +180,75 @@ function UserMenu({ fullName, email, streak }: { fullName: string; email: string
   );
 }
 
+/**
+ * LA BARRA SUPERIOR DEL APRENDIZ, la misma en toda su superficie —incluido el reproductor—.
+ *
+ * La racha se pide aqui dentro y no desde fuera para que quien monte la barra no tenga que saber
+ * que existe: antes cada pantalla que la usara tenia que traerse el progreso a mano.
+ *
+ * `leading` sustituye al saludo donde el saludo no viene a cuento (en el reproductor va la salida
+ * y el nombre de la formacion); `trailing` agrega los controles propios de esa pantalla.
+ */
 export function LearnerTopbar({
-  fullName,
-  email,
-  streak,
   greeting,
   onSearch,
+  leading,
+  leadingControls,
+  trailing,
+  wide = false,
+  flush = false,
 }: {
-  fullName: string;
-  email: string;
-  streak: number | null;
-  greeting: string;
+  greeting?: string;
   onSearch: () => void;
+  leading?: ReactNode;
+  /** Controles de la pantalla, a la izquierda del bloque de la persona. */
+  leadingControls?: ReactNode;
+  trailing?: ReactNode;
+  wide?: boolean;
+  /** Sin borde ni fondo propios: la barra es una con la pantalla. */
+  flush?: boolean;
 }) {
+  const profile = useLearnerProfile();
+  const pathname = usePathname();
+  const [streak, setStreak] = useState<number | null>(null);
+
+  // Se relee al cambiar de pantalla: al terminar una leccion la racha puede haber avanzado.
+  useEffect(() => {
+    let cancelled = false;
+    getMyProgress()
+      .then((value) => {
+        if (!cancelled) setStreak(value.currentStreak);
+      })
+      .catch(() => {
+        // La racha es un adorno: si falla, la barra sigue siendo util sin ella.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-[1100px] items-center gap-3 px-5 lg:px-10">
-        <p className="min-w-0 flex-1 truncate">
-          <span className="text-sm text-ink-500">{greeting}, </span>
-          <span className="font-display text-base font-semibold text-ink-900">{fullName.split(/\s+/)[0]}</span>
-        </p>
+    /*
+     * `flush`: la barra se funde con el fondo, sin linea ni superficie propia. Se usa donde nada
+     * se desplaza POR DEBAJO de ella —el reproductor, que desplaza solo el escenario—, y ahi la
+     * linea solo partia la pantalla en dos sin separar nada. Donde el contenido si pasa por
+     * debajo, la barra conserva su fondo y su borde: sin ellos, el texto se leeria encima.
+     */
+    <header
+      className={cn(
+        'sticky top-0 z-30',
+        flush ? 'bg-transparent' : 'border-b border-line bg-surface/95 backdrop-blur',
+      )}
+    >
+      <div className={cn('flex h-16 w-full items-center gap-3 px-5 lg:px-10', wide ? '' : 'mx-auto max-w-[1100px]')}>
+        {leading ?? (
+          <p className="min-w-0 flex-1 truncate">
+            <span className="text-sm text-ink-500">{greeting}, </span>
+            <span className="font-display text-base font-semibold text-ink-900">
+              {profile.fullName.split(/\s+/)[0]}
+            </span>
+          </p>
+        )}
 
         <button
           type="button"
@@ -212,8 +259,23 @@ export function LearnerTopbar({
           <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
         </button>
 
+        {/*
+          `leadingControls` son los controles de la PANTALLA (plegar un panel, por ejemplo) y van
+          antes de lo que es de la PERSONA —racha, avisos, cuenta—, que es un bloque y no debe
+          partirse con botones de otra naturaleza en medio.
+        */}
+        {leadingControls}
+
+        {/*
+          LA RACHA VIVE AQUI, al lado de los avisos, y no escondida dentro del menu de cuenta. Es
+          lo unico de la pantalla que premia volver manana, y dentro de un desplegable no la veia
+          nadie. Sigue siendo PRIVADA (Decision #23): es la propia, jamas la de otro.
+        */}
+        {streak !== null ? <StreakPill days={streak} className="animate-card-in hidden sm:inline-flex" /> : null}
+
         <Notifications />
-        <UserMenu fullName={fullName} email={email} streak={streak} />
+        <UserMenu fullName={profile.fullName} email={profile.email} />
+        {trailing}
       </div>
     </header>
   );

@@ -14,6 +14,15 @@ export const tenantSettingsSchema = z
     passingScoreDefault: z.number().int().min(1).max(100).default(80),
     maxAttemptsDefault: z.number().int().min(1).max(10).default(3),
     retryWaitHours: z.number().int().min(0).max(720).default(0),
+    /**
+     * Cuanto hay que ver de un video para darlo por visto, cuando la formacion no dice otra cosa.
+     *
+     * Vive aqui y no como una constante porque no es una preferencia estetica: una empresa que
+     * capacita en SST puede exigir el 100% del video de un procedimiento, y otra darse por
+     * satisfecha con el 80% porque los ultimos segundos son creditos. Antes estaba clavado en 90
+     * dentro del reproductor y de la regla del servidor, en dos sitios distintos.
+     */
+    minWatchPctDefault: z.number().int().min(50).max(100).default(90),
 
     // Microlearning / engagement.
     pillCadencePerWeek: z.number().int().min(1).max(7).default(3),

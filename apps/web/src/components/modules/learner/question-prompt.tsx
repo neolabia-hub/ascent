@@ -34,7 +34,7 @@ export function QuestionPrompt({ qtype, stem, options, value, onChange, disabled
   if (qtype === 'ESSAY') {
     return (
       <div>
-        <p className="font-display text-lg font-semibold leading-snug text-ink-900">{stem}</p>
+        <p className="font-display text-lg font-semibold leading-snug text-ink-900 lg:text-[22px]">{stem}</p>
         <p className="mt-2 text-sm text-ink-500">Responde con tus palabras. La revisa una persona.</p>
         <textarea
           className="focus-ring mt-4 min-h-[160px] w-full rounded-md border border-line-strong bg-surface p-3 text-base text-ink-900"
@@ -51,7 +51,7 @@ export function QuestionPrompt({ qtype, stem, options, value, onChange, disabled
   if (qtype === 'TRUE_FALSE') {
     return (
       <div>
-        <p className="font-display text-lg font-semibold leading-snug text-ink-900">{stem}</p>
+        <p className="font-display text-lg font-semibold leading-snug text-ink-900 lg:text-[22px]">{stem}</p>
         <ul className="mt-5 space-y-3">
           {TRUE_FALSE_OPTIONS.map((option) => (
             <li key={option.id}>
@@ -87,7 +87,7 @@ export function QuestionPrompt({ qtype, stem, options, value, onChange, disabled
 
   return (
     <div>
-      <p className="font-display text-lg font-semibold leading-snug text-ink-900">{stem}</p>
+      <p className="font-display text-lg font-semibold leading-snug text-ink-900 lg:text-[22px]">{stem}</p>
       {isMulti ? <p className="mt-2 text-sm text-ink-500">Puedes marcar varias.</p> : null}
       <ul className="mt-5 space-y-3">
         {options.map((option) => (

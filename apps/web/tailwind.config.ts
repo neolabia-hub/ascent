@@ -60,6 +60,10 @@ const config: Config = {
       boxShadow: {
         card: 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
+        btn: 'var(--shadow-btn)',
+        'btn-hover': 'var(--shadow-btn-hover)',
+        'btn-active': 'var(--shadow-btn-active)',
+        'btn-flat': 'var(--shadow-btn-flat)',
       },
       transitionTimingFunction: {
         pulse: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -73,6 +77,28 @@ const config: Config = {
         'card-in': {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        // Se ABRE la accion: el boton que era un medidor pasa a poder pulsarse.
+        unlock: {
+          '0%': { transform: 'scale(1)' },
+          '45%': { transform: 'scale(1.035)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        // Entrada de la diapositiva SEGUN LA DIRECCION en que se avanza: al pasar, entra desde
+        // la derecha; al retroceder, desde la izquierda. Es lo que hace que se sienta una pila de
+        // laminas y no una imagen que se sustituye sola.
+        'slide-next': {
+          '0%': { opacity: '0', transform: 'translateX(24px) scale(0.985)' },
+          '100%': { opacity: '1', transform: 'translateX(0) scale(1)' },
+        },
+        'slide-prev': {
+          '0%': { opacity: '0', transform: 'translateX(-24px) scale(0.985)' },
+          '100%': { opacity: '1', transform: 'translateX(0) scale(1)' },
+        },
+        // El punto guia de la linea de avance: respira, no parpadea.
+        breathe: {
+          '0%, 100%': { opacity: '0.55', transform: 'scale(1)' },
+          '50%': { opacity: '1', transform: 'scale(1.35)' },
         },
         'drawer-in': {
           '0%': { transform: 'translateX(100%)' },
@@ -94,6 +120,10 @@ const config: Config = {
       animation: {
         'pulse-ring': 'pulse-ring 320ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         'card-in': 'card-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        unlock: 'unlock 320ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'slide-next': 'slide-next 260ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'slide-prev': 'slide-prev 260ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        breathe: 'breathe 2600ms cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'drawer-in': 'drawer-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         'drawer-out': 'drawer-out 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         'overlay-in': 'overlay-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',

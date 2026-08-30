@@ -1,10 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { ProgressInput } from '@neo-pulse/shared';
+import { tenantSettingsSchema, type ProgressInput } from '@neo-pulse/shared';
 import { EngagementService } from '../engagement/engagement.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CompletionService } from './completion.service.js';
+import { meetsCompletion, mergeProgressData, readLastCard, resolveMinWatchPct } from './progress-rules.js';
 
 /**
  * EL REPRODUCTOR: lo que ve y hace la persona mientras cursa.
@@ -37,11 +38,19 @@ export class PlayerService {
           id: true,
           type: true,
           title: true,
+          description: true,
           displayOrder: true,
           isRequired: true,
           config: true,
           lessonId: true,
           assessmentVersionId: true,
+          // Lo justo para que el indice diga de que tamano es cada parte ANTES de abrirla:
+          // "8 tarjetas", "11 diapositivas". Un indice que solo lista titulos obliga a entrar
+          // para saber en que se esta metiendo uno.
+          lesson: { select: { estimatedMinutes: true, _count: { select: { cards: true } } } },
+          contentPackage: {
+            select: { kind: true, storageKey: true, originalName: true, mimeType: true, sizeBytes: true, manifest: true },
+          },
         },
       }),
       this.prisma.scoped.activityProgress.findMany({ where: { enrollmentId } }),
@@ -74,20 +83,47 @@ export class PlayerService {
       },
       contents: contents.map((content) => {
         const own = progressByContent.get(content.id);
+        const slides = (content.contentPackage?.manifest as { slides?: unknown[] } | null)?.slides;
         return {
           id: content.id,
           type: content.type,
           title: content.title,
+          description: content.description,
           isRequired: content.isRequired,
           config: content.config,
           hasLesson: content.lessonId !== null,
           assessmentVersionId: content.assessmentVersionId,
+          /**
+           * EL TAMANO DE LA PIEZA, en la unidad de cada tipo.
+           *
+           * No se inventan minutos donde no los hay: de un video subido no se conoce la duracion
+           * hasta reproducirlo, y poner un numero redondo seria mentirle a quien decide si le da
+           * tiempo antes de entrar al turno. Se dice lo que se sabe: tarjetas, diapositivas o los
+           * minutos estimados que escribio quien armo la leccion.
+           */
+          size: {
+            cards: content.lesson?._count.cards ?? null,
+            slides: Array.isArray(slides) ? slides.length : null,
+            minutes: content.lesson?.estimatedMinutes ?? null,
+          },
+          /**
+           * El archivo, cuando la pieza ES un archivo. Lo usa la pestana de material de apoyo
+           * para ofrecer el documento sin sacar a nadie del reproductor.
+           */
+          file: content.contentPackage
+            ? {
+                storageKey: content.contentPackage.storageKey,
+                originalName: content.contentPackage.originalName,
+                mimeType: content.contentPackage.mimeType,
+                sizeBytes: content.contentPackage.sizeBytes,
+              }
+            : null,
           status:
             content.type === 'ASSESSMENT' && content.assessmentVersionId && passed.has(content.assessmentVersionId)
               ? 'COMPLETED'
               : (own?.status ?? 'NOT_STARTED'),
           pct: own?.pct ?? 0,
-          lastCardIndex: this.readLastCard(own?.data),
+          lastCardIndex: readLastCard(own?.data),
         };
       }),
       attempts,
@@ -102,6 +138,7 @@ export class PlayerService {
         id: true,
         type: true,
         title: true,
+        description: true,
         config: true,
         lessonId: true,
         contentPackageId: true,
@@ -136,11 +173,29 @@ export class PlayerService {
     const documentPackage = content.contentPackageId
       ? await this.prisma.scoped.contentPackage.findUnique({
           where: { id: content.contentPackageId },
-          select: { id: true, kind: true, storageKey: true, originalName: true, mimeType: true, sizeBytes: true },
+          // `manifest` trae las diapositivas de una presentacion ya convertida: sin el, el
+          // reproductor no sabria que imagenes pedir ni cuantas son.
+          select: {
+            id: true,
+            kind: true,
+            storageKey: true,
+            originalName: true,
+            mimeType: true,
+            sizeBytes: true,
+            manifest: true,
+          },
         })
       : null;
 
-    return { content, enrollmentId: enrollment.id, lesson, package: documentPackage };
+    /*
+     * El minimo de reproduccion YA RESUELTO. Lo calcula el servidor y no el reproductor porque la
+     * cascada (formacion -> empresa -> plataforma) tiene que dar el mismo numero en los dos sitios:
+     * si la pantalla dijera 90 y la regla exigiera 100, la persona veria el boton abrirse y el
+     * servidor no le daria la pieza por vista.
+     */
+    const minWatchPct = resolveMinWatchPct(content.config, await this.minWatchDefault());
+
+    return { content, enrollmentId: enrollment.id, lesson, package: documentPackage, minWatchPct };
   }
 
   /**
@@ -168,7 +223,7 @@ export class PlayerService {
     const pct = Math.max(existing?.pct ?? 0, input.pct);
     const timeSpentS = (existing?.timeSpentS ?? 0) + input.secondsSpent;
     const wasCompleted = existing?.status === 'COMPLETED';
-    const completed = this.meetsCompletion(content.type, content.config, pct, timeSpentS);
+    const completed = meetsCompletion(content.type, content.config, pct, timeSpentS, await this.minWatchDefault());
     const now = new Date();
 
     await this.prisma.scoped.activityProgress.upsert({
@@ -182,14 +237,14 @@ export class PlayerService {
         timeSpentS,
         firstAt: now,
         lastAt: now,
-        data: this.writeLastCard(input.lastCardIndex),
+        data: mergeProgressData(null, input) as unknown as Prisma.InputJsonValue,
       },
       update: {
         status: completed ? 'COMPLETED' : 'IN_PROGRESS',
         pct,
         timeSpentS,
         lastAt: now,
-        ...(input.lastCardIndex !== undefined ? { data: this.writeLastCard(input.lastCardIndex) } : {}),
+        data: mergeProgressData(existing?.data ?? null, input) as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -201,7 +256,7 @@ export class PlayerService {
         verb: completed && !wasCompleted ? 'COMPLETED' : 'PROGRESSED',
         objectType: 'activity_contents',
         objectId: contentId,
-        result: { pct, timeSpentS } as Prisma.InputJsonValue,
+        result: { pct, timeSpentS, ...(input.evidence ? { evidence: input.evidence } : {}) } as Prisma.InputJsonValue,
       },
     });
 
@@ -216,26 +271,18 @@ export class PlayerService {
   }
 
   /**
-   * Criterio de completitud de una pieza. El "tiempo minimo" es el freno al click siguiente: no
-   * bloquea a nadie, pero no da por vista una tarjeta que estuvo dos segundos en pantalla.
+   * El minimo de reproduccion que exige LA EMPRESA cuando la formacion no dice otra cosa.
+   *
+   * Se lee en cada guardado en vez de cachearse: es una consulta por clave primaria y cambiarlo
+   * tiene que surtir efecto ya. Si alguien sube el minimo del 80 al 100 un lunes, no puede seguir
+   * dando videos por vistos al 80 hasta que caduque un cache.
    */
-  private meetsCompletion(type: string, config: Prisma.JsonValue, pct: number, timeSpentS: number): boolean {
-    const settings = (config ?? {}) as { minWatchPct?: number; minSeconds?: number };
-    if (type === 'VIDEO') {
-      const required = settings.minWatchPct ?? 90;
-      return pct >= required;
-    }
-    const minSeconds = settings.minSeconds ?? 0;
-    return pct >= 100 && timeSpentS >= minSeconds;
-  }
-
-  private readLastCard(data: Prisma.JsonValue | undefined): number {
-    const parsed = (data ?? {}) as { lastCardIndex?: unknown };
-    return typeof parsed.lastCardIndex === 'number' ? parsed.lastCardIndex : 0;
-  }
-
-  private writeLastCard(index: number | undefined): Prisma.InputJsonValue {
-    return { lastCardIndex: index ?? 0 };
+  private async minWatchDefault(): Promise<number> {
+    const tenant = await this.prisma.scoped.tenant.findUniqueOrThrow({
+      where: { id: this.prisma.currentTenantId },
+      select: { settings: true },
+    });
+    return tenantSettingsSchema.parse(tenant.settings ?? {}).minWatchPctDefault;
   }
 
   /** Ninguna operacion del reproductor toca la ejecucion de otra persona. */
