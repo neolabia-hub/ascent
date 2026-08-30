@@ -27,8 +27,8 @@ export class PlansController {
 
   @Get(':id')
   @RequirePermissions('plans:manage')
-  getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.plans.getById(id);
+  getById(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.plans.getById(actor, id);
   }
 
   @Post()

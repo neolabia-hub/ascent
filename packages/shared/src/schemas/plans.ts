@@ -27,6 +27,14 @@ export const addPlanItemSchema = z.object({
   offeringId: z.string().uuid(),
   plannedMonth: z.number().int().min(1).max(12),
   notes: z.string().max(2000).nullable().optional(),
+  /**
+   * OBLIGATORIA si el plan ya esta aprobado o en ejecucion (Decision #55).
+   *
+   * En borrador no se pide: el plan todavia no obliga a nadie y pedir un motivo por cada renglon
+   * mientras se arma el ano seria ruido. Despues de aprobado si, porque agregar una jornada crea
+   * obligaciones reales para personas reales y el auditor va a preguntar de donde salio.
+   */
+  justification: z.string().min(10).max(500).optional(),
 });
 export type AddPlanItemInput = z.infer<typeof addPlanItemSchema>;
 

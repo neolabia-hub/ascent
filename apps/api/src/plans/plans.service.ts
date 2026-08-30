@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type PlanItemStatus } from '@prisma/client';
 import type {
   AddPlanItemInput,
   ApprovePlanInput,
@@ -8,12 +8,25 @@ import type {
   UpdatePlanItemInput,
   UpdateTrainingPlanInput,
 } from '@neo-pulse/shared';
+import { offeringScopeWhere } from '../common/analyst-scope.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ProjectedAudienceService } from '../offerings/projected-audience.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { computePlanMetrics, type PlanItemFacts } from './plan-metrics.js';
+
+/** Lo minimo que hace falta de un renglon para materializarlo (ver `materialize`). */
+interface PlanItemToMaterialize {
+  id: string;
+  plannedMonth: number;
+  status: PlanItemStatus;
+  offering: {
+    projectedCount: number | null;
+    regionalId: string | null;
+    activityVersion: { activityId: string; activity: { name: string } };
+  };
+}
 
 /** Ejecuciones que cuentan como "capacitado" para la cobertura. */
 const TRAINED_STATUSES: Prisma.EnumEnrollmentStatusFilter = { in: ['COMPLETED', 'PASSED'] };
@@ -47,11 +60,21 @@ export class PlansService {
     }));
   }
 
-  async getById(id: string) {
+  /**
+   * El plan que ve QUIEN pregunta.
+   *
+   * El analista de SST no abre "el plan de la empresa con 52 renglones": abre su parte. Y por eso
+   * las metricas se calculan sobre los renglones VISIBLES —ensenarle un 62% de cumplimiento global
+   * junto a sus ocho jornadas seria un numero que no puede explicar ni mover—. El administrador,
+   * sin alcance, sigue viendo el plan completo y el 62% de verdad.
+   */
+  async getById(actor: AuthUser, id: string) {
+    const scoped = offeringScopeWhere(actor.scopeProcessIds);
     const plan = await this.prisma.scoped.trainingPlan.findUnique({
       where: { id },
       include: {
         items: {
+          ...(Object.keys(scoped).length ? { where: { offering: scoped } } : {}),
           orderBy: [{ plannedMonth: 'asc' }],
           include: {
             offering: {
@@ -65,6 +88,9 @@ export class PlansService {
                 regional: { select: { id: true, name: true } },
                 activityVersion: {
                   select: {
+                    // El id hace falta para "otra jornada de esta misma capacitacion": sin el, el plan
+                    // no puede preseleccionar la version y obliga a buscarla en un desplegable.
+                    id: true,
                     versionNumber: true,
                     activity: {
                       select: {
@@ -130,7 +156,7 @@ export class PlansService {
       resourceId: plan.id,
       newValues: { year: input.year, name: input.name },
     });
-    return this.getById(plan.id);
+    return this.getById(actor, plan.id);
   }
 
   async update(actor: AuthUser, id: string, input: UpdateTrainingPlanInput) {
@@ -157,25 +183,54 @@ export class PlansService {
       oldValues: { name: plan.name, objective: plan.objective },
       newValues: input,
     });
-    return this.getById(id);
+    return this.getById(actor, id);
   }
 
   // ─────────────────────────── Renglones ───────────────────────────
 
-  /** El renglon REFERENCIA una convocatoria; el plan no posee la actividad (Decision #3). */
+  /**
+   * El renglon REFERENCIA una convocatoria; el plan no posee la actividad (Decision #3).
+   *
+   * Se puede agregar con el plan YA APROBADO, con justificacion (Decision #55). La regla anterior
+   * —"el plan aprobado no se edita"— era correcta en su intencion y demasiado apretada en la
+   * practica: si en agosto abren una regional, esa jornada tiene que entrar en el plan del ano.
+   * Prohibirlo no evita el cambio, lo saca del sistema, que es justo lo que el plan existe para
+   * impedir. AGREGAR no reescribe el pasado; BORRAR si, y eso sigue prohibido.
+   */
   async addItem(actor: AuthUser, planId: string, input: AddPlanItemInput) {
     const tenantId = this.prisma.currentTenantId;
     const plan = await this.requirePlan(planId);
-    this.assertEditable(plan.status);
+    if (plan.status === 'CLOSED') {
+      throw new ConflictException({
+        code: 'PLAN_CLOSED',
+        message: 'El plan del ano esta cerrado: ya es historia y no admite renglones nuevos.',
+      });
+    }
+    const live = plan.status !== 'DRAFT';
+    if (live && !input.justification) {
+      throw new ConflictException({
+        code: 'PLAN_JUSTIFICATION_REQUIRED',
+        message: 'El plan ya esta aprobado: para agregar una jornada hay que decir por que.',
+      });
+    }
 
     const offering = await this.prisma.scoped.offering.findUnique({
       where: { id: input.offeringId },
-      select: { id: true, code: true, status: true, scheduledDate: true },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        scheduledDate: true,
+        projectedCount: true,
+        regionalId: true,
+        activityVersion: { select: { activityId: true, activity: { select: { name: true } } } },
+      },
     });
     if (!offering) throw new NotFoundException({ code: 'OFFERING_NOT_FOUND' });
     if (offering.status === 'CANCELLED') {
       throw new ConflictException({ code: 'OFFERING_CANCELLED', message: 'Esa convocatoria esta cancelada.' });
     }
+
 
     const duplicate = await this.prisma.scoped.planItem.findFirst({
       where: { planId, offeringId: input.offeringId },
@@ -193,15 +248,33 @@ export class PlansService {
         notes: input.notes ?? null,
       },
     });
+    // En un plan vivo el renglon nace ya obligando: congela proyectados y crea las asignaciones.
+    // Si la convocatoria aun esta en borrador, el numero sale de la regla de audiencia y al
+    // publicarla se sincroniza (ver `publish`): pedirle al usuario que publique primero romperia
+    // el camino natural, que es crear la jornada desde el propio plan.
+    let assignments = 0;
+    if (live) {
+      const perUser = new Map<string, string[]>();
+      assignments = await this.materialize(actor, tenantId, plan.year, { ...item, offering }, perUser);
+      await this.announce(tenantId, perUser, plan.year);
+    }
+
     await this.audit.record({
       tenantId,
       userId: actor.id,
       action: 'PLAN_ITEM_ADDED',
       resourceType: 'plan_items',
       resourceId: item.id,
-      newValues: { planId, offering: offering.code, plannedMonth: input.plannedMonth },
+      newValues: {
+        planId,
+        offering: offering.code,
+        plannedMonth: input.plannedMonth,
+        planStatus: plan.status,
+        justification: input.justification ?? null,
+        assignments,
+      },
     });
-    return this.getById(planId);
+    return this.getById(actor, planId);
   }
 
   async updateItem(actor: AuthUser, itemId: string, input: UpdatePlanItemInput) {
@@ -297,45 +370,7 @@ export class PlansService {
     const perUser = new Map<string, string[]>();
 
     for (const item of plan.items) {
-      if (item.status === 'CANCELLED') continue;
-
-      const people = await this.projected.resolve(item.offering.activityVersion.activityId, item.offering.regionalId);
-      const dueAt = this.endOfMonth(plan.year, item.plannedMonth);
-
-      const existing = await this.prisma.scoped.assignment.findMany({
-        where: { planItemId: item.id, userId: { in: people.userIds } },
-        select: { userId: true },
-      });
-      const already = new Set(existing.map((row) => row.userId));
-      const recipients = people.userIds.filter((userId) => !already.has(userId));
-
-      await this.prisma.scoped.planItem.update({
-        where: { id: item.id },
-        data: { projectedSnapshot: item.offering.projectedCount ?? people.count },
-      });
-
-      if (recipients.length > 0) {
-        await this.prisma.scoped.assignment.createMany({
-          data: recipients.map((userId) => ({
-            tenantId,
-            userId,
-            targetType: 'ACTIVITY' as const,
-            targetId: item.offering.activityVersion.activityId,
-            source: 'PLAN' as const,
-            planItemId: item.id,
-            assignedBy: actor.id,
-            cycleNumber: 1,
-            dueAt,
-            status: 'PENDING' as const,
-          })),
-        });
-        createdAssignments += recipients.length;
-        for (const userId of recipients) {
-          const titles = perUser.get(userId) ?? [];
-          titles.push(item.offering.activityVersion.activity.name);
-          perUser.set(userId, titles);
-        }
-      }
+      createdAssignments += await this.materialize(actor, tenantId, plan.year, item, perUser);
     }
 
     const approved = await this.prisma.scoped.trainingPlan.update({
@@ -468,6 +503,66 @@ export class PlansService {
         referenceId: null,
       });
     }
+  }
+
+  /**
+   * MATERIALIZAR un renglon: congela sus proyectados y crea las obligaciones de la gente.
+   *
+   * Es lo que hace de verdad "aprobar el plan", renglon a renglon, y vive aparte porque desde la
+   * Decision #55 tambien lo necesita agregar una jornada a un plan YA aprobado: un renglon que
+   * entra en agosto tiene que obligar igual que los que entraron en enero, o seria un adorno en
+   * una pantalla que nadie cumple.
+   *
+   * Idempotente a proposito (mira que asignaciones ya existen antes de crear): aprobar dos veces,
+   * o agregar y reintentar, no puede duplicar obligaciones —duplicar corrompe todo indicador de
+   * cumplimiento, Decision #35—.
+   */
+  private async materialize(
+    actor: AuthUser,
+    tenantId: string,
+    planYear: number,
+    item: PlanItemToMaterialize,
+    perUser: Map<string, string[]>,
+  ): Promise<number> {
+    if (item.status === 'CANCELLED') return 0;
+
+    const people = await this.projected.resolve(item.offering.activityVersion.activityId, item.offering.regionalId);
+    const dueAt = this.endOfMonth(planYear, item.plannedMonth);
+
+    const existing = await this.prisma.scoped.assignment.findMany({
+      where: { planItemId: item.id, userId: { in: people.userIds } },
+      select: { userId: true },
+    });
+    const already = new Set(existing.map((row) => row.userId));
+    const recipients = people.userIds.filter((userId) => !already.has(userId));
+
+    await this.prisma.scoped.planItem.update({
+      where: { id: item.id },
+      data: { projectedSnapshot: item.offering.projectedCount ?? people.count },
+    });
+
+    if (recipients.length === 0) return 0;
+
+    await this.prisma.scoped.assignment.createMany({
+      data: recipients.map((userId) => ({
+        tenantId,
+        userId,
+        targetType: 'ACTIVITY' as const,
+        targetId: item.offering.activityVersion.activityId,
+        source: 'PLAN' as const,
+        planItemId: item.id,
+        assignedBy: actor.id,
+        cycleNumber: 1,
+        dueAt,
+        status: 'PENDING' as const,
+      })),
+    });
+    for (const userId of recipients) {
+      const titles = perUser.get(userId) ?? [];
+      titles.push(item.offering.activityVersion.activity.name);
+      perUser.set(userId, titles);
+    }
+    return recipients.length;
   }
 
   private async requirePlan(id: string) {
