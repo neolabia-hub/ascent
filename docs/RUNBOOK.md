@@ -910,3 +910,27 @@ El precio del modo estable: un cambio nuevo no aparece hasta volver a ejecutar e
 **Ojo con `NEXT_PUBLIC_API_URL`:** Next lo **incrusta al compilar**, no lo lee al arrancar. Por eso
 el build vive dentro del script, con el entorno ya puesto. Si se compila fuera, la web sale
 apuntando al 3002 (el de las pruebas) y el sintoma es exactamente el mismo mensaje.
+
+### El alcance por AREA se reescribia solo al editar la persona (2026-08-30)
+
+**Sintoma, tal como lo reporto el cliente:** en Permisos se le da a alguien alcance sobre otra
+area, dice que se aplico —y se aplico—, pero al abrir Editar el campo sigue mostrando lo de antes;
+y con los PROCESOS no pasa, ahi si se ve el cambio.
+
+**Causa.** El cajon de alta/edicion tiene tres opciones y una de ellas, "Solo su area", asumia que
+un alcance de area era SIEMPRE la propia area de la persona: leia solo *si habia* filas de area, no
+CUALES, y al guardar escribia `areaIds: [area de la persona]`. Los procesos si se leian uno a uno,
+y por eso esos si cuadraban.
+
+**Lo grave no era lo que se veia, sino lo que pasaba despues:** guardar cualquier cambio de la
+ficha —un telefono— reescribia el alcance a "su propia area" sin avisar. Un jefe con alcance sobre
+otra area lo perdia al corregirle el correo.
+
+**Arreglo.** El cajon lee ahora QUE areas son. Si es exactamente una y es la suya, sigue siendo
+"Solo su area". Cualquier otra cosa —otra area, o varias— aparece como cuarta opcion, "a medida",
+seleccionada y explicada, y **guardar no la toca**: se cambia desde Permisos o eligiendo otra
+opcion a proposito.
+
+**La leccion.** Dos pantallas que escriben el MISMO dato con formas distintas: la simple tiene que
+saber reconocer lo que no sabe representar, y no puede escribir por defecto. Cuando una pantalla
+"simplifica" un dato, el caso que no cabe no es un caso raro: es el que se pierde.

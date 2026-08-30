@@ -75,9 +75,18 @@ export default function UsuariosPage() {
   /** Permisos que concede cada rol: con ellos se decide si "Gestiona" tiene sentido. */
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
 
-  /** Alcance de la persona que se esta creando o editando. Ver el campo "Gestiona". */
-  const [scopeKind, setScopeKind] = useState<'all' | 'area' | 'processes'>('all');
+  /**
+   * Alcance de la persona que se esta creando o editando. Ver el campo "Gestiona".
+   *
+   * `custom` es el cuarto caso y existe por un fallo real: este cajon asumia que un alcance de
+   * AREA era siempre "su propia area", asi que al guardar escribia el area DE LA PERSONA. Si
+   * alguien le habia dado en Permisos alcance sobre otra area —o sobre dos—, editarle el telefono
+   * se lo reescribia sin decir nada. Ahora, cuando el alcance no cabe en las tres opciones
+   * simples, se muestra tal cual y guardar aqui NO lo toca.
+   */
+  const [scopeKind, setScopeKind] = useState<'all' | 'area' | 'processes' | 'custom'>('all');
   const [scopeProcessIds, setScopeProcessIds] = useState<string[]>([]);
+  const [scopeAreaIds, setScopeAreaIds] = useState<string[]>([]);
 
   // Drawer crear/editar
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -147,6 +156,7 @@ export default function UsuariosPage() {
     setForm(EMPTY_FORM);
     setScopeKind('all');
     setScopeProcessIds([]);
+    setScopeAreaIds([]);
     setFormError(null);
     setDrawerOpen(true);
   };
@@ -174,16 +184,25 @@ export default function UsuariosPage() {
     // El alcance vive en su propia tabla, asi que se pide aparte para poder mostrarlo tal como esta.
     void getUser(user.id)
       .then((detail) => {
-        const areaScope = detail.analystScopes.some((row) => row.area);
+        const areaIds = detail.analystScopes
+          .map((row) => row.area?.id)
+          .filter((id): id is string => Boolean(id));
         const processIds = detail.analystScopes
           .map((row) => row.process?.id)
           .filter((id): id is string => Boolean(id));
-        setScopeKind(areaScope ? 'area' : processIds.length > 0 ? 'processes' : 'all');
+        // "Solo su area" es UNA area y ademas la suya. Cualquier otra cosa —otra area, o dos— es
+        // un alcance a medida que este cajon sabe mostrar pero no sabe editar.
+        const soloSuArea = areaIds.length === 1 && areaIds[0] === user.area.id;
+        setScopeAreaIds(areaIds);
         setScopeProcessIds(processIds);
+        setScopeKind(
+          areaIds.length > 0 ? (soloSuArea ? 'area' : 'custom') : processIds.length > 0 ? 'processes' : 'all',
+        );
       })
       .catch(() => {
         setScopeKind('all');
         setScopeProcessIds([]);
+        setScopeAreaIds([]);
       });
   };
 
@@ -207,7 +226,10 @@ export default function UsuariosPage() {
       }
       // El alcance va DESPUES de crear a la persona porque necesita su id, y solo si el rol lo usa:
       // mandarlo para un aprendiz escribiria filas que ninguna consulta va a mirar.
-      if (roleManages) {
+      // Con alcance A MEDIDA no se escribe nada: guardar el telefono no puede reescribir un
+      // alcance que este cajon no sabe representar. Se cambia desde Permisos, o eligiendo aqui
+      // otra de las tres opciones a proposito.
+      if (roleManages && scopeKind !== 'custom') {
         await setAnalystScopes(userId, {
           areaIds: scopeKind === 'area' && form.areaId ? [form.areaId] : [],
           processIds: scopeKind === 'processes' ? scopeProcessIds : [],
@@ -539,6 +561,23 @@ export default function UsuariosPage() {
                     disabled={!form.areaId}
                     disabledHint="Elige primero el area."
                   />
+                  {/*
+                    ALCANCE A MEDIDA. Solo aparece si de verdad existe, y aparece SELECCIONADO:
+                    es lo que la persona tiene ahora. Elegir otra opcion lo sustituye —eso es un
+                    acto deliberado—, pero guardar sin tocarlo lo deja intacto.
+                  */}
+                  {scopeKind === 'custom' ? (
+                    <ScopeOption
+                      checked
+                      onSelect={() => setScopeKind('custom')}
+                      title={
+                        scopeAreaIds.length === 1
+                          ? `Otra area: ${areas.find((a) => a.id === scopeAreaIds[0])?.name ?? 'sin nombre'}`
+                          : `A medida: ${scopeAreaIds.length} areas`
+                      }
+                      description="Configurado en Permisos. Guardar aqui no lo cambia; para tocarlo, abre Permisos o elige otra opcion."
+                    />
+                  ) : null}
                   <ScopeOption
                     checked={scopeKind === 'processes'}
                     onSelect={() => setScopeKind('processes')}
