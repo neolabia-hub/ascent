@@ -80,6 +80,7 @@ enum MigrationPolicy {
 enum ContentType {
   LESSON
   VIDEO
+  PRESENTATION
   DOCUMENT
   ASSESSMENT
   SURVEY
@@ -100,6 +101,7 @@ enum CardType {
 enum PackageKind {
   FILE
   VIDEO
+  PRESENTATION
   SCORM_12
   SCORM_2004
 }
@@ -355,6 +357,7 @@ model Process {
   name              String
   code              String // SGI | SST | PESV | SARLAFT | ...
   responsibleUserId String? @map("responsible_user_id") @db.Uuid
+  responsible       User?   @relation("ProcesosQueLidera", fields: [responsibleUserId], references: [id])
   areaId            String? @map("area_id") @db.Uuid
   area              Area?   @relation(fields: [areaId], references: [id])
   active            Boolean @default(true)
@@ -422,6 +425,7 @@ model Service {
 
   @@unique([tenantId, code])
   @@map("services")
+  users     User[]
 }
 
 model Regional {
@@ -485,8 +489,13 @@ model User {
   areaId     String    @map("area_id") @db.Uuid
   area       Area      @relation(fields: [areaId], references: [id])
   regionalId String?   @map("regional_id") @db.Uuid
+  // Linea de servicio a la que pertenece (almacenamiento, masivo, paqueteo). OPCIONAL: hay
+  // empresas que no organizan asi a su gente, y exigirlo bloquearia su carga masiva entera.
+  serviceId  String?   @map("service_id") @db.Uuid
+  service    Service?  @relation(fields: [serviceId], references: [id])
   regional   Regional? @relation(fields: [regionalId], references: [id])
 
+  birthDate      DateTime?      @map("birth_date") @db.Date // felicitaciones, indicadores por edad
   hiredAt        DateTime?      @map("hired_at") @db.Date // dispara induccion PREVIA al inicio (D1072)
   employmentType EmploymentType @default(DIRECTO) @map("employment_type")
   roadActor      RoadActor?     @map("road_actor") // PESV Paso 10
@@ -513,6 +522,7 @@ model User {
   assignments     Assignment[]
   attempts        Attempt[]
   audienceMembers AudienceMember[]
+  processesLed    Process[]               @relation("ProcesosQueLidera")
   streak          UserStreak?
 
   @@unique([tenantId, documentNumber])
@@ -769,6 +779,8 @@ model ActivityContent {
   activityVersion     ActivityVersion   @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
   type                ContentType
   title               String
+  /// Descripcion editorial de ESTA pieza, no de la actividad. La lee quien cursa.
+  description         String?
   displayOrder        Int               @map("display_order")
   isRequired          Boolean           @default(true) @map("is_required")
   config              Json              @default("{}") // min_watch_pct, min_seconds...
