@@ -476,7 +476,7 @@ export default function UsuariosPage() {
             <Input id="u-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} maxLength={160} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field htmlFor="u-email" label="Correo" required hint="Personal o corporativo; se puede cambiar despues sin perder el historial.">
+            <Field htmlFor="u-email" label="Correo" required hint="Personal o corporativo.">
               <Input id="u-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={120} />
             </Field>
             <Field htmlFor="u-emailkind" label="Tipo de correo">
@@ -498,8 +498,27 @@ export default function UsuariosPage() {
                 ))}
               </Select>
             </Field>
-            <Field htmlFor="u-area" label="Area donde trabaja" required hint="De aqui salen las formaciones que le exigen a ELLA. No es lo que administra.">
-              <Select id="u-area" value={form.areaId} onChange={(e) => setForm({ ...form, areaId: e.target.value })}>
+            <Field htmlFor="u-area" label="Area donde trabaja" required>
+              <Select
+                id="u-area"
+                value={form.areaId}
+                onChange={(e) => {
+                  const anterior = form.areaId;
+                  const nueva = e.target.value;
+                  setForm({ ...form, areaId: nueva });
+                  /*
+                    SI CAMBIA DE AREA, EL ALCANCE LA SIGUE. A quien administraba su area y la
+                    trasladan, lo normal es que administre la nueva; dejarle la anterior marcada
+                    es dejarle alcance sobre un area de la que ya no es, y nadie lo revisa.
+                    Solo se sustituye lo que era SU area: lo que se marco a mano no se toca.
+                  */
+                  setScopeAreaIds((previas) =>
+                    anterior && nueva && previas.includes(anterior)
+                      ? [...previas.filter((id) => id !== anterior), nueva]
+                      : previas,
+                  );
+                }}
+              >
                 <option value="">Seleccionar...</option>
                 {areas.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
@@ -508,7 +527,7 @@ export default function UsuariosPage() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field htmlFor="u-service" label="Servicio" hint="Opcional. Permite dirigir formacion por linea de servicio.">
+            <Field htmlFor="u-service" label="Servicio" hint="Opcional.">
               <Select id="u-service" value={form.serviceId ?? ''} onChange={(e) => setForm({ ...form, serviceId: e.target.value || null })}>
                 <option value="">Ninguno</option>
                 {services.map((r) => (
@@ -561,7 +580,7 @@ export default function UsuariosPage() {
               <Field
                 htmlFor="u-scope"
                 label="Gestiona"
-                hint="Que parte del catalogo, las convocatorias y el plan puede ver y administrar."
+                hint="Que parte del catalogo, las convocatorias y el plan administra."
               >
                 <div className="space-y-2">
                   <ScopeOption
@@ -575,7 +594,7 @@ export default function UsuariosPage() {
                     checked={scopeKind === 'scoped'}
                     onSelect={acotar}
                     title="Solo estas areas y procesos"
-                    description="Lo que ADMINISTRA. No tiene por que ser donde trabaja: se puede estar en Gestion Humana y llevar SARLAFT."
+                    description="Lo que administra. No tiene por que ser donde trabaja."
                   />
 
                   {scopeKind === 'scoped' ? (
@@ -592,7 +611,7 @@ export default function UsuariosPage() {
                           id="u-scope-areas"
                           placeholder="Ninguna area marcada"
                           /*
-                            SU area sale rotulada "(donde trabaja)". Sin eso, esta lista y el campo
+                            SU area sale rotulada "(su area)". Sin eso, esta lista y el campo
                             "Area" de arriba parecen el mismo dato y no lo son: arriba es DONDE
                             TRABAJA —y de ahi salen las formaciones que le exigen a ella—; aqui es
                             QUE ADMINISTRA. Marcar SGI no arrastra a Logistica: se toma solo lo
@@ -600,14 +619,13 @@ export default function UsuariosPage() {
                           */
                           options={areas.map((row) => ({
                             id: row.id,
-                            label: row.id === form.areaId ? `${row.name} (donde trabaja)` : row.name,
+                            label: row.id === form.areaId ? `${row.name} (su area)` : row.name,
                           }))}
                           value={scopeAreaIds}
                           onChange={setScopeAreaIds}
                         />
                         <p className="mt-1 text-xs text-ink-500">
-                          Ve todos los procesos que cuelguen de esas areas — tambien los que se creen manana.
-                          Se toma <strong>solo lo marcado</strong>: su area no entra sola.
+                          Incluye los procesos que se creen manana en esas areas.
                         </p>
                       </div>
 
@@ -620,9 +638,7 @@ export default function UsuariosPage() {
                           value={scopeProcessIds}
                           onChange={setScopeProcessIds}
                         />
-                        <p className="mt-1 text-xs text-ink-500">
-                          Exactamente estos, aunque cuelguen de otra area o la persona trabaje en otra.
-                        </p>
+                        <p className="mt-1 text-xs text-ink-500">Solo estos, cuelguen de donde cuelguen.</p>
                       </div>
 
                       {/*
@@ -656,7 +672,7 @@ export default function UsuariosPage() {
             <Field htmlFor="u-hired" label="Fecha de ingreso" hint="Dispara la induccion previa al inicio.">
               <Input id="u-hired" type="date" value={form.hiredAt ?? ''} onChange={(e) => setForm({ ...form, hiredAt: e.target.value || null })} />
             </Field>
-            <Field htmlFor="u-birth" label="Fecha de nacimiento" hint="Opcional. No afecta a ninguna obligacion.">
+            <Field htmlFor="u-birth" label="Fecha de nacimiento" hint="Opcional.">
               <Input
                 id="u-birth"
                 type="date"

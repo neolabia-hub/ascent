@@ -20,6 +20,80 @@ un diario, no una referencia.
 
 ---
 
+## 2026-08-30 (tarde) — El alcance, los avisos, y el terreno de asignaciones
+
+### Lo que se cerro
+
+**El alcance ya se entiende y se edita en un solo sitio.**
+- El campo "Gestiona" marca **areas y procesos** con dos listas, igual que Permisos, asi que no
+  queda alcance que la ficha no sepa mostrar. **Permisos ya solo lo MUESTRA** — un dato, un
+  editor: tenerlo en dos sitios fue lo que produjo el fallo del mediodia.
+- **Su area viene marcada** al acotar (tambien al editar), y **si cambia de area de trabajo, el
+  alcance la sigue**: a quien administraba su area y trasladan, dejarle marcada la anterior es
+  dejarle alcance sobre un area de la que ya no es. Solo se sustituye lo que era SU area; lo
+  marcado a mano no se toca.
+- Si le quitan su area, se dice la consecuencia —"no administrara nada de Logistica, que es donde
+  trabaja"— sin impedirlo: quien lleva SARLAFT desde Gestion Humana esta en ese caso.
+- Fuera los textos largos y el bloque ambar. El aviso de "marca al menos uno" impide guardar, asi
+  que habla como los demas errores del formulario. Y los desplegables tienen el mismo acabado que
+  los botones: uno plano al lado de un boton con profundidad se lee como deshabilitado.
+
+**Los avisos llevan a su sitio.** Pulsar uno abre lo que nombra y lo marca leido. El de "se te
+asigno X" referenciaba `assignments` con id NULO —ninguna referencia— asi que lo mejor que podia
+hacer era llevar al modulo; ahora referencia la formacion y abre `/formacion/<id>`: si esta
+empezada entra a ella, si no ensena su tarjeta, y **si la obligacion se retiro despues del aviso lo
+DICE**.
+
+### La pregunta del cliente que valia por un diagnostico
+
+*"El aviso dice que me asignaron la S3 07489087 y no esta en mis pendientes."* No era un fallo de
+asignacion: la obligacion existe y esta en **`WITHDRAWN_LEFT_AUDIENCE`** — se retiro porque la
+persona dejo de pertenecer a la audiencia (la limpieza del e2e borra su requisito al terminar). El
+aviso se queda porque es un registro de lo que paso, no un espejo del estado de hoy. En esta base
+hay 230 avisos contra 117 obligaciones creadas en total. Esta en el RUNBOOK con la consulta que lo
+comprueba en un minuto.
+
+---
+
+### LO QUE SIGUE: asignaciones, tipos de formacion y convocatorias
+
+Se hablo entero y **no se construyo nada**. Esto es el terreno, para no volver a levantarlo.
+
+**Que es cada cosa** (esta tambien en `arquitectura.md` 4.55): **audiencia** = grupo por reglas, no
+obliga; **requisito** = la regla permanente que si obliga, y hacia el futuro; **matriz** = que
+exige cada cargo; **obligacion** = el resultado, lo unico que se mide. **Quienes** crea
+obligaciones manuales. **Convocatoria** es la jornada, y de ella cuelga la inscripcion.
+
+**El hallazgo:** `activity_types.config` YA trae `defaultAssignmentMode`
+(`ON_HIRE` | `BY_JOB_TITLE` | `MANUAL`) y **nadie lo lee**. Es la tercera semilla que se guarda y
+no se aplica, despues de `analyst_scopes` y `norms.annual_hours_required`. Lo que deberia
+gobernar, y que el cliente pidio en estos terminos:
+
+| Tipo | Quien decide la audiencia | Que deberia hacer "Quienes" |
+|---|---|---|
+| **Induccion general** | nadie: es para TODOS | precargado y **sin editar**. Marcarlo a mano solo puede salir mal |
+| **Induccion especifica** | la **matriz de cargos** | precargado desde el cargo, **editable con novedad justificada** |
+| **Reinduccion** | como la general | + su recurrencia (12 meses) |
+| **Plan / extraordinaria / pildora** | el analista, caso a caso | **obligatorio marcarlo**: ahi si es su decision |
+
+Y **el tipo deberia preguntarse PRIMERO** al crear una formacion, porque cambia el resto del
+formulario. Hoy es un campo mas y por eso todos los tipos preguntan lo mismo.
+
+**La decision que falta, y es del cliente** (sin ella no se toca el modelo): cuando una formacion
+tiene dos convocatorias —dos regionales, dos meses—, ¿la convocatoria tiene su propia **lista de
+convocados** (de los obligados, quienes van a esta jornada, y el resto queda como "pendiente de
+convocar"), o **arrastra a todos los obligados** y solo se registra la asistencia? La recomendacion
+dada fue la primera: es lo que permite decir "faltan 23 por convocar" y lo que evita que el reparto
+acabe en un Excel al lado.
+
+### Verificado
+
+`tsc`, `eslint` y `nest build` en verde; **172/172** unitarias; **16/16 e2e**. Ojo: `la obligacion
+nace sola` tarda ~25 s y alguna asercion tiene 20 s de tope, asi que bajo carga puede caer en la
+suite completa y pasar sola en aislamiento — esta en el RUNBOOK.
+
+---
+
 ## 2026-08-30 — Quien administra tambien se forma
 
 ### El hueco

@@ -59,7 +59,9 @@ export function notificationHref(item: {
     return `/aprender/${referenceId}`;
   }
   if (eventType === 'ASSIGNMENT_CREATED' && referenceType === 'activities' && referenceId) {
-    return `/mi-formacion?actividad=${referenceId}`;
+    // A la formacion misma: si ya esta empezada entra a ella, si no ensena su tarjeta, y si la
+    // obligacion se retiro despues del aviso lo DICE, en vez de dejar a la persona pulsando.
+    return `/formacion/${referenceId}`;
   }
   if (eventType === 'ASSIGNMENT_CREATED' || eventType === 'PLAN_ASSIGNMENTS_CREATED' || eventType === 'ENROLLED') {
     return '/mi-formacion';

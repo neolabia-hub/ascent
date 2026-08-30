@@ -934,3 +934,36 @@ opcion a proposito.
 **La leccion.** Dos pantallas que escriben el MISMO dato con formas distintas: la simple tiene que
 saber reconocer lo que no sabe representar, y no puede escribir por defecto. Cuando una pantalla
 "simplifica" un dato, el caso que no cabe no es un caso raro: es el que se pierde.
+
+### "El aviso dice que me asignaron X, pero no esta en mis pendientes" (2026-08-30)
+
+**No es un fallo de asignacion.** Se comprueba en un minuto:
+
+```
+docker exec neo-pulse-postgres psql -U neopulse -d neopulse -c "select s.status, s.source \
+  from assignments s join users u on u.id=s.user_id join activities a on a.id=s.target_id \
+  where a.name ilike '%<parte del nombre>%' and u.document_number='<documento>';"
+```
+
+Si sale `WITHDRAWN_LEFT_AUDIENCE`, la obligacion **se retiro** porque la persona dejo de
+pertenecer a la audiencia que se la exigia —lo mas comun en esta base: la limpieza del e2e borra
+su requisito al terminar, y el motor retira lo que ese requisito sostenia—. El aviso se queda
+porque es el registro de lo que paso.
+
+En esta base hay **230 avisos `ASSIGNMENT_CREATED` contra 117 obligaciones creadas en total**: son
+datos de prueba acumulados de decenas de corridas.
+
+Desde hoy, pulsar ese aviso lleva a `/formacion/<id>`, que lo explica en pantalla en vez de dejar
+a la persona pulsando sin que pase nada.
+
+### Intermitencia conocida del e2e bajo carga (2026-08-30)
+
+`DoD: la obligacion nace sola al ingresar` tarda ~25 s con la maquina cargada y algunas
+aserciones tienen 20 s de tope, asi que en una corrida completa puede caer y **pasa sola en
+aislamiento**:
+
+```
+pnpm exec playwright test e2e/sprint-3.spec.ts -g "nace sola"
+```
+
+Antes de dar por rota una prueba que falla en la suite completa, correrla sola. Si pasa, es carga.

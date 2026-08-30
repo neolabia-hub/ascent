@@ -328,6 +328,49 @@ si se confunden.
 
 ---
 
+## 4.55 Asignaciones: quien esta obligado a que
+
+Cuatro piezas que se confunden entre si porque las cuatro hablan de "a quien". Se distinguen por
+lo que HACEN:
+
+| Pieza | Tabla | Que es | ¿Obliga por si sola? |
+|---|---|---|---|
+| **Audiencia** | `audiences` | Un GRUPO definido por reglas (cargo, tipo de cargo, area, regional, tipo de contrato, servicio). Se recalcula solo: quien entra y cumple la regla, entra al grupo | **No.** Es el "a quienes" reutilizable |
+| **Requisito** | `assignment_rules` | La REGLA permanente: *a esta audiencia · esta formacion · disparada por X · vence en N dias · se repite cada M meses* | **Si**, y ademas hacia el futuro |
+| **Matriz** | `activity_job_titles` | La matriz de competencia: que formacion exige cada CARGO | Si, a traves del motor |
+| **Obligacion** | `assignments` | El RESULTADO: una fila por persona y formacion, con vencimiento, estado y origen (`RULE`, `PLAN`, `MANUAL`) | Es lo unico que se mide |
+
+**Quienes**, en la ficha de la formacion, crea obligaciones `MANUAL`: el atajo para cuando no hay
+regla que lo cubra.
+
+**Y la convocatoria (`offerings`) es otra cosa**: la JORNADA —cuando, donde, quien dicta,
+modalidad, intensidad horaria, proyectados—. La inscripcion (`enrollments`) cuelga de ella.
+
+> **Obligacion ≠ convocatoria.** Una dice *a quien se le exige y para cuando*; la otra, *cuando se
+> dicta*. Por eso una formacion tiene UNA lista de obligados y VARIAS jornadas.
+
+### Estados de una obligacion, y el que mas confunde
+
+`PENDING` · `IN_PROGRESS` · `OVERDUE` son las abiertas: son las que salen en "lo pendiente" de la
+persona. `COMPLETED` cierra. `WAIVED` la exime alguien con motivo.
+
+**`WITHDRAWN_LEFT_AUDIENCE` es la que produce la pregunta "¿por que no aparece?"**: la persona
+dejo de pertenecer a la audiencia que se la exigia —se retiro el requisito, o cambio de cargo— asi
+que la obligacion se retira. El AVISO que se mando en su dia se queda, porque un aviso es el
+registro de algo que paso y no un espejo del estado de hoy. Por eso pulsar un aviso viejo puede
+llevar a una formacion que ya no esta entre las tuyas, y por eso la pantalla lo DICE en vez de
+quedarse muda (`(learner)/formacion/[activityId]`).
+
+### Lo que el tipo de formacion ya sabe y todavia nadie usa
+
+`activity_types.config` trae `defaultAssignmentMode` (`ON_HIRE` | `BY_JOB_TITLE` | `MANUAL`),
+`participatesInPlan`, `requiresBeforeHire`, `defaultRecurrenceMonths`… y **ninguna consulta lo
+lee**. Es la tercera semilla del proyecto que se guarda y no se aplica, despues de
+`analyst_scopes` y `norms.annual_hours_required`. Lo que deberia gobernar esta escrito en
+`docs/HANDOFF.md` (sesion del 2026-08-30) y es el trabajo que sigue.
+
+---
+
 ## 4.6 El plan anual de capacitacion
 
 El plan es una **entidad empresarial propia**, no una vista de las convocatorias: tiene objetivo,
