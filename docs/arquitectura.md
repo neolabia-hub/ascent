@@ -284,6 +284,30 @@ inventarle una naturaleza seria una suposicion con aspecto de dato.
 | `APPROVAL_REQUESTED` | a quien tiene `approvals:decide` | Gestion |
 | `OFFERING_PUBLISHED` | al instructor ("vas a dictarla") | Gestion |
 
+### La vida de un aviso: aparece, se apaga, se borra
+
+Un aviso no puede quedarse para siempre, y tampoco puede desaparecer en cuanto molesta. Tiene tres
+momentos y cada uno lo dispara algo distinto:
+
+| Momento | Cuando | Que pasa |
+|---|---|---|
+| **Aparece** | ocurre el hecho (te asignan, te aprueban, alguien agota intentos) | sin leer; cuenta en la campana |
+| **Se apaga** | lo abres · marcas todo leido · **la obligacion se cumple** · **la obligacion se retira** | leido: sale de la vista, sigue bajo "Ver leidas" |
+| **Se borra** | 30 dias despues de leido · 90 sin que nadie lo abriera | desaparece de la base (`NotificationRetentionWorker`, diario a las 3) |
+
+**Se apaga solo en los dos casos en que ya no pide nada:**
+- **Cumplida** (`completion.service.ts`): terminar la formacion apaga el aviso que la anunciaba.
+- **Retirada** (`requirement-engine.service.ts`): quien sale de la audiencia deja de estar
+  obligado, y el aviso que se le mando deja de reclamarle algo que ya no se le exige. Este es el
+  caso que se veia como "la campana dice que tengo X y X no esta en mis pendientes".
+
+**EMPEZARLA NO lo apaga, a proposito.** Un aviso puede estar pidiendo que la TERMINES; apagarlo al
+abrir la formacion silenciaria justo el recordatorio que hacia falta.
+
+**Y borrar es seguro porque el aviso es una COPIA.** El hecho vive en `assignments`, en
+`audit_logs` y en `enrollments`; lo que caduca es el recordatorio, no el registro. Por eso el
+ciclo no toca los avisos de correo pendientes de enviar: esos todavia no cumplieron su funcion.
+
 **El contador cuenta PENDIENTES, no avisos.** Son dos senales distintas y estan a dos centimetros
 una de otra en la barra: la campana cuenta lo que no has leido y se apaga al leerlo; el conmutador
 cuenta lo que te falta por HACER y no se apaga hasta que lo haces. Si contara avisos, bajaria a

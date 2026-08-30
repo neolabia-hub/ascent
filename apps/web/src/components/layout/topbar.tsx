@@ -107,6 +107,16 @@ function NotificationsMenu() {
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(false);
+  /**
+   * LA CAMPANA ENSENA LO NO LEIDO. Un aviso leido se va de la vista: eso es lo que significa una
+   * campana, y sin ello la lista era un registro que no se vaciaba nunca —el aviso de una
+   * obligacion retirada hace tres semanas seguia ahi, delante de lo de hoy—.
+   *
+   * Pero NO se borra: sigue estando bajo "Ver leidas", porque a veces es la unica traza que
+   * explica por que alguien creia tener una formacion que ya le retiraron. Desaparecer de la vista
+   * y desaparecer de la historia no son lo mismo.
+   */
+  const [verLeidas, setVerLeidas] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useOutsideClick(ref, () => setOpen(false));
 
@@ -127,6 +137,7 @@ function NotificationsMenu() {
   async function handleToggle() {
     const next = !open;
     setOpen(next);
+    if (next) setVerLeidas(false);
     if (next) {
       setLoading(true);
       try {
@@ -150,6 +161,9 @@ function NotificationsMenu() {
       // el estado ya se actualizo de forma optimista; una recarga posterior lo reconcilia
     }
   }
+
+  const visibles = verLeidas ? items : items.filter((item) => !item.readAt);
+  const leidas = items.filter((item) => item.readAt).length;
 
   return (
     <div className="relative" ref={ref}>
@@ -189,10 +203,12 @@ function NotificationsMenu() {
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
               <p className="px-4 py-6 text-center text-sm text-ink-500">Cargando...</p>
-            ) : items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-ink-500">No hay notificaciones.</p>
+            ) : visibles.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-ink-500">
+                {verLeidas ? 'No hay notificaciones.' : 'Nada sin leer.'}
+              </p>
             ) : (
-              items.map((item) => (
+              visibles.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -225,6 +241,16 @@ function NotificationsMenu() {
               ))
             )}
           </div>
+
+          {leidas > 0 ? (
+            <button
+              type="button"
+              onClick={() => setVerLeidas((actual) => !actual)}
+              className="focus-ring w-full border-t border-line px-4 py-2.5 text-center text-xs text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+            >
+              {verLeidas ? 'Ver solo lo no leido' : `Ver leidas (${leidas})`}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

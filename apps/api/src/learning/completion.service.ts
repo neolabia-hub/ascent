@@ -158,6 +158,25 @@ export class CompletionService {
       where: { id: assignment.id },
       data: { status: 'COMPLETED', completedAt, completedEnrollmentId: enrollment.id },
     });
+
+    // EL AVISO QUE YA NO PIDE NADA SE APAGA. "Tienes esta formacion asignada" deja de tener
+    // sentido en cuanto la formacion esta hecha, y dejarlo sin leer hace que la campana reclame
+    // atencion por algo que la persona acaba de terminar.
+    //
+    // Se marca LEIDO, no se borra: sigue estando en "ver leidas", que es donde se comprueba que a
+    // alguien se le aviso y cuando. Un registro que el sistema borra solo es un registro en el que
+    // no se puede confiar.
+    await db.notification.updateMany({
+      where: {
+        recipientUserId: enrollment.userId,
+        channel: 'IN_APP',
+        readAt: null,
+        referenceType: 'activities',
+        referenceId: enrollment.activityVersion.activityId,
+      },
+      data: { readAt: completedAt },
+    });
+
     return true;
   }
 

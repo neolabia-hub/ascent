@@ -70,6 +70,25 @@ de la convocatoria. Iniciar por el hecho de mirar de que se trata pondria a cont
 formacion de alguien que no ha hecho nada. Se ensena la tarjeta con su boton: mirar es gratis,
 empezar es un acto.
 
+### La bandeja de avisos, terminada
+
+La pregunta que lo cerro fue "¿y como desaparece esa notificacion?, no puede quedar para siempre".
+No podia: nada borraba nada y la bandeja crecia sin fin. Ahora un aviso tiene tres momentos —
+**aparece, se apaga, se borra** — y cada uno lo dispara algo distinto (tabla completa en
+`arquitectura.md` 4.4):
+
+- **La campana ensena lo NO LEIDO.** Lo leido se pliega bajo "Ver leidas (N)": desaparecer de la
+  vista y desaparecer de la historia no son lo mismo.
+- **Se apaga solo cuando ya no pide nada**: al **cumplir** la formacion y al **retirarse** la
+  obligacion (quien sale de la audiencia). Ese segundo caso es el que empezo todo esto.
+- **Empezarla NO lo apaga**, a proposito: el aviso puede estar pidiendo que la TERMINES.
+- **Se borra**: leido a los 30 dias, sin leer a los 90 (`NotificationRetentionWorker`, diario a las
+  3 de la manana). Es seguro porque el aviso es una COPIA de un hecho que vive en `assignments`,
+  `audit_logs` y `enrollments`. Caduca el recordatorio, no el registro.
+- **Sin boton de "marcar leido" por aviso**: abrirlo ya lo marca. Un boton aparte pide un clic que
+  no significa nada para quien lo pulsa — nadie quiere marcar leido, quiere resolver la cosa. Para
+  vaciar de golpe esta "marcar todo leido", ahora en las dos barras.
+
 ### LO QUE SIGUE: asignaciones, tipos de formacion y convocatorias
 
 Se hablo entero y **no se construyo nada**. Esto es el terreno, para no volver a levantarlo.

@@ -54,6 +54,8 @@ function Notifications() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  /** Ver arriba (barra del panel): la campana ensena lo no leido; lo leido no se borra, se pliega. */
+  const [verLeidas, setVerLeidas] = useState(false);
   const ref = useOutsideClick(() => setOpen(false));
 
   useEffect(() => {
@@ -72,11 +74,17 @@ function Notifications() {
     };
   }, []);
 
+  const visibles = items === null ? [] : verLeidas ? items : items.filter((item) => !item.readAt);
+  const leidas = items === null ? 0 : items.filter((item) => item.readAt).length;
+
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setOpen((value) => !value);
+          setVerLeidas(false);
+        }}
         aria-label={unread > 0 ? `${unread} avisos sin leer` : 'Avisos'}
         className="focus-ring relative flex h-10 w-10 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
       >
@@ -111,13 +119,13 @@ function Notifications() {
 
           {items === null ? (
             <p className="px-4 py-8 text-center text-sm text-ink-500">Cargando...</p>
-          ) : items.length === 0 ? (
+          ) : visibles.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-ink-500">
-              No tienes avisos. Aqui llegan los recordatorios de lo que vence.
+              {verLeidas ? 'No tienes avisos.' : 'Nada sin leer. Aqui llegan los recordatorios de lo que vence.'}
             </p>
           ) : (
             <ul className="max-h-[60vh] overflow-y-auto">
-              {items.slice(0, 8).map((item) => {
+              {visibles.slice(0, 8).map((item) => {
                 const destino = notificationHref(item);
                 const contenido = (
                   <>
@@ -172,6 +180,16 @@ function Notifications() {
               })}
             </ul>
           )}
+
+          {leidas > 0 ? (
+            <button
+              type="button"
+              onClick={() => setVerLeidas((actual) => !actual)}
+              className="focus-ring w-full border-t border-line px-4 py-2.5 text-center text-xs text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+            >
+              {verLeidas ? 'Ver solo lo no leido' : `Ver leidas (${leidas})`}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
