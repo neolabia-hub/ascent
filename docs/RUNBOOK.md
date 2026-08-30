@@ -861,3 +861,24 @@ fecha posterior, la recien publicada caia en la posicion 103 de una pagina de 10
 **La leccion, que se repite.** El sintoma vuelve a ser "esta vacio / no aparece" y la causa vuelve a
 estar lejos: un orden por defecto que nadie eligio. Cuando una lista con tope no encuentra algo que
 acaba de crearse, mirar el ORDEN antes que el filtro.
+
+### La persona recien creada NO aparece en el listado (2026-08-29)
+
+**Sintoma.** Se da de alta a alguien, sale "Persona creada" con su contrasena… y no esta en la
+tabla. Parece que el alta no se guardo.
+
+**Causa.** El listado es **alfabetico y paginado de 20**. Con volumen, la persona nueva cae en la
+pagina 3 y nadie la ve. No es un fallo del alta: el dato esta.
+
+**Arreglo.** Al crear (no al editar), la pantalla filtra por el **documento** de quien se acaba de
+crear y vuelve a la pagina 1, asi que queda mostrando exactamente a esa persona.
+
+**Hermano del anterior.** Misma familia que el orden de las convocatorias: el sintoma es "no
+aparece" y la causa esta en como se ORDENA o se PAGINA, no en lo que se guardo. Los dos salieron
+del mismo e2e al crecer los datos, y ninguno se habria visto en una base recien sembrada.
+
+**Nota de migraciones.** Al aplicar la de este dia se vio que `_prisma_migrations` estaba
+DESINCRONIZADA: `user_birth_date` figuraba como fallida y `user_service` ni siquiera constaba,
+aunque las dos columnas existian (se aplicaron a mano en su sesion). Se arreglo con
+`prisma migrate resolve --applied <nombre>` para cada una, con el usuario owner. Si `migrate
+deploy` se queja de que una columna "already exists", es esto: resolver, no re-aplicar.

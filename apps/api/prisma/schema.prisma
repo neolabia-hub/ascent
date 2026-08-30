@@ -523,6 +523,7 @@ model User {
   attempts        Attempt[]
   audienceMembers AudienceMember[]
   processesLed    Process[]               @relation("ProcesosQueLidera")
+  versionsLed     ActivityVersion[]       @relation("VersionesQueResponde")
   streak          UserStreak?
 
   @@unique([tenantId, documentNumber])
@@ -753,6 +754,10 @@ model ActivityVersion {
   publishedBy   String?       @map("published_by") @db.Uuid
 
   // SNAPSHOT resuelto de la cascada (tenant -> actividad) al publicar (Decision #27).
+  // Incluye QUIEN RESPONDIA por la formacion cuando se publico (Decision #64): la constancia y el
+  // auditor preguntan por el de entonces, no por el de hoy.
+  responsibleUserId  String?         @map("responsible_user_id") @db.Uuid
+  responsible        User?           @relation("VersionesQueResponde", fields: [responsibleUserId], references: [id])
   passingScore       Int             @map("passing_score")
   maxAttempts        Int             @map("max_attempts")
   retryWaitHours     Int?            @map("retry_wait_hours")

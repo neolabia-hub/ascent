@@ -214,7 +214,17 @@ export default function UsuariosPage() {
         });
       }
       setDrawerOpen(false);
-      await load();
+      if (editing) {
+        await load();
+      } else {
+        // VER LO QUE ACABAS DE HACER. El listado es alfabetico y paginado de 20: con 800
+        // personas, la recien creada cae en la pagina 3 y el alta parece no haber pasado. Se
+        // filtra por su documento, que es unico, asi que la pantalla queda mostrando exactamente
+        // a quien se acaba de crear. (Mismo sintoma que el orden de las convocatorias: "no
+        // aparece" con la causa a dos capas de distancia.)
+        setQ(form.documentNumber);
+        setPage(1);
+      }
     } catch (error) {
       setFormError(apiErrorText(error));
     } finally {

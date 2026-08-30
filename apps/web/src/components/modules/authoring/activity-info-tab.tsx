@@ -51,6 +51,14 @@ export function ActivityInfoTab({
     jobTitles: CatalogRow[];
   } | null>(null);
   const [people, setPeople] = useState<PickableUser[]>([]);
+  /**
+   * EL RESPONSABLE SE COMPORTA COMO EL CONTENIDO (Decision #64): se decide mientras hay un
+   * borrador abierto y se congela al publicar. Sin borrador, el campo se ve pero no se toca, y el
+   * texto dice la salida —crear una version nueva—, que es la operacion que hay que hacer y que
+   * casi nadie sabe que existe. Deshabilitado y explicado, no escondido: quien entra a la ficha
+   * tiene que poder VER quien responde.
+   */
+  const hayBorrador = activity.versions.some((version) => version.status === 'DRAFT');
   const [helpOpen, setHelpOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -146,11 +154,15 @@ export function ActivityInfoTab({
               <Field
                 htmlFor="i-responsible"
                 label="Responsable"
-                hint="Se hereda del proceso al crear la formacion. Se puede cambiar aqui; recibe los avisos de incumplimiento."
+                hint={
+                  hayBorrador
+                    ? 'Se hereda del proceso al crear la formacion. Recibe los avisos de incumplimiento, y al publicar queda congelado en la version.'
+                    : 'Congelado en la version publicada: es quien respondia cuando se dicto. Para cambiarlo, crea una version nueva.'
+                }
               >
                 <PersonPicker
                   id="i-responsible"
-                  disabled={!canEdit}
+                  disabled={!canEdit || !hayBorrador}
                   people={people}
                   suggestedAreaId={areaDelProceso}
                   value={form.responsibleUserId || null}

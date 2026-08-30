@@ -173,6 +173,14 @@ export class VersioningService {
       if (previous) {
         await tx.activityVersion.update({ where: { id: previous.id }, data: { status: 'RETIRED' } });
       }
+      // 4. QUIEN RESPONDE, congelado igual que el temario (Decision #64). La actividad sigue
+      //    teniendo su responsable vigente —es a quien hay que avisar hoy—, pero la version
+      //    publicada guarda el de ESTE momento: la constancia y el auditor preguntan por el de
+      //    entonces, y cambiar el responsable manana no puede reescribir lo que ya se dicto.
+      const owner = await tx.activity.findUnique({
+        where: { id: draft.activityId },
+        select: { responsibleUserId: true },
+      });
       const result = await tx.activityVersion.update({
         where: { id: draft.id },
         data: {
@@ -181,6 +189,7 @@ export class VersioningService {
           publishedBy: actor.id,
           migrationPolicy: input.migrationPolicy,
           syllabusSnapshot: syllabus,
+          responsibleUserId: owner?.responsibleUserId ?? null,
         },
       });
       await tx.activity.update({ where: { id: draft.activityId }, data: { currentVersionId: result.id } });
@@ -197,6 +206,7 @@ export class VersioningService {
         versionNumber: draft.versionNumber,
         migrationPolicy: input.migrationPolicy,
         retiredVersionId: published.previousId,
+        responsibleUserId: published.result.responsibleUserId,
       },
     });
     return published.result;

@@ -11,6 +11,7 @@ import { assertScopeAllows, processScopeWhere, scopeAllows } from '../common/ana
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertResponsibleChangeAllowed } from './responsible-rules.js';
 import { VersioningService } from './versioning.service.js';
 
 const ACTIVITY_LIST_SELECT = {
@@ -169,6 +170,19 @@ export class ActivitiesService {
       throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
     }
     if (input.processId) assertScopeAllows(actor.scopeProcessIds, input.processId);
+
+    // EL RESPONSABLE SE COMPORTA COMO EL CONTENIDO (Decision #64): se decide en borrador y se
+    // congela al publicar. Con una version publicada y ningun borrador abierto, cambiarlo
+    // reescribiria quien respondia por algo que ya se dicto y ya se certifico.
+    const openDraft = await this.prisma.scoped.activityVersion.findFirst({
+      where: { activityId: id, status: 'DRAFT' },
+      select: { id: true },
+    });
+    assertResponsibleChangeAllowed({
+      current: before.responsibleUserId,
+      requested: input.responsibleUserId,
+      hasOpenDraft: openDraft !== null,
+    });
 
     await this.prisma.tx(async (tx) => {
       await tx.activity.update({

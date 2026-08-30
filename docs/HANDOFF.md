@@ -71,10 +71,32 @@ el RUNBOOK, con el conteo que lo caza.
 - **Anular un plan aprobado por error cuando ya hay gente empezando.** Hoy no hay salida: o se
   cancela renglon a renglon, o se cierra — y "cerrado" significa otra cosa. Es un hueco de estado.
 
+### El responsable, congelado en la version (Decision #64)
+
+Aplicado lo que se hablo. Ahora hay **tres niveles** y cada uno responde una pregunta distinta: el
+del PROCESO (quien lo lleva hoy), el de la ACTIVIDAD (quien responde hoy por esa formacion, copiado
+por valor al crearla) y el de la VERSION (quien respondia **cuando se publico**). El tercero es el
+que faltaba y es el que ve un auditor.
+
+Cambiar el responsable solo se permite **con un borrador de version abierto** — o sea, al crear la
+formacion desde cero o tras abrir una version nueva. Sin borrador, el servidor responde
+`RESPONSIBLE_LOCKED` y la pantalla deshabilita el campo **diciendo la salida**, sin esconderlo:
+quien entra a la ficha tiene que poder ver quien responde. Las notificaciones de incumplimiento
+siguen yendo al responsable **vigente**: para avisar sirve quien esta hoy.
+
+Migracion `20260829210000_version_responsible`. Las versiones ya publicadas se quedan en NULL: no
+se puede inventar un dato historico que nadie registro.
+
+### Y otro "no aparece", el tercero
+
+Al crear una persona no salia en el listado: alfabetico y paginado de 20, con 46 personas de prueba
+la nueva caia en la pagina 3. Ahora la pantalla filtra por su documento al crearla. En el RUNBOOK,
+junto al de las convocatorias — son la misma familia y ya van tres.
+
 ### Verificado
 
-`tsc`, `eslint` y `nest build` en verde; **165/165 unitarias** (9 nuevas de la regla de borrado);
-**15/15 e2e**, incluido el caso nuevo de corregir y eliminar un plan en borrador.
+`tsc`, `eslint` y `nest build` en verde; **172/172 unitarias** (9 del borrado del plan + 7 del
+responsable); **15/15 e2e**, incluido el caso nuevo que corrige y elimina un plan en borrador.
 
 ---
 

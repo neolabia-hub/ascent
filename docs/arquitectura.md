@@ -101,7 +101,31 @@ de servir para auditoria.
 Publicar una version **congela** todo:
 - Las lecciones se **copian** a copias marcadas como publicadas, que rechazan toda edicion.
 - Se congelan el temario (para las constancias) y la nota minima exigida.
+- Se congela **quien responde** por la formacion (`activity_versions.responsible_user_id`).
 - La version publicada rechaza agregar, quitar o reordenar contenidos.
+
+**El responsable tiene DOS niveles, y esa es la parte que se malentiende** (Decision #64):
+
+| Nivel | Que responde | Cuando cambia |
+|---|---|---|
+| `processes.responsible_user_id` | Quien lleva el proceso HOY | Se edita en Configuracion → Procesos |
+| `activities.responsible_user_id` | Quien responde por esta formacion HOY. Se copia **por valor** del proceso al crearla | Solo con un borrador de version abierto |
+| `activity_versions.responsible_user_id` | Quien respondia cuando esa version **se publico** | Nunca: es historia |
+
+Copiar por valor del proceso a la actividad ya evitaba que cambiar al lider de SARLAFT reescribiera
+las capacitaciones existentes. Lo que faltaba era el tercer nivel: sin el, editar la ficha cambiaba
+en silencio quien figuraba como responsable de la version publicada en marzo, que es **evidencia**.
+
+Por eso el campo se comporta como el contenido: se decide **mientras hay borrador** —al crear la
+formacion desde cero o tras abrir una version nueva— y se congela al publicar. Con una version
+publicada y ningun borrador, el servidor responde `RESPONSIBLE_LOCKED` y la pantalla lo dice
+deshabilitando el campo, sin esconderlo, con la salida escrita: crear una version nueva.
+
+**Las notificaciones NO usan el congelado.** Un aviso de incumplimiento va al responsable
+**vigente** del proceso: para avisar sirve quien esta hoy, y para la evidencia quien estaba
+entonces. Son dos usos distintos del mismo dato y estan separados a proposito.
+
+La regla vive en `apps/api/src/activities/responsible-rules.ts`, pura y con 7 pruebas.
 
 "Editar" lo publicado crea la version siguiente en borrador, con copias editables. La anterior no
 se toca.
