@@ -179,12 +179,20 @@ export default function TodayPage() {
                 type="button"
                 aria-pressed={activo}
                 onClick={() => setFiltro(chip.clave)}
+                /*
+                  EL ACTIVO LLEVA EL AZUL DE LA EMPRESA (Decision #92): el color del tenant marca
+                  lo elegido, que es exactamente para lo que sirve un acento. Antes el activo era
+                  negro —correcto y anonimo—: podia ser el filtro de cualquier producto.
+                  El resto se quedan neutros a proposito: si todos llevaran color, ninguno
+                  destacaria y el acento dejaria de senalar nada.
+                */
                 className={cn(
-                  'focus-ring shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-150',
+                  'focus-ring shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150',
                   activo
-                    ? 'bg-ink-900 text-surface shadow-sm'
-                    : 'border border-line bg-surface text-ink-500 hover:border-line-strong hover:text-ink-900',
+                    ? 'text-white shadow-btn'
+                    : 'border border-line bg-surface text-ink-500 hover:-translate-y-px hover:border-line-strong hover:text-ink-900',
                 )}
+                style={activo ? { backgroundColor: 'var(--brand-primary)' } : undefined}
               >
                 {chip.label}
                 {/* El numero evita el filtro que no lleva a ninguna parte. */}
@@ -497,21 +505,79 @@ function FilaRepaso({ review }: { review: TodayReview }) {
   return (
     <Link
       href="/repaso"
-      className="stage-in focus-ring mt-8 flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 transition-transform duration-150 hover:-translate-y-0.5 sm:p-5"
+      className="group/rep stage-in focus-ring relative mt-8 block overflow-hidden rounded-3xl border border-line bg-surface p-5 transition-all duration-200 ease-pulse hover:-translate-y-1 hover:shadow-card-hover sm:p-6"
     >
+      {/*
+        EL VERDE DE LA EMPRESA, como halo y no como fondo (Decision #92). Un relleno de color
+        macizo compite con las portadas de las filas de abajo y ademas obliga a texto blanco, que
+        en tema claro se lee peor. Un halo suave detras deja la tarjeta sobre superficie normal y
+        aun asi la separa de todo lo demas: es la unica pieza de la pantalla que no es una
+        formacion, y tiene que notarse.
+      */}
       <span
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 30%, transparent)' }}
-      >
-        <Repeat2 className="h-6 w-6 text-white" strokeWidth={1.75} aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-display text-base font-semibold text-ink-900">Tu repaso de hoy</span>
-        <span className="block text-sm text-ink-500">
-          {review.total} {review.total === 1 ? 'pregunta' : 'preguntas'} de lo que ya viste. Tres minutos.
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full opacity-60 blur-3xl transition-opacity duration-300 group-hover/rep:opacity-90"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-accent) 30%, transparent)' }}
+      />
+
+      <div className="relative flex items-center gap-4">
+        <span
+          className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 ease-pulse group-hover/rep:scale-105"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--brand-accent) 16%, transparent)' }}
+        >
+          {/* Gira un poco al pasar: es el gesto de "volver a pasar por esto", que es el repaso. */}
+          <Repeat2
+            className="h-7 w-7 transition-transform duration-500 ease-pulse group-hover/rep:rotate-180"
+            strokeWidth={1.75}
+            style={{ color: 'var(--brand-accent)' }}
+            aria-hidden="true"
+          />
         </span>
-      </span>
-      <ArrowRight className="h-5 w-5 shrink-0 text-ink-300" strokeWidth={1.75} aria-hidden="true" />
+
+        <div className="min-w-0 flex-1">
+          <p
+            className="text-[11px] font-bold uppercase tracking-[0.08em]"
+            style={{ color: 'var(--brand-accent)' }}
+          >
+            Tres minutos
+          </p>
+          <p className="mt-0.5 font-display text-lg font-bold leading-tight text-ink-900">Tu repaso de hoy</p>
+          <p className="mt-1 text-sm text-ink-500">
+            {review.total} {review.total === 1 ? 'pregunta' : 'preguntas'} de lo que ya viste. Es lo que hace que no
+            se te olvide.
+          </p>
+        </div>
+
+        {/*
+          LAS PREGUNTAS, COMO FICHAS APILADAS. Es lo que convierte un numero en algo que se ve: se
+          entiende de un vistazo que son pocas y que se acaban rapido, que es justo lo que frena a
+          alguien con cinco minutos. Mas de cinco no se dibujan —serian ruido— y el resto se dice
+          con un "+N".
+        */}
+        <div className="hidden shrink-0 items-center sm:flex" aria-hidden="true">
+          {Array.from({ length: Math.min(review.total, 5) }).map((_, indice) => (
+            <span
+              key={indice}
+              className="-ml-2 h-9 w-7 rounded-md border border-line bg-paper transition-transform duration-300 ease-pulse first:ml-0"
+              style={{
+                transform: `rotate(${(indice - 2) * 4}deg)`,
+                zIndex: indice,
+                transitionDelay: `${indice * 40}ms`,
+              }}
+            />
+          ))}
+          {review.total > 5 ? (
+            <span className="ml-1.5 text-sm font-semibold tabular-nums text-ink-500">+{review.total - 5}</span>
+          ) : null}
+        </div>
+
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all duration-200 ease-pulse group-hover/rep:translate-x-1"
+          style={{ backgroundColor: 'var(--brand-accent)' }}
+        >
+          <ArrowRight className="h-5 w-5 text-white" strokeWidth={2.25} aria-hidden="true" />
+        </span>
+      </div>
     </Link>
   );
 }

@@ -87,20 +87,24 @@ function Notifications() {
         }}
         aria-label={unread > 0 ? `${unread} avisos sin leer` : 'Avisos'}
         /*
-          FONDO FIJO Y NO SOLO AL PASAR POR ENCIMA (Decision #90). Un icono suelto sobre una
-          portada no se lee como un boton —parece parte de la foto— y en un telefono no hay
-          "pasar por encima" que lo revele. Con su pastilla propia siempre puesta, se ve que se
-          puede pulsar; y al ABRIRLO cambia a la superficie llena con borde, que es un estado
-          distinto y no un tono mas oscuro del mismo.
+          LA MISMA PASTILLA QUE EL CONMUTADOR (Decision #92): borde, superficie y sombra propios,
+          siempre puestos. Los tres controles de la derecha son la misma familia, asi que se ven
+          igual y se levantan igual al pasar. Antes cada uno tenia su forma y la barra parecia
+          tres cosas pegadas.
         */
         className={cn(
-          'focus-ring relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors duration-150',
+          'focus-ring group/bell relative flex h-10 w-10 items-center justify-center rounded-full border shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
           open
-            ? 'border-line-strong bg-surface text-ink-900 shadow-card'
-            : 'border-line bg-surface/70 text-ink-500 backdrop-blur-sm hover:bg-surface hover:text-ink-900',
+            ? 'border-line-strong bg-paper text-ink-900'
+            : 'border-line bg-surface text-ink-500 hover:border-line-strong hover:text-ink-900',
         )}
       >
-        <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+        {/* Se inclina al pasar. Es lo que hace una campana, y basta para que se sienta viva. */}
+        <Bell
+          className="h-[18px] w-[18px] origin-top transition-transform duration-300 ease-pulse group-hover/bell:-rotate-12"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
         {unread > 0 ? (
           <span
             className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
@@ -208,7 +212,7 @@ function Notifications() {
   );
 }
 
-function UserMenu({ fullName, email }: { fullName: string; email: string }) {
+function UserMenu({ fullName, email, jobTitle }: { fullName: string; email: string; jobTitle: string | null }) {
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const ref = useOutsideClick(() => setOpen(false));
@@ -226,17 +230,35 @@ function UserMenu({ fullName, email }: { fullName: string; email: string }) {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-label="Tu cuenta"
-        className="focus-ring flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors duration-150 hover:bg-paper"
+        aria-label={`Tu cuenta: ${fullName}${jobTitle ? `, ${jobTitle}` : ''}`}
+        title={`${fullName}${jobTitle ? ` · ${jobTitle}` : ''}`}
+        className={cn(
+          'focus-ring flex h-10 items-center gap-2 rounded-full border p-1 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
+          open ? 'border-line-strong bg-paper' : 'border-line bg-surface hover:border-line-strong',
+        )}
       >
         <span
           aria-hidden="true"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
           style={{ backgroundColor: 'var(--brand-primary)' }}
         >
           {initials || <UserRound className="h-4 w-4" strokeWidth={1.75} />}
         </span>
-        <ChevronDown className="h-4 w-4 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
+        {/*
+          EL NOMBRE Y EL CARGO, no solo las iniciales (Decision #92). En una empresa de 600
+          personas, "AN" no identifica a nadie; y el CARGO es ademas lo que explica por que a esta
+          persona le tocan justo esas formaciones. Se ocultan en pantallas estrechas, donde el
+          espacio vale mas que el dato.
+        */}
+        <span className="hidden min-w-0 pr-1 text-left lg:block">
+          <span className="block max-w-[140px] truncate text-xs font-semibold leading-tight text-ink-900">
+            {fullName.split(/s+/).slice(0, 2).join(' ')}
+          </span>
+          {jobTitle ? (
+            <span className="block max-w-[140px] truncate text-[11px] leading-tight text-ink-500">{jobTitle}</span>
+          ) : null}
+        </span>
+        <ChevronDown className="mr-1 h-4 w-4 shrink-0 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
       {open ? (
@@ -409,7 +431,7 @@ export function LearnerTopbar({
         {managesAnything(profile.permissions) ? <SpaceSwitcher to="admin" /> : null}
 
         <Notifications />
-        <UserMenu fullName={profile.fullName} email={profile.email} />
+        <UserMenu fullName={profile.fullName} email={profile.email} jobTitle={profile.jobTitle} />
         {trailing}
       </div>
     </header>

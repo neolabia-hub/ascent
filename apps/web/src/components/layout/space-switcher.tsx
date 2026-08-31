@@ -6,7 +6,6 @@ import { GraduationCap, LayoutGrid } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getPending } from '@/lib/learner-api';
 import { ADMIN_HOME, LEARNER_HOME } from '@/lib/landing';
-import { cn } from '@/components/ui/cn';
 
 /**
  * EL CONMUTADOR DE ESPACIO — de administrar a formarse y de vuelta.
@@ -22,11 +21,23 @@ import { cn } from '@/components/ui/cn';
  * del plan se infla y la constancia sale con un documento que no existe — el papel que mira el
  * auditor. No es incomodo: corrompe el indicador y la evidencia.
  *
- * POR QUE UN BOTON Y NO UNA PREGUNTA EN EL LOGIN. Preguntar "¿entras como analista o como
- * aprendiz?" interroga a la persona en el momento en que menos sabe —antes de ver nada— y rompe
- * los enlaces de correo: un aviso de formacion vencida apunta al reproductor, y un login que
- * pregunta el rol ya no lleva donde dice. Esto NO cambia permisos: son los mismos siempre. Cambia
- * de sitio, como cualquier enlace.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * DECIA A DONDE VAS, Y AHORA DICE DONDE ESTAS (Decision #92).
+ *
+ * Lo destapo el cliente: *"el conmutador es confuso; en la interfaz de aprendiz dice
+ * Administracion para ir alla, pero los usuarios no entenderan; debe decir donde esta"*. El
+ * diagnostico era correcto, aunque la solucion literal —poner "Mi formacion" en un control que
+ * lleva a Administracion— seria peor: un rotulo que nombra un sitio y te lleva a otro.
+ *
+ * El fallo de fondo era que UN rotulo intentaba decir dos cosas: donde estas y a donde irias. Asi
+ * que ahora son dos, y el control se abre para ensenarlas:
+ *
+ *   PLEGADO     dos iconos, nada mas. Ocupa lo que una campana.
+ *   DESPLEGADO  al pasar por encima o al enfocarlo con el teclado se abre a lo ancho: el espacio
+ *               actual sale marcado y SIN enlace, y el otro como el sitio al que ir.
+ *
+ * Asi nadie deduce nada: se ve donde esta, se ve que hay otro sitio, y lo unico que se puede
+ * pulsar es lo unico que hace algo.
  *
  * EL CONTADOR ES DE PENDIENTES, NO DE AVISOS, y esa diferencia es el motivo de que exista. Un
  * aviso se apaga al leerlo; una formacion pendiente sigue ahi aunque leas el correo diez veces. Si
@@ -49,7 +60,7 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
         });
       })
       .catch(() => {
-        // Sin contador el boton sigue llevando donde tiene que llevar. Un fallo al contar no
+        // Sin contador el control sigue llevando donde tiene que llevar. Un fallo al contar no
         // puede dejar a nadie sin camino a su propia formacion.
       });
     return () => {
@@ -58,70 +69,92 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
     // Se relee al cambiar de pantalla: se acaba de aprobar algo y el numero tiene que bajar.
   }, [to, pathname]);
 
+  // `to` es el DESTINO, asi que el espacio actual es el otro.
+  const IconoActual = to === 'learner' ? LayoutGrid : GraduationCap;
+  const IconoDestino = to === 'learner' ? GraduationCap : LayoutGrid;
+  const nombreActual = to === 'learner' ? 'Administracion' : 'Mi formacion';
+  const nombreDestino = to === 'learner' ? 'Mi formacion' : 'Administracion';
   const href = to === 'learner' ? LEARNER_HOME : ADMIN_HOME;
-  const label = to === 'learner' ? 'Mi formacion' : 'Administracion';
-  const Icon = to === 'learner' ? GraduationCap : LayoutGrid;
 
   const total = pending?.total ?? 0;
   const overdue = pending?.overdue ?? 0;
   const urgente = overdue > 0;
 
-  const descripcion =
+  /*
+    EL NOMBRE ACCESIBLE DEL ENLACE DICE LA ACCION, no donde estas: quien navega con lector de
+    pantalla oye "enlace: ir al panel de administracion" y con eso sabe que pasa al pulsarlo. El
+    "estas en X" es contexto y va en el tooltip, que es donde el contexto ayuda sin estorbar.
+  */
+  const accion = to === 'admin' ? 'Ir al panel de administracion' : 'Ir a mi formacion';
+  const detalle =
     to === 'admin'
-      ? 'Ir al panel de administracion'
+      ? ''
       : total === 0
-        ? 'Mi formacion: no tienes nada pendiente'
+        ? ': no tienes nada pendiente'
         : urgente
-          ? `Mi formacion: ${total} pendiente${total === 1 ? '' : 's'}, ${overdue} vencida${overdue === 1 ? '' : 's'}`
-          : `Mi formacion: ${total} pendiente${total === 1 ? '' : 's'}`;
+          ? `: ${total} pendiente${total === 1 ? '' : 's'}, ${overdue} vencida${overdue === 1 ? '' : 's'}`
+          : `: ${total} pendiente${total === 1 ? '' : 's'}`;
+  const accesible = `${accion}${detalle}`;
+  const descripcion = `Estas en ${nombreActual}. ${accesible}`;
 
   return (
-    <Link
-      href={href}
-      aria-label={descripcion}
+    /*
+      SE ABRE A LO ANCHO al pasar por encima o al enfocar con el teclado. La animacion es de
+      `grid-template-columns` de 0fr a 1fr, que es lo unico que deja animar la aparicion de un
+      texto de ancho DESCONOCIDO: con `width` habria que fijar un numero y un rotulo mas largo
+      —o traducido— se cortaria.
+    */
+    <div
+      className="group/sw flex h-10 items-center rounded-full border border-line bg-surface p-1 shadow-card transition-all duration-200 ease-pulse focus-within:-translate-y-px focus-within:border-line-strong hover:-translate-y-px hover:border-line-strong hover:shadow-card-hover"
       title={descripcion}
-      className={cn(
-        'focus-ring group flex h-9 items-center gap-2 rounded-full border pl-1.5 pr-1.5 text-sm transition-all duration-150 ease-pulse sm:pr-3',
-        'shadow-btn hover:-translate-y-px hover:shadow-btn-hover active:translate-y-0 active:shadow-btn-active',
-        // Con algo VENCIDO el boton NO se pinta entero de rojo. Se probo y quedaba al lado de la
-        // campana de avisos, que tambien lleva su punto rojo: dos bloques del mismo color pegados
-        // se leen como el mismo dato, y son justo lo contrario —uno es lo leido, otro lo que
-        // falta por hacer—. El rojo se concentra en el CONTADOR y el borde solo lo insinua.
-        urgente
-          ? 'border-danger/40 bg-surface text-ink-900'
-          : 'border-line bg-surface text-ink-700 hover:border-line-strong hover:text-ink-900',
-      )}
     >
-      {/*
-        El icono va en su propia pastilla con el color de marca del tenant: es lo que hace que el
-        control se lea como un LUGAR al que ir y no como un boton mas de la barra.
-      */}
+      {/* DONDE ESTAS: marcado y sin enlace, porque no lleva a ninguna parte. */}
       <span
-        className={cn(
-          'flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-150',
-          urgente ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary group-hover:bg-primary group-hover:text-white',
-        )}
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2"
+        style={{ backgroundColor: 'var(--primary-soft)' }}
       >
-        <Icon className="h-[15px] w-[15px]" strokeWidth={2} aria-hidden="true" />
+        <IconoActual
+          className="h-[17px] w-[17px] shrink-0"
+          strokeWidth={2}
+          style={{ color: 'var(--brand-primary)' }}
+          aria-hidden="true"
+        />
+        <span className="grid grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-within/sw:grid-cols-[1fr] group-hover/sw:grid-cols-[1fr]">
+          <span className="min-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold text-ink-900">
+            {nombreActual}
+          </span>
+        </span>
       </span>
 
-      <span className="hidden font-medium sm:inline">{label}</span>
-
-      {/*
-        UN NUMERO SOLO CUANDO HAY ALGO VENCIDO, y un punto cuando solo hay pendientes.
-        Se probo con numero siempre y quedaba pegado al numero de la campana: dos cifras rojas
-        juntas se leen como el mismo dato, y el cliente pregunto —con razon— si no sobraba una. No
-        sobra, pero tienen pesos distintos y la pantalla tiene que decirlo: la campana cuenta lo
-        que no has LEIDO, esto cuenta lo que no has HECHO. Tener formacion pendiente es lo normal;
-        tenerla vencida es lo que hay que mirar hoy, y solo eso merece una cifra.
-      */}
-      {to === 'learner' && urgente ? (
-        <span className="ml-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-semibold tabular-nums text-white animate-card-in">
-          {overdue > 9 ? '9+' : overdue}
+      {/* A DONDE PUEDES IR: lo unico pulsable. */}
+      <Link
+        href={href}
+        aria-label={accesible}
+        title={descripcion}
+        className="focus-ring relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+      >
+        <IconoDestino className="h-[17px] w-[17px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        <span className="grid grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-within/sw:grid-cols-[1fr] group-hover/sw:grid-cols-[1fr]">
+          <span className="min-w-0 overflow-hidden whitespace-nowrap text-xs font-medium">{nombreDestino}</span>
         </span>
-      ) : to === 'learner' && total > 0 ? (
-        <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-card-in" aria-hidden="true" />
-      ) : null}
-    </Link>
+
+        {/*
+          UN NUMERO SOLO CUANDO HAY ALGO VENCIDO, y un punto cuando solo hay pendientes. Tener
+          formacion pendiente es lo normal; tenerla vencida es lo que hay que mirar hoy, y solo
+          eso merece una cifra.
+        */}
+        {to === 'learner' && urgente ? (
+          <span className="animate-card-in absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold tabular-nums text-white">
+            {overdue > 9 ? '9+' : overdue}
+          </span>
+        ) : to === 'learner' && total > 0 ? (
+          <span
+            className="animate-card-in absolute right-0.5 top-1 h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+            aria-hidden="true"
+          />
+        ) : null}
+      </Link>
+    </div>
   );
 }

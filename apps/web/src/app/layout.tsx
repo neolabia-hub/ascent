@@ -1,18 +1,33 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Manrope } from 'next/font/google';
+import { Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 import './globals.css';
 
-const manrope = Manrope({
+/**
+ * LA TIPOGRAFIA (Decision #92).
+ *
+ * Era Inter + Manrope. Inter es la fuente mas correcta que existe para interfaz y tambien la mas
+ * usada del sector: no falla nunca y no dice nada. Ese era justo el problema —el cliente lleva
+ * toda la sesion pidiendo que no se vea generico— y una tipografia que se reconoce como "la de
+ * todos los SaaS" trabaja en contra.
+ *
+ * OUTFIT para los titulos: geometrica, de formas amplias y abiertas, con un contraste claro entre
+ * mayuscula y minuscula. En un titular grande se ve intencionada, no por defecto.
+ *
+ * PLUS JAKARTA SANS para el texto: humanista, un poco mas calida y con la altura de x algo mayor
+ * que Inter, que es lo que la hace mas legible en el telefono de bodega con mala luz —el caso que
+ * manda aqui—. Las dos traen los acentos y la ñ del castellano completos, que no es obvio.
+ */
+const outfit = Outfit({
   subsets: ['latin'],
-  weight: ['500', '600', '800'],
+  weight: ['500', '600', '700'],
   variable: '--font-manrope',
   display: 'swap',
 });
 
-const inter = Inter({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-inter',
   display: 'swap',
 });
@@ -44,7 +59,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es" className={`${manrope.variable} ${inter.variable}`}>
+    <html lang="es" className={`${outfit.variable} ${jakarta.variable}`}>
       <body className="min-h-screen bg-paper font-sans text-ink-900 antialiased">{children}</body>
     </html>
   );

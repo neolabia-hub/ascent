@@ -87,7 +87,20 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         —que en la biblioteca son varios miles de pixeles—, asi que el bloque de progreso del final
         quedaba a un scroll enorme de distancia: existia y no lo veia nadie.
       */}
-      <aside className="hidden w-[248px] shrink-0 border-r border-line bg-paper lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+      {/*
+        LA BARRA ES UNA TARJETA QUE FLOTA (Decision #92).
+
+        Lo pregunto el cliente y la respuesta es que si, con una condicion: BLANCA sobre el fondo
+        de la pagina, no de color. Una barra de color macizo pegada al borde parte la pantalla en
+        dos mitades de luminosidad distinta y la vista salta cada vez que cruza el filo; una
+        tarjeta blanca separada del borde hace lo contrario —el fondo pasa por detras y las dos
+        zonas siguen siendo la misma pantalla—.
+
+        Y es ademas lo que ya hacen las tarjetas del catalogo y el bloque de progreso: una
+        superficie elevada sobre papel. Un lenguaje, no dos.
+      */}
+      <aside className="hidden shrink-0 p-3 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[264px] lg:flex-col">
+        <div className="flex min-h-0 flex-1 flex-col rounded-3xl border border-line bg-surface shadow-card">
         <div className="flex items-center gap-2.5 px-5 py-5">
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-white"
@@ -116,26 +129,28 @@ export function LearnerShell({ children }: { children: ReactNode }) {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'focus-ring relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors duration-150 ease-pulse',
-                  active
-                    ? 'bg-surface font-medium text-ink-900 shadow-card'
-                    : 'text-ink-500 hover:bg-surface/70 hover:text-ink-900',
+                  active ? 'font-medium text-ink-900' : 'text-ink-500 hover:bg-paper hover:text-ink-900',
                 )}
               >
                 {/* El color de la empresa marca lo ACTIVO, no rellena el fondo de nada. */}
+                {/*
+                  El activo se rellena con el azul de la empresa al 10%: DENTRO de una tarjeta
+                  blanca, una superficie blanca no marcaria nada.
+                */}
                 {active ? (
                   <span
                     aria-hidden="true"
-                    className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full"
-                    style={{ backgroundColor: 'var(--brand-primary)' }}
+                    className="absolute inset-0 rounded-xl"
+                    style={{ backgroundColor: 'var(--primary-soft)' }}
                   />
                 ) : null}
                 <Icon
-                  className="h-[18px] w-[18px] shrink-0"
+                  className="relative h-[18px] w-[18px] shrink-0"
                   strokeWidth={active ? 2 : 1.75}
                   style={active ? { color: 'var(--brand-primary)' } : undefined}
                   aria-hidden="true"
                 />
-                {item.label}
+                <span className="relative">{item.label}</span>
               </Link>
             );
           })}
@@ -162,6 +177,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
           pasar rapido, no a aprender—.
         */}
         <ProgresoPropio />
+        </div>
       </aside>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
@@ -197,9 +213,20 @@ export function LearnerShell({ children }: { children: ReactNode }) {
       {/* Barra inferior: solo movil. */}
       <nav
         aria-label="Navegacion principal"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+        /*
+          EN MOVIL, LA MISMA TARJETA FLOTANTE QUE EN ESCRITORIO (Decision #92).
+
+          Era una franja pegada al borde de abajo con una linea encima. Ahora es una tarjeta que
+          flota sobre el contenido, con el mismo radio y la misma sombra que la barra lateral: una
+          persona que usa el telefono y el computador ve el MISMO producto, no dos.
+
+          Se separa del borde tambien por abajo (`bottom-3` + el area segura), que es lo que la
+          aleja de la barra de gestos del telefono: pegada al filo, el gesto de "volver atras" de
+          iOS y Android se come los toques del primer y del ultimo icono.
+        */
+        className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 rounded-2xl border border-line bg-surface/90 shadow-card-hover backdrop-blur-lg lg:hidden"
       >
-        <ul className="mx-auto flex w-full max-w-md items-stretch">
+        <ul className="mx-auto flex w-full items-stretch p-1">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
@@ -209,17 +236,25 @@ export function LearnerShell({ children }: { children: ReactNode }) {
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'focus-ring flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors duration-150 ease-pulse',
-                    active ? 'text-primary' : 'text-ink-500',
+                    'focus-ring relative flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-medium transition-colors duration-150 ease-pulse',
+                    active ? 'text-ink-900' : 'text-ink-500',
                   )}
                 >
+                  {/* El activo se rellena con el azul de la empresa, igual que en la barra lateral. */}
+                  {active ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-xl"
+                      style={{ backgroundColor: 'var(--primary-soft)' }}
+                    />
+                  ) : null}
                   <Icon
-                    className="h-5 w-5"
+                    className="relative h-5 w-5"
                     strokeWidth={active ? 2 : 1.75}
                     aria-hidden="true"
                     style={active ? { color: 'var(--brand-primary)' } : undefined}
                   />
-                  <span>{item.label}</span>
+                  <span className="relative">{item.label}</span>
                 </Link>
               </li>
             );
@@ -258,7 +293,7 @@ function ProgresoPropio() {
   if (!progress) return null;
 
   return (
-    <div className="m-3 mt-auto rounded-2xl border border-line bg-surface p-3.5">
+    <div className="m-3 mt-auto rounded-2xl bg-paper p-3.5">
       <div className="flex items-center gap-3">
         {/*
           La llama crece con la racha en vez de ser un icono fijo: a los 30 dias tiene que

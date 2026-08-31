@@ -215,14 +215,24 @@ export class AuthService {
     return { ok: true };
   }
 
-  async me(userId: string, tenantId: string): Promise<AuthUserView & { permissions: string[] }> {
+  async me(
+    userId: string,
+    tenantId: string,
+  ): Promise<AuthUserView & { permissions: string[]; jobTitle: string | null }> {
     const user = await this.prisma.forTenant(tenantId).user.findUniqueOrThrow({
       where: { id: userId },
-      include: { role: { include: { permissions: { include: { permission: true } } } } },
+      include: {
+        role: { include: { permissions: { include: { permission: true } } } },
+        // EL CARGO, para la barra superior (Decision #92). El nombre a secas no dice quien es
+        // alguien dentro de la empresa; "Auxiliar de Bodega" si, y ademas es lo que explica por
+        // que le tocan justo esas formaciones.
+        jobTitle: { select: { name: true } },
+      },
     });
     return {
       ...this.toView(user),
       permissions: user.role.permissions.map((rp) => rp.permission.code),
+      jobTitle: user.jobTitle?.name ?? null,
     };
   }
 

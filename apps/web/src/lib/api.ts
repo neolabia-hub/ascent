@@ -174,6 +174,8 @@ export interface AuthUser {
 export interface MeResponse {
   id: string;
   fullName: string;
+  /** El cargo, para la barra superior. `null` si el catalogo aun no lo tiene. */
+  jobTitle: string | null;
   email: string;
   mustChangePassword: boolean;
   activated: boolean;

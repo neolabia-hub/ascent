@@ -177,14 +177,18 @@ test('quien administra llega a su propia formacion y vuelve al panel', async ({ 
   await loginAsAdmin(page);
   await page.goto('/inicio');
 
-  // Ida: el conmutador vive en la barra superior, no escondido en un menu.
-  const aFormacion = page.getByRole('link', { name: /Mi formacion/ });
+  /*
+    El conmutador vive en la barra superior y su nombre accesible dice la ACCION, no donde estas
+    (Decision #92): el rotulo visible es "Mi formacion" pero lo que un lector de pantalla —y esta
+    prueba— leen es "Ir a mi formacion", que es lo que pasa al pulsarlo.
+  */
+  const aFormacion = page.getByRole('link', { name: /Ir a mi formacion/i });
   await expect(aFormacion).toBeVisible();
   await aFormacion.click();
   await page.waitForURL('**/hoy', { timeout: 20_000 });
 
   // Vuelta: solo aparece para quien administra algo, y este usuario lo hace.
-  const alPanel = page.getByRole('link', { name: /panel de administracion/i });
+  const alPanel = page.getByRole('link', { name: /Ir al panel de administracion/i });
   await expect(alPanel).toBeVisible();
   await alPanel.click();
   await page.waitForURL('**/inicio', { timeout: 20_000 });

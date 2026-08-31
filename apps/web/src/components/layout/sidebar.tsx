@@ -20,7 +20,9 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { logout } from '@/lib/api';
 import { useTenant } from '@/components/providers/tenant-provider';
+import { listPlans, type PlanRow } from '@/lib/delivery-api';
 import { cn } from '@/components/ui/cn';
+import { ProgressRing } from '@/components/ui/progress-ring';
 
 const SIDEBAR_COLLAPSED_KEY = 'pulso.sidebar.collapsed';
 
@@ -94,14 +96,18 @@ export function Sidebar({ userFullName }: SidebarProps) {
   return (
     <aside
       className={cn(
-        // LA BARRA ES DEL MISMO COLOR QUE EL CUERPO, no un bloque oscuro pegado al lado.
-        // Un panel de administracion no gana nada partiendo la pantalla en dos mitades de
-        // luminosidad opuesta: la vista salta cada vez que cruza el borde. Ahora la unica
-        // separacion es una linea, y lo que marca donde estas es la pastilla del activo.
-        'flex h-screen shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-[220ms] ease-pulse',
-        collapsed ? 'w-16' : 'w-[248px]',
+        // LA BARRA ES UNA TARJETA QUE FLOTA (Decision #92), igual que en el aprendiz.
+        //
+        // Era un bloque oscuro pegado al lado, y partir la pantalla en dos mitades de luminosidad
+        // opuesta hace que la vista salte cada vez que cruza el filo. Una tarjeta blanca separada
+        // del borde hace lo contrario: el fondo pasa por detras y las dos zonas siguen siendo la
+        // misma pantalla. Ademas es la misma forma que ya tienen las tarjetas del contenido, asi
+        // que el producto habla UN idioma y no dos.
+        'flex h-screen shrink-0 flex-col p-3 transition-[width] duration-[220ms] ease-pulse',
+        collapsed ? 'w-[76px]' : 'w-[264px]',
       )}
     >
+      <div className="flex min-h-0 flex-1 flex-col rounded-3xl border border-line bg-surface shadow-card">
       <div className={cn('flex items-center gap-2 px-4 py-4', collapsed && 'justify-center px-0')}>
         <div
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-display text-sm font-bold text-white"
@@ -161,6 +167,19 @@ export function Sidebar({ userFullName }: SidebarProps) {
         )}
       </button>
 
+      {/*
+        EL PULSO DEL PLAN (Decision #92), que es el equivalente administrador de la racha del
+        aprendiz: el numero del que esta persona responde.
+
+        Por que ESTE y no "usuarios activos" o "formaciones creadas": el cumplimiento del plan
+        anual es lo que le pregunta el auditor y lo que mide el item 1.2.1 de la Res. 0312. Un
+        contador de cosas creadas se siente productivo y no responde a nadie.
+
+        Y va con su META al lado, porque un 62% suelto no dice si eso esta bien —que es justo lo
+        que hay que poder contestar de un vistazo—.
+      */}
+      {!collapsed ? <PulsoDelPlan /> : null}
+
       <div className={cn('flex items-center gap-2.5 border-t border-line px-3 py-3', collapsed && 'justify-center px-0')}>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-ink-900">
           {getInitials(userFullName)}
@@ -181,6 +200,58 @@ export function Sidebar({ userFullName }: SidebarProps) {
           <LogOut className="h-4 w-4" strokeWidth={1.75} />
         </button>
       </div>
+      </div>
     </aside>
+  );
+}
+
+/**
+ * COMO VA EL PLAN DEL ANO EN CURSO, en la barra.
+ *
+ * Si no hay plan o falla la peticion no se pinta nada: es un indicador que orienta, no un dato
+ * sin el cual no se pueda trabajar. Un bloque de error aqui seria mas ruido que ausencia.
+ */
+function PulsoDelPlan() {
+  const [plan, setPlan] = useState<PlanRow | null>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    let cancelled = false;
+    listPlans({ year: new Date().getFullYear() })
+      .then((filas) => {
+        if (!cancelled) setPlan(filas[0] ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // Se relee al cambiar de pantalla: se acaba de ejecutar un renglon y el numero tiene que subir.
+  }, [pathname]);
+
+  if (!plan) return null;
+
+  const cumplimiento = Math.round(plan.metrics.compliancePct);
+  const meta = plan.goalPct;
+  const faltan = meta === null ? null : Math.max(0, meta - cumplimiento);
+
+  return (
+    <Link
+      href={`/plan/${plan.id}`}
+      className="focus-ring m-3 mt-auto flex items-center gap-3 rounded-2xl bg-paper p-3 transition-colors duration-150 hover:bg-primary-soft"
+      title={`Plan ${plan.year}: ${cumplimiento}% de cumplimiento${meta === null ? '' : `, meta ${meta}%`}`}
+    >
+      <ProgressRing value={cumplimiento} size={44} showLabel={false} />
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Plan {plan.year}</p>
+        <p className="font-display text-lg font-bold leading-none tabular-nums text-ink-900">{cumplimiento}%</p>
+        {/*
+          La meta en palabras y no otro numero suelto: "faltan 28 puntos" se entiende sin restar,
+          que es lo que hace falta cuando se mira de reojo desde otra pantalla.
+        */}
+        <p className="mt-0.5 text-[11px] leading-tight text-ink-500">
+          {faltan === null ? 'Sin meta acordada' : faltan === 0 ? 'Meta cumplida' : `Faltan ${faltan} puntos`}
+        </p>
+      </div>
+    </Link>
   );
 }
