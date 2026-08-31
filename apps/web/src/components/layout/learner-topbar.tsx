@@ -325,7 +325,17 @@ export function LearnerTopbar({
      */
     <header
       className={cn(
-        'sticky top-0 z-30',
+        /*
+          NI FONDO NI FIJA, y lo segundo es consecuencia de lo primero.
+
+          Sin fondo y fija, el contenido pasaba POR DEBAJO y el saludo se leia encima de las
+          tarjetas: ilegible en cuanto se desplazaba un poco. Las dos salidas de siempre son
+          devolverle un velo —que es justo lo que se quito— o que no se quede pegada. Se elige la
+          segunda: la barra se va con el contenido, no hay superficie que ensucie la portada y no
+          hay nada que se pise. La navegacion no se pierde por eso —vive en la barra lateral, que
+          si esta fija— y el buscador sigue a un Ctrl K desde cualquier sitio.
+        */
+        'relative z-30',
         // Sin linea inferior nunca: lo que separa la barra del contenido es el aire, no un filo.
         // Con contenido pasando por debajo conserva el velo difuminado para que el texto no se
         // lea encima. La barra NUNCA se superpone al contenido: el heroe empieza DEBAJO. Se probo
