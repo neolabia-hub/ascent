@@ -113,3 +113,32 @@ export function singleJobTitleOf(rule: AudienceRule): string | null {
   const onlyFacet = facetsOf(rule).length === 1;
   return onlyFacet && rule.jobTitleIds.length === 1 ? (rule.jobTitleIds[0] as string) : null;
 }
+
+/**
+ * ¿Son la MISMA audiencia? Se compara la forma, no el nombre.
+ *
+ * Hace falta para que exigir una formacion "a los conductores" desde la ficha reutilice la
+ * audiencia que ya creo la matriz por cargo, en vez de crear una gemela. Dos audiencias
+ * identicas no rompen nada —las obligaciones no se duplican—, pero convierten la lista de
+ * audiencias en un vertedero donde nadie sabe cual es la buena.
+ *
+ * El orden dentro de cada faceta no cuenta: marcar "Conductor, Auxiliar" y "Auxiliar, Conductor"
+ * es la misma gente.
+ */
+export function sameAudienceRule(a: AudienceRule, b: AudienceRule): boolean {
+  if (a.match !== b.match) return false;
+  const facets: Array<keyof AudienceRule> = [
+    'jobTitleIds',
+    'jobTitleTypeIds',
+    'areaIds',
+    'regionalIds',
+    'serviceIds',
+    'employmentTypes',
+    'roadActors',
+  ];
+  return facets.every((facet) => {
+    const left = [...(a[facet] as string[])].sort();
+    const right = [...(b[facet] as string[])].sort();
+    return left.length === right.length && left.every((value, index) => value === right[index]);
+  });
+}

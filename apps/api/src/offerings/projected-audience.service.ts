@@ -17,6 +17,19 @@ export interface ProjectedPeople extends ProjectedAudience {
 }
 
 /**
+ * LA TAJADA de una jornada: a que parte de los obligados atiende.
+ *
+ *   audienceId  el grupo que declara la convocatoria (cargo, area, regional, servicio). Es la
+ *               respuesta explicita, y cuando esta, manda.
+ *   regionalId  la SEDE. Solo acota cuando no hay tajada declarada, que es el caso simple de
+ *               siempre: "esta jornada es en Neiva, atiende a los de Neiva".
+ */
+export interface OfferingScope {
+  audienceId: string | null;
+  regionalId: string | null;
+}
+
+/**
  * PROYECTADOS de una convocatoria (Decision #5): cuantas personas DEBERIAN capacitarse.
  *
  * El numero se DERIVA de a quien obliga la formacion, no se teclea: es el denominador de la
@@ -35,30 +48,34 @@ export interface ProjectedPeople extends ProjectedAudience {
  * para la obligacion— y las dos listas se separaban en cuanto alguien cambiaba una sola. El
  * denominador ahora sale del mismo sitio que la obligacion, asi que no pueden discrepar.
  *
- * Si la convocatoria es de una regional, el alcance se acota a esa regional: una jornada en Neiva
- * no le promete nada a Barranquilla.
+ * LA TAJADA (Decision #68) se aplica en los tres escalones. Sin ella, dos jornadas de la misma
+ * formacion proyectan a los mismos obligados y el plan los SUMA: 40 obligados repartidos en dos
+ * jornadas salian como 80 proyectados, y la cobertura no podia pasar del 50% aunque se capacitara
+ * a todo el mundo. Acotar solo por regional no bastaba: una jornada puede ser "Gestion Humana de
+ * Antioquia", o incluso un cargo concreto de esa area.
  */
 @Injectable()
 export class ProjectedAudienceService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Solo el numero (lo que necesita la pantalla y el congelado al publicar). */
-  async derive(activityId: string, regionalId: string | null): Promise<ProjectedAudience> {
-    const { userIds: _userIds, ...summary } = await this.resolve(activityId, regionalId);
+  async derive(activityId: string, scope: OfferingScope): Promise<ProjectedAudience> {
+    const { userIds: _userIds, ...summary } = await this.resolve(activityId, scope);
     return summary;
   }
 
   /** Las personas proyectadas, no solo cuantas (lo que necesita el plan para obligar). */
-  async resolve(activityId: string, regionalId: string | null): Promise<ProjectedPeople> {
+  async resolve(activityId: string, scope: OfferingScope): Promise<ProjectedPeople> {
+    const tajada = await this.tajadaWhere(scope);
+
     const eligible: Prisma.UserWhereInput = {
       active: true,
       deletedAt: null,
       terminatedAt: null,
-      ...(regionalId ? { regionalId } : {}),
+      ...tajada.where,
     };
-    const scope = regionalId ? ' en la regional de la convocatoria' : '';
 
-    // 1. Los ya obligados. Se acota a la regional de la convocatoria como todo lo demas.
+    // 1. Los ya obligados, acotados a la tajada de la jornada.
     const obliged = await this.findUserIds({
       ...eligible,
       assignments: {
@@ -74,7 +91,7 @@ export class ProjectedAudienceService {
         userIds: obliged,
         count: obliged.length,
         source: 'OBLIGATIONS',
-        detail: `Personas ya obligadas a esta formacion${scope}.`,
+        detail: `Personas ya obligadas a esta formacion${tajada.detail}.`,
       };
     }
 
@@ -93,7 +110,7 @@ export class ProjectedAudienceService {
         userIds,
         count: userIds.length,
         source: 'RULES',
-        detail: `Personas alcanzadas por ${rules.length === 1 ? 'el requisito' : `los ${rules.length} requisitos`} de esta actividad${scope}.`,
+        detail: `Personas alcanzadas por ${rules.length === 1 ? 'el requisito' : `los ${rules.length} requisitos`} de esta actividad${tajada.detail}.`,
       };
     }
 
@@ -101,8 +118,34 @@ export class ProjectedAudienceService {
       userIds: [],
       count: 0,
       source: 'NONE',
-      detail: 'Nadie esta obligado a esta formacion todavia: asignala en Quienes, o ajusta los proyectados con justificacion.',
+      detail:
+        'Nadie esta obligado a esta formacion todavia: asignala en Quienes, o ajusta los proyectados con justificacion.',
     };
+  }
+
+  /**
+   * El filtro de la tajada, y como se dice en pantalla.
+   *
+   * La audiencia declarada MANDA sobre la regional: si alguien acota la jornada a "los
+   * conductores", que se dicte en Neiva no puede recortar en silencio a quien atiende —una
+   * jornada nacional puede darse en una sede—. La regional sigue acotando en el caso simple, que
+   * es el de siempre: jornada sin tajada declarada.
+   */
+  private async tajadaWhere(scope: OfferingScope): Promise<{ where: Prisma.UserWhereInput; detail: string }> {
+    if (scope.audienceId) {
+      const audience = await this.prisma.scoped.audience.findUnique({
+        where: { id: scope.audienceId },
+        select: { name: true },
+      });
+      return {
+        where: { audienceMembers: { some: { audienceId: scope.audienceId, leftAt: null } } },
+        detail: audience ? ` de "${audience.name}"` : ' en el alcance de la convocatoria',
+      };
+    }
+    if (scope.regionalId) {
+      return { where: { regionalId: scope.regionalId }, detail: ' en la regional de la convocatoria' };
+    }
+    return { where: {}, detail: '' };
   }
 
   private async findUserIds(where: Prisma.UserWhereInput): Promise<string[]> {

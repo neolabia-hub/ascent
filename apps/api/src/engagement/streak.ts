@@ -97,9 +97,6 @@ export function lastActivityLabel(state: StreakState): string | null {
 }
 
 /** Puntos por logro REAL (nunca por entrar ni por pulsar). */
-export const POINTS = {
-  LESSON_COMPLETED: 10,
-  ACTIVITY_COMPLETED: 50,
-  ASSESSMENT_PASSED: 30,
-  REVIEW_SESSION: 5,
-} as const;
+// Los puntos viven en `shared`: los promete la pantalla del aprendiz y los otorga esto. Una sola
+// fuente evita prometer 50 y dar 30 (Decision #90).
+export { POINTS } from '@neo-pulse/shared';

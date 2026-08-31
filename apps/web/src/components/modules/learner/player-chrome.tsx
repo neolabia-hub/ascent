@@ -228,7 +228,6 @@ export function PlayerShell({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <LearnerTopbar
           wide
-          flush
           onSearch={onExit}
           leading={
             <div className="flex min-w-0 flex-1 items-center gap-3">

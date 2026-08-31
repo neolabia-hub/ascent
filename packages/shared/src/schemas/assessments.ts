@@ -10,7 +10,17 @@ import { z } from 'zod';
  *    editar el banco, con permiso questions:manage.
  */
 
-export const questionTypeSchema = z.enum(['SINGLE', 'MULTI', 'TRUE_FALSE', 'ESSAY']);
+export const questionTypeSchema = z.enum([
+  'SINGLE',
+  'MULTI',
+  'TRUE_FALSE',
+  'ESSAY',
+  // Decision #86: con solo opcion multiple, media formacion de SST se pregunta mal.
+  'FILL_BLANK',
+  'ORDER',
+  'MATCH',
+  'NUMERIC',
+]);
 export type QuestionType = z.infer<typeof questionTypeSchema>;
 
 const answerOptionSchema = z.object({
@@ -70,17 +80,137 @@ const essayQuestionSchema = z.object({
   points: z.number().min(0.1).max(100).default(1),
 });
 
+/**
+ * COMPLETAR HUECOS (Decision #86).
+ *
+ * El enunciado lleva marcas `{{1}}`, `{{2}}`... y cada una tiene su lista de respuestas validas.
+ * Se aceptan VARIAS a proposito: "arnes", "arnés" y "arnes de cuerpo entero" son la misma
+ * respuesta, y una lista de una sola cadena convierte la pregunta en una loteria de ortografia.
+ * La comparacion ignora tildes, mayusculas y espacios de mas (ver `grading.ts`).
+ */
+const fillBlankQuestionSchema = z
+  .object({
+    qtype: z.literal('FILL_BLANK'),
+    stem: z.string().min(5).max(1000),
+    blanks: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(20),
+          /** Todas las formas que cuentan como correctas para ESE hueco. */
+          accept: z.array(z.string().min(1).max(200)).min(1).max(10),
+        }),
+      )
+      .min(1)
+      .max(10),
+    /** Cada hueco suma por separado. Sin esto, un dedazo en el ultimo anula toda la pregunta. */
+    partialCredit: z.boolean().default(true),
+    points: z.number().min(0.1).max(100).default(1),
+    explanation: z.string().max(1000).optional(),
+  })
+  .refine((q) => q.blanks.every((blank) => q.stem.includes(`{{${blank.id}}}`)), {
+    message: 'Cada hueco tiene que aparecer en el enunciado',
+    path: ['blanks'],
+  });
+
+/**
+ * ORDENAR LOS PASOS (Decision #86).
+ *
+ * Es el tipo que le faltaba a este producto: un bloqueo LOTO, la reaccion ante un derrame o la
+ * inspeccion de un arnes son SECUENCIAS, y preguntarlas con opcion multiple regala la respuesta
+ * porque el orden correcto esta escrito en una de las cuatro opciones.
+ *
+ * Los pasos se sirven SIEMPRE barajados, elija lo que elija el administrador en "barajar
+ * opciones": servirlos en su orden correcto seria dar la respuesta hecha.
+ */
+const orderQuestionSchema = z
+  .object({
+    qtype: z.literal('ORDER'),
+    stem: z.string().min(5).max(1000),
+    items: z.array(answerOptionSchema).min(2).max(10),
+    /** Los ids en el orden CORRECTO. */
+    correctOrder: z.array(z.string().min(1).max(20)).min(2).max(10),
+    /** Puntua cada paso que quedo en su sitio. Sin esto, un solo cambio anula la pregunta. */
+    partialCredit: z.boolean().default(true),
+    points: z.number().min(0.1).max(100).default(1),
+    explanation: z.string().max(1000).optional(),
+  })
+  .refine((q) => q.correctOrder.length === q.items.length, {
+    message: 'El orden correcto tiene que incluir todos los pasos',
+    path: ['correctOrder'],
+  })
+  .refine((q) => q.correctOrder.every((id) => q.items.some((item) => item.id === id)), {
+    message: 'El orden correcto solo puede usar los pasos de la lista',
+    path: ['correctOrder'],
+  });
+
+/**
+ * EMPAREJAR (Decision #86).
+ *
+ * Senal <-> significado, EPP <-> riesgo, extintor <-> tipo de fuego. Cubre en una pregunta lo que
+ * hoy son seis sueltas, y ademas se responde razonando por descarte sobre el conjunto, que es
+ * mas parecido a lo que se hace en el puesto.
+ */
+const matchQuestionSchema = z.object({
+  qtype: z.literal('MATCH'),
+  stem: z.string().min(5).max(1000),
+  pairs: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(20),
+        left: z.string().min(1).max(300),
+        right: z.string().min(1).max(300),
+      }),
+    )
+    .min(2)
+    .max(10),
+  /** Cada pareja acertada suma. */
+  partialCredit: z.boolean().default(true),
+  points: z.number().min(0.1).max(100).default(1),
+  explanation: z.string().max(1000).optional(),
+});
+
+/**
+ * RESPUESTA NUMERICA (Decision #86).
+ *
+ * "¿A cuantos metros es obligatorio el arnes?" con cuatro opciones se acierta descartando. Aqui
+ * hay que saberlo. La TOLERANCIA existe porque hay preguntas donde el numero exacto no es lo que
+ * importa —"¿cada cuantos metros una linea de vida?"— y una diferencia de 0,1 no es un fallo.
+ */
+const numericQuestionSchema = z.object({
+  qtype: z.literal('NUMERIC'),
+  stem: z.string().min(5).max(1000),
+  correctNumber: z.number(),
+  /** Margen aceptado hacia arriba y hacia abajo. 0 = exacto. */
+  tolerance: z.number().min(0).max(1000).default(0),
+  /** Se ENSENA a quien responde: sin unidad, "1,5" y "150" parecen respuestas distintas. */
+  unit: z.string().max(20).optional(),
+  points: z.number().min(0.1).max(100).default(1),
+  explanation: z.string().max(1000).optional(),
+});
+
 /** Contenido completo de una version de pregunta. */
 export const questionPayloadSchema = z.union([
   singleQuestionSchema,
   multiQuestionSchema,
   trueFalseQuestionSchema,
   essayQuestionSchema,
+  fillBlankQuestionSchema,
+  orderQuestionSchema,
+  matchQuestionSchema,
+  numericQuestionSchema,
 ]);
 export type QuestionPayload = z.infer<typeof questionPayloadSchema>;
 
+/**
+ * El TEMA es opcional (Decision #84).
+ *
+ * Era obligatorio, y eso ponia una ceremonia delante de la primera pregunta: habia que salirse a
+ * crear una categoria antes de poder escribir nada. El tema solo hace falta cuando se quiere un
+ * BLOQUE AL AZAR, que saca N preguntas de un tema; una pregunta escrita para un examen concreto
+ * no necesita ninguno.
+ */
 export const createQuestionSchema = z.object({
-  categoryId: z.string().uuid(),
+  categoryId: z.string().uuid().nullable().optional(),
   payload: questionPayloadSchema,
 });
 export type CreateQuestionInput = z.infer<typeof createQuestionSchema>;
@@ -88,6 +218,11 @@ export type CreateQuestionInput = z.infer<typeof createQuestionSchema>;
 /** Editar una pregunta NO la modifica: crea una version nueva. */
 export const reviseQuestionSchema = z.object({
   payload: questionPayloadSchema,
+});
+
+/** Cambiar el TEMA no es cambiar la pregunta: archiva, no revisa. Por eso no crea version. */
+export const setQuestionCategorySchema = z.object({
+  categoryId: z.string().uuid().nullable(),
 });
 
 export const createQuestionCategorySchema = z.object({
@@ -117,6 +252,42 @@ export const reviewPolicySchema = z
   })
   .strict()
   .default({});
+
+/**
+ * COMO SE VE EL EXAMEN para quien lo rinde (Decision #85).
+ *
+ * Lo pidio el cliente asi: *"la interfaz de aprendiz debe ser lo mejor tipo Typeform,
+ * transiciones, dinamica y wow; desde admin configuracion como diseño, colores o animaciones"*.
+ *
+ * Es un puñado CERRADO de opciones y no un editor de temas: cada una responde a una pregunta que
+ * quien arma el examen se hace de verdad, y ninguna puede dejar la pantalla ilegible. Un selector
+ * de color libre si puede —texto gris sobre fondo gris—, y ademas no hay quien lo mantenga.
+ *
+ * La transicion "ninguna" no es solo una preferencia estetica: es la salida para quien se marea
+ * y para el equipo viejo. Ademas, prefers-reduced-motion la fuerza sin preguntar.
+ */
+export const presentationSchema = z
+  .object({
+    /** El color con el que se pinta lo elegido y el progreso. */
+    accent: z.enum(['brand', 'indigo', 'teal', 'violet', 'amber', 'rose']).default('brand'),
+    /** Como se pasa de una pregunta a la siguiente. */
+    transition: z.enum(['slide', 'fade', 'none']).default('slide'),
+    /** Una pregunta por pantalla (Typeform) o todas en una lista (formulario de siempre). */
+    pace: z.enum(['one', 'all']).default('one'),
+    /** Al marcar una respuesta unica, pasar solo a la siguiente. */
+    autoAdvance: z.boolean().default(false),
+    /** Fondo liso o degradado suave hacia el acento. */
+    background: z.enum(['plain', 'gradient']).default('plain'),
+    /** Numerar las opciones con A/B/C y aceptarlas por teclado. */
+    optionLetters: z.boolean().default(true),
+  })
+  .strict()
+  .default({});
+export type PresentationInput = z.infer<typeof presentationSchema>;
+
+export const updatePresentationSchema = z.object({
+  presentation: presentationSchema,
+});
 
 export const createAssessmentSchema = z.object({
   title: z.string().min(3).max(200),

@@ -1,35 +1,70 @@
 'use client';
 
-import { ArrowRight, CircleCheck, Clock, Repeat2 } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  Clock,
+  Play,
+  Repeat2,
+  Sparkles,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
-import { describeDueDate, formatDate } from '@/lib/format';
+import { describeDueDate } from '@/lib/format';
 import { getPending, getTodayReview, selfEnroll, type PendingItem, type TodayReview } from '@/lib/learner-api';
-import { ActivityCard } from '@/components/modules/learner/activity-card';
 import { ActivityCover } from '@/components/modules/activity-cover';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 
 /**
- * INICIO del aprendiz: un catalogo, no una lista.
+ * HOY: una BIBLIOTECA, no una lista de tareas (Decision #89).
  *
- * El orden responde a como decide una persona con cinco minutos libres:
- *   1. lo que ya empezo (terminar algo a medias cuesta menos que empezar),
- *   2. el repaso del dia (tres minutos, sostiene lo aprendido),
- *   3. lo que le falta.
+ * DE DONDE VIENE. Esto era una lista de pendientes en tarjetas. Correcta y triste: la pantalla a
+ * la que un auxiliar de bodega entra cada dia parecia un formulario de deberes, y lo dijo el
+ * cliente en una frase —*"quiero que hoy sea estilo streaming tipo Netflix"*—. Detras de esa
+ * frase hay algo real: nadie abre por gusto una lista de obligaciones, pero todo el mundo abre
+ * una biblioteca. El contenido es el mismo; lo que cambia es si da ganas de entrar.
  *
- * Estetica sobria a proposito (referencia Sana Labs, no Netflix): portadas limpias, una sola
- * accion por tarjeta y nada que se mueva sin motivo. El contenido de una empresa no necesita
- * carrusel; necesita que se entienda que toca hacer.
+ * POR QUE FUNCIONA AQUI y no es solo maquillaje: la formacion de esta empresa YA tiene la forma
+ * de un catalogo —piezas cortas, con portada, agrupadas por tema y con una que conviene ver
+ * ahora—. Lo unico que faltaba era enseñarla asi.
+ *
+ * LOS FILTROS SON POR ESTADO Y NO POR TIPO, y es la decision de fondo de la pantalla. "Induccion"
+ * o "Alturas" es como lo clasifica quien la administra; la pregunta de quien entra a las 6 de la
+ * manana con el celular en la mano es OTRA: *"¿que hago hoy?"*. Por eso arriba se filtra por lo
+ * que decide —vence pronto, ya empezado, sin empezar— y el TIPO se usa mas abajo, para agrupar
+ * las filas, que es donde clasificar si ayuda a encontrar.
+ *
+ * EL FONDO NO TRAE COLOR PROPIO. La primera version pintaba esta pantalla oscura siempre, con su
+ * paleta aparte. Se veia bien y estaba mal: el modo aprendiz ya tiene claro y oscuro, y una
+ * pantalla que se los salta deja el producto con dos criterios. Ademas ponia una superficie de
+ * color donde el resto usa neutros —y el azul y el verde de la empresa son ACENTO, no fondo—.
+ *
+ * Lo cinematografico lo pone la PORTADA a sangre con su degradado, que es una foto: funciona
+ * igual sobre blanco que sobre negro, y por eso el texto que va encima si es blanco.
  */
+
+type Filtro = 'TODO' | 'EMPEZADO' | 'URGENTE' | 'NUEVO';
+
+/** Vence hoy, manana o ya vencio: es lo que de verdad aprieta. */
+function urge(item: PendingItem): boolean {
+  if (item.overdue) return true;
+  if (!item.dueAt) return false;
+  const dias = Math.round((new Date(item.dueAt).getTime() - Date.now()) / 86_400_000);
+  return dias <= 2;
+}
+
 export default function TodayPage() {
   const [pending, setPending] = useState<PendingItem[] | null>(null);
   const [review, setReview] = useState<TodayReview | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>('TODO');
 
   useEffect(() => {
     let cancelled = false;
@@ -52,25 +87,56 @@ export default function TodayPage() {
     };
   }, []);
 
+  const filtrados = useMemo(() => {
+    const todos = pending ?? [];
+    if (filtro === 'EMPEZADO') return todos.filter((item) => item.started);
+    if (filtro === 'URGENTE') return todos.filter(urge);
+    if (filtro === 'NUEVO') return todos.filter((item) => !item.started);
+    return todos;
+  }, [pending, filtro]);
+
+  /**
+   * LAS FILAS. Primero las que responden "¿que hago ahora?" y despues el catalogo por tema, que
+   * es donde el tipo si ayuda: agrupa lo que se parece entre si.
+   */
+  const filas = useMemo(() => {
+    const salida: Array<{ clave: string; titulo: string; items: PendingItem[] }> = [];
+    const empezadas = filtrados.filter((item) => item.started);
+    const urgentes = filtrados.filter((item) => !item.started && urge(item));
+    const resto = filtrados.filter((item) => !item.started && !urge(item));
+
+    if (empezadas.length > 0) salida.push({ clave: 'empezadas', titulo: 'Continua donde ibas', items: empezadas });
+    if (urgentes.length > 0) salida.push({ clave: 'urgentes', titulo: 'Vence pronto', items: urgentes });
+
+    // Por tema: una fila por tipo de formacion, con el nombre que usa la empresa.
+    const porTipo = new Map<string, PendingItem[]>();
+    for (const item of resto) {
+      const nombre = item.type?.name ?? 'Otras formaciones';
+      porTipo.set(nombre, [...(porTipo.get(nombre) ?? []), item]);
+    }
+    for (const [nombre, items] of porTipo) {
+      salida.push({ clave: `tipo-${nombre}`, titulo: nombre, items });
+    }
+    return salida;
+  }, [filtrados]);
+
   if (pending === null) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-56 w-full rounded-xl" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+      <div className="min-h-screen bg-paper px-4 pt-6 sm:px-6">
+        <Skeleton className="h-[380px] w-full rounded-3xl" />
+        <div className="mt-8 flex gap-3">
+          <Skeleton className="h-[240px] w-[170px] shrink-0 rounded-2xl" />
+          <Skeleton className="h-[240px] w-[170px] shrink-0 rounded-2xl" />
+          <Skeleton className="h-[240px] w-[170px] shrink-0 rounded-2xl" />
         </div>
       </div>
     );
   }
 
-  const started = pending.filter((item) => item.started);
-  const notStarted = pending.filter((item) => !item.started);
-  const hero = started[0] ?? notStarted[0] ?? null;
-  const rest = pending.filter((item) => item.assignmentId !== hero?.assignmentId);
+  const hero = pending.find((item) => item.started) ?? pending.find(urge) ?? pending[0] ?? null;
+  const hayRepaso = review !== null && review.total > 0;
 
-  if (!hero && (!review || review.total === 0)) {
+  if (!hero && !hayRepaso) {
     return (
       <EmptyState
         icon={CircleCheck}
@@ -81,41 +147,83 @@ export default function TodayPage() {
   }
 
   return (
-    <div className="space-y-10">
-      {hero ? <Hero item={hero} /> : null}
+    // Se sale de los margenes del contenedor para que el heroe llegue al borde: un heroe con
+    // margenes a los lados deja de ser un heroe y pasa a ser una tarjeta grande.
+    <div className="min-h-screen bg-paper pb-16">
+      {hero ? <Heroe item={hero} /> : null}
 
-      <ReviewRow review={review} />
+      <div className="px-4 sm:px-6">
+        {/* ─────────────── Filtros ─────────────── */}
+        <div className="rail -mx-4 mt-7 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          {(
+            [
+              { clave: 'TODO', label: 'Todo' },
+              { clave: 'EMPEZADO', label: 'En curso' },
+              { clave: 'URGENTE', label: 'Vence pronto' },
+              { clave: 'NUEVO', label: 'Sin empezar' },
+            ] as Array<{ clave: Filtro; label: string }>
+          ).map((chip) => {
+            const activo = filtro === chip.clave;
+            const cuantos =
+              chip.clave === 'TODO'
+                ? pending.length
+                : chip.clave === 'EMPEZADO'
+                  ? pending.filter((item) => item.started).length
+                  : chip.clave === 'URGENTE'
+                    ? pending.filter(urge).length
+                    : pending.filter((item) => !item.started).length;
+            if (cuantos === 0 && chip.clave !== 'TODO') return null;
+            return (
+              <button
+                key={chip.clave}
+                type="button"
+                aria-pressed={activo}
+                onClick={() => setFiltro(chip.clave)}
+                className={cn(
+                  'focus-ring shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-150',
+                  activo
+                    ? 'bg-ink-900 text-surface shadow-sm'
+                    : 'border border-line bg-surface text-ink-500 hover:border-line-strong hover:text-ink-900',
+                )}
+              >
+                {chip.label}
+                {/* El numero evita el filtro que no lleva a ninguna parte. */}
+                <span className="ml-1.5 tabular-nums opacity-60">{cuantos}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      {rest.length > 0 ? (
-        <section aria-labelledby="pendientes">
-          <h2 id="pendientes" className="mb-4 font-display text-lg font-semibold text-ink-900">
-            {started.length > 1 ? 'Lo demas que tienes pendiente' : 'Tu formacion pendiente'}
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {rest.map((item, index) => (
-              <ActivityCard key={item.assignmentId} item={item} index={index} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+        {hayRepaso ? <FilaRepaso review={review} /> : null}
+
+        {filas.length === 0 ? (
+          <p className="py-16 text-center text-sm text-ink-300">
+            Nada en este filtro. Prueba con &quot;Todo&quot;.
+          </p>
+        ) : (
+          filas.map((fila) => <Fila key={fila.clave} titulo={fila.titulo} items={fila.items} />)
+        )}
+      </div>
     </div>
   );
 }
 
 /**
- * El heroe: UNA formacion, la que conviene hacer ahora. Se prefiere la que ya se empezo sobre la
- * mas urgente, porque abandonar algo a medias es el patron que mas mata la constancia.
+ * EL HEROE, a sangre. Una sola formacion: la que conviene hacer ahora.
+ *
+ * Se prefiere la EMPEZADA sobre la mas urgente, y no al reves: abandonar algo a medias es el
+ * patron que mas mata la constancia, y terminar lo empezado cuesta menos que arrancar de cero.
  */
-function Hero({ item }: { item: PendingItem }) {
+function Heroe({ item }: { item: PendingItem }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [starting, setStarting] = useState(false);
 
-  const canEnter = item.enrollmentId !== null;
-  const canSelfStart = !canEnter && item.selfServiceOfferingId !== null;
+  const puedeEntrar = item.enrollmentId !== null;
+  const puedeEmpezar = !puedeEntrar && item.selfServiceOfferingId !== null;
 
-  const open = async () => {
-    if (canEnter) {
+  const abrir = async () => {
+    if (puedeEntrar) {
       router.push(`/aprender/${item.enrollmentId}`);
       return;
     }
@@ -137,97 +245,273 @@ function Hero({ item }: { item: PendingItem }) {
   };
 
   return (
-    <section className="animate-card-in overflow-hidden rounded-xl border border-line bg-surface lg:flex">
+    /*
+      SIN CANTOS RECTOS. Iba a sangre absoluta y los cuatro angulos rectos lo hacian parecer un
+      banner pegado encima de la pantalla en vez de una pieza del producto. Ahora respira por los
+      lados y redondea fuerte: es la misma forma que tienen las tarjetas, solo que en grande.
+    */
+    <section className="stage-in relative isolate mx-4 min-h-[380px] overflow-hidden rounded-[1.75rem] sm:mx-6 sm:min-h-[440px] sm:rounded-[2rem]">
+      <ActivityCover
+        seed={item.activityId}
+        colorHex={item.type?.colorHex}
+        coverKey={item.coverKey}
+        variant="wide"
+        className="absolute inset-0 h-full w-full rounded-none [aspect-ratio:auto]"
+      />
       {/*
-        En escritorio la portada llena su columna y deja de mandar la proporcion: si conserva el
-        21/9 calcula su ancho desde el alto de la fila y se desborda sobre el texto.
+        DOS degradados y no uno: el vertical asienta el texto sobre la imagen y el lateral deja
+        sitio al bloque de la izquierda sin oscurecer la foto entera, que es lo que la aplanaria.
       */}
-      <div className="relative lg:w-[42%] lg:shrink-0">
-        <ActivityCover
-          seed={item.activityId}
-          colorHex={item.type?.colorHex}
-          label={item.type?.name}
-          variant="wide"
-          className="lg:absolute lg:inset-0 lg:aspect-auto lg:h-full lg:w-full lg:rounded-none"
-        />
-      </div>
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/20 to-transparent" />
 
-      <div className="flex flex-1 flex-col justify-center p-6 lg:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-500">
-          {item.started ? 'Continua donde ibas' : 'Lo primero'}
-        </p>
-        <h1 className="mt-2 font-display text-[26px] font-semibold leading-tight text-ink-900 lg:text-[32px]">
-          {item.title}
-        </h1>
-
-        {item.description ? <p className="mt-3 line-clamp-3 text-base text-ink-500">{item.description}</p> : null}
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-500">
+      <div className="relative flex min-h-[420px] max-w-2xl flex-col justify-end p-5 pb-8 sm:min-h-[460px] sm:p-8 sm:pb-10">
+        <div className="flex flex-wrap items-center gap-2">
+          {item.type ? (
+            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-white backdrop-blur-sm">
+              {item.type.name}
+            </span>
+          ) : null}
+          {/* La urgencia se pinta en rojo solo cuando lo es: si todo grita, nada avisa. */}
+          <span
+            className={cn(
+              'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] backdrop-blur-sm',
+              item.overdue ? 'bg-danger text-white' : 'bg-white/15 text-white',
+            )}
+          >
+            {describeDueDate(item.dueAt)}
+          </span>
           {item.estimatedMinutes ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-white backdrop-blur-sm">
+              <Clock className="h-3 w-3" strokeWidth={2.25} aria-hidden="true" />
               {item.estimatedMinutes} min
             </span>
           ) : null}
-          <span className={cn(item.overdue && 'font-medium text-danger')}>{describeDueDate(item.dueAt)}</span>
         </div>
 
-        <div className="mt-6">
-          {canEnter || canSelfStart ? (
-            <Button size="lg" className="w-full sm:w-auto" loading={starting} onClick={() => void open()}>
+        <h1 className="mt-4 font-display text-[30px] font-bold leading-[1.08] text-white sm:text-[44px]">
+          {item.title}
+        </h1>
+        {item.description ? (
+          <p className="mt-3 line-clamp-2 max-w-xl text-[15px] leading-relaxed text-white/75">{item.description}</p>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap gap-2.5">
+          {puedeEntrar || puedeEmpezar ? (
+            <button
+              type="button"
+              disabled={starting}
+              onClick={() => void abrir()}
+              className="focus-ring inline-flex h-12 items-center gap-2 rounded-xl bg-surface px-6 text-base font-semibold text-ink-900 shadow-lg transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+            >
+              <Play className="h-4 w-4 fill-current" strokeWidth={0} aria-hidden="true" />
               {item.started ? 'Continuar' : 'Empezar ahora'}
-              {!starting ? <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" /> : null}
-            </Button>
+            </button>
           ) : (
-            <p className="rounded-md bg-paper px-3 py-2 text-sm text-ink-500">
+            <p className="rounded-xl bg-white/10 px-4 py-3 text-sm text-white/75">
               Todavia no esta abierta. Quien programa la formacion debe convocarte.
             </p>
           )}
+          {puedeEntrar ? (
+            <Link
+              href={`/aprender/${item.enrollmentId}`}
+              className="focus-ring inline-flex h-12 items-center gap-2 rounded-xl border border-white/25 px-5 text-base font-medium text-white transition-colors hover:bg-white/10"
+            >
+              Ver que trae
+              <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            </Link>
+          ) : null}
         </div>
       </div>
     </section>
   );
 }
 
-/** El repaso del dia. Si hoy no hay nada, se dice cuando vuelve en vez de dejar el hueco vacio. */
-function ReviewRow({ review }: { review: TodayReview | null }) {
-  if (!review) return null;
+/**
+ * UNA FILA del catalogo. Se desplaza con el dedo en el telefono y con las flechas en escritorio.
+ *
+ * Las flechas aparecen solo al pasar por encima y SOLO en pantallas con raton: en un telefono
+ * ocupan sitio y no las usa nadie, porque ahi ya se arrastra.
+ */
+function Fila({ titulo, items }: { titulo: string; items: PendingItem[] }) {
+  const rail = useRef<HTMLDivElement | null>(null);
 
-  if (review.total === 0) {
-    if (review.pendingLater === 0) return null;
-    return (
-      <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-display text-base font-semibold text-ink-900">Hoy no tienes repaso</h2>
-        <p className="mt-1 text-sm text-ink-500">
-          {review.pendingLater === 1 ? 'Tienes 1 pregunta guardada' : `Tienes ${review.pendingLater} preguntas guardadas`}
-          {review.nextDueAt ? `; la proxima vuelve el ${formatDate(review.nextDueAt)}.` : '.'}
+  const mover = (direccion: -1 | 1) => {
+    const nodo = rail.current;
+    if (!nodo) return;
+    nodo.scrollBy({ left: direccion * Math.max(280, nodo.clientWidth * 0.8), behavior: 'smooth' });
+  };
+
+  return (
+    <section className="group/fila mt-9">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="font-display text-lg font-semibold text-ink-900">{titulo}</h2>
+        <div className="hidden gap-1 opacity-0 transition-opacity group-hover/fila:opacity-100 md:flex">
+          <button
+            type="button"
+            onClick={() => mover(-1)}
+            aria-label={`Desplazar "${titulo}" hacia atras`}
+            className="focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink-700 transition-colors hover:border-line-strong hover:text-ink-900"
+          >
+            <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            onClick={() => mover(1)}
+            aria-label={`Desplazar "${titulo}" hacia adelante`}
+            className="focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink-700 transition-colors hover:border-line-strong hover:text-ink-900"
+          >
+            <ChevronRight className="h-5 w-5" strokeWidth={1.75} />
+          </button>
+        </div>
+      </div>
+
+      <div ref={rail} className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        {items.map((item, indice) => (
+          <Poster key={item.assignmentId} item={item} indice={indice} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Una formacion como caratula vertical: es la forma que la vista reconoce como "algo que ver". */
+function Poster({ item, indice }: { item: PendingItem; indice: number }) {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [starting, setStarting] = useState(false);
+
+  const abrir = async () => {
+    if (item.enrollmentId) {
+      router.push(`/aprender/${item.enrollmentId}`);
+      return;
+    }
+    if (!item.selfServiceOfferingId) {
+      showToast({ kind: 'warning', title: 'Todavia no esta abierta', description: 'Deben convocarte primero.' });
+      return;
+    }
+    setStarting(true);
+    try {
+      const result = await selfEnroll(item.selfServiceOfferingId);
+      router.push(`/aprender/${result.enrollmentId}`);
+    } catch {
+      showToast({ kind: 'danger', title: 'No se pudo empezar la formacion.' });
+      setStarting(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void abrir()}
+      disabled={starting}
+      /*
+        TARJETA ANCHA, NO CARATULA ESTRECHA (Decision #90).
+
+        La primera version era un poster 2:3 de 150 px, como el cartel de una pelicula. Se veia
+        bien y no servia: en 150 px no cabe nada mas que el titulo, y aqui la decision no se toma
+        por la imagen —una foto de bodega no distingue una formacion de otra— sino por lo que
+        dice al lado: cuanto dura, cuando vence y que gano. Un cartel funciona cuando la portada
+        ES el producto; aqui la portada solo lo identifica.
+
+        Asi que la proporcion baja a 16/10 y la tarjeta se ensancha hasta donde el texto respira.
+      */
+      className="poster stage-in focus-ring w-[250px] shrink-0 overflow-hidden rounded-2xl border border-line bg-surface text-left disabled:opacity-60 sm:w-[280px]"
+      style={{ animationDelay: `${Math.min(indice, 5) * 60}ms` }}
+    >
+      <div className="relative">
+        <ActivityCover
+          seed={item.activityId}
+          colorHex={item.type?.colorHex}
+          coverKey={item.coverKey}
+          variant="tile"
+          className="w-full rounded-none"
+        />
+        {item.started ? (
+          <span
+            className="absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+          >
+            En curso
+          </span>
+        ) : item.overdue ? (
+          <span className="absolute left-2.5 top-2.5 rounded-full bg-danger px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            Vencida
+          </span>
+        ) : null}
+      </div>
+
+      <div className="p-3.5">
+        {item.type ? (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ color: item.type.colorHex ?? 'var(--brand-primary)' }}>
+            {item.type.name}
+          </p>
+        ) : null}
+        <p className="mt-1 line-clamp-2 min-h-[2.6em] text-[15px] font-semibold leading-snug text-ink-900">
+          {item.title}
         </p>
-      </section>
-    );
-  }
 
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+          {item.estimatedMinutes ? (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+              {item.estimatedMinutes} min
+            </span>
+          ) : null}
+          <span className={cn('inline-flex items-center gap-1', item.overdue && 'font-medium text-danger')}>
+            <CalendarClock className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+            {describeDueDate(item.dueAt)}
+          </span>
+        </div>
+
+        {/*
+          LO QUE GANA, y es un numero VERDADERO: la constante vive en `shared` y es la misma que
+          usa el servidor al otorgarlo (Decision #90). Prometer 50 y dar 30 seria peor que no
+          prometer nada, asi que la promesa y el premio salen del mismo sitio.
+        */}
+        <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-semibold"
+            style={{ color: 'var(--brand-accent)' }}
+          >
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />+{item.pointsOnComplete} pts
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-ink-700">
+            {item.started ? 'Continuar' : 'Empezar'}
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/**
+ * EL REPASO DEL DIA, con su propia forma.
+ *
+ * No es una formacion y no puede parecerlo: no tiene portada, no se "termina" y dura tres
+ * minutos. Por eso es una banda ancha y no una caratula mas de la fila —si se disfrazara de
+ * formacion, competiria con ellas por la misma decision y confundiria las dos cosas—.
+ */
+function FilaRepaso({ review }: { review: TodayReview }) {
   return (
     <Link
       href="/repaso"
-      className="focus-ring group flex items-center gap-4 rounded-xl border border-line bg-surface p-5 transition-shadow duration-150 ease-pulse hover:shadow-card-hover"
+      className="stage-in focus-ring mt-8 flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 transition-transform duration-150 hover:-translate-y-0.5 sm:p-5"
     >
       <span
-        aria-hidden="true"
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
-        style={{ backgroundColor: 'var(--brand-primary-soft)' }}
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 30%, transparent)' }}
       >
-        <Repeat2 className="h-6 w-6" strokeWidth={1.75} style={{ color: 'var(--brand-primary)' }} />
+        <Repeat2 className="h-6 w-6 text-white" strokeWidth={1.75} aria-hidden="true" />
       </span>
-      <div className="min-w-0 flex-1">
-        <h2 className="font-display text-base font-semibold text-ink-900">Tu repaso de hoy</h2>
-        <p className="mt-0.5 text-sm text-ink-500">
-          {review.total === 1 ? '1 pregunta' : `${review.total} preguntas`} que fallaste antes. Tres minutos.
-        </p>
-      </div>
-      <ArrowRight
-        className="h-5 w-5 shrink-0 text-ink-300 transition-transform duration-150 ease-pulse group-hover:translate-x-0.5"
-        aria-hidden="true"
-      />
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-base font-semibold text-ink-900">Tu repaso de hoy</span>
+        <span className="block text-sm text-ink-500">
+          {review.total} {review.total === 1 ? 'pregunta' : 'preguntas'} de lo que ya viste. Tres minutos.
+        </span>
+      </span>
+      <ArrowRight className="h-5 w-5 shrink-0 text-ink-300" strokeWidth={1.75} aria-hidden="true" />
     </Link>
   );
 }

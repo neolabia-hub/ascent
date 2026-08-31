@@ -124,3 +124,156 @@ describe('question-payload', () => {
     });
   });
 });
+
+/**
+ * LOS TIPOS DE LA DECISION #86.
+ *
+ * Lo que se prueba aqui no es "que no rompa": es que la RESPUESTA CORRECTA no se escape hacia el
+ * cliente por ninguno de los cuatro caminos nuevos, y que la ida y vuelta a columnas conserve
+ * exactamente lo que el administrador escribio. Un emparejar cuyos ids delaten la pareja se
+ * resuelve leyendo el HTML, sin haber leido la pregunta.
+ */
+/** Monta la vista del aprendiz desde unas columnas recien traducidas. */
+function vistaDe(id: string, columns: ReturnType<typeof payloadToColumns>) {
+  return {
+    id,
+    qtype: columns.qtype,
+    stem: columns.stem,
+    options: columns.options as never,
+    correct: columns.correct as never,
+    feedback: columns.feedback as never,
+    points: columns.points,
+  };
+}
+
+describe('tipos de la Decision #86', () => {
+  it('completar huecos conserva sus huecos y sus formas aceptadas', () => {
+    const payload: QuestionPayload = {
+      qtype: 'FILL_BLANK',
+      stem: 'El arnes se inspecciona cada {{1}} y lo revisa el {{2}}.',
+      blanks: [
+        { id: '1', accept: ['seis meses', 'medio ano'] },
+        { id: '2', accept: ['supervisor'] },
+      ],
+      partialCredit: true,
+      points: 2,
+    };
+    expect(roundTrip(payload)).toEqual(payload);
+  });
+
+  it('completar huecos NUNCA manda las respuestas al que responde', () => {
+    const columns = payloadToColumns({
+      qtype: 'FILL_BLANK',
+      stem: 'El arnes se inspecciona cada {{1}}.',
+      blanks: [{ id: '1', accept: ['seis meses'] }],
+      partialCredit: true,
+      points: 1,
+    });
+    const vista = toLearnerView(vistaDe('v1', columns));
+    expect(JSON.stringify(vista)).not.toContain('seis meses');
+    // Los huecos si viajan, vacios y en su orden: el reproductor los necesita para abrirlos.
+    expect(vista.options).toEqual([{ id: '1', text: '' }]);
+  });
+
+  it('ordenar conserva los pasos y su orden correcto', () => {
+    const payload: QuestionPayload = {
+      qtype: 'ORDER',
+      stem: 'Ordena el bloqueo de la maquina',
+      items: [
+        { id: 'a', text: 'Avisar al operador' },
+        { id: 'b', text: 'Cortar la energia' },
+        { id: 'c', text: 'Poner el candado' },
+      ],
+      correctOrder: ['a', 'b', 'c'],
+      partialCredit: true,
+      points: 3,
+    };
+    expect(roundTrip(payload)).toEqual(payload);
+  });
+
+  it('ordenar manda los pasos pero NO su orden correcto', () => {
+    const columns = payloadToColumns({
+      qtype: 'ORDER',
+      stem: 'Ordena el bloqueo de la maquina',
+      items: [
+        { id: 'a', text: 'Avisar al operador' },
+        { id: 'b', text: 'Cortar la energia' },
+      ],
+      correctOrder: ['b', 'a'],
+      partialCredit: true,
+      points: 2,
+    });
+    const vista = toLearnerView(vistaDe('v1', columns));
+    expect(vista.options).toHaveLength(2);
+    expect(JSON.stringify(vista)).not.toContain('order');
+  });
+
+  it('emparejar conserva las parejas al ir y volver', () => {
+    const payload: QuestionPayload = {
+      qtype: 'MATCH',
+      stem: 'Une cada senal con su significado',
+      pairs: [
+        { id: '1', left: 'Senal de alto', right: 'Detenerse por completo' },
+        { id: '2', left: 'Senal de ceda', right: 'Dar prioridad' },
+      ],
+      partialCredit: true,
+      points: 2,
+    };
+    expect(roundTrip(payload)).toEqual(payload);
+  });
+
+  it('emparejar no delata la pareja: el emparejamiento vive solo en `correct`', () => {
+    const columns = payloadToColumns({
+      qtype: 'MATCH',
+      stem: 'Une cada senal con su significado',
+      pairs: [
+        { id: '1', left: 'Senal de alto', right: 'Detenerse por completo' },
+        { id: '2', left: 'Senal de ceda', right: 'Dar prioridad' },
+      ],
+      partialCredit: true,
+      points: 2,
+    });
+    const vista = toLearnerView(vistaDe('v1', columns));
+    // Las dos columnas viajan, pero el mapa L->R se queda en el servidor.
+    expect(vista.options.map((option) => option.id)).toEqual(['L1', 'L2', 'R1', 'R2']);
+    expect(JSON.stringify(vista)).not.toContain('pairs');
+  });
+
+  it('numerica conserva numero, margen y unidad', () => {
+    const payload: QuestionPayload = {
+      qtype: 'NUMERIC',
+      stem: 'A cuantos metros es obligatorio el arnes?',
+      correctNumber: 1.5,
+      tolerance: 0,
+      unit: 'm',
+      points: 1,
+    };
+    expect(roundTrip(payload)).toEqual(payload);
+  });
+
+  it('numerica manda la UNIDAD pero jamas el numero', () => {
+    const columns = payloadToColumns({
+      qtype: 'NUMERIC',
+      stem: 'A cuantos metros es obligatorio el arnes?',
+      correctNumber: 1.5,
+      tolerance: 0.1,
+      unit: 'm',
+      points: 1,
+    });
+    const vista = toLearnerView(vistaDe('v1', columns));
+    // La unidad si: sin ella "1,5" y "150" parecen respuestas distintas a la misma pregunta.
+    expect(vista.unit).toBe('m');
+    expect(JSON.stringify(vista)).not.toContain('1.5');
+    expect(JSON.stringify(vista)).not.toContain('0.1');
+  });
+
+  it('la unidad solo sale en las numericas, no en el resto de tipos', () => {
+    const columns = payloadToColumns({
+      qtype: 'TRUE_FALSE',
+      stem: 'El arnes se revisa antes de cada uso',
+      correctValue: true,
+      points: 1,
+    });
+    expect(toLearnerView(vistaDe('v1', columns)).unit).toBeUndefined();
+  });
+});

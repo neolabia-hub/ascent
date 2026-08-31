@@ -4,9 +4,10 @@ import {
   createQuestionCategorySchema,
   createQuestionSchema,
   listQuestionsQuerySchema,
-  publishAssessmentSchema,
   reviseQuestionSchema,
+  setQuestionCategorySchema,
   updateAssessmentDraftSchema,
+  updatePresentationSchema,
 } from '@neo-pulse/shared';
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
@@ -66,6 +67,13 @@ export class AssessmentsController {
   }
 
   /** Editar NO modifica: crea la version N+1 (los intentos historicos quedan intactos). */
+  @Patch('questions/:id/category')
+  @RequirePermissions('questions:manage')
+  setQuestionCategory(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const { categoryId } = setQuestionCategorySchema.parse(body);
+    return this.questions.setCategory(actor, id, categoryId);
+  }
+
   @Post('questions/:id/revise')
   @RequirePermissions('questions:manage')
   reviseQuestion(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
@@ -87,10 +95,22 @@ export class AssessmentsController {
     return this.assessments.list();
   }
 
+  /**
+   * El lienzo de armado necesita la pregunta ENTERA para pintarla y editarla en su sitio, pero
+   * este endpoint es `catalog:read` y por ahi tambien entra quien solo esta mirando el catalogo.
+   * Asi que `correct` viaja SOLO si ademas puede editar el banco.
+   */
   @Get('assessments/:id')
   @RequirePermissions('catalog:read')
-  getAssessment(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assessments.getById(id);
+  getAssessment(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.assessments.getById(id, actor.hasPermission('questions:manage'));
+  }
+
+  @Patch('assessments/:id/presentation')
+  @RequirePermissions('questions:manage')
+  updatePresentation(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const { presentation } = updatePresentationSchema.parse(body);
+    return this.assessments.updatePresentation(actor, id, presentation);
   }
 
   @Post('assessments')
@@ -100,26 +120,20 @@ export class AssessmentsController {
     return this.assessments.create(actor, title);
   }
 
-  @Patch('assessments/versions/:versionId')
+  /**
+   * GUARDAR. Ya no hay borrador ni publicacion propia de la evaluacion (Decision #87): se edita
+   * siempre, y lo que congela una copia es publicar la FORMACION. Por eso desaparecieron
+   * `publish`, `discardDraft` y `createNextDraft`: eran la segunda escalera de versiones.
+   */
+  @Patch('assessments/:id')
   @RequirePermissions('questions:manage')
-  updateDraft(
-    @CurrentUser() actor: AuthUser,
-    @Param('versionId', ParseUUIDPipe) versionId: string,
-    @Body() body: unknown,
-  ) {
-    return this.assessments.updateDraft(actor, versionId, updateAssessmentDraftSchema.parse(body));
+  updateAssessment(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.assessments.update(actor, id, updateAssessmentDraftSchema.parse(body));
   }
 
-  @Post('assessments/versions/:versionId/publish')
+  @Delete('assessments/:id')
   @RequirePermissions('questions:manage')
-  publish(@CurrentUser() actor: AuthUser, @Param('versionId', ParseUUIDPipe) versionId: string, @Body() body: unknown) {
-    publishAssessmentSchema.parse(body);
-    return this.assessments.publish(actor, versionId);
-  }
-
-  @Post('assessments/:id/versions')
-  @RequirePermissions('questions:manage')
-  createNextDraft(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.assessments.createNextDraft(actor, id);
+  removeAssessment(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.assessments.remove(actor, id);
   }
 }

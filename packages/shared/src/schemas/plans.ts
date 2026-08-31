@@ -15,7 +15,14 @@ export const createTrainingPlanSchema = z.object({
   year: z.number().int().min(2000).max(2100),
   name: z.string().min(3).max(160),
   objective: z.string().max(4000).nullable().optional(),
-  goals: z.string().max(4000).nullable().optional(),
+  /**
+   * LA META, en porcentaje: cuanto del programa se compromete la empresa a ejecutar este ano.
+   *
+   * Era `goals`, texto libre, y por eso el plan ensenaba "62% de cumplimiento" sin nada contra
+   * que compararlo. Se mide contra el CUMPLIMIENTO (ejecutadas / programadas), que es el indicador
+   * que revisa el item 1.2.1 de la Res. 0312.
+   */
+  goalPct: z.number().int().min(1).max(100).nullable().optional(),
   scope: z.string().max(4000).nullable().optional(),
 });
 export type CreateTrainingPlanInput = z.infer<typeof createTrainingPlanSchema>;
@@ -83,6 +90,23 @@ export const approvePlanSchema = z.object({
   justification: z.string().min(10).max(500).optional(),
 });
 export type ApprovePlanInput = z.infer<typeof approvePlanSchema>;
+
+/**
+ * REABRIR un plan CERRADO. Exige motivo, siempre.
+ *
+ * Cerrar es lo que convierte al plan en la evidencia del ano, asi que reabrirlo no puede ser un
+ * clic mas: el auditor tiene derecho a saber por que un ano que estaba cerrado volvio a moverse.
+ * Pero tampoco puede ser imposible — desde que hay un plan por ano (Decision #71), un plan cerrado
+ * por error bloquea el ano entero y no queda forma de planear.
+ *
+ * Reabrir deja rastro; borrar no. Por eso esta es la salida para un plan que SI obligo a gente, y
+ * borrar se reserva al que nunca obligo a nadie.
+ */
+export const reopenPlanSchema = z.object({
+  confirm: z.literal(true),
+  justification: z.string().min(10).max(500),
+});
+export type ReopenPlanInput = z.infer<typeof reopenPlanSchema>;
 
 export const listPlansQuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100).optional(),

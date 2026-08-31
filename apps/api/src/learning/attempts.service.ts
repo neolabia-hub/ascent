@@ -36,7 +36,7 @@ export class AttemptsService {
    * Abre un intento. Antes valida lo que protege la seriedad de la evaluacion: que no este
    * bloqueado, que le queden intentos y que haya cumplido la espera entre ellos.
    */
-  async start(actor: AuthUser, enrollmentId: string, assessmentVersionId: string) {
+  async start(actor: AuthUser, enrollmentId: string, assessmentId: string) {
     const tenantId = this.prisma.currentTenantId;
     const enrollment = await this.requireOwn(actor, enrollmentId);
     if (enrollment.blockedAt) {
@@ -46,8 +46,8 @@ export class AttemptsService {
       });
     }
 
-    const version = await this.prisma.scoped.assessmentVersion.findUnique({
-      where: { id: assessmentVersionId },
+    const version = await this.prisma.scoped.assessment.findUnique({
+      where: { id: assessmentId },
       select: {
         id: true,
         status: true,
@@ -59,11 +59,11 @@ export class AttemptsService {
         sections: { orderBy: { displayOrder: 'asc' } },
       },
     });
-    if (!version) throw new NotFoundException({ code: 'ASSESSMENT_VERSION_NOT_FOUND' });
+    if (!version) throw new NotFoundException({ code: 'ASSESSMENT_NOT_FOUND' });
     if (version.status !== 'PUBLISHED') throw new ConflictException({ code: 'ASSESSMENT_NOT_PUBLISHED' });
 
     const previous = await this.prisma.scoped.attempt.findMany({
-      where: { enrollmentId, assessmentVersionId },
+      where: { enrollmentId, assessmentId },
       orderBy: { attemptNumber: 'asc' },
       select: { id: true, attemptNumber: true, status: true, submittedAt: true, passed: true },
     });
@@ -97,7 +97,7 @@ export class AttemptsService {
         data: {
           tenantId,
           enrollmentId,
-          assessmentVersionId,
+          assessmentId,
           userId: actor.id,
           attemptNumber: previous.length + 1,
           status: 'IN_PROGRESS',
@@ -123,7 +123,7 @@ export class AttemptsService {
         enrollmentId,
         verb: 'LAUNCHED',
         objectType: 'assessment_versions',
-        objectId: assessmentVersionId,
+        objectId: assessmentId,
         result: { attemptNumber: attempt.attemptNumber } as Prisma.InputJsonValue,
       },
     });
@@ -154,14 +154,16 @@ export class AttemptsService {
         attemptNumber: attempt.attemptNumber,
         status: attempt.status,
         startedAt: attempt.startedAt,
-        timeLimitMin: attempt.assessmentVersion.timeLimitMin,
+        timeLimitMin: attempt.assessment.timeLimitMin,
+        presentation: attempt.assessment.source?.presentation ?? attempt.assessment.presentation,
       },
       questions: questions.map((row) => {
         const learner = toLearnerView(row.questionVersion);
         return {
           attemptQuestionId: row.id,
           ...learner,
-          // Se respeta el orden de opciones barajado para ESTE intento.
+          // Se respeta el orden de opciones barajado para ESTE intento (en FILL_BLANK no hay
+          // barajado que aplicar: sus "opciones" son los huecos y se sirven en su orden).
           options: this.applyOptionOrder(learner.options, row.optionsOrder),
           answer: row.answer,
           pointsPossible: Number(row.pointsPossible),
@@ -240,7 +242,7 @@ export class AttemptsService {
       });
     }
 
-    const passingScore = attempt.assessmentVersion.passingScore ?? attempt.enrollment.activityVersion.passingScore;
+    const passingScore = attempt.assessment.passingScore ?? attempt.enrollment.activityVersion.passingScore;
     const result = scoreAttempt(graded, passingScore);
     const submittedAt = new Date();
     const anomalies = detectAnomalies(
@@ -266,7 +268,7 @@ export class AttemptsService {
       return { status: 'PENDING_MANUAL' as const, score: null, passed: null, blocked: false };
     }
 
-    await this.applyFinalScore(actor, attempt.enrollmentId, attempt.assessmentVersionId);
+    await this.applyFinalScore(actor, attempt.enrollmentId, attempt.assessmentId);
     if (result.passed) {
       await this.engagement.awardAssessmentPassed(this.prisma.scoped, tenantId, actor.id, attemptId);
     }
@@ -298,7 +300,7 @@ export class AttemptsService {
     const attempt = await this.requireOwnAttempt(actor, attemptId);
     if (attempt.status === 'IN_PROGRESS') throw new ConflictException({ code: 'ATTEMPT_NOT_SUBMITTED' });
 
-    const policy = (attempt.assessmentVersion.reviewPolicy ?? {}) as {
+    const policy = (attempt.assessment.reviewPolicy ?? {}) as {
       showScore?: boolean;
       showCorrectAnswers?: boolean;
       showExplanations?: boolean;
@@ -307,9 +309,9 @@ export class AttemptsService {
     const showScore = policy.showScore ?? true;
 
     const attemptsUsed = await this.prisma.scoped.attempt.count({
-      where: { enrollmentId: attempt.enrollmentId, assessmentVersionId: attempt.assessmentVersionId },
+      where: { enrollmentId: attempt.enrollmentId, assessmentId: attempt.assessmentId },
     });
-    const maxAttempts = attempt.assessmentVersion.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts;
+    const maxAttempts = attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts;
     const isLast = attempt.passed === true || attemptsUsed >= maxAttempts;
     const detailAllowed = !(policy.onlyAfterLastAttempt ?? true) || isLast;
 
@@ -348,13 +350,13 @@ export class AttemptsService {
   // ─────────────────────────── Apoyo ───────────────────────────
 
   /** Nota final de la ejecucion segun la politica (por defecto, la mas alta de los intentos). */
-  private async applyFinalScore(actor: AuthUser, enrollmentId: string, assessmentVersionId: string): Promise<void> {
-    const version = await this.prisma.scoped.assessmentVersion.findUnique({
-      where: { id: assessmentVersionId },
+  private async applyFinalScore(actor: AuthUser, enrollmentId: string, assessmentId: string): Promise<void> {
+    const version = await this.prisma.scoped.assessment.findUnique({
+      where: { id: assessmentId },
       select: { gradingPolicy: true },
     });
     const graded = await this.prisma.scoped.attempt.findMany({
-      where: { enrollmentId, assessmentVersionId, status: 'GRADED' },
+      where: { enrollmentId, assessmentId, status: 'GRADED' },
       select: { attemptNumber: true, score: true, passed: true },
     });
     const outcome = applyGradingPolicy(
@@ -376,12 +378,12 @@ export class AttemptsService {
    */
   private async blockIfExhausted(
     actor: AuthUser,
-    attempt: { id: string; enrollmentId: string; assessmentVersionId: string; assessmentVersion: { maxAttempts: number | null }; enrollment: { activityVersion: { maxAttempts: number; activityId: string } } },
+    attempt: { id: string; enrollmentId: string; assessmentId: string; assessment: { maxAttempts: number | null }; enrollment: { activityVersion: { maxAttempts: number; activityId: string } } },
   ): Promise<boolean> {
     const tenantId = this.prisma.currentTenantId;
-    const maxAttempts = attempt.assessmentVersion.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts;
+    const maxAttempts = attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts;
     const used = await this.prisma.scoped.attempt.count({
-      where: { enrollmentId: attempt.enrollmentId, assessmentVersionId: attempt.assessmentVersionId },
+      where: { enrollmentId: attempt.enrollmentId, assessmentId: attempt.assessmentId },
     });
     if (used < maxAttempts) return false;
 
@@ -454,17 +456,34 @@ export class AttemptsService {
 
     const versions = await this.prisma.scoped.questionVersion.findMany({
       where: { id: { in: unique } },
-      select: { id: true, options: true, points: true },
+      select: { id: true, qtype: true, options: true, points: true },
     });
     const ordered = shuffleQuestions ? this.shuffle(versions) : versions;
 
     return ordered.map((version) => {
       const options = (Array.isArray(version.options) ? version.options : []) as Array<{ id: string }>;
       const optionIds = options.map((option) => option.id);
+      /*
+        EL BARAJADO NO ES LA MISMA DECISION PARA TODOS LOS TIPOS (Decision #86). "Barajar
+        opciones" es una preferencia del administrador, pero en dos tipos deja de serlo:
+
+          ORDER y MATCH  SIEMPRE se barajan, elija lo que elija. Servir los pasos en su orden
+                         correcto, o las dos columnas alineadas, es dar la respuesta hecha: se
+                         responde sin leer, pulsando "siguiente".
+          FILL_BLANK     NUNCA se baraja. Aqui las "opciones" son los HUECOS del enunciado, en el
+                         orden en que aparecen; moverlos escribiria la respuesta del hueco 2 en el
+                         hueco 1 y suspenderia a quien acerto.
+      */
+      const barajar =
+        version.qtype === 'ORDER' || version.qtype === 'MATCH'
+          ? true
+          : version.qtype === 'FILL_BLANK'
+            ? false
+            : shuffleOptions;
       return {
         questionVersionId: version.id,
         points: Number(version.points),
-        optionIds: shuffleOptions ? this.shuffle(optionIds) : optionIds,
+        optionIds: barajar ? this.shuffle(optionIds) : optionIds,
       };
     });
   }
@@ -508,14 +527,29 @@ export class AttemptsService {
         id: true,
         userId: true,
         enrollmentId: true,
-        assessmentVersionId: true,
+        assessmentId: true,
         attemptNumber: true,
         status: true,
         startedAt: true,
         score: true,
         passed: true,
-        assessmentVersion: {
-          select: { timeLimitMin: true, passingScore: true, maxAttempts: true, reviewPolicy: true },
+        assessment: {
+          select: {
+            timeLimitMin: true,
+            passingScore: true,
+            maxAttempts: true,
+            reviewPolicy: true,
+            presentation: true,
+            /*
+              COMO SE VE el examen (Decision #85), leido del ORIGEN si esta es una copia congelada.
+
+              El acento y la transicion no son evidencia —no cambian que se pregunto ni como se
+              califico—, asi que retocarlos tiene que llegar tambien a quien ya esta cursando. Si
+              se leyera solo de la copia, cambiar un color obligaria a publicar la formacion otra
+              vez, que es justo la rigidez que la Decision #87 vino a quitar.
+            */
+            source: { select: { presentation: true } },
+          },
         },
         enrollment: {
           select: { activityVersion: { select: { passingScore: true, maxAttempts: true, activityId: true } } },

@@ -32,6 +32,27 @@ function asRecord(value: Prisma.JsonValue): Record<string, unknown> {
     : {};
 }
 
+/**
+ * Normaliza una respuesta escrita a mano para poder compararla (Decision #86).
+ *
+ * Quita tildes, mayusculas y espacios de mas. Es a proposito y no una concesion: quien responde
+ * esta escribiendo desde el telefono en una obra, y suspender a alguien por teclear "arnes" sin
+ * tilde seria medir ortografia en vez de seguridad. Lo que de verdad haya que exigir se exige
+ * anadiendo esa forma a la lista de respuestas aceptadas.
+ */
+function normalizar(value: string): string {
+  return (
+    value
+      .normalize('NFD')
+      // Las marcas diacriticas que NFD acaba de separar de su letra.
+      .replace(/[̀-ͯ]/g, '')
+      .trim()
+      .toLowerCase()
+      // Espacios de mas EN MEDIO: "seis   meses" y "seis meses" son la misma respuesta.
+      .replace(/\s+/g, ' ')
+  );
+}
+
 /** Califica UNA pregunta. Sin respuesta = cero, nunca un error: no responder es una decision. */
 export function gradeQuestion(question: GradableQuestion, answer: StoredAnswer): QuestionGrade {
   const correct = asRecord(question.correct);
@@ -74,6 +95,104 @@ export function gradeQuestion(question: GradableQuestion, answer: StoredAnswer):
     case 'ESSAY':
       // La califica una persona (attempts:grade_manual). El intento queda PENDIENTE de revision.
       return { pointsAwarded: null, needsManualGrading: true, correct: false };
+
+    /**
+     * COMPLETAR HUECOS. Cada hueco se compara NORMALIZADO —sin tildes, sin mayusculas y sin
+     * espacios de mas— contra su lista de respuestas validas.
+     *
+     * Es una decision de fondo, no una comodidad: quien responde esta escribiendo desde el
+     * telefono en una obra, y suspender a un conductor por escribir "arnes" sin tilde seria medir
+     * ortografia en vez de seguridad. Lo que hay que exigir de verdad se exige poniendo la forma
+     * completa en la lista de aceptadas.
+     */
+    case 'FILL_BLANK': {
+      const blanks = Array.isArray(correct.blanks)
+        ? (correct.blanks as Array<{ id: string; accept: string[] }>)
+        : [];
+      const written = asRecord((given.blanks ?? null) as Prisma.JsonValue);
+      if (blanks.length === 0) {
+        return { pointsAwarded: 0, needsManualGrading: false, correct: false };
+      }
+      const hits = blanks.filter((blank) => {
+        const value = normalizar(String(written[blank.id] ?? ''));
+        if (!value) return false;
+        return (blank.accept ?? []).some((accepted) => normalizar(accepted) === value);
+      }).length;
+
+      if (hits === blanks.length) {
+        return { pointsAwarded: question.pointsPossible, needsManualGrading: false, correct: true };
+      }
+      if (correct.partialCredit === false) {
+        return { pointsAwarded: 0, needsManualGrading: false, correct: false };
+      }
+      return {
+        pointsAwarded: Math.round(question.pointsPossible * (hits / blanks.length) * 100) / 100,
+        needsManualGrading: false,
+        correct: false,
+      };
+    }
+
+    /**
+     * ORDENAR. El credito parcial cuenta los pasos que quedaron EN SU SITIO, y no las parejas
+     * consecutivas correctas: es lo que se puede explicar en una frase a quien reclama la nota
+     * ("cuatro de los siete pasos estaban en su lugar"), y una metrica que no se puede explicar
+     * no sirve en una auditoria.
+     */
+    case 'ORDER': {
+      const expected = Array.isArray(correct.order) ? (correct.order as string[]) : [];
+      const dado = Array.isArray(given.order) ? (given.order as string[]) : [];
+      if (expected.length === 0) {
+        return { pointsAwarded: 0, needsManualGrading: false, correct: false };
+      }
+      const enSuSitio = expected.filter((id, index) => dado[index] === id).length;
+      if (enSuSitio === expected.length) {
+        return { pointsAwarded: question.pointsPossible, needsManualGrading: false, correct: true };
+      }
+      if (correct.partialCredit === false) {
+        return { pointsAwarded: 0, needsManualGrading: false, correct: false };
+      }
+      return {
+        pointsAwarded: Math.round(question.pointsPossible * (enSuSitio / expected.length) * 100) / 100,
+        needsManualGrading: false,
+        correct: false,
+      };
+    }
+
+    /** EMPAREJAR. Cada pareja acertada suma; las que se dejan sin unir cuentan como falladas. */
+    case 'MATCH': {
+      const expected = asRecord((correct.pairs ?? null) as Prisma.JsonValue) as Record<string, string>;
+      const dado = asRecord((given.pairs ?? null) as Prisma.JsonValue) as Record<string, string>;
+      const claves = Object.keys(expected);
+      if (claves.length === 0) {
+        return { pointsAwarded: 0, needsManualGrading: false, correct: false };
+      }
+      const hits = claves.filter((left) => dado[left] === expected[left]).length;
+      if (hits === claves.length) {
+        return { pointsAwarded: question.pointsPossible, needsManualGrading: false, correct: true };
+      }
+      if (correct.partialCredit === false) {
+        return { pointsAwarded: 0, needsManualGrading: false, correct: false };
+      }
+      return {
+        pointsAwarded: Math.round(question.pointsPossible * (hits / claves.length) * 100) / 100,
+        needsManualGrading: false,
+        correct: false,
+      };
+    }
+
+    /**
+     * NUMERICA. Dentro de la tolerancia o fuera: no hay credito parcial, porque "casi" no
+     * significa nada en una distancia de seguridad. La tolerancia se compara con un epsilon
+     * minimo para que 1,5 con tolerancia 0 no falle por como se representan los decimales.
+     */
+    case 'NUMERIC': {
+      const esperado = Number(correct.number ?? 0);
+      const tolerancia = Number(correct.tolerance ?? 0);
+      const dado = typeof given.number === 'number' ? given.number : Number.NaN;
+      const acierta = Number.isFinite(dado) && Math.abs(dado - esperado) <= tolerancia + 1e-9;
+      return { pointsAwarded: acierta ? question.pointsPossible : 0, needsManualGrading: false, correct: acierta };
+    }
+
   }
 }
 

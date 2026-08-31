@@ -43,7 +43,7 @@ export class PlayerService {
           isRequired: true,
           config: true,
           lessonId: true,
-          assessmentVersionId: true,
+          assessmentId: true,
           // Lo justo para que el indice diga de que tamano es cada parte ANTES de abrirla:
           // "8 tarjetas", "11 diapositivas". Un indice que solo lista titulos obliga a entrar
           // para saber en que se esta metiendo uno.
@@ -57,12 +57,12 @@ export class PlayerService {
       this.prisma.scoped.attempt.findMany({
         where: { enrollmentId },
         orderBy: { attemptNumber: 'asc' },
-        select: { id: true, assessmentVersionId: true, attemptNumber: true, status: true, score: true, passed: true },
+        select: { id: true, assessmentId: true, attemptNumber: true, status: true, score: true, passed: true },
       }),
     ]);
 
     const progressByContent = new Map(progress.map((row) => [row.activityContentId, row]));
-    const passed = new Set(attempts.filter((attempt) => attempt.passed).map((attempt) => attempt.assessmentVersionId));
+    const passed = new Set(attempts.filter((attempt) => attempt.passed).map((attempt) => attempt.assessmentId));
 
     return {
       enrollment: {
@@ -92,7 +92,7 @@ export class PlayerService {
           isRequired: content.isRequired,
           config: content.config,
           hasLesson: content.lessonId !== null,
-          assessmentVersionId: content.assessmentVersionId,
+          assessmentId: content.assessmentId,
           /**
            * EL TAMANO DE LA PIEZA, en la unidad de cada tipo.
            *
@@ -119,7 +119,7 @@ export class PlayerService {
               }
             : null,
           status:
-            content.type === 'ASSESSMENT' && content.assessmentVersionId && passed.has(content.assessmentVersionId)
+            content.type === 'ASSESSMENT' && content.assessmentId && passed.has(content.assessmentId)
               ? 'COMPLETED'
               : (own?.status ?? 'NOT_STARTED'),
           pct: own?.pct ?? 0,
@@ -142,7 +142,7 @@ export class PlayerService {
         config: true,
         lessonId: true,
         contentPackageId: true,
-        assessmentVersionId: true,
+        assessmentId: true,
         activityVersionId: true,
       },
     });
@@ -311,6 +311,7 @@ export class PlayerService {
                 description: true,
                 modality: true,
                 activityType: { select: { code: true, name: true, colorHex: true } },
+          coverKey: true,
                 // El proceso y la norma son lo que hace de esto EVIDENCIA y no un video suelto.
                 // El colaborador tenia derecho a verlo y no lo tenia en ninguna pantalla.
                 process: { select: { name: true } },

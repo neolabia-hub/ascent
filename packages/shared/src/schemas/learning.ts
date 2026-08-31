@@ -27,12 +27,27 @@ export const progressSchema = z.object({
 export type ProgressInput = z.infer<typeof progressSchema>;
 
 /** Respuesta a una pregunta. La forma depende del tipo; el servidor valida contra lo servido. */
+/**
+ * UNA RESPUESTA. Cada tipo de pregunta usa su campo y deja el resto sin poner.
+ *
+ * Es `.strict()` a proposito: un campo que no reconocemos no se guarda en silencio para que
+ * luego la calificacion no lo mire. Por eso, al anadir un tipo de pregunta hay que anadir aqui
+ * su forma de responder (Decision #86).
+ */
 export const answerSchema = z
   .object({
     optionId: z.string().min(1).max(20).optional(),
     optionIds: z.array(z.string().min(1).max(20)).max(8).optional(),
     value: z.boolean().optional(),
     text: z.string().max(5000).optional(),
+    /** FILL_BLANK: lo escrito en cada hueco, por id de hueco. */
+    blanks: z.record(z.string().max(20), z.string().max(200)).optional(),
+    /** ORDER: los ids de los pasos en el orden en que quedaron. */
+    order: z.array(z.string().min(1).max(20)).max(10).optional(),
+    /** MATCH: a que id de la derecha unio cada id de la izquierda. */
+    pairs: z.record(z.string().max(20), z.string().max(20)).optional(),
+    /** NUMERIC: el numero tecleado. */
+    number: z.number().finite().optional(),
   })
   .strict();
 export type AnswerInput = z.infer<typeof answerSchema>;

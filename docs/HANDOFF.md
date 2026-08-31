@@ -20,6 +20,1035 @@ un diario, no una referencia.
 
 ---
 
+## 2026-08-31 (tarde) — Las evaluaciones dejan de tener dos escaleras, y "Hoy" deja de ser una lista
+
+### Por donde empezo: "esto esta mal, no me gusta"
+
+Lo dijo el cliente de la pantalla de evaluaciones, y al mirarla de cerca no era estetica. Eran
+cinco cosas y las cinco estructurales:
+
+1. **El banco de preguntas era una pestana de primer nivel.** Nadie entra al modulo queriendo
+   "administrar un banco": entra queriendo armar un examen. Es el error mas citado de Moodle, y
+   Canvas lo repitio partiendo Question Banks e Item Banks en dos sistemas que ni se hablan.
+2. **El editor vivia en un cajon lateral de 420 px.** Escribir una pregunta es EL acto principal
+   de la pantalla, no un recado.
+3. **La pregunta en el examen era una linea de texto.** Ni opciones ni cual era la correcta:
+   revisar veinte preguntas antes de publicar eran veinte viajes a otra pantalla, asi que nadie
+   las revisaba.
+4. **El examen eran DOS listas** —las elegidas arriba, los bloques al azar en otra tarjeta abajo—
+   y el orden entre ellas no se podia ni expresar. Quien lo responde lo vive como UNA secuencia.
+5. **Habia un editor de pregunta duplicado**: el cajon del listado no usaba `question-editor.tsx`.
+   Ya habian divergido.
+
+Y un peaje: para escribir la primera pregunta habia que salirse a crear una "categoria".
+
+### El banco: la pregunta era "¿sirve o lo quito?"
+
+Lo pregunto asi: *"si tiene beneficio el banco de preguntas o biblioteca si si, si no quitarlo"*.
+La respuesta honesta es que el banco tiene DOS beneficios reales y ninguno justifica ser un sitio
+al que ir:
+
+- sin el no existe el **bloque al azar**, que es lo que evita que 116 personas se pasen la hoja de
+  respuestas el primer dia;
+- guarda el **versionado de preguntas** (Decision #6): corregir un enunciado hoy no reescribe lo
+  que alguien respondio el ano pasado.
+
+Los dos siguen enteros. Lo que se retiro es el DESTINO. **Decision #84**: fuera la pestana, el tema
+pasa a ser OPCIONAL y se crea tecleandolo, y reutilizar vive DENTRO de la evaluacion. La base lo
+confirmaba: de 18 categorias, 17 eran basura del e2e y solo una tenia contenido real.
+
+### Como quedo: rail, lienzo y ajustes
+
+Tres zonas, cada una respondiendo una pregunta distinta: el RAIL dice "¿que hay y que me falta?"
+(la secuencia numerada, con las preguntas a medias marcadas sin abrirlas); el LIENZO dice "¿como
+va a quedar?" (la pregunta con la forma exacta que tendra para quien la responda, y se escribe
+encima); los AJUSTES dicen "¿como se comporta?".
+
+Y **un bloque al azar es un paso mas de la secuencia**, no otra lista: por dentro se guarda como
+secciones intercaladas con su `displayOrder`. El servidor ya lo soportaba; faltaba una pantalla
+capaz de decirlo. **No queda ni un cajon en el camino normal**: traer del banco tambien es un paso
+del rail cuyo lienzo es el buscador, y ahi la pregunta se VE entera antes de meterla.
+
+### Vista del empleado, y el diseno configurable (Decision #85)
+
+*"La interfaz de aprendiz debe ser lo mejor tipo Typeform, transiciones, dinamica y wow; desde
+admin configuracion como diseno, colores o animaciones."*
+
+Sale `ExamStage`, y lo importante es que **lo usan las DOS pantallas**: el reproductor real y la
+vista previa del administrador. Si fueran dos implementaciones, la previa mentiria en cuanto una
+cambiara — y una vista previa que miente es peor que no tenerla, porque se publica confiando en
+ella. Se previsualiza en escritorio y en un marco de telefono de 390 px, y por eso el escenario
+recibe `wide` como PROP y no lo deduce de puntos de ruptura: dentro de un monitor, un `lg:` creeria
+que el telefono simulado tiene sitio para el panel lateral.
+
+La presentacion (acento, transicion, ritmo, auto-avance, fondo) vive en la EVALUACION y no en su
+version: **el color no es evidencia**. No cambia que se pregunto ni como se califico, asi que
+retocarlo no puede exigir publicar de nuevo.
+
+### Mas tipos de pregunta (Decision #86)
+
+*"Debe tener buena variedad, mas de lo normal que simplemente opciones, como completar huecos."*
+Y detras habia algo mas grande que la variedad: **con solo opcion multiple, media formacion de SST
+se pregunta mal**. Un bloqueo LOTO es una SECUENCIA y las cuatro opciones llevan la respuesta
+escrita; una distancia de seguridad se acierta por descarte; una senal se reconoce, no se elige de
+una lista.
+
+Entran cuatro, los cuatro de calificacion automatica y sin subir archivos: **completar huecos,
+ordenar los pasos, emparejar y numerica con tolerancia**. Senalar sobre una imagen queda para
+despues (arrastra subida de foto y zonas en coordenadas relativas).
+
+Detalles que costaron pensarlos:
+- **ORDER y MATCH se barajan SIEMPRE**, elija lo que elija el administrador: servirlos en su orden
+  es dar la respuesta hecha. **FILL_BLANK no se baraja NUNCA**: sus "opciones" son los huecos.
+- **Ni ordenar ni emparejar se arrastran.** No es una version pobre del arrastre: es la que
+  funciona con guantes, con lector de pantalla y dentro de una pagina que se desplaza.
+- La comparacion de huecos ignora tildes y mayusculas a proposito: suspender a un conductor por
+  escribir "arnes" sin tilde seria medir ortografia en vez de seguridad.
+
+### Las dos pruebas que encontraron bugs reales
+
+Escribirlas no fue tramite. **La primera**: el normalizador de huecos tenia `/s+/g` en vez de
+`/\s+/g` —el escapado se comio la barra— y reemplazaba la letra "s". **La segunda**: reutilizar una
+pregunta del banco perdia sus opciones, porque el paso se armaba con el RESUMEN de la lista en vez
+de pedir la pregunta entera. Reutilizar significaba reescribirla.
+
+### La contradiccion de fondo, y su cirugia (Decision #87)
+
+Auditando el ciclo de calificacion aparecio algo peor que un fallo de pantalla:
+
+> Publicar la v2 de una evaluacion ponia la v1 en RETIRED, pero el contenido de la formacion seguia
+> apuntando a la v1 — y `attempts.start` exige PUBLISHED. **El examen dejaba de poder abrirse** para
+> todas las formaciones publicadas que la usaran.
+
+Comprobado contra la base: no habia pasado todavia porque nadie habia publicado una segunda version
+de una evaluacion. Pero el boton que lo dispara es justo el que se acababa de hacer prominente.
+
+Y al preguntarse *"¿es necesario el versionado de evaluaciones?"* la respuesta fue que no, por una
+razon que se ve al mirar el archivo de al lado: **las lecciones NO se versionan aparte** —publicar
+la formacion las CLONA congeladas— mientras las evaluaciones tenian su propia escalera. Dos
+soluciones distintas al mismo problema, en la misma tabla, sin sincronizar. De ahi salian los
+cuatro danos: el de arriba, los intentos que se reseteaban al publicar una version nueva, la
+completitud que se invalidaba, y el administrador sosteniendo dos escaleras a la vez.
+
+**Ahora una evaluacion es un objeto plano, como una leccion.** Se edita siempre y publicar la
+FORMACION congela una copia (`sourceId` distingue la editable de la copia). Desaparecen "Publicar",
+"Descartar" y "Nueva version" de la evaluacion: tener dos botones de publicar era la contradiccion.
+Lo que protege el historico sigue siendo `question_versions`, que es donde siempre estuvo.
+
+La migracion no borro nada a ciegas: las versiones que no eran la vigente se convirtieron en copias
+congeladas para que los contenidos y los intentos que les apuntaban siguieran apuntando a algo real.
+**0 huerfanos**, 10 intentos y 30 contenidos repuntados.
+
+### Y donde vive el tope de intentos, que era otra pregunta suya
+
+*"Quien pierda los intentos no puede, pero la formacion en si tiene intentos, ¿de donde es mejor?"*
+
+La cadena ya existia y es correcta: `evaluacion ?? formacion ?? valor por defecto del tenant`. Lo
+que faltaba era decirlo: la pantalla no explicaba que vacio significa "lo que diga la formacion".
+**La formacion es el sitio bueno** porque lo que se bloquea es la MATRICULA, que es por formacion; y
+una formacion puede llevar varias evaluaciones — si cada una trae su tope, "¿cuantas oportunidades
+tiene esta persona?" no tiene una sola respuesta. El campo de la evaluacion se gana su sitio solo
+como piso mas estricto ("alturas siempre 90%").
+
+### "Hoy" deja de ser una lista de deberes (Decisiones #88, #89, #90)
+
+*"Quiero que hoy sea estilo streaming tipo Netflix."* Detras de eso hay algo real: nadie abre por
+gusto una lista de obligaciones, pero todo el mundo abre una biblioteca.
+
+**Las portadas (#88).** Ya existia una portada GENERADA determinista desde el id. Se conserva como
+base y la foto pasa a ser una MEJORA que se pinta encima: si fuera obligatoria, el primer dia media
+biblioteca estaria en gris —el analista de SST no es fotografo— y habria un requisito estetico
+delante de publicar una capacitacion obligatoria. `coverKey` vive en la ACTIVIDAD, no en su version:
+una foto no es evidencia.
+
+**Los filtros son por ESTADO y no por tipo (#89)**, y es la decision de fondo. "Induccion" o
+"Alturas" es como lo clasifica quien administra; la pregunta de quien entra a las 6 de la manana con
+el celular es otra: *"¿que hago hoy?"*. El tipo se usa mas abajo, para agrupar las filas, que es
+donde clasificar si ayuda a encontrar.
+
+**Y una correccion que hizo el cliente y tenia razon:** la primera version pintaba "Hoy" oscura
+siempre, con paleta propia. Se veia bien y estaba mal —*"principalmente tema claro y oscuro... no
+puede ser un color de fondo de ninguno de los dos"*—: el modo aprendiz ya tiene claro y oscuro, y
+una pantalla que se los salta deja el producto con dos criterios. Ademas ponia superficie de color
+donde el resto usa neutros. **Lo cinematografico lo pone la portada, que es una foto y funciona
+igual sobre blanco que sobre negro.** El azul y el verde de la empresa son ACENTO: lo activo, lo
+elegido, el boton. Nunca fondo.
+
+**El sistema, no solo el contenedor (#90).** Barra lateral con el mismo fondo que el cuerpo,
+separada por linea y no por cambio de tono. Barra superior **sin fondo ninguno** y repartida en TRES
+zonas —saludo | buscador | acciones—: antes eran dos y en un monitor ancho dejaba un vacio enorme en
+medio con el bloque de la persona flotando lejos de las dos esquinas. El buscador de la barra
+lateral se retira: quedaba duplicado a diez centimetros del otro.
+
+**La gamificacion se agrupa en la barra lateral**, y es la respuesta a *"¿hago un panel izquierdo
+con el perfil o las alertas?"*. Un panel nuevo no: seria una tercera columna que roba ancho a los
+carruseles justo en el portatil de 1280, y duplicaria lo que la barra de arriba ya tiene. Dentro de
+la barra que ya existe si: no cuesta un pixel y es donde la referencia pone su bloque. Y JUNTOS —la
+racha era una pastilla suelta arriba, y un numero con una llama al lado no dice que es una racha ni
+que se pierde manana—.
+
+**Las tarjetas dejan de ser caratulas estrechas.** Un poster 2:3 de 150 px se veia bien y no servia:
+ahi no cabe nada mas que el titulo, y aqui la decision no se toma por la imagen —una foto de bodega
+no distingue una formacion de otra— sino por lo que dice al lado. Ahora dicen tipo, duracion,
+vencimiento y **los puntos que gana**, que viajan desde el servidor: prometer 50 y dar 30 seria peor
+que no prometer nada.
+
+Y los colores del tenant pasan a ser los del logo: azul marino `#16265C` y verde `#1FA23A`. El
+acento era naranja y no era de nadie.
+
+### Lo aprendido rompiendo algo
+
+- **Las pruebas e2e corren contra `.next`, el stack de mirar contra `.next-mirar`.** Un `pnpm build`
+  no actualiza lo que sirve `mirar.ps1`, y al reves. Se perdio un rato depurando un "bug" que era
+  simplemente el bundle anterior: hay que volver a ejecutar el script para ver un cambio.
+- **`String.replace` con `$` en el reemplazo**, otra vez. Y esta vez el escapado de `\s` dentro de
+  un script generado se comio la barra invertida y produjo una regex que borraba la letra "s". La
+  prueba lo cazo; sin ella habria suspendido a gente por escribir "seis meses".
+
+### Verificado
+
+`lint`, `typecheck` y `build` en verde. **238/238 unitarias** (29 nuevas: los cuatro tipos de
+pregunta calificados caso por caso, y la ida y vuelta del payload comprobando que la respuesta
+correcta NO se escapa por ninguno de los cuatro caminos nuevos). **21/21 e2e**, con dos reescritas
+para la interfaz nueva.
+
+Migraciones aplicadas: `optional_question_theme`, `more_question_types`, `flat_assessments`,
+`activity_cover`.
+
+### LO QUE SIGUE
+
+**Lo primero al retomar:** `alcance-analista` y `sprint-1 personas` fallan de forma intermitente por
+**53 reglas de audiencia activas** acumuladas en la base de desarrollo (44 cuelgan de una sola
+audiencia de pruebas, "Toda la empresa 40511390"): crear UNA persona dispara 53 rondas del motor y
+expira. Es el mismo incidente del 2026-08-31 por la manana. Se RETIRAN, no se borran.
+
+**La UI del aprendiz esta a medias.** Hecho: `/hoy`, la barra lateral, la barra superior, las
+portadas y la gamificacion. Falta: `/mi-formacion`, `/repaso`, `/perfil`, la navegacion inferior del
+telefono y afinar tipografia y botones como sistema.
+
+**Y el hueco que detecto el cliente y no se cerro:** editar preguntas por tema. Hoy se pueden VER
+por tema (al reutilizar) pero solo se editan abriendo una evaluacion que las contenga, y corregir
+una no llega a las demas. Lo correcto no es devolver la pestana sino poner la biblioteca donde surge
+la pregunta: en el lienzo del bloque al azar, un "ver las N preguntas de este tema" que liste y deje
+editar ahi mismo.
+
+Del listado anterior siguen abiertos: el editor de la ENCUESTA de satisfaccion (hueco gemelo del que
+se cerro), evaluacion de DESEMPENO, editar una convocatoria PUBLICADA, la carrera de respuestas en
+las listas, el Sprint 5 (asistencia, certificados, encuestas) y las aprobaciones.
+
+---
+
+
+## 2026-08-31 — Un plan por ano, y "capacitacion del plan" deja de ser una promesa vacia
+
+### La pregunta del cliente, que era dos fallos
+
+*"Cuando se crea un tipo de formacion del plan, ¿que se crea, un plan o una capacitacion dentro
+del plan? Debe ser una capacitacion del plan, no un plan. El plan es por ano."*
+
+Las dos mitades eran ciertas, y ninguna estaba bien resuelta.
+
+**1. El tipo prometia algo que no cumplia.** Crear una formacion de tipo "Capacitacion del plan"
+crea una formacion suelta y nada mas. `participates_in_plan` estaba sembrado desde el Sprint 1 y
+**lo leia UNA sola linea del panel**: la que pinta "Cuenta para los indicadores del plan anual" al
+elegir el tipo. Era falso. Los indicadores del plan solo miran obligaciones nacidas de un RENGLON
+suyo (regla de oro 2), asi que una capacitacion del plan que nadie programa no cuenta ni para el
+cumplimiento ni para la cobertura, y en el listado se ve exactamente igual que una que si esta.
+Es la misma familia que `defaultAssignmentMode` y `annual_hours_required`: config que se guarda y
+no gobierna nada.
+
+**2. El plan NO era por ano.** La clave era `(tenant, ano, NOMBRE)`, asi que "Plan 2026", "Plan
+anual 2026" y "Plan SST 2026" convivian, cada uno con su aprobacion, sus proyectados congelados y
+su propio porcentaje. El auditor pregunta por el plan de 2026 y habia tres numeros distintos sin
+forma de saber cual vale. Ademas contradecia lo que `CLAUDE.md` 3.10 ya decia: los planes SST,
+PESV y BASC son la VISTA POR PROCESO del mismo plan, y esa pestana ya existe.
+
+### Lo que se hizo (Decision #71)
+
+**Un plan por ano**: `UNIQUE(tenant_id, year)`. El nombre baja a rotulo corregible y viene
+propuesto ("Plan anual de capacitacion 2026"); si se teclea un ano que ya tiene plan, se dice
+ANTES de pulsar y se ofrece abrirlo, en vez de contestar 409 al enviar.
+
+**La ficha de la formacion dice donde esta respecto al plan**, encima de las pestanas: fuera del
+plan, o dentro y en que meses. Y ofrece "Programar en el plan 2026", que crea la convocatoria y el
+renglon en un acto sin salir de la ficha. **No se automatiza a proposito**: el MES lo decide el
+analista y no hay forma de adivinarlo. Lo que no podia seguir es que el paso fuera mudo — el mismo
+remedio que "Dejarla disponible" para el candado.
+
+**Y el plan lleva el tipo puesto de vuelta**: "Capacitacion nueva" desde el plan ya no abre el
+desplegable de tipos en blanco, va con `tipo=PLAN`. Quien pulsa eso dentro del plan de 2026 esta
+creando una capacitacion del plan; dejarlo en blanco invitaba a crearla como extraordinaria, que
+se ve igual en el listado y no cuenta para nada del plan.
+
+### Dos cosas mas que salio a la luz al recorrer el ciclo entero
+
+**Cancelar un renglon no retiraba sus obligaciones.** `updateItem` con `CANCELLED` solo cambiaba
+el renglon: las metricas dejaban de contarlo (`computePlanMetrics` filtra los cancelados) y su
+gente se quedaba con la formacion pendiente, venciendo el ultimo dia de un mes cuya jornada ya no
+se iba a dictar. Ahora se RETIRAN —`WITHDRAWN_PLAN_ITEM_CANCELLED`, estado nuevo—, no se borran:
+a esas personas se les anuncio la formacion y el aviso sigue en su bandeja, asi que sin la traza
+"me asignaron X y no esta" no tiene respuesta. **Lo ya empezado no se toca**: ese avance es suyo.
+Cae solo de todas las consultas porque lo abierto se pide por lista blanca.
+
+**El desplegable recortado, por TERCERA vez.** `NewOfferingDrawer` buscaba el tipo de la
+capacitacion en `listActivities({ pageSize: 100 })`, tambien cuando la version venia fija. A partir
+de la actividad 101 no la encontraba y armaba el formulario con los valores por defecto: una
+capacitacion del plan dejaba de pedir fecha, lugar e instructor, en silencio. Ahora el tipo y la
+modalidad VIAJAN con la version fija, y el servidor los manda en el plan.
+
+### Lo que NO era un fallo, y se retira
+
+Se anoto que el aviso del plan (`PLAN_ASSIGNMENTS_CREATED`) va con `referenceId: null` y no lleva
+a ningun sitio. Es falso: `notification-kind.ts` lo manda a `/mi-formacion`, y es lo correcto —el
+aviso nombra VARIAS formaciones, asi que apuntar a una seria elegir mal—.
+
+### Lo aprendido rompiendo algo (dos, y las dos caras)
+
+**`String.replace` con `$` + comilla invertida en el reemplazo duplico un archivo entero.** El
+texto de reemplazo contenia `new RegExp(\`${planUrl}$\`)`, y ese `$` pegado a la comilla es un
+patron de sustitucion que inserta "todo lo anterior". El archivo paso de 320 a 638 lineas y el
+compilador señalo una linea que estaba perfecta, 300 mas abajo.
+
+**Y al deshacerlo, `git checkout -- e2e/sprint-3.spec.ts` se llevo los cambios SIN CONFIRMAR de la
+sesion anterior.** En este repo hay trabajo sin confirmar casi siempre, asi que ese comando es mas
+peligroso aqui que en un arbol limpio. Se recuperaron los 7 bloques desde la transcripcion de la
+sesion anterior (`~/.claude/projects/<proyecto>/<uuid>.jsonl` guarda cada comando con su texto), y
+se comprobo que la reconstruccion era exacta contra dos fuentes independientes: los numeros de
+linea que Playwright habia impreso ayer y los leidos hoy antes de perderlo. Ambas cosas estan en el
+RUNBOOK con su regla.
+
+### El plan, terminado: la meta es un numero y el alta pregunta lo mismo que la edicion
+
+Lo pidio el cliente en tres frases y las tres apuntaban al mismo sitio: *"al crear el plan debe
+pedir lo mismo que al editar, esta mas completo"*, *"el ano debe ser un seleccionar"*, *"meta es un
+porcentaje de eficiencia que se quiere alcanzar, importante para metricas"*.
+
+- **El alta pide lo mismo que la edicion**: ano, nombre, meta, objetivo y alcance. Antes pedia
+  tres campos y los otros dos habia que acordarse de anadirlos despues desde "Editar" — y un campo
+  que solo existe en una de las dos pantallas se queda vacio para siempre.
+- **El ano se ELIGE.** Es lo que identifica al plan, solo hay un punado de valores posibles (dos
+  atras, el que corre y el siguiente) y **los anos que ya tienen plan no se ofrecen**: tecleandolo
+  se podia poner 2062 sin que nada lo notara, o elegir un ano ocupado para que lo rechazaran.
+- **`goals` (texto libre) pasa a `goal_pct` (1..100).** Un indicador sin meta —"62% de
+  cumplimiento"— deja al lector sin saber si eso esta bien, que es justo lo que el auditor viene a
+  preguntar. Se mide contra el CUMPLIMIENTO (ejecutadas / programadas), el indicador del item 1.2.1
+  de la Res. 0312; la cobertura se ensena al lado sin meta, porque son dos preguntas distintas.
+  Se dropea la columna vieja en vez de conservarla: no habia ni una fila con contenido, y dejar un
+  campo "metas" de texto junto a una meta numerica es la duplicidad que este proyecto ya pago cara.
+
+### El listado deja de ser una tabla
+
+*"No debe verse en modo tabla los planes, algo mejor mas wow, que diga cosas importantes del plan"*.
+La tabla tenia seis columnas para responder "¿que planes hay?", que no es la pregunta por la que
+alguien entra ahi: la pregunta es **"¿como vamos?"**, y para contestarla habia que abrir el plan.
+
+Ahora cada ano es una **tarjeta** con sus indicadores YA calculados: el ano en grande, el anillo de
+cumplimiento, la meta al lado —"faltan 28 puntos" o "meta cumplida"—, la cobertura con sus dos
+numeros, y lo que toca **este mes**. La del ano en curso viene destacada. La tarjeta entera es el
+enlace: con una sola accion principal, anadir ademas un boton "Abrir" solo reparte la atencion.
+
+Para eso `GET /plans` devuelve las metricas de cada plan, calculadas **con el alcance de quien
+pregunta** —igual que en la ficha—: al analista de SST se le ensena el cumplimiento de SUS
+renglones, no el de la empresa. Es una consulta mas, y con un plan por ano la lista es cortisima.
+
+### La trampa que abrio la Decision #71, y su salida (Decision #72)
+
+La destapo el cliente en cuatro palabras: *"real esta cerrado"*.
+
+Con varios planes por ano, "el plan CERRADO no se borra ni se reabre" era una regla estricta y
+correcta. Con **uno** por ano se convirtio en una **trampa**: un plan de ensayo que alguien cerro
+probando el boton se queda con 2026 para siempre — no se puede planear el ano, no se puede
+programar nada en el, y la ficha de una capacitacion del plan dice "no hay ningun plan abierto".
+La unica salida real era entrar a la base de datos.
+
+Y el cliente pidio exactamente lo que uno pide cuando se topa con eso: *"elimina o dame usuario
+superadmin que tenga permiso de eliminar cerrados, control total desde UI"*. **La respuesta no es
+un permiso que se salte las reglas** —eso solo mueve el problema y deja el producto con una puerta
+trasera— sino que la operacion EXISTA y deje rastro:
+
+| Situacion | Salida | Por que |
+|---|---|---|
+| Cerrado y **sin una sola obligacion** | **se borra** | No es evidencia de nada: es un ensayo |
+| Cerrado y **ya obligo a gente** | **se reabre**, con motivo | Reabrir deja rastro en la auditoria; borrar no dejaria ninguno |
+
+Reabrir devuelve el plan a EN EJECUCION y no a BORRADOR: sus renglones ya obligaron a gente real,
+y marcarlo como no aprobado seria decir que el ano esta sin aprobar mientras hay personas con la
+formacion encima. Va con `plans:approve`, el mismo permiso que cerrarlo.
+
+### La base de desarrollo, limpia
+
+Se borraron **167 planes** de las pruebas (con 816 obligaciones, ninguna empezada), un borrador
+vacio llamado `plan2` creado al probar la pantalla, y el que se llamaba "el real" — que tambien
+resulto ser de prueba: CERRADO, 3 renglones, **0 obligaciones**, y uno de ellos un sobrante del
+e2e (`Capacitacion S3 13268426`). **2026 queda libre** para crear el plan de verdad con el
+formulario nuevo. Esto es tambien lo que hace la Decision #72 defendible: la regla vieja habria
+obligado a tocar la base a mano para desbloquear el ano.
+
+### "¿El mes del plan no es redundante con la fecha?" — no, pero se preguntaba dos veces
+
+Lo pregunto el cliente asi: *"el analista tiene que saber el mes que aplica la convocatoria en el
+plan, ¿esto ya se define o es redundante? Al crear la formacion pide ya la fecha"*. La respuesta
+son dos cosas distintas y solo una era un problema.
+
+**En el MODELO no es redundante.** Son dos datos que responden preguntas distintas:
+
+| | `offerings.scheduled_date` | `plan_items.planned_month` |
+|---|---|---|
+| Dice | cuando se dicta | contra que mes se mide el cumplimiento |
+| Se mueve | si | **no**: se queda quieto |
+
+Es lo que permite distinguir **"se hizo en su mes"** de **"se movio"** (`RESCHEDULED`). Si el mes
+se derivara siempre de la fecha, correr una jornada de marzo a junio reescribiria el plan en
+silencio y el cumplimiento saldria perfecto todos los anos. Es la misma pareja que
+`projected_count` (vivo) y `projected_snapshot` (congelado).
+
+**En el FORMULARIO si era redundante**, y ademas producia datos falsos: se tecleaba "15 de
+septiembre" y el desplegable se quedaba en enero, asi que una jornada de septiembre entraba al plan
+como de enero y el cronograma la pintaba en la columna equivocada. Nadie relee un campo que ya
+viene lleno.
+
+Ahora **el mes SIGUE a la fecha mientras nadie lo toque**, y el texto de ayuda lo dice ("Tomado de
+la fecha de la jornada"). En las permanentes —que es como se dicta casi todo el autoservicio, y por
+eso el cliente lo intuia— se propone desde *disponible desde*; y si no hay ni ventana, no hay de
+donde sacarlo y la eleccion es de verdad del analista. Propuesto y corregible, nunca decidido por
+detras.
+
+### Dos huecos mas del ciclo "capacitacion del plan" — CERRADOS despues, mismo dia
+
+Salieron al recorrer el ciclo entero. Se dejaron abiertos un rato porque el primero era una
+decision de modelo; los dos quedaron cerrados el mismo dia (Decisiones #73, #74 y #76). Se deja
+escrito el diagnostico porque explica POR QUE el modelo quedo como quedo:
+
+**1. Doble obligacion, y es el camino NORMAL, no un caso raro.** Una capacitacion del plan obliga
+a marcar Quienes (su tipo deja la decision al analista) y ademas el plan crea sus propias
+obligaciones al aprobarse (`source = PLAN`, regla de oro 2). Y no se solapan a veces: se solapan
+**siempre**, porque `projected.resolve` deriva a quien obliga el plan **de los ya obligados**. Cada
+persona acaba con DOS obligaciones de la misma formacion. Tres consecuencias, las tres reales:
+
+- la formacion aparece **dos veces** en sus pendientes, con dos vencimientos;
+- terminarla cierra **una sola** (`closeAssignment` busca una, la de vencimiento mas cercano), asi
+  que la otra queda viva y acaba VENCIDA: la persona figura incumplida despues de cumplir;
+- y la peor: la inscripcion se ata a la obligacion de vencimiento mas cercano, que suele ser la del
+  requisito. Si se ata a esa, **la cobertura del plan no la cuenta** —`factsFor` solo mira
+  ejecuciones colgadas de obligaciones con `source = PLAN`—, asi que el plan puede quedarse en 0%
+  de cobertura con todo el mundo capacitado.
+
+Salidas posibles, para decidir: (a) que el plan ADOPTE la obligacion existente marcandole
+`plan_item_id` en vez de crear otra, y que los indicadores filtren por `plan_item_id` en vez de por
+`source`; (b) que cerrar una cierre TODAS las abiertas de esa formacion y que los capacitados se
+cuenten por PERSONA y no por enlace de inscripcion; (c) que una capacitacion del plan no pida
+Quienes en absoluto —el plan ES su "a quien", y la tajada de la jornada ya lo dice—. La (c) es la
+mas limpia conceptualmente y la que mas toca.
+
+**2. `requiresAssessment` y `requiresSurvey` no los lee NADIE.** El tipo "Capacitacion del plan"
+los trae en `true` y se puede publicar una sin examen y sin encuesta sin que nada avise. Es la
+misma familia que `participates_in_plan` (cerrada hoy) y `default_assignment_mode` (cerrada ayer):
+config sembrado en el Sprint 1 que la pantalla promete y el motor ignora. Quedan estos dos, mas
+`requiresEfficacy` e `issuesCertificate`, que son del Sprint 5 y por eso no cuentan como deuda.
+
+### Programar ES poner en el plan, y la obligacion del plan la crea el plan
+
+Dos reportes del cliente, el mismo dia, que resultaron ser el mismo problema visto por dos sitios.
+
+**El primero:** *"cree una capacitacion tipo plan, llene todo —quienes, ficha, contenido y
+programacion—, la convocatoria quedo PUBLICADA, pero no se creo dentro del plan"*. Y al lado, la
+ficha decia "esta capacitacion no esta en el plan de 2026" con un boton para programarla otra vez:
+*"no se si es redundante, porque se supone que si se programa se debe crear en el plan"*.
+
+Tenia razon. Habia **tres caminos** para crear una jornada —el plan, la pestana Programacion de la
+ficha, y el modulo Convocatorias— y **solo el primero creaba el renglon**. Por los otros dos la
+jornada quedaba huerfana: se dicta, la gente asiste, y no cuenta para el cumplimiento de nadie.
+
+Ahora **programar una jornada de una capacitacion del plan la mete en el plan de su ano** con el
+mes de su fecha (Decision #75), y lo hace el SERVIDOR: depender de que alguien pase por una
+pantalla es depender de que se acuerde. Solo cuando el plan esta en BORRADOR — en uno vivo el
+renglon nace obligando a gente real y la Decision #55 exige un motivo, que no se inventa por
+detras; ahi lo sigue preguntando la ficha, y ese es el unico caso en que el boton aparece.
+
+**El segundo**, preguntando por que "Quienes" se comporta distinto en el plan: *"si plazo y
+recurrencia no aplican para plan deben salir de la UI para que no confunda; lo ven, creen que hace
+algo y realmente nada"*. Exacto, y al ir a quitarlos aparecio la causa de fondo.
+
+### La raiz: un requisito es lo contrario de lo que necesita el plan
+
+Un requisito es, por definicion, **"una obligacion viva en el tiempo"**: nace al ingresar, al
+entrar a un grupo o por calendario, y **sigue captando a quien llegue despues**. Una capacitacion
+del plan es lo contrario: pasa el mes que diga el plan, a la gente que el plan congelo al
+aprobarse.
+
+Usarlo igual producia dos danos a la vez, con 20 conductores y "Manejo defensivo" en marzo:
+
+- al guardar Quienes nacian **20 obligaciones** con vencimiento "a los 30 dias"; al aprobar el plan
+  nacian **otras 20** con vencimiento "31 de marzo". Cada conductor la veia dos veces en sus
+  pendientes, al hacerla se le cerraba una, la otra vencia, y figuraba **incumplido despues de
+  cumplir**. Si su inscripcion quedaba atada a la del requisito —la de vencimiento mas cercano— la
+  cobertura del plan **no lo contaba**: podia marcar 0% con los 20 capacitados;
+- y quien entrara de conductor en septiembre quedaba obligado a la jornada de marzo, que es
+  exactamente lo que la regla de oro 2 prohibe.
+
+**`RuleTrigger` gana el valor `PLAN`** (Decision #76): la regla sigue guardando A QUIENES —hay que
+poder consultarlo antes de aprobar— pero **el motor no la materializa**. Las obligaciones nacen una
+sola vez, al aprobar el renglon, con el vencimiento del mes. Lo fuerza el servidor ignorando lo que
+mande el cliente: no es una preferencia de la pantalla, es una consecuencia del tipo.
+
+Y los tres campos **salen** de la interfaz, no se ocultan. En su lugar la pantalla contesta la
+pregunta que dejaban abierta: *"aqui solo se decide a quienes. El vencimiento lo pone el mes en el
+que quede programada en el plan, y las obligaciones nacen al aprobarlo — no ahora"*. El aviso de
+guardado tambien cambia: decia "nadie nuevo quedo obligado", que se lee como que algo fallo, y
+ahora dice cuantas personas quedan en el alcance y cuando naceran sus obligaciones.
+
+La adopcion de la Decision #73 se queda como RED DE SEGURIDAD y deja de ser el mecanismo: ya no hay
+dos obligaciones que reconciliar en el camino normal, pero si alguien tiene una por otra via —una
+asignacion a mano— el plan la adopta en vez de crear una segunda.
+
+### Lo que la pantalla no decia, dicho
+
+Cuatro cosas que el cliente encontro probando, y las cuatro eran lo mismo: informacion que el
+sistema tenia y la pantalla se guardaba.
+
+**1. Una formacion no decia si estaba en borrador.** Lo unico que lo mencionaba era "Editando la
+version 1 en borrador", DENTRO de la pestana Contenido: quien no entraba ahi no tenia forma de
+saber si su capacitacion ya existia para la gente. Ahora va junto al nombre —`EN BORRADOR` o
+`PUBLICADA v2`— y debajo, en una linea, lo que eso significa: *"todavia no la ve nadie y no se
+puede programar"*. Si hay trabajo sin publicar sobre una publicada, se dice aparte
+(`CON CAMBIOS SIN PUBLICAR`): son dos hechos distintos y mezclarlos era lo que confundia.
+
+**2. La convocatoria no decia de que TIPO era su formacion.** Tenia nombre, codigo, version y
+proceso, pero no el tipo — que es lo que decide si cuenta para el plan, si se repite y si emite
+constancia. Dos convocatorias que se leen igual podian significar cosas distintas y habia que
+salirse a la ficha para saber cual era cual.
+
+**3. La pestana "Programacion" pasa a llamarse "Convocatorias"**, igual que el modulo. Eran dos
+nombres para la misma cosa, que es exactamente lo que el glosario existe para evitar. La clave
+interna se queda en `programacion`: viaja en `?tab=` y cambiarla romperia enlaces que ya existan.
+
+**4. Los tres botones del plan no decian si acababan metiendo algo en el plan.** Lo pregunto asi:
+*"ese boton tambien crea una convocatoria, ¿o no hace nada, la agrega al plan?"*. Ahora los dos
+que SI agregan comparten verbo y se diferencian en una palabra, que es la diferencia real:
+
+| Antes | Ahora | Que hace |
+|---|---|---|
+| Capacitacion nueva | **Crear capacitacion** | te lleva a ARMAR la formacion. No toca el plan |
+| Agregar al plan | **Agregar convocatoria nueva** | la crea Y la mete en el plan |
+| Usar una que ya existe | **Agregar convocatoria existente** | solo la engancha; no crea nada |
+| Otra jornada de esta capacitacion | **Agregar otra convocatoria** | otra jornada de la misma, tambien al plan |
+
+**Y el alcance de una jornada dice a cuanta gente cubre.** Los selectores decian a QUE se acota
+—"Conductores de Antioquia"— y no a CUANTOS, que es la pregunta de quien esta partiendo el
+reparto: si atiende a 8 o a 80 decide si cabe en una sesion. Enterarse despues de publicar, con
+el numero ya congelado, es la peor forma de descubrir que el corte estaba mal. Es una CONSULTA:
+no crea ninguna obligacion.
+### Las evaluaciones: armarlas era imposible desde la interfaz
+
+Y desde el CONTENIDO de una formacion tampoco se llegaba: solo se podia elegir una evaluacion de
+un desplegable, asi que para escribirle las preguntas habia que salirse al modulo, buscarla por
+nombre entre todas y volver. Fue lo primero que noto el cliente —*"no veo los cambios de
+evaluacion en contenido"*—. Ahora cada evaluacion de la lista de contenidos tiene su boton
+**Armar preguntas**, con `volverA`, igual que una leccion. Y el atajo del cajon —"nace con N al
+azar"— dice que es un atajo y donde se escriben preguntas concretas: era lo que dejaba invisible
+el constructor entero.
+
+Se anaden ademas las dos acciones que faltaban y que SI estan en una formacion (Decision #83):
+**descartar el borrador** —la opuesta a publicar, que tiene que estar a su lado; sin ella, abrir
+una version nueva "a ver que tal" te dejaba atrapado— y **eliminar**, con la frontera de siempre:
+no se borra lo que ya es evidencia (alguien la respondio) ni lo que esta dentro de una formacion,
+y el mensaje dice cual de las dos cosas lo impide con el numero delante.
+
+Lo pidio asi: *"al crear la evaluacion se necesita que desde aqui se cree desde 0, un editor
+completo con tipos de preguntas, respuesta correcta, todo lo necesario"*. Y tenia razon en algo mas
+grande de lo que parecia.
+
+**El constructor solo sabia hacer UNA cosa:** "N preguntas al azar de la categoria X". Escribir las
+preguntas era otra pestana, con su propio vocabulario —categoria, banco, version—, y armar un
+examen de diez preguntas CONCRETAS —que es lo que pide una induccion— era **imposible desde la
+interfaz**, aunque la API soportara `mode: 'FIXED'` desde el Sprint 2.
+
+Por que nunca se ofrecio: `getById` devolvia `fixedQuestionVersionIds`, uuids de VERSION, sin
+enunciados y sin el id de la pregunta. No se podian ni ensenar ni volver a guardar, asi que la
+pantalla solo podia ofrecer lo que sabia reconstruir. Se enriquece el servidor con
+`fixedQuestions` ya resueltas y **en orden** —el orden es una decision de quien arma el examen y
+`findMany` no lo respeta—.
+
+**Ahora la evaluacion es una PANTALLA** (`/evaluaciones/[id]`), como la ficha de una formacion, con
+tres formas de poner preguntas que conviven en el mismo examen:
+
+| Forma | Para que |
+|---|---|
+| **Escribir pregunta** | la mas comun al empezar. Se crea en el banco —para no perderla— y entra en el examen, sin salir |
+| **Traer del banco** | reutilizar lo escrito. Para eso existe el banco |
+| **Bloque al azar** | "5 de Alturas". Con 116 personas rindiendo lo mismo, un cuestionario fijo se comparte entero el primer dia |
+
+Y el editor de pregunta sale a su propio componente (`question-editor.tsx`) para poder usarlo en
+los dos sitios. Dos cambios sobre lo que habia, los dos por lo mismo —que se vea cual es la
+correcta—: se marca pulsando **la opcion entera** en vez de un radio de 13 px (era el objetivo mas
+pequeno de la pantalla y ahi se decide lo mas importante de la pregunta), y la correcta **se ve**
+con borde y fondo de acierto en vez de depender de si el punto esta relleno. Al revisar veinte
+preguntas, esa es la diferencia entre leerlas y tener que inspeccionarlas.
+
+Ademas: la pestana se llamaba "Examenes" y todo lo demas del producto dice "Evaluacion". Unificado.
+
+### El examen en escritorio dejaba de ser el de movil estirado
+
+*"En la web la evaluacion se ve tipo movil, no esta bien eso"*. La columna ya se habia ensanchado
+de 448 a 672 px y no bastaba: seguia siendo una pantalla de telefono centrada en un monitor.
+
+Lo que falta en escritorio no es ANCHO, es un SITIO DONDE MIRAR. Quien rinde veinte preguntas
+necesita saber todo el rato tres cosas —cuanto lleva, cuanto le queda de tiempo y **cuales dejo en
+blanco**— y en movil eso solo cabe como una barra de segmentos que no dice cual es cual.
+
+En `lg` aparece un **panel con la cuadricula de preguntas**: cada numero dice si esta respondida y
+lleva a ella de un clic. Volver a revisar la 7 pasa de seis pulsaciones a una. Es el patron de todo
+examen serio. En movil no aparece —no cabe, y ahi la barra ya cumple—. La columna de la pregunta
+mantiene su tope aunque haya sitio: una linea de 1400 px no se lee, se recorre.
+
+### El selector del producto, y lo que se aprendio construyendolo
+
+*"Cuando dije cambia la UI es de todo: la barra, los selectores de todos los campos, sea del tipo
+que sea. Y ese buscador no tiene mucho uso cuando son pocas las convocatorias."*
+
+Sale `components/ui/combo.tsx`, que sustituye al `<select>` nativo. El nativo tenia tres problemas
+y ninguno era estetico:
+
+1. **No se puede buscar.** Con 250 convocatorias o 60 cargos, elegir es girar la rueda del raton.
+2. **Solo sabe pintar una linea de texto gris.** Una convocatoria es su codigo, su formacion, su
+   tipo, su estado y su fecha; meterlo todo en una cadena la vuelve ilegible y dejarlo fuera obliga
+   a abrir otra pantalla para saber cual es cual.
+3. **Miente cuando la lista viene filtrada.** Se busca algo, no aparece, y no hay forma de saber si
+   es que no existe o que no se ofrece.
+
+El buscador **aparece solo cuando hace falta** —ocho opciones, o siempre que se pregunte al
+servidor—. Con cinco es ruido; con cincuenta es lo unico que hace la lista usable. Y `onSearchChange`
+deja que el padre pregunte al SERVIDOR: es la cuarta vez que este proyecto se topa con lo mismo
+—filtrar en el cliente sobre las 100 que quepan hace que la recien creada no exista nunca—.
+
+Dos trampas del componente, y cada una costo una corrida de la suite:
+
+- **el disparador no puede deshabilitarse cuando aun no llegaron las opciones.** Casi siempre
+  llegan por red; apagado medio segundo se lee como roto, no como "cargando". Y ademas deja sin
+  sitio donde decir POR QUE esta vacio, que es justo lo que hace falta cuando la lista viene
+  filtrada;
+- **`options` no puede estar en las dependencias del efecto de apertura.** Con busqueda contra el
+  servidor, cada respuesta cambia `options`, el efecto se reejecuta y BORRA lo que se estaba
+  escribiendo. El sintoma es un campo que se vacia solo mientras tecleas.
+
+Ademas, dos iconos que eran genericos:
+
+| Antes | Ahora | Por que |
+|---|---|---|
+| `Ban` (prohibido) | `CalendarX2` | lo que se cancela es una JORNADA, una fecha. "Prohibido" es el icono de un error |
+| `Trash2` (papelera) | `Unlink` | quitar del plan NO borra: desengancha el renglon y la convocatoria sigue existiendo. Una papelera prometia lo contrario |
+
+Los dos llevan `title`: un boton que es solo un icono tiene que poder explicarse sin pulsarlo. El de
+quitar dice para que sirve, que era la pregunta —*"¿que uso tiene, en que situacion?"*—: **sacar un
+renglon puesto por error mientras el plan es un borrador**, sin tocar la convocatoria.
+
+### Y en la ficha de la formacion, una pastilla de menos
+
+La segunda pastilla —"CON CAMBIOS SIN PUBLICAR"— sobraba y lo dijo el cliente: cuando eso es
+cierto, al lado hay un boton que dice "Descartar cambios" y otro "Publicar cambios". Decir lo mismo
+dos veces en la misma linea no informa mas, solo llena. Queda una sola, corta.
+
+### Verificado
+
+`lint`, `typecheck`, `build` y **209/209** unitarias en verde. Las migraciones `one_plan_per_year` y `plan_trigger` estan **aplicadas** (un plan por ano + `goal_pct` + el estado
+`WITHDRAWN_PLAN_ITEM_CANCELLED`), y se comprobo contra la base que la regla muerde: un segundo
+plan de 2026 lo rechaza el indice. Y **21/21 e2e**, con dos pruebas nuevas:
+
+- una fija la Decision #76 —una capacitacion del plan no pregunta plazo ni recurrencia, y guardar
+  Quienes NO crea ninguna obligacion—;
+- otra arma una **evaluacion desde cero**: escribir la pregunta dentro de la evaluacion, marcar la
+  correcta pulsando la opcion, verla en la lista numerada y publicar. Es la prueba de lo que
+  antes era imposible desde la interfaz.
+
+Llegar a 19/19 costo cuatro corridas y las cuatro ensenaron algo:
+
+| Fallo | Causa | Donde quedo |
+|---|---|---|
+| Las 3 pruebas del plan | se reescribio el listado y el helper seguia buscando el boton "Nuevo plan" y un campo de texto para el ano | helpers.ts |
+| El DoD del plan, dos veces | el helper contaba los botones con la lista todavia sin cargar y concluia que no habia plan que borrar. Esperar el TITULO no espera nada; esperar a que el esqueleto DESAPAREZCA acierta igual antes de que aparezca. Se arreglo con `aria-busy` sobre un contenedor que esta siempre | pantalla + helpers.ts |
+| `/ejecutadas de 1 programadas/` | al meter la meta en el indicador se reescribio la frase entera, y esa frase es lo que la prueba mide. La meta se ANADE detras, no sustituye | plan/[id] |
+| `alcance-analista` y `sprint-1 personas` | **67 reglas activas** sobre "toda la empresa" acumuladas por corridas anteriores: crear UNA persona disparaba 67 rondas del motor y expiraba. Se RETIRARON 52 (no se borraron: 154 ya tenian ejecucion) | base de desarrollo, RUNBOOK |
+
+Las pruebas de plan pasan a tener **su propio ano** —calculado desde el actual: -2, -1 y +1, dejando
+libre el que corre— y a limpiarlo al empezar Y al terminar. No se clavan porque el selector solo
+ofrece esa ventana de anos, asi que unas constantes fijas dejarian de existir al cambiar de ano. Antes cada una creaba su plan en el ano en curso con un sufijo distinto, y
+por eso la base de desarrollo llego a **168 planes de 2026** — 167 de ellos basura de las pruebas,
+con 816 obligaciones colgando. Con un plan por ano eso ya no es solo suciedad: es colision.
+
+### LO QUE SIGUE
+
+**Lo primero al retomar:** `prisma generate` con el stack de mirar BAJADO. Se genero varias veces
+con el stack arriba, asi que los tipos estan al dia pero el binario del motor quedo viejo (ver
+RUNBOOK, EPERM). No rompe nada —es la misma version 5.22.0— pero conviene dejarlo limpio.
+
+**Lo que pidio el cliente y NO se ha empezado**, por orden de urgencia declarada por el:
+
+1. **La ENCUESTA de satisfaccion no tiene editor.** Es el hueco gemelo del que se acaba de cerrar:
+   `survey_templates` existe desde el Sprint 0, el tipo "Capacitacion del plan" la pide
+   (`requiresSurvey`) y no hay ninguna pantalla que la cree. Hoy solo se puede avisar de que falta
+   (Decision #74).
+2. **Evaluacion de DESEMPENO**, modulo nuevo que no tiene que ver con capacitacion: es sobre todas
+   las personas. Falta decidir si comparte motor con las evaluaciones de formacion o va aparte, y
+   eso se decide investigando que trae un modulo de desempeno serio. **Puede esperar**, lo dijo el.
+
+Del listado anterior siguen abiertos, en el mismo orden: editar una convocatoria PUBLICADA (solo
+logistica, con auditoria), la carrera de respuestas en las listas de convocatorias y personas,
+el Sprint 5 (asistencia) y las aprobaciones. Y los que pueden esperar: "ejecutada por" como
+catalogo, un solo nombre para "formacion", editar el `config` del tipo desde la interfaz, la
+migracion que borre `activity_job_titles` y compania, las 10 h/ano de BPM, documentar la
+inscripcion sin obligacion, y confirmar con el cliente la fecha `03-31` de la reinduccion.
+
+---
+
+## 2026-08-30 (noche) — El tipo manda, y "a quien se le exige" deja de estar en otra pantalla
+
+### El error de la reinduccion, corregido
+
+Lo destapo el cliente con la pregunta exacta: *"¿como cubre la reinduccion a alguien de hace anos,
+si se supone que se hace al ano de haber hecho la induccion?"*. No cubria: **el modelo estaba
+mal descrito y mal sembrado**.
+
+La reinduccion **no es un aniversario por persona**. Es una obligacion de **calendario**: la
+reinduccion de 2026 se hace antes del 31 de marzo, y cae igual sobre quien entro ayer y sobre quien
+lleva quince anos. Con el modelo por persona, alguien que nunca hizo una induccion no tenia de
+donde contar sus 12 meses y se quedaba sin reinduccion **para siempre** — justo la gente a la que
+la reinduccion existe para cubrir.
+
+- El tipo gana `defaultAnnualDate` en su config y Reinduccion se siembra con **`03-31`**, no con
+  `defaultRecurrenceMonths: 12`.
+- Al publicar, la exigencia automatica usa la campana anual si el tipo la trae.
+- El formulario propone "cada ano en fecha fija" para ese tipo.
+
+**Y "se repite" no se contradice con que la reinduccion tenga contenido propio.** Son dos ejes:
+"se repite" dice que hay que VOLVER A HACERLA; las versiones dicen QUE se ve al volver. Cada ano se
+publica una version nueva con los cambios del ano, y la obligacion vuelve por calendario.
+
+### La pregunta que se quito, y por que era la respuesta equivocada
+
+Se llego a preguntar al publicar "¿a todos o solo a quien entre desde ahora?". El cliente lo corto
+bien: *"siento que se complica cada vez mas para el usuario"*. Tenia razon, y la salida no era
+simplificar la pregunta sino **borrarla**, porque el tipo ya sabe la respuesta:
+
+- **Induccion** = parte del INGRESO. Quien lleva siete anos no esta ingresando, asi que no se le
+  exige. A esa gente la cubre la reinduccion, que es exactamente como parte la norma las dos cosas.
+- **Reinduccion** = la obligacion ANUAL de todos. Dejar fuera a la plantilla actual la vaciaria de
+  sentido.
+
+Asi que al publicar **no se pregunta nada**: se ANUNCIA lo que va a pasar, con las palabras del
+caso ("se exigira a quien entre desde ahora" o "quedara exigida a toda la empresa"). Cada pregunta
+que sobra es una en la que se puede acertar mal.
+
+**`applies_from`** (migracion `rule_applies_from`) es lo que lo hace posible: un requisito puede
+acotarse a quien entre a la audiencia despues de una fecha. Sin eso, la unica salida al subir la
+plantilla real habria sido eximir 116 veces o marcar como cumplido algo sin evidencia.
+
+### Las dos formas de repetir, que el modelo tenia y la pantalla no ofrecia
+
+`recurrence` siempre acepto `fixedDate`, pero el formulario solo dejaba "cada N meses". La
+diferencia se ve justo al arrancar:
+
+| | Cada N meses (rodante) | Cada ano en fecha fija (campana) |
+|---|---|---|
+| Ancla | desde que **cada persona la completo** | una fecha: "antes del 31 de marzo" |
+| Al subir 116 personas el mismo dia | los 116 vencen **el mismo dia** | los 116 vencen **el 31 de marzo** |
+| Lo que pregunta el auditor | "¿cuando la hizo Juan?" | "¿hicieron la reinduccion 2026?" |
+
+Ahora se elige en Quienes, y para la reinduccion viene propuesta la **campana anual**, que es como
+las empresas la hacen de verdad.
+
+### Correccion sobre lo anterior: la exigencia automatica estaba en el sitio equivocado
+
+El primer intento la hacia el NAVEGADOR al abrir la pestana Quienes, y eso dejaba abierto el mismo
+agujero que queria tapar: **si alguien publica y se va, no pasa nada**. Se comprobo en la base —dos
+inducciones generales publicadas por el e2e con 0 requisitos— y se movio al servidor, a
+`versioning.publish()`. Depender de que alguien visite una pantalla es depender de que se acuerde.
+
+Con ello, tres cosas mas:
+
+- **El plazo automatico es `-1`, no `0`.** D1072 exige que la induccion sea PREVIA al inicio de
+  labores; "el mismo dia" no es previa.
+- **Dos reglas "para toda la empresa" sobre la misma formacion se rechazan**
+  (`ALREADY_REQUIRED_FOR_ALL`). No anaden a nadie: solo dan a cada persona dos obligaciones por lo
+  mismo con dos vencimientos distintos, y el dia que alguien pregunte cual es la buena no hay
+  respuesta. Desde que la induccion se exige sola, ese choque es facil de provocar.
+- **"Ajustar" sin retirar**, que pidio el cliente: cambiar el plazo o la recurrencia de algo que ya
+  se exige es una correccion, no una novedad. Obligar a retirar y volver a exigir para cambiar "30
+  dias" por "15" retiraria de paso las obligaciones vivas de todo el mundo.
+
+Las dos pruebas de sprint-3 pasaron a **capacitacion extraordinaria**: necesitan controlar ellas
+mismas a quien se le exige, y con una induccion el requisito automatico se sumaba al suyo. Que se
+exija sola tiene ahora **su propia prueba** de punta a punta: crear, publicar y comprobar que ya
+esta exigida sin que nadie pulse nada. **19/19 e2e.**
+
+### Lo que no es una decision, no se pregunta
+
+Lo planteo el cliente probando: *"lo mas comun es que la induccion general sea siempre para todos y
+que al que ingresa se le cargue automaticamente. Se que es solo un clic, pero al cargar deberia
+estar todo; si es novedad, que se retire"*. Tiene razon, y el clic no era el problema: **el
+problema es que se puede olvidar**, y una induccion que no se le exige a nadie no la nota nadie
+hasta la auditoria.
+
+- **Se exige sola al PUBLICAR el contenido** (Decision #69), no al crear: obligar a 116 personas a
+  algo que todavia nadie puede hacer es peor que no obligarlas.
+- **El boton de confirmar desaparece.** Lo que queda es *Retirar*, que es la novedad de verdad.
+- **Las personas sueltas no se ofrecen** cuando ya se exige a toda la empresa: no hay a quien
+  anadir. Donde SI tienen sentido es en la induccion especifica —"Juan no es conductor pero va a
+  manejar el mes que viene"— y en todo lo que decide el analista.
+
+### La trampa que habia que desactivar ANTES de precargar
+
+Precargar la exigencia con el ancla de ingreso habria estrenado el requisito con **la plantilla
+entera en rojo**: a quien entro en 2019, su obligacion le nace vencida desde 2019. Y es falso —la
+empresa no estaba incumpliendo, es que el sistema no existia—.
+
+**La gracia** (Decision #70): si la fecha calculada cae ANTES del momento en que la obligacion
+nace, se sustituye por "desde hoy, 30 dias". A quien entra manana no le afecta: su ancla de ingreso
+es posterior a su entrada a la audiencia, asi que la fecha de D1072 se respeta intacta. Cuatro
+pruebas nuevas lo fijan, incluida la de que **no** se toca el caso del ingreso futuro.
+
+### Convocados: el proceso cierra hasta "capacitado" en lo virtual
+
+`GET /offerings/:id/pendientes-por-convocar` responde la pregunta que el analista se hace de
+verdad —"¿ya cite a todos los mios?"— y que antes obligaba a cruzar dos listas a ojo:
+
+```
+  obligados abiertos ∩ tajada de la jornada − inscritos en CUALQUIER jornada de la formacion
+```
+
+Lo ultimo es lo que hace util el numero: a quien ya se cito el 12 de marzo en Antioquia no le
+falta nada por no estar en la del 19 en Cundinamarca.
+
+En la ficha de la convocatoria salen los cuatro numeros en el orden en que se leen —**proyectados,
+convocados, faltan por convocar**, intensidad— y **la lista con nombre y apellido** de quien falta,
+con su boton. El de arriba dice "Convocar a los N que faltan". Y `allAssigned` ahora respeta la
+TAJADA y no solo la regional: convocar a mas de los proyectados es inflar el numerador de la
+cobertura.
+
+**Con esto el ciclo cierra de punta a punta en autoservicio**: obligado → convocado (o entra solo)
+→ cursa → capacitado → se cierra la obligacion → sube la cobertura. En PRESENCIAL sigue sin cerrar:
+falta el puente asistencia → capacitado, que es el Sprint 5.
+
+### El formulario de convocatoria, unificado
+
+Habia **dos formularios para la misma entidad** y habian divergido: el de la pestana Programacion
+pedia instructor, ejecutada por y observaciones y heredaba la modalidad; el del modulo y el del
+plan no pedian instructor, fijaban "propios" y arrancaban en presencial sin heredar nada. Quien
+programaba desde el plan **no podia poner el instructor nunca**, porque tampoco existia pantalla
+de edicion. Ahora los tres sitios usan `components/modules/delivery/offering-form.tsx`.
+
+**Lo que se pregunta lo decide la FORMA, y el tipo propone la forma.** Con fecha: fecha, hora,
+lugar, quien la dicta, intensidad y cupo. Permanente: nada de eso, a lo sumo la ventana. Asi una
+pildora no pregunta por instructor —no lo tiene— y una capacitacion del plan si; y si alguien
+decide dictar una pildora en una sesion presencial, los campos aparecen: manda lo elegido, no lo
+que el tipo suponia.
+
+Ademas:
+
+- **CORREGIR una convocatoria en borrador**, que no existia en ninguna pantalla: el `PATCH` estaba
+  en el servidor y en el cliente web, sin un solo uso. Equivocarse de instructor obligaba a
+  CANCELAR la jornada y crear otra, y eso deja el renglon del plan cancelado.
+- **"¿Cual?" en toda ejecucion externa.** Antes solo "otros" abria el campo, asi que de la ARL
+  nunca se sabia cual. "La ARL Sura dicto 14 jornadas este ano" es una metrica; "un tercero" no.
+- **El instructor se elige como el responsable del proceso** (mismo selector, sugiriendo el area) y
+  solo cuando la dicta la empresa.
+- **La tajada dentro del formulario**, y al elegir la regional como SEDE se propone como alcance:
+  marcada y quitable, sugerencia visible y no decision por detras.
+- **Lo que falta se dice antes de enviar**, en vez de enterarse por un 422.
+
+### Y la trampa del candado, cerrada
+
+Publicar el contenido NO abre la formacion: sin convocatoria publicada, quien la tiene exigida la
+ve con candado y no puede empezarla. Era el estado roto mas facil de alcanzar —publicar y
+marcharse— y nada lo decia. Ahora la pestana lo avisa y, en las de autoservicio, hay un boton:
+**"Dejarla disponible"**, que crea la convocatoria permanente **y la publica** en el mismo acto
+(una en borrador deja el candado igual, y eso no hay forma de adivinarlo).
+
+### Dos bugs que destapo la suite, ninguno de la sesion
+
+1. **El desplegable del plan traia 100 convocatorias y ya hay 253**: la recien publicada quedaba
+   fuera y el plan no podia engancharla. Ahora se busca contra el servidor.
+2. **Una carrera de respuestas en Obligaciones**: la consulta sin filtro, lenta con la base
+   grande, aterrizaba DESPUES de la filtrada y la pisaba; la tabla mostraba filas que no
+   correspondian a lo buscado, sin ningun error. Ambos estan en el RUNBOOK con su regla.
+
+Los dos son de la misma familia y llegan igual a produccion, solo que en dos anos en vez de en dos
+semanas: **una lista que puede crecer sin techo no se trae entera, y una respuesta vieja no puede
+pintar**.
+
+### Lo que encontro el cliente probando, y que resulto ser tres cosas rotas
+
+**El codigo propuesto estaba mal desde siempre, y era la causa del "revisa los campos".** A dos
+expresiones regulares de `sugerirCodigo` les faltaban las barras invertidas: `[^A-Z0-9s]` conserva
+la letra "s" en vez de los espacios y `split(/s+/)` parte por la letra "s". El nombre entero salia
+como UNA palabra y el codigo quedaba `GESTION DE SERVICIOS` **con espacios**, que el servidor
+rechaza (`^[A-Z0-9_-]+$`) con un 422 generico. No lo veia ninguna prueba porque **todas teclean el
+codigo a mano**; se hizo visible al plegar el campo, cuando dejo de teclearse.
+
+**El desplegable de procesos ofrecia lo que el servidor iba a rechazar.** `/auth/me` no llevaba el
+alcance, asi que el alta ensenaba los 13 procesos a quien solo puede crear en el suyo. Ahora viaja
+el alcance y se ofrece solo lo usable; en la ficha se anade ademas el proceso que la formacion ya
+tiene, para que guardar el telefono no se lo cambie en silencio.
+
+**Y al llevar ese alcance al panel se leyo al reves.** `null` es "sin acotar, ve todo" y `[]` es
+"acotada a ninguno". Leer el vacio como "ve todo" dejaba la lista vacia para el administrador
+—porque el filtro reventaba dentro de un `.then()` sin `catch` y la promesa moria en silencio— y,
+peor, le habria abierto la empresa entera a quien no tiene nada asignado. La suite e2e paso de 2,5
+a **11,9 minutos** por las esperas de los fallos: esta en el RUNBOOK, con la regla de sospechar de
+un fallo lento antes que de la maquina.
+
+**Publicar ahora dice QUE falta, antes de pulsar.** El servidor ya devolvia los titulos de las
+piezas incompletas y la pantalla los tiraba. Ahora el dialogo abre con la lista y el boton no deja
+publicar hasta resolverla; anadido tambien el mensaje del examen, que salia crudo.
+
+### Los terminos, cerrados con el cliente
+
+Obligados (de la FORMACION) · proyectados y convocados (de cada JORNADA) · pendientes de convocar
+(de la formacion) · asistentes (de la SESION) · capacitados (de la PERSONA). En virtual **no hay
+asistencia que firmar y no hace falta**: la telemetria dice que vio y que respondio, que es mas
+fuerte que una firma. En presencial es al reves, y ahi sigue el hueco del Sprint 5.
+
+**Correccion sobre lo que se dijo por la tarde:** se propuso "proyectado de una jornada = sus
+convocados". Es falso y se retira: si el denominador fueran los convocados, a quien nunca se
+convoco no contaria en contra y la cobertura saldria perfecta escondiendo justo el fallo.
+
+### La decision que cambia el diseno de la convocatoria
+
+Acotar los proyectados por REGIONAL no basta: una jornada puede ser "Gestion Humana de Antioquia"
+o incluso un cargo concreto de esa area, y con un solo corte las dos jornadas de la misma
+formacion proyectan a los mismos obligados. Lo acordado:
+
+> **La obligacion vive en la FORMACION; la jornada declara la TAJADA que atiende** (mismo selector
+> de Quienes: cargo, area, regional, servicio). **Proyectados = obligados ∩ tajada**, congelado al
+> publicar. La regional deja de ser un caso especial y pasa a ser una faceta mas; se queda como
+> campo aparte solo en su papel de SEDE, y al elegirla la tajada se propone con ella.
+
+Con eso el plan suma 20+20 y no 40+40, y "faltan N por convocar" se puede decir. Exige una columna
+nueva en `offerings` (la audiencia de la jornada) y es lo primero del bloque siguiente.
+
+### El diagnostico, antes de tocar codigo
+
+Se leyo entero el camino de asignaciones, convocatorias y la ficha, y salieron **seis
+redundancias reales**, no de estilo:
+
+1. **La ficha pedia cargos, servicios y regionales que no hacian nada.** Se cargaban en el estado
+   del formulario, no se pintaban y **no se guardaban** (`save()` solo mandaba `normIds`), pero el
+   panel de ayuda seguia prometiendolos. Su unico uso —los proyectados— lo quito la Decision #59.
+   `activity_job_titles` no la lee nadie: **no es la matriz**, aunque `arquitectura.md` lo dijera.
+2. **Dos formularios distintos para crear la MISMA convocatoria.** El de Programacion pide
+   instructor, ejecutada por y observaciones y hereda la modalidad; el del modulo y el del plan no
+   piden instructor, fijan `executedBy: PROPIOS` y arrancan en PRESENCIAL sin heredar nada.
+3. **Una convocatoria no se puede editar desde ninguna pantalla.** `PATCH /offerings/:id` existe y
+   `updateOffering()` esta en el cliente web: **cero usos**. Y el servidor solo deja editar en
+   BORRADOR; publicada, el mensaje es "cancelala y programa otra".
+4. **La modalidad se pide dos veces** y solo un camino la hereda.
+5. **`defaultAssignmentMode` no lo leia nadie** (esto es lo que se cerro hoy).
+6. **La intensidad horaria se guarda y solo se muestra**: `norms.annual_hours_required` sigue sin
+   leerse, asi que no se suma contra nada.
+
+Y un fallo que se puede reproducir: **si dos jornadas de la misma formacion se crean sin regional,
+cada una congela los mismos proyectados** y el plan los SUMA. Con 40 obligados y dos jornadas, el
+plan divide por 80 y la cobertura no puede pasar del 50% aunque se capacite a todo el mundo.
+
+### Lo que se construyo
+
+**El tipo se pregunta PRIMERO y dice lo que implica** (Decision #66). El alta quedo en cuatro
+campos —tipo, nombre, proceso y el codigo plegado, que ya venia propuesto— y al elegir el tipo
+enumera lo que va a pasar: a quien se le exige, si se repite, como se dicta, si certifica.
+**Fuera del alta: modalidad y descripcion.** La descripcion se escribe mejor con el contenido
+delante y la modalidad la decide cada jornada; pedirlas al crear es cobrar dos campos por
+adelantado a cambio de nada.
+
+**`config` gana `defaultOfferingKind`**, que es lo que permite que una pildora no pregunte por
+instructor y una capacitacion del plan si. Vive en el tenant y no en el codigo porque donde esta
+esa frontera lo decide cada empresa. Y **la reinduccion estaba sin modo de asignacion**, asi que
+caia en MANUAL: la reinduccion anual de 116 personas dependia de que alguien se acordara.
+
+**Quienes, en una sola operacion** (Decision #67). `POST /activities/:id/requirements` busca o crea
+la audiencia **por su forma** (`sameAudienceRule`, con pruebas) y crea o pone al dia el requisito.
+La pantalla ya no dice "audiencia" ni "requisito", y lo que ofrece depende del tipo:
+
+- **induccion general y reinduccion**: no se ofrece marcar a nadie. Dice a cuantos alcanza y ya.
+- **induccion especifica**: solo cargos, precargados con lo que ya hay, y **novedad obligatoria**
+  (minimo 10 caracteres) que queda auditada contra la FORMACION, que es por donde se busca.
+- **plan, extraordinaria, pildora**: el alcance completo, y hay que marcar algo: un alcance vacio
+  es "toda la empresa", o sea lo contrario de lo que quiso decir quien esta marcando cargos.
+
+Debajo, "lo que se exige hoy" con **a cuanta gente alcanza cada regla**, y las obligaciones sueltas
+en segundo plano a proposito: no alcanzan a quien entre manana.
+
+**La trampa del anclaje, avisada en pantalla.** "Al ingresar" cuenta desde la fecha de ingreso de
+cada persona: para quien lleva cuatro anos, esa fecha ya paso y **la obligacion nace VENCIDA**.
+Correcto para quien entra manana, desastroso para estrenar un requisito con la plantilla actual.
+
+### Lo aprendido rompiendo algo
+
+La prueba nueva dejaba un requisito VIVO sobre un cargo, y sprint-3 —que crea una persona con ese
+mismo cargo— empezo a encontrarle dos obligaciones y a leer la fecha de la equivocada. Es
+exactamente la leccion que ese test ya tenia escrita en su paso 5. Ahora la prueba retira su
+requisito al terminar, y de paso comprueba lo que importa: **retirar no borra**, deja RETIRADA.
+
+### Verificado
+
+`lint`, `typecheck` y `build` en verde; **177/177** unitarias (5 nuevas de `sameAudienceRule`);
+**19/19 e2e**, con `quienes-desde-la-ficha.spec.ts` nuevo (tres casos). Ojo al dato de arriba: la
+corrida en la que el alcance se leia al reves tardo 11,9 min y dejo 9 pruebas caidas.
+
+Tras el formulario unificado: **18/18 e2e**, 177/177 unitarias, lint y typecheck limpios.
+
+Tras convocados: **18/18 e2e**, 177/177 unitarias, lint y build limpios.
+
+### LO QUE SIGUE — revisado el 2026-08-31, en orden de importancia
+
+**Cerrado hoy y no vuelve a la lista:** la tajada de la jornada, el formulario unico de
+convocatoria con correccion en borrador, los convocados y quien falta, la exigencia automatica al
+publicar con su gracia, la reinduccion como campana anual, eliminar una formacion, y el ciclo
+completo de autoservicio (publicar exige, pone al dia las permanentes y ABRE la formacion sola).
+
+#### Lo que conviene hacer ANTES del Sprint 5
+
+1. **El ciclo del PLAN, recorrido entero.** Es el unico tipo cuyo ciclo no se ha revisado con esta
+   cabeza: ahi el analista elige todo —a quienes, la jornada, el mes— y es donde mas facil es que
+   quede un paso mudo como los que se han ido encontrando. Lo pidio el cliente y sigue pendiente.
+2. **Editar una convocatoria PUBLICADA**, solo su logistica (instructor, lugar, hora, cupo,
+   observaciones), con auditoria. Hoy no se edita en absoluto y el unico camino es cancelar y
+   rehacer, que ademas deja el renglon del plan como cancelado. Fecha y tajada mueven indicadores:
+   eso seria REPROGRAMAR, con motivo.
+3. **La carrera de respuestas en las otras listas** (convocatorias, personas): el mismo patron ya
+   arreglado en Obligaciones. Es un fallo latente que solo aparece con datos, y en produccion
+   aparece con el cliente delante.
+
+#### Los dos bloques grandes
+
+4. **Sprint 5 — asistencia.** Lista, QR, firma y acta, y el puente que falta: **asistir a una
+   jornada presencial completa la ejecucion**. Hoy solo el reproductor y el examen cierran una
+   obligacion, asi que una capacitacion presencial sube el cumplimiento del plan y deja la
+   cobertura en CERO. Incluye ensenarle al aprendiz la jornada a la que lo convocan —fecha, hora,
+   lugar, instructor—, que hoy no ve por ningun lado.
+5. **Aprobaciones: "todo cambio lo aprueba el administrador"** (lo que pidio el cliente). NO es
+   versionado: el modulo ya existe (`requestOrExecute`) y hoy solo cubre publicar una version y
+   publicar/cancelar/migrar una convocatoria. Falta decidir que mas se compuerta, que el rol
+   Analista no tenga esos permisos, y que la pantalla lo diga ANTES de guardar, no despues.
+
+#### Lo que puede esperar sin coste
+
+6. **"Ejecutada por" como catalogo del tenant.** Hoy la pregunta "¿cual?" ya se hace, pero la lista
+   de opciones esta en el codigo y la entidad es texto libre: "Sura" y "ARL SURA" cuentan como dos
+   proveedores. Se registra; todavia no se mide bien.
+7. **Un solo nombre: "formacion", no "actividad"**, en rotulos y ayudas. Puro texto, pero toca
+   selectores de e2e.
+8. **Editar el `config` del tipo desde la interfaz.** Ya es parametrizable por empresa; lo que
+   falta es la pantalla. El comportamiento por defecto de Transprensa ya es el correcto.
+9. **Migracion que borre `activity_job_titles`, `activity_services` y `activity_regionals`** y las
+   quite del contrato: la API todavia las acepta aunque ninguna pantalla las mande.
+10. **Las 10 h/ano de BPM**: `norms.annual_hours_required` sigue sembrada y sin leer, asi que la
+    intensidad horaria se guarda y no se suma contra nada.
+11. **Documentar la inscripcion SIN obligacion**: el modelo la soporta y no hay pantalla que la
+    produzca. Se aclara con el catalogo abierto (idea 8), que es su caso de uso natural.
+12. **La fecha de la campana anual de reinduccion**: `03-31` lo puso el asistente, no el cliente.
+    Es el unico valor de la sesion que no salio ni de el ni del codigo.
+
+---
+
 ## 2026-08-30 (tarde) — El alcance, los avisos, y el terreno de asignaciones
 
 ### Lo que se cerro

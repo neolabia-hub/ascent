@@ -94,7 +94,11 @@ export function Sidebar({ userFullName }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'flex h-screen shrink-0 flex-col bg-ink-900 transition-[width] duration-[220ms] ease-pulse',
+        // LA BARRA ES DEL MISMO COLOR QUE EL CUERPO, no un bloque oscuro pegado al lado.
+        // Un panel de administracion no gana nada partiendo la pantalla en dos mitades de
+        // luminosidad opuesta: la vista salta cada vez que cruza el borde. Ahora la unica
+        // separacion es una linea, y lo que marca donde estas es la pastilla del activo.
+        'flex h-screen shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-[220ms] ease-pulse',
         collapsed ? 'w-16' : 'w-[248px]',
       )}
     >
@@ -106,7 +110,7 @@ export function Sidebar({ userFullName }: SidebarProps) {
           {tenant.name.charAt(0).toUpperCase()}
         </div>
         {!collapsed ? (
-          <span className="truncate font-display text-sm font-semibold text-white">{tenant.name}</span>
+          <span className="truncate font-display text-sm font-semibold text-ink-900">{tenant.name}</span>
         ) : null}
       </div>
 
@@ -121,7 +125,7 @@ export function Sidebar({ userFullName }: SidebarProps) {
               className={cn(
                 'focus-ring relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors duration-150',
                 collapsed && 'justify-center px-0',
-                active ? 'bg-white/10 font-medium text-white' : 'text-ink-300 hover:text-white',
+                active ? 'bg-primary-soft font-medium text-ink-900' : 'text-ink-500 hover:bg-paper hover:text-ink-900',
               )}
               title={collapsed ? item.label : undefined}
             >
@@ -144,7 +148,7 @@ export function Sidebar({ userFullName }: SidebarProps) {
         onClick={toggleCollapsed}
         aria-label={collapsed ? 'Expandir menu' : 'Contraer menu'}
         className={cn(
-          'focus-ring mx-2 mb-2 flex items-center justify-center gap-2 rounded-md py-2 text-xs text-ink-300 transition-colors duration-150 hover:bg-white/5 hover:text-white',
+          'focus-ring mx-2 mb-2 flex items-center justify-center gap-2 rounded-md py-2 text-xs text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900',
         )}
       >
         {collapsed ? (
@@ -157,13 +161,13 @@ export function Sidebar({ userFullName }: SidebarProps) {
         )}
       </button>
 
-      <div className={cn('flex items-center gap-2.5 border-t border-white/10 px-3 py-3', collapsed && 'justify-center px-0')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
+      <div className={cn('flex items-center gap-2.5 border-t border-line px-3 py-3', collapsed && 'justify-center px-0')}>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-ink-900">
           {getInitials(userFullName)}
         </div>
         {!collapsed ? (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{userFullName}</p>
+            <p className="truncate text-sm font-medium text-ink-900">{userFullName}</p>
           </div>
         ) : null}
         <button
@@ -172,7 +176,7 @@ export function Sidebar({ userFullName }: SidebarProps) {
           disabled={loggingOut}
           aria-label="Cerrar sesion"
           title="Cerrar sesion"
-          className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-300 transition-colors duration-150 hover:bg-white/10 hover:text-white disabled:opacity-50"
+          className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900 disabled:opacity-50"
         >
           <LogOut className="h-4 w-4" strokeWidth={1.75} />
         </button>

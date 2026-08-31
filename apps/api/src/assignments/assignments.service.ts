@@ -1,9 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
+  AudienceRule,
   CreateAssignmentInput,
   CreateAssignmentRuleInput,
   ListAssignmentsQuery,
+  SetActivityRequirementInput,
   ToggleJobTitleMatrixInput,
   UpdateAssignmentRuleInput,
   WaiveAssignmentInput,
@@ -12,7 +14,12 @@ import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { buildAudienceWhere, ELIGIBLE_MEMBER, singleJobTitleOf } from './audience-rule.js';
+import {
+  buildAudienceWhere,
+  ELIGIBLE_MEMBER,
+  ruleReachesEveryone,
+  singleJobTitleOf,
+} from './audience-rule.js';
 import { AudiencesService } from './audiences.service.js';
 import { endOfDay, type CalendarDate } from './due-date.js';
 import { RequirementEngineService } from './requirement-engine.service.js';
@@ -56,12 +63,29 @@ export class AssignmentsService {
     }));
   }
 
-  async createRule(actor: AuthUser, input: CreateAssignmentRuleInput) {
+  async createRule(actor: AuthUser, input: CreateAssignmentRuleInput & { appliesFrom?: Date | null }) {
     const tenantId = this.prisma.currentTenantId;
     await this.assertTargetExists(input.targetType, input.targetId);
 
     const audience = await this.prisma.scoped.audience.findUnique({ where: { id: input.audienceId } });
     if (!audience) throw new NotFoundException({ code: 'AUDIENCE_NOT_FOUND' });
+
+    // DOS REGLAS "para toda la empresa" sobre la misma formacion no anaden a nadie: solo crean
+    // una segunda obligacion a cada persona por lo mismo, con dos vencimientos distintos, y el
+    // dia que alguien pregunte cual es la buena no habra respuesta. Desde que la induccion
+    // general se exige sola al publicar (Decision #69), este choque es facil de provocar.
+    if (ruleReachesEveryone(this.audiences.parseRule(audience.rule))) {
+      const yaParaTodos = await this.prisma.scoped.assignmentRule.findFirst({
+        where: { targetType: input.targetType, targetId: input.targetId, active: true },
+        include: { audience: { select: { rule: true } } },
+      });
+      if (yaParaTodos && ruleReachesEveryone(this.audiences.parseRule(yaParaTodos.audience.rule))) {
+        throw new ConflictException({
+          code: 'ALREADY_REQUIRED_FOR_ALL',
+          message: 'Esta formacion ya se le exige a toda la empresa: ajusta el requisito que existe.',
+        });
+      }
+    }
 
     const duplicate = await this.prisma.scoped.assignmentRule.findFirst({
       where: { audienceId: input.audienceId, targetId: input.targetId, active: true },
@@ -82,6 +106,9 @@ export class AssignmentsService {
         trigger: input.trigger,
         dueDaysAfterTrigger: input.dueDaysAfterTrigger,
         recurrence: (input.recurrence ?? null) as Prisma.InputJsonValue,
+        // "Solo a quien entre desde ahora": se marca con el instante de creacion. Quien ya estaba
+        // en la audiencia entro ANTES, asi que el motor no lo alcanza.
+        appliesFrom: input.appliesFrom ?? null,
         createdBy: actor.id,
       },
     });
@@ -242,6 +269,186 @@ export class AssignmentsService {
     });
     await this.audiences.reevaluate(this.prisma.scoped, tenantId, created.id);
     return created;
+  }
+
+  // ──────────────── Exigirla desde la formacion (una sola operacion) ────────────────
+
+  /**
+   * Los requisitos VIVOS de una formacion, dichos como los diria una persona.
+   *
+   * La pestana Quienes los necesita para poder responder "a quien se le exige esto" sin mandar a
+   * nadie a otra pantalla. Se devuelve tambien el alcance en crudo para que el formulario pueda
+   * ABRIRSE con lo que ya hay puesto en vez de en blanco.
+   */
+  async activityRequirements(activityId: string) {
+    const rules = await this.prisma.scoped.assignmentRule.findMany({
+      where: { targetType: 'ACTIVITY', targetId: activityId, active: true },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        audience: { select: { id: true, name: true, rule: true, active: true } },
+        _count: { select: { assignments: true } },
+      },
+    });
+
+    return Promise.all(
+      rules.map(async (rule) => {
+        const scope = this.audiences.parseRule(rule.audience.rule);
+        return {
+          id: rule.id,
+          audienceId: rule.audience.id,
+          audienceName: rule.audience.name,
+          scope,
+          reachesEveryone: ruleReachesEveryone(scope),
+          trigger: rule.trigger,
+          dueDaysAfterTrigger: rule.dueDaysAfterTrigger,
+          everyMonths: this.everyMonthsOf(rule.recurrence),
+          fixedDate: this.fixedDateOf(rule.recurrence),
+          assignmentCount: rule._count.assignments,
+          /**
+           * SOLO A QUIEN ENTRE DESDE ENTONCES. Cambia por completo como hay que leer la cifra de
+           * al lado, y por eso viaja: un requisito con esto puesto alcanza a 471 personas EN LA
+           * AUDIENCIA y obliga a CERO hoy, porque todas entraron antes. Decir "alcanza a 471" sin
+           * decir esto hace pensar que el sistema esta roto cuando esta haciendo justo lo pedido.
+           */
+          soloNuevos: rule.appliesFrom !== null,
+          /** Cuanta gente alcanza HOY: es la cifra que evita crear un requisito a ciegas. */
+          reach: (await this.audiences.preview(scope)).count,
+        };
+      }),
+    );
+  }
+
+  /**
+   * Exigir una formacion a un grupo, en un solo paso: se busca o se crea la audiencia y se crea
+   * (o se pone al dia) el requisito. Nadie tiene que saber que existe la palabra "audiencia".
+   *
+   * Si ya habia un requisito para ese mismo alcance, se ACTUALIZA en vez de rechazarlo: quien
+   * vuelve a la pantalla y cambia el plazo de 30 dias a 15 esta corrigiendo, no creando algo
+   * nuevo, y un error de "ya existe" ahi es un callejon sin salida.
+   */
+  async setActivityRequirement(actor: AuthUser, input: SetActivityRequirementInput) {
+    const tenantId = this.prisma.currentTenantId;
+    await this.assertTargetExists('ACTIVITY', input.activityId);
+
+    /**
+     * SI LA FORMACION ES DEL PLAN, LA OBLIGACION LA DISPARA EL PLAN (Decision #76).
+     *
+     * Lo decide el SERVIDOR y no la pantalla, y se IGNORA lo que mande el cliente: el disparador,
+     * el plazo y la recurrencia no son opiniones aqui, son consecuencias del tipo. Si dependiera
+     * del formulario, una llamada directa a la API o una pantalla vieja volveria a crear un
+     * requisito que dispara solo, y con el las dos obligaciones que este cambio existe para
+     * evitar.
+     *
+     * El plazo se fuerza a 0 y la recurrencia a null porque no significan nada en este caso: una
+     * capacitacion del plan vence el ultimo dia del mes que diga su renglon, y la del ano que
+     * viene es otro plan, no otra ronda de esta.
+     */
+    const tipo = await this.prisma.scoped.activity.findUniqueOrThrow({
+      where: { id: input.activityId },
+      select: { activityType: { select: { config: true } } },
+    });
+    const config = (tipo.activityType.config ?? {}) as Record<string, unknown>;
+    const esDelPlan = config.participatesInPlan === true;
+    const trigger = esDelPlan ? ('PLAN' as const) : input.trigger;
+    const dueDaysAfterTrigger = esDelPlan ? 0 : input.dueDaysAfterTrigger;
+
+    const audience = await this.findOrCreateAudience(tenantId, input.scope);
+
+    // La novedad se registra aparte y contra la FORMACION, no contra la regla: quien audita
+    // pregunta "por que esta formacion se le exige a este cargo", y busca por la formacion.
+    if (input.reason) {
+      await this.audit.record({
+        tenantId,
+        userId: actor.id,
+        action: 'ACTIVITY_REQUIREMENT_CHANGED',
+        resourceType: 'activities',
+        resourceId: input.activityId,
+        newValues: { audienceId: audience.id, scope: input.scope, reason: input.reason },
+      });
+    }
+
+    // Dos formas de repetir, y solo una a la vez: "cada N meses desde que la completo" (rodante)
+    // o "cada ano en esta fecha" (campana anual, que es como las empresas hacen la reinduccion).
+    const recurrence = esDelPlan
+      ? null
+      : input.fixedDate
+        ? { fixedDate: input.fixedDate, windowDays: 60 }
+        : input.everyMonths
+          ? { everyMonths: input.everyMonths, windowDays: 60 }
+          : null;
+
+    const existing = await this.prisma.scoped.assignmentRule.findFirst({
+      where: { audienceId: audience.id, targetId: input.activityId, targetType: 'ACTIVITY' },
+    });
+
+    if (existing) {
+      const rule = await this.updateRule(actor, existing.id, {
+        active: true,
+        dueDaysAfterTrigger,
+        recurrence,
+      });
+      // El disparador no entra en `updateRule` (no se edita desde Asignaciones), pero aqui SI
+      // puede haber cambiado: pasar de "al ingresar" a "desde ya" es justo lo que hace falta
+      // cuando la formacion empieza a exigirse a gente que lleva anos en la empresa.
+      if (rule.trigger !== trigger) {
+        await this.prisma.scoped.assignmentRule.update({ where: { id: rule.id }, data: { trigger } });
+      }
+      return {
+        ruleId: rule.id,
+        audienceId: audience.id,
+        audienceName: audience.name,
+        created: 0,
+        updated: true as const,
+      };
+    }
+
+    const outcome = await this.createRule(actor, {
+      audienceId: audience.id,
+      targetType: 'ACTIVITY',
+      targetId: input.activityId,
+      trigger,
+      dueDaysAfterTrigger,
+      recurrence,
+      // "Solo a quien entre desde ahora" se traduce a la fecha de este momento: quien ya estaba
+      // en la audiencia entro antes y no queda obligado.
+      appliesFrom: input.soloNuevos ? new Date() : null,
+    });
+    return {
+      ruleId: outcome.rule.id,
+      audienceId: audience.id,
+      audienceName: audience.name,
+      created: outcome.generated,
+      updated: false as const,
+    };
+  }
+
+  /** Retirar un requisito desde la ficha. Lo pendiente queda RETIRADO; lo cumplido no se toca. */
+  async retireActivityRequirement(actor: AuthUser, ruleId: string) {
+    const rule = await this.prisma.scoped.assignmentRule.findUnique({ where: { id: ruleId } });
+    if (!rule) throw new NotFoundException({ code: 'RULE_NOT_FOUND' });
+    await this.updateRule(actor, ruleId, { active: false });
+    return { ok: true as const };
+  }
+
+  /**
+   * La audiencia del alcance. Delega en `AudiencesService`, que es donde vive desde que la
+   * convocatoria tambien la necesita para declarar su tajada: dos implementaciones crearian
+   * audiencias gemelas para el mismo grupo.
+   */
+  private findOrCreateAudience(tenantId: string, scope: AudienceRule) {
+    return this.audiences.findOrCreate(tenantId, scope);
+  }
+
+  private fixedDateOf(recurrence: Prisma.JsonValue | null): string | null {
+    if (!recurrence || typeof recurrence !== "object" || Array.isArray(recurrence)) return null;
+    const value = (recurrence as Record<string, unknown>).fixedDate;
+    return typeof value === "string" ? value : null;
+  }
+
+  private everyMonthsOf(recurrence: Prisma.JsonValue | null): number | null {
+    if (!recurrence || typeof recurrence !== 'object' || Array.isArray(recurrence)) return null;
+    const value = (recurrence as Record<string, unknown>).everyMonths;
+    return typeof value === 'number' ? value : null;
   }
 
   // ─────────────────────────── Asignacion manual ───────────────────────────

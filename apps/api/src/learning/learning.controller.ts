@@ -80,9 +80,9 @@ export class LearningController {
   startAttempt(
     @CurrentUser() actor: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('assessmentVersionId', ParseUUIDPipe) assessmentVersionId: string,
+    @Query('assessmentId', ParseUUIDPipe) assessmentId: string,
   ) {
-    return this.attempts.start(actor, id, assessmentVersionId);
+    return this.attempts.start(actor, id, assessmentId);
   }
 
   @Get('attempts/:attemptId')

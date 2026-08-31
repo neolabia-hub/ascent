@@ -1,9 +1,19 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { tenantSettingsSchema, type PublishVersionInput, type UpdateVersionSettingsInput } from '@neo-pulse/shared';
+import {
+  activityTypeConfigSchema,
+  audienceRuleSchema,
+  tenantSettingsSchema,
+  type PublishVersionInput,
+  type UpdateVersionSettingsInput,
+} from '@neo-pulse/shared';
+import { AssessmentsService } from '../assessments/assessments.service.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AssignmentsService } from '../assignments/assignments.service.js';
+import { OfferingsService } from '../offerings/offerings.service.js';
+import { loQueExigeElTipo } from './type-requirements.js';
 
 /**
  * MOTOR DE VERSIONADO (Decision #6 — la regla de oro 4 del modelo).
@@ -26,6 +36,14 @@ export class VersioningService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    // Publicar una induccion general la EXIGE sola (Decision #69): el requisito lo crea quien
+    // sabe hacerlo, no una copia de su logica aqui.
+    private readonly assignments: AssignmentsService,
+    // Publicar pone al dia las convocatorias permanentes (ver `ponerAlDiaLasPermanentes`).
+    private readonly offerings: OfferingsService,
+    // Publicar CONGELA una copia de cada evaluacion (Decision #87), igual que hace con las
+    // lecciones. Lo hace quien sabe: aqui solo se pide la copia.
+    private readonly assessments: AssessmentsService,
   ) {}
 
   /** Version en borrador de una actividad (si existe). */
@@ -45,14 +63,14 @@ export class VersioningService {
           include: {
             lesson: { select: { id: true, title: true, estimatedMinutes: true, status: true, _count: { select: { cards: true } } } },
             contentPackage: { select: { id: true, kind: true, originalName: true, sizeBytes: true, storageKey: true } },
-            assessmentVersion: {
+            assessment: {
               select: {
                 id: true,
-                versionNumber: true,
+                title: true,
                 status: true,
                 passingScore: true,
                 maxAttempts: true,
-                assessment: { select: { id: true, title: true } },
+                sourceId: true,
                 _count: { select: { sections: true } },
               },
             },
@@ -134,6 +152,36 @@ export class VersioningService {
       });
     }
 
+    /**
+     * LO QUE EL TIPO EXIGE: se DICE y queda registrado, pero no se bloquea (Decision #74).
+     *
+     * `activity_types.config` trae `requiresAssessment` y `requiresSurvey` desde el Sprint 1 y no
+     * los leia NADIE: una "Capacitacion del plan" —que los tiene los dos en true— se publicaba con
+     * un video y nada mas, y ninguna pantalla decia una palabra. Es la misma familia que
+     * `participatesInPlan` y `defaultAssignmentMode`: config que la interfaz promete y el motor
+     * ignora. El precio se paga tarde: sin examen no hay nota que ensenarle a un auditor.
+     *
+     * Y AUN ASI NO SE BLOQUEA, por dos razones concretas y no por prudencia:
+     *
+     *   1. **El tenant todavia no puede cambiar ese config desde la interfaz** (esta pendiente).
+     *      Bloquear una regla que nadie puede ajustar deja encerrado a quien no la comparta, sin
+     *      salida y sin nadie a quien pedirsela.
+     *   2. **Ni una sola de las 19 pruebas de punta a punta anade evaluacion**, y ocho publican
+     *      tipos que la piden. Eso no es un descuido de las pruebas: es la senal de que la regla
+     *      no esta acordada con el cliente todavia. Convertirla en muro seria imponerla.
+     *
+     * Lo que SI estaba roto es el silencio, y eso se cierra: la pantalla lo dice antes de pulsar y
+     * aqui queda en la AUDITORIA. El dia que alguien pregunte por que esa capacitacion del plan no
+     * tiene examen, la respuesta existe con fecha y con nombre.
+     *
+     * Se convierte en compuerta el dia que el config del tipo se edite desde la interfaz.
+     */
+    const conTipo = await this.prisma.scoped.activityVersion.findUniqueOrThrow({
+      where: { id: draft.id },
+      select: { activity: { select: { activityType: { select: { config: true } } } } },
+    });
+    const avisosDelTipo = loQueExigeElTipo(conTipo.activity.activityType.config, contents);
+
     const published = await this.prisma.tx(async (tx) => {
       // 1. Congelar el contenido editable: la version publicada apunta a copias inmutables.
       for (const content of contents) {
@@ -141,15 +189,36 @@ export class VersioningService {
           const frozenLessonId = await this.cloneLesson(tx, tenantId, content.lessonId, 'PUBLISHED');
           await tx.activityContent.update({ where: { id: content.id }, data: { lessonId: frozenLessonId } });
         }
-        if (content.type === 'ASSESSMENT' && content.assessmentVersionId) {
-          await tx.assessmentVersion.updateMany({
-            where: { id: content.assessmentVersionId, status: 'DRAFT' },
-            data: { status: 'PUBLISHED' },
-          });
+        /*
+          LA EVALUACION SE CONGELA EN UNA COPIA (Decision #87), igual que la leccion de arriba.
+
+          Antes esto PROMOVIA la version borrador de la evaluacion a publicada. Eso ataba dos
+          escaleras de versiones que nadie mantenia sincronizadas: publicar despues una version
+          nueva de la evaluacion retiraba esta, el contenido seguia apuntandole, y el examen
+          dejaba de poder abrirse para todo el mundo.
+        */
+        if (content.type === 'ASSESSMENT' && content.assessmentId) {
+          const congelada = await this.assessments.clonarParaPublicar(tx, tenantId, content.assessmentId);
+          await tx.activityContent.update({ where: { id: content.id }, data: { assessmentId: congelada } });
         }
       }
 
       // 2. Temario por VALOR para las constancias (renombrar la actividad no altera el historico).
+      //
+      // Y con el, LO QUE LA CONSTANCIA IMPRIME de la ficha: el nombre, el proceso y la NORMA que
+      // aplicaba el dia que se publico. La ficha no esta versionada —cambiar un nombre no puede
+      // costar una version— pero eso deja un hueco que solo se ve tarde: alguien se capacita en
+      // enero, en marzo cambia la norma aplicable, y la constancia de enero saldria citando una
+      // norma que ese dia no aplicaba. Es el mismo patron con el que ya se congela quien responde
+      // (Decision #64): no se versiona la ficha, se copia por valor lo que la evidencia necesita.
+      const ficha = await tx.activity.findUniqueOrThrow({
+        where: { id: draft.activityId },
+        select: {
+          name: true,
+          process: { select: { code: true, name: true } },
+          norms: { select: { norm: { select: { code: true, name: true } } } },
+        },
+      });
       const frozenContents = await tx.activityContent.findMany({
         where: { activityVersionId: draft.id },
         orderBy: { displayOrder: 'asc' },
@@ -157,6 +226,9 @@ export class VersioningService {
       });
       const syllabus = {
         publishedAt: new Date().toISOString(),
+        activityName: ficha.name,
+        process: ficha.process,
+        norms: ficha.norms.map((row) => row.norm),
         items: frozenContents.map((c) => ({
           order: c.displayOrder,
           type: c.type,
@@ -207,9 +279,125 @@ export class VersioningService {
         migrationPolicy: input.migrationPolicy,
         retiredVersionId: published.previousId,
         responsibleUserId: published.result.responsibleUserId,
+        // Lo que su tipo pedia y esta version no trae. Vacio casi siempre; cuando no lo esta, es
+        // la unica traza de que se publico sabiendolo (Decision #74).
+        ...(avisosDelTipo.length > 0 ? { publicadaSinLoQuePideElTipo: avisosDelTipo } : {}),
       },
     });
+
+    // SE EXIGE SOLA, y se decide AQUI y no en la pantalla (Decision #69).
+    //
+    // El primer intento lo hacia el navegador al abrir la pestana Quienes, y eso dejaba el mismo
+    // agujero que queria tapar: si alguien publica y se va, no pasa nada. Una induccion general
+    // que no se le exige a nadie no la nota NADIE hasta la auditoria, y depender de que alguien
+    // visite una pantalla es depender de que se acuerde.
+    //
+    // Publicar es el momento correcto: antes, el contenido no existe y obligar a 116 personas a
+    // algo que nadie puede hacer es peor que no obligarlas.
+    await this.aplicarExigenciaAutomatica(actor, draft.activityId);
+
+    // Y las convocatorias PERMANENTES pasan a esta version: no hay nadie citado a quien mover
+    // por sorpresa, y dejarlas ancladas hace que quien entre manana curse lo viejo. Las de FECHA
+    // no se tocan: ahi si hay gente citada y actualizarlas es un acto aparte.
+    await this.offerings.ponerAlDiaLasPermanentes(actor, draft.activityId, versionId);
+
+    // Y si el tipo dice que se hace "disponible siempre", se ABRE sola: sin convocatoria nadie
+    // puede empezarla, y en una permanente no hay fecha, lugar, instructor ni cupo que decidir.
+    // Era el ultimo paso del ciclo que seguia dependiendo de que alguien se acordara.
+    await this.abrirlaSiElTipoLoDice(actor, draft.activityId, versionId);
+
     return published.result;
+  }
+
+  /**
+   * Cuando el TIPO dice que la audiencia es toda la empresa —induccion general, reinduccion— no
+   * hay ninguna decision que tomar, asi que el requisito se crea solo. Con el plazo que dice el
+   * propio tipo: si exige estar hecha antes de empezar a trabajar, ancla en el ingreso; si no,
+   * cuenta desde ahora.
+   *
+
+  /**
+   * Abre la formacion si su tipo se hace "disponible siempre". Mira el config aqui y no arriba
+   * para no arrastrar variables de la transaccion de publicar: esto pasa DESPUES y no puede
+   * tumbarla.
+   */
+  private async abrirlaSiElTipoLoDice(actor: AuthUser, activityId: string, versionId: string): Promise<void> {
+    const activity = await this.prisma.scoped.activity.findUnique({
+      where: { id: activityId },
+      select: { modality: true, activityType: { select: { config: true } } },
+    });
+    if (!activity) return;
+    const config = activityTypeConfigSchema.partial().safeParse(activity.activityType.config ?? {});
+    if (!config.success || config.data.defaultOfferingKind !== 'PERMANENT') return;
+    await this.offerings.abrirlaSiEsDisponible(actor, activityId, versionId, activity.modality);
+  }
+
+  /**
+   * Cuando el TIPO dice que la audiencia es toda la empresa —induccion general, reinduccion— no
+   * hay ninguna decision que tomar, asi que el requisito se crea solo. Con el plazo que dice el
+   * propio tipo: si exige estar hecha antes de empezar a trabajar, ancla en el ingreso; si no,
+   * cuenta desde ahora.
+   *
+   * Es seguro por la GRACIA de `due-date.ts` (Decision #70): a quien lleva anos en la empresa la
+   * obligacion no le nace vencida, le nace con 30 dias. Sin eso, esto habria estrenado cada
+   * induccion con la plantilla entera en rojo.
+   *
+   * No pisa nada: si ya hay un requisito activo para esa formacion, no toca nada. Y si falla, no
+   * tumba la publicacion —el contenido ya esta congelado, que es lo importante— pero deja rastro
+   * en la auditoria, que es donde se buscan las cosas raras.
+   */
+  private async aplicarExigenciaAutomatica(actor: AuthUser, activityId: string): Promise<void> {
+    try {
+      const activity = await this.prisma.scoped.activity.findUnique({
+        where: { id: activityId },
+        select: { activityType: { select: { config: true } } },
+      });
+      const config = activityTypeConfigSchema.partial().safeParse(activity?.activityType.config ?? {});
+      if (!config.success || config.data.defaultAssignmentMode !== 'ON_HIRE') return;
+
+      const yaExige = await this.prisma.scoped.assignmentRule.findFirst({
+        where: { targetType: 'ACTIVITY', targetId: activityId, active: true },
+        select: { id: true },
+      });
+      if (yaExige) return;
+
+      // A QUIEN ALCANZA, y por que NO se pregunta.
+      //
+      // Una INDUCCION es parte del ingreso: quien lleva siete anos en la empresa no esta
+      // ingresando, asi que no se le exige —y si se le exigiera, se le pediria repetir algo que
+      // ya hizo el dia que entro—. Una REINDUCCION es al reves: es la obligacion anual de todos,
+      // y dejar fuera a la plantilla actual la vaciaria de sentido.
+      //
+      // Las dos respuestas las da el propio tipo. Preguntarlo al publicar era pedirle al usuario
+      // que decidiera algo que el sistema ya sabe, y cada pregunta que sobra es una en la que se
+      // puede acertar mal.
+      const esInduccionDeIngreso = config.data.requiresBeforeHire === true;
+
+      await this.assignments.setActivityRequirement(actor, {
+        activityId,
+        scope: audienceRuleSchema.parse({}),
+        trigger: esInduccionDeIngreso ? 'ON_HIRE' : 'ON_JOIN',
+        // -1 y no 0: D1072 art. 2.2.4.6.11 exige que la induccion sea PREVIA al inicio de
+        // labores. "El mismo dia" no es previa.
+        dueDaysAfterTrigger: esInduccionDeIngreso ? -1 : 30,
+        // La campana anual manda: es una obligacion de calendario, no un aniversario por persona.
+        everyMonths: config.data.defaultAnnualDate ? null : (config.data.defaultRecurrenceMonths ?? null),
+        fixedDate: config.data.defaultAnnualDate ?? null,
+        soloNuevos: esInduccionDeIngreso,
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      await this.audit
+        .record({
+          tenantId: this.prisma.currentTenantId,
+          userId: actor.id,
+          action: 'AUTO_REQUIREMENT_FAILED',
+          resourceType: 'activities',
+          resourceId: activityId,
+          newValues: { reason },
+        })
+        .catch(() => undefined);
+    }
   }
 
   /**
@@ -234,7 +422,14 @@ export class VersioningService {
 
     const source = await this.prisma.scoped.activityVersion.findFirst({
       where: { activityId, status: 'PUBLISHED' },
-      include: { contents: { orderBy: { displayOrder: 'asc' } } },
+      include: {
+        contents: {
+          orderBy: { displayOrder: 'asc' },
+          // `sourceId` dice si la evaluacion del contenido es la COPIA congelada: la version nueva
+          // tiene que volver a apuntar a la EDITABLE para poder tocarse (Decision #87).
+          include: { assessment: { select: { sourceId: true } } },
+        },
+      },
     });
     if (!source) throw new NotFoundException({ code: 'NO_PUBLISHED_VERSION' });
 
@@ -278,7 +473,9 @@ export class VersioningService {
             config: content.config as Prisma.InputJsonValue,
             lessonId,
             contentPackageId: content.contentPackageId, // los paquetes ya son inmutables
-            assessmentVersionId: content.assessmentVersionId,
+            // La evaluacion vuelve a ser la EDITABLE: una version en borrador tiene que poder
+            // tocarse, y la copia congelada de la publicada no se toca (`sourceId` la delata).
+            assessmentId: content.assessment?.sourceId ?? content.assessmentId,
             surveyTemplateId: content.surveyTemplateId,
           },
         });
@@ -376,7 +573,7 @@ export class VersioningService {
     type: string;
     lessonId: string | null;
     contentPackageId: string | null;
-    assessmentVersionId: string | null;
+    assessmentId: string | null;
     surveyTemplateId: string | null;
     config: Prisma.JsonValue;
   }): boolean {
@@ -391,7 +588,7 @@ export class VersioningService {
       case 'SCORM':
         return Boolean(content.contentPackageId);
       case 'ASSESSMENT':
-        return Boolean(content.assessmentVersionId);
+        return Boolean(content.assessmentId);
       case 'SURVEY':
         return Boolean(content.surveyTemplateId);
       case 'LINK':

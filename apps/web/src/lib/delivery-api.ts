@@ -24,7 +24,8 @@ export interface OfferingActivityRef {
     name: string;
     /** Version vigente de la formacion. Si no coincide con la de arriba, esto esta desactualizado. */
     currentVersionId: string | null;
-    activityType: { code: string; name: string; colorHex: string | null };
+    /** El `config` viaja para saber si esta convocatoria puede contar para el plan. */
+    activityType: { code: string; name: string; colorHex: string | null; config: Record<string, unknown> };
     process: { id: string; code: string; name: string };
   };
 }
@@ -103,6 +104,8 @@ export interface OfferingDetail extends Omit<OfferingListItem, '_count'> {
   obligedCount: number;
   derivedProjected: ProjectedAudience;
   planItems: Array<{ id: string; plannedMonth: number; status: string; plan: { id: string; name: string; year: number; status: string } }>;
+  /** La TAJADA: a que parte de los obligados atiende esta jornada (Decision #68). */
+  audience: { id: string; name: string; rule: AudienceRule } | null;
   versionUpgrade: VersionUpgrade;
   _count: { enrollments: number };
 }
@@ -126,6 +129,8 @@ export interface OfferingBody {
   regionalId?: string | null;
   capacity?: number | null;
   observations?: string | null;
+  /** A quienes atiende. Sin facetas o null = a todos los obligados. */
+  audienceScope?: AudienceRule | null;
 }
 
 /** Respuesta de las acciones que pueden pasar por aprobacion (publicar, cancelar). */
@@ -283,7 +288,12 @@ export function createAudience(body: { name: string; rule: AudienceRule; isDynam
   return apiFetch('/audiences', { method: 'POST', body });
 }
 
-export type RuleTrigger = 'ON_JOIN' | 'ON_HIRE' | 'SCHEDULED';
+/**
+ * Que dispara la obligacion. `PLAN` es el unico que NO dispara nada: guarda a quienes se le va
+ * a exigir una capacitacion del plan, y las obligaciones las crea el plan al aprobar el renglon
+ * (Decision #76). Lo pone el servidor; la pantalla no lo ofrece.
+ */
+export type RuleTrigger = 'ON_JOIN' | 'ON_HIRE' | 'SCHEDULED' | 'PLAN';
 
 export interface Recurrence {
   everyMonths?: number;
@@ -351,6 +361,8 @@ export type AssignmentStatus =
   | 'COMPLETED'
   | 'OVERDUE'
   | 'WITHDRAWN_LEFT_AUDIENCE'
+  /** El renglon del plan que la creo se cancelo: esa jornada ya no se dicta. */
+  | 'WITHDRAWN_PLAN_ITEM_CANCELLED'
   | 'WAIVED';
 
 export interface AssignmentRow {
@@ -416,9 +428,16 @@ export interface PlanRow {
   year: number;
   name: string;
   status: PlanStatus;
+  /** La META de cumplimiento en porcentaje, o null si todavia no se acordo. */
+  goalPct: number | null;
   approvedAt: string | null;
   itemCount: number;
   updatedAt: string;
+  /**
+   * Los indicadores del ano, ya calculados. Vienen en el LISTADO a proposito: la pregunta que
+   * trae a alguien a esa pantalla es "¿como vamos?", y antes habia que entrar a cada plan.
+   */
+  metrics: PlanMetrics;
 }
 
 export interface PlanItemFacts {
@@ -465,8 +484,10 @@ export interface PlanItemRow {
       activity: {
         id: string;
         name: string;
+        /** Lo que necesita "otra jornada de esta misma": sin ellos el formulario no sabe que pedir. */
+        modality: Modality;
         process: { id: string; code: string; name: string };
-        activityType: { code: string; name: string; colorHex: string | null };
+        activityType: { code: string; name: string; colorHex: string | null; config: Record<string, unknown> };
       };
     };
   };
@@ -477,7 +498,8 @@ export interface PlanDetail {
   year: number;
   name: string;
   objective: string | null;
-  goals: string | null;
+  /** La META en porcentaje: cuanto del programa se compromete la empresa a ejecutar este ano. */
+  goalPct: number | null;
   scope: string | null;
   status: PlanStatus;
   approvedAt: string | null;
@@ -498,7 +520,19 @@ export function getPlan(id: string): Promise<PlanDetail> {
   return apiFetch(`/plans/${id}`, { method: 'GET' });
 }
 
-export function createPlan(body: { year: number; name: string; objective?: string | null }): Promise<PlanDetail> {
+/**
+ * Se pide LO MISMO que al editar. El alta preguntaba solo ano, nombre y objetivo, asi que la meta
+ * y el alcance —que son parte del documento que revisa el auditor— habia que acordarse de
+ * anadirlos despues, entrando al plan y abriendo "Editar". Un campo que solo existe en una de las
+ * dos pantallas es un campo que se queda vacio.
+ */
+export function createPlan(body: {
+  year: number;
+  name: string;
+  objective?: string | null;
+  goalPct?: number | null;
+  scope?: string | null;
+}): Promise<PlanDetail> {
   return apiFetch('/plans', { method: 'POST', body });
 }
 
@@ -512,7 +546,7 @@ export function updatePlan(
     year?: number;
     name?: string;
     objective?: string | null;
-    goals?: string | null;
+    goalPct?: number | null;
     scope?: string | null;
     justification?: string;
   },
@@ -561,4 +595,87 @@ export function activatePlan(id: string): Promise<PlanRow> {
 
 export function closePlan(id: string): Promise<PlanRow> {
   return apiFetch(`/plans/${id}/close`, { method: 'POST' });
+}
+
+/**
+ * REABRIR un plan cerrado, con motivo obligatorio.
+ *
+ * Cerrar es lo que convierte al plan en la evidencia del ano, y por eso durante meses no se
+ * reabria. Con un plan por ano (Decision #71) esa regla paso a ser una trampa: un plan cerrado se
+ * queda con el ano y ya no hay forma de planear. Reabrir deja rastro en la auditoria; borrar no,
+ * y por eso borrar sigue reservado al plan que nunca obligo a nadie.
+ */
+export function reopenPlan(id: string, justification: string): Promise<PlanRow> {
+  return apiFetch(`/plans/${id}/reopen`, { method: 'POST', body: { confirm: true, justification } });
+}
+
+// ──────────── Exigir la formacion desde la formacion misma ────────────
+
+/**
+ * Un requisito visto desde la ficha: a quien alcanza, cuando vence y si se repite. Es la misma
+ * regla que administra el modulo de Asignaciones, dicha sin la palabra "audiencia".
+ */
+export interface ActivityRequirement {
+  id: string;
+  audienceId: string;
+  audienceName: string;
+  scope: AudienceRule;
+  reachesEveryone: boolean;
+  trigger: RuleTrigger;
+  dueDaysAfterTrigger: number;
+  everyMonths: number | null;
+  /** "Cada ano antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`. */
+  fixedDate: string | null;
+  assignmentCount: number;
+  /** Si solo obliga a quien entre desde que se creo. Cambia como se lee `reach`. */
+  soloNuevos: boolean;
+  /** Cuanta gente alcanza HOY. */
+  reach: number;
+}
+
+export function listActivityRequirements(activityId: string): Promise<ActivityRequirement[]> {
+  return apiFetch(`/activities/${activityId}/requirements`, { method: 'GET' });
+}
+
+export function setActivityRequirement(
+  activityId: string,
+  body: {
+    scope: AudienceRule;
+    trigger: 'ON_HIRE' | 'ON_JOIN';
+    dueDaysAfterTrigger: number;
+    everyMonths?: number | null;
+    fixedDate?: string | null;
+    reason?: string | null;
+  },
+): Promise<{ ruleId: string; audienceId: string; audienceName: string; created: number; updated: boolean }> {
+  return apiFetch(`/activities/${activityId}/requirements`, { method: 'POST', body });
+}
+
+export function retireActivityRequirement(activityId: string, ruleId: string): Promise<{ ok: true }> {
+  return apiFetch(`/activities/${activityId}/requirements/${ruleId}`, { method: 'DELETE' });
+}
+
+// ──────────── Convocados y quien falta por convocar ────────────
+
+/**
+ * La respuesta a "¿ya cite a todos los que me tocan?". `faltan` son personas obligadas dentro de
+ * la tajada de la jornada que no estan inscritas en NINGUNA convocatoria de esa formacion: a
+ * quien ya se cito el 12 de marzo no le falta nada por no estar en la del 19.
+ */
+export interface PendingInvites {
+  proyectados: number;
+  detalle: string;
+  convocados: number;
+  enEstaJornada: number;
+  faltan: Array<{
+    id: string;
+    fullName: string;
+    documentNumber: string;
+    jobTitle: { name: string };
+    area: { name: string };
+  }>;
+}
+
+export function getPendingInvites(offeringId: string): Promise<PendingInvites> {
+  return apiFetch(`/offerings/${offeringId}/pendientes-por-convocar`, { method: 'GET' });
 }

@@ -53,7 +53,33 @@ export const activityTypeConfigSchema = z
     issuesCertificate: z.boolean().default(true),
     requiresBeforeHire: z.boolean().default(false),
     defaultAssignmentMode: z.enum(['ON_HIRE', 'BY_JOB_TITLE', 'MANUAL']).default('MANUAL'),
+    /**
+     * Como se dicta por defecto, y por tanto QUE CAMPOS pide su convocatoria.
+     *
+     *   EVENT     jornada con fecha: pide instructor, ejecutada por, lugar, horario y cupo.
+     *   PERMANENT disponible para hacerla cuando se pueda: no pide nada de eso.
+     *
+     * Vive aqui y no en el codigo porque una pildora no lleva instructor y una capacitacion del
+     * plan si, y donde esta la frontera la decide cada empresa, no nosotros.
+     */
+    defaultOfferingKind: z.enum(['EVENT', 'PERMANENT', 'HYBRID']).default('PERMANENT'),
     defaultRecurrenceMonths: z.number().int().min(1).max(120).nullable().default(null),
+    /**
+     * "Cada ano antes del 31 de marzo" (MM-DD). Es la CAMPANA anual, y es como funciona de verdad
+     * una reinduccion: no es la induccion repetida a los 12 meses de que cada quien la hiciera,
+     * es una obligacion de CALENDARIO que cae sobre todo el mundo el mismo dia.
+     *
+     * La diferencia no es cosmetica: con el modelo por persona, alguien que nunca hizo la
+     * induccion no tendria de donde contar sus 12 meses. Con la campana no hace falta anclarse a
+     * nada: el 31 de marzo llega igual para todos.
+     *
+     * Manda sobre `defaultRecurrenceMonths` cuando las dos estan puestas.
+     */
+    defaultAnnualDate: z
+      .string()
+      .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Fecha MM-DD')
+      .nullable()
+      .default(null),
     participatesInPlan: z.boolean().default(false),
     isMicro: z.boolean().default(false),
   })

@@ -1,0 +1,15 @@
+-- PORTADA DE LA FORMACION (Decision #88).
+--
+-- La pantalla "Hoy" del aprendiz pasa a ser una biblioteca tipo plataforma de streaming, y ese
+-- lenguaje vive de la imagen: sin portada, los carruseles son cajas grises y la pantalla queda
+-- peor que la lista que sustituye.
+--
+-- Va en `activities` y no en `activity_versions` por la misma razon que la presentacion de una
+-- evaluacion: una foto NO es evidencia. No cambia que se enseno ni como se califico, asi que
+-- cambiarla no puede exigir publicar una version nueva de la formacion.
+--
+-- Es NULLABLE a proposito y para siempre: sin foto se pinta una portada GENERADA a partir del id
+-- y del tipo de formacion, que es determinista —la misma formacion se ve siempre igual y la gente
+-- la reconoce por su color—. Exigir la foto dejaria media biblioteca en gris el primer dia y
+-- pondria un requisito estetico delante de publicar una capacitacion obligatoria.
+ALTER TABLE "activities" ADD COLUMN "cover_key" TEXT;

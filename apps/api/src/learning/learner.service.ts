@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { SelfEnrollInput } from '@neo-pulse/shared';
+import { POINTS, type SelfEnrollInput } from '@neo-pulse/shared';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -42,6 +42,7 @@ export class LearnerService {
           name: true,
           description: true,
           activityType: { select: { code: true, name: true, colorHex: true } },
+          coverKey: true,
           currentVersionId: true,
           versions: {
             where: { status: 'PUBLISHED' },
@@ -91,6 +92,14 @@ export class LearnerService {
           description: activity?.description ?? null,
           type: activity?.activityType ?? null,
           estimatedMinutes: activity?.versions[0]?.estimatedMinutes ?? null,
+          coverKey: activity?.coverKey ?? null,
+          /*
+            LO QUE GANA AL TERMINARLA. Viaja desde el servidor y no se escribe en la pantalla
+            porque la promesa y el premio tienen que salir del mismo sitio: prometer 50 y dar 30
+            es peor que no prometer nada (Decision #90). Y si algun dia los puntos dependen del
+            tipo de formacion, ya tiene donde vivir.
+          */
+          pointsOnComplete: POINTS.ACTIVITY_COMPLETED,
           dueAt: assignment.dueAt,
           overdue: assignment.status === 'OVERDUE',
           cycleNumber: assignment.cycleNumber,
@@ -130,6 +139,7 @@ export class LearnerService {
                     id: true,
                     name: true,
                     activityType: { select: { code: true, name: true, colorHex: true } },
+          coverKey: true,
                   },
                 },
               },

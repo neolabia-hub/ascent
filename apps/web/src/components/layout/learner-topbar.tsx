@@ -86,7 +86,19 @@ function Notifications() {
           setVerLeidas(false);
         }}
         aria-label={unread > 0 ? `${unread} avisos sin leer` : 'Avisos'}
-        className="focus-ring relative flex h-10 w-10 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+        /*
+          FONDO FIJO Y NO SOLO AL PASAR POR ENCIMA (Decision #90). Un icono suelto sobre una
+          portada no se lee como un boton —parece parte de la foto— y en un telefono no hay
+          "pasar por encima" que lo revele. Con su pastilla propia siempre puesta, se ve que se
+          puede pulsar; y al ABRIRLO cambia a la superficie llena con borde, que es un estado
+          distinto y no un tono mas oscuro del mismo.
+        */
+        className={cn(
+          'focus-ring relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors duration-150',
+          open
+            ? 'border-line-strong bg-surface text-ink-900 shadow-card'
+            : 'border-line bg-surface/70 text-ink-500 backdrop-blur-sm hover:bg-surface hover:text-ink-900',
+        )}
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
         {unread > 0 ? (
@@ -276,7 +288,6 @@ export function LearnerTopbar({
   leadingControls,
   trailing,
   wide = false,
-  flush = false,
 }: {
   greeting?: string;
   onSearch: () => void;
@@ -285,8 +296,6 @@ export function LearnerTopbar({
   leadingControls?: ReactNode;
   trailing?: ReactNode;
   wide?: boolean;
-  /** Sin borde ni fondo propios: la barra es una con la pantalla. */
-  flush?: boolean;
 }) {
   const profile = useLearnerProfile();
   const pathname = usePathname();
@@ -317,12 +326,20 @@ export function LearnerTopbar({
     <header
       className={cn(
         'sticky top-0 z-30',
-        flush ? 'bg-transparent' : 'border-b border-line bg-surface/95 backdrop-blur',
+        // Sin linea inferior nunca: lo que separa la barra del contenido es el aire, no un filo.
+        // Con contenido pasando por debajo conserva el velo difuminado para que el texto no se
+        // lea encima. La barra NUNCA se superpone al contenido: el heroe empieza DEBAJO. Se probo
+        // flotando sobre la portada y tapaba justo la primera franja de la imagen, que es donde
+        // la foto tiene su asunto.
+        // SIN FONDO, NUNCA. Tenia un velo difuminado y sobraba: la barra ya se separa por el aire
+        // y por el hecho de que lo de dentro son piezas con superficie propia. El velo solo
+        // ensuciaba el borde de la portada al pasar por debajo.
+        'bg-transparent',
       )}
     >
-      <div className={cn('flex h-16 w-full items-center gap-3 px-5 lg:px-10', wide ? '' : 'mx-auto max-w-[1100px]')}>
+      <div className={cn('flex h-16 w-full items-center gap-3 px-5 lg:px-8', wide ? '' : 'mx-auto max-w-[1100px]')}>
         {leading ?? (
-          <p className="min-w-0 flex-1 truncate">
+          <p className="min-w-0 shrink-0 truncate">
             <span className="text-sm text-ink-500">{greeting}, </span>
             <span className="font-display text-base font-semibold text-ink-900">
               {profile.fullName.split(/\s+/)[0]}
@@ -340,6 +357,25 @@ export function LearnerTopbar({
         </button>
 
         {/*
+          EL BUSCADOR OCUPA EL CENTRO y se lleva el espacio sobrante (Decision #90).
+
+          Antes la barra tenia DOS zonas —saludo a la izquierda y todo lo demas amontonado a la
+          derecha— y en un monitor ancho eso dejaba un vacio enorme en medio, con el bloque de la
+          persona flotando lejos de las dos esquinas: no se leia ni como "arriba a la derecha" ni
+          como parte de nada. Con el buscador en medio, cada cosa tiene su sitio y la barra se
+          reparte sola a cualquier ancho.
+        */}
+        <button
+          type="button"
+          onClick={onSearch}
+          className="focus-ring hidden h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-line-strong hover:text-ink-700 lg:flex"
+        >
+          <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          <span className="flex-1 truncate text-left">Buscar una formacion</span>
+          <kbd className="shrink-0 rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
+        </button>
+
+        {/*
           `leadingControls` son los controles de la PANTALLA (plegar un panel, por ejemplo) y van
           antes de lo que es de la PERSONA —racha, avisos, cuenta—, que es un bloque y no debe
           partirse con botones de otra naturaleza en medio.
@@ -347,11 +383,13 @@ export function LearnerTopbar({
         {leadingControls}
 
         {/*
-          LA RACHA VIVE AQUI, al lado de los avisos, y no escondida dentro del menu de cuenta. Es
-          lo unico de la pantalla que premia volver manana, y dentro de un desplegable no la veia
-          nadie. Sigue siendo PRIVADA (Decision #23): es la propia, jamas la de otro.
+          LA RACHA SOLO EN TELEFONO (Decision #90). En escritorio vive en la barra lateral, junto a
+          los puntos y las congelaciones: aqui era una pastilla suelta —un numero con una llama al
+          lado no dice que es una racha ni que se pierde manana— y ademas quedaba DUPLICADA con el
+          bloque de la barra. En telefono no hay barra lateral, asi que ahi si se queda.
+          Sigue siendo PRIVADA (Decision #23): es la propia, jamas la de otro.
         */}
-        {streak !== null ? <StreakPill days={streak} className="animate-card-in hidden sm:inline-flex" /> : null}
+        {streak !== null ? <StreakPill days={streak} className="animate-card-in inline-flex lg:hidden" /> : null}
 
         {/*
           LA VUELTA AL PANEL, solo para quien administra algo. Para el 95% del personal operativo

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type Modality } from '@prisma/client';
 import type {
+  AudienceRule,
   AdjustProjectedInput,
   CancelOfferingInput,
   CreateOfferingInput,
@@ -11,11 +12,14 @@ import type {
   UpdateOfferingInput,
 } from '@neo-pulse/shared';
 import { assertScopeAllows, processScopeWhere, scopeAllows } from '../common/analyst-scope.js';
+import { renglonAutomatico } from './plan-auto-item.js';
 import { AuditService } from '../common/audit.service.js';
 import { SequenceService } from '../common/sequence.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ruleReachesEveryone } from '../assignments/audience-rule.js';
+import { AudiencesService } from '../assignments/audiences.service.js';
 import { ProjectedAudienceService } from './projected-audience.service.js';
 import { planVersionMigration, type MigrationPolicy } from './version-migration.js';
 
@@ -47,7 +51,7 @@ const OFFERING_LIST_SELECT = {
           // Con esto el listado ya puede DECIR cuales quedaron colgadas de una version vieja,
           // sin una consulta por fila: la actividad apunta a su version vigente.
           currentVersionId: true,
-          activityType: { select: { code: true, name: true, colorHex: true } },
+          activityType: { select: { code: true, name: true, colorHex: true, config: true } },
           process: { select: { id: true, code: true, name: true } },
         },
       },
@@ -71,6 +75,9 @@ export class OfferingsService {
     private readonly sequences: SequenceService,
     private readonly projected: ProjectedAudienceService,
     private readonly notifications: NotificationsService,
+    // La TAJADA de la jornada se declara con los mismos criterios que Quienes, asi que la
+    // audiencia la resuelve la misma pieza: dos implementaciones crearian grupos gemelos.
+    private readonly audiences: AudiencesService,
   ) {}
 
   async list(actor: AuthUser, query: ListOfferingsQuery) {
@@ -120,6 +127,9 @@ export class OfferingsService {
       where: { id },
       include: {
         regional: { select: { id: true, name: true } },
+        // La TAJADA, con su regla, para que la pantalla pueda ABRIRSE con lo que hay puesto en
+        // vez de en blanco y no haya que volver a marcarlo todo para corregir un detalle.
+        audience: { select: { id: true, name: true, rule: true } },
         activityVersion: {
           select: {
             id: true,
@@ -134,7 +144,7 @@ export class OfferingsService {
                 name: true,
                 currentVersionId: true,
                 description: true,
-                activityType: { select: { code: true, name: true, colorHex: true } },
+                activityType: { select: { code: true, name: true, colorHex: true, config: true } },
                 process: { select: { id: true, code: true, name: true } },
               },
             },
@@ -165,7 +175,7 @@ export class OfferingsService {
       }),
       // Los proyectados congelados NO se recalculan; se muestra el derivado de hoy solo como
       // referencia para quien decide si vale la pena ajustar con justificacion.
-      this.projected.derive(offering.activityVersion.activity.id, offering.regionalId),
+      this.projected.derive(offering.activityVersion.activity.id, { audienceId: offering.audienceId, regionalId: offering.regionalId }),
     ]);
 
     return {
@@ -181,18 +191,52 @@ export class OfferingsService {
     const tenantId = this.prisma.currentTenantId;
     const version = await this.prisma.scoped.activityVersion.findUnique({
       where: { id: input.activityVersionId },
-      select: { id: true, status: true, activity: { select: { id: true, name: true, processId: true } } },
+      select: {
+        id: true,
+        status: true,
+        activity: {
+          select: {
+            id: true,
+            name: true,
+            processId: true,
+            // Para saber si esta jornada tiene que entrar sola al plan (Decision #75).
+            activityType: { select: { config: true } },
+          },
+        },
+      },
     });
     if (!version) throw new NotFoundException({ code: 'ACTIVITY_VERSION_NOT_FOUND' });
     // La convocatoria hereda el proceso de su capacitacion: programar fuera del alcance es
     // programar en el plan de otro.
     assertScopeAllows(actor.scopeProcessIds, version.activity.processId);
-    if (version.status !== 'PUBLISHED') {
+    /**
+     * SE PUEDE PROGRAMAR CON EL CONTENIDO EN BORRADOR (Decision #77).
+     *
+     * Aqui se rechazaba si la version no estaba publicada, y eso obligaba a un orden que no hace
+     * falta: para planear el ano en enero —"Manejo defensivo, marzo, Cali"— el contenido todavia
+     * no existe, asi que o se publicaba una capacitacion vacia o no se podia planear. Lo dijo el
+     * cliente: *"esto hace mas lento el proceso"*.
+     *
+     * Y no protegia nada, porque **la compuerta de verdad ya estaba en `publish()`**: una
+     * convocatoria no se publica si su version no lo esta. Es ahi donde importa —publicar es lo
+     * que cita a la gente y congela los proyectados— y es ahi donde sigue.
+     *
+     * El invariante que se defiende no cambia ni un milimetro: **nadie queda citado a contenido
+     * que todavia puede cambiar**. Una convocatoria en borrador no cita a nadie, no congela
+     * proyectados, no abre el candado y no deja aprobar el plan (`PLAN_OFFERINGS_NOT_PUBLISHED`).
+     * Lo unico que hace es reservar el sitio en el calendario, que es exactamente lo que se hace
+     * al planear un ano.
+     */
+    if (version.status === 'RETIRED') {
       throw new ConflictException({
-        code: 'VERSION_NOT_PUBLISHED',
-        message: 'Solo se convoca contenido publicado: publica la version antes de programarla.',
+        code: 'VERSION_RETIRED',
+        message: 'Esa version quedo atras: programa sobre la version vigente.',
       });
     }
+
+    // La tajada se resuelve ANTES de la transaccion: buscar o crear la audiencia toca varias
+    // tablas y no tiene por que alargar la transaccion que reserva el consecutivo.
+    const tajada = await this.resolveAudience(tenantId, input.audienceScope);
 
     const year = input.scheduledDate ? Number(input.scheduledDate.slice(0, 4)) : new Date().getFullYear();
     const offering = await this.prisma.tx(async (tx) => {
@@ -203,6 +247,7 @@ export class OfferingsService {
           activityVersionId: input.activityVersionId,
           code: this.sequences.format('CONV', year, value),
           ...this.writableFields(input),
+          ...tajada,
           createdBy: actor.id,
           updatedBy: actor.id,
         },
@@ -217,7 +262,66 @@ export class OfferingsService {
       resourceId: offering.id,
       newValues: { code: offering.code, activity: version.activity.name, kind: input.kind },
     });
+
+    await this.entraSolaAlPlan(actor, tenantId, offering.id, offering.code, version.activity.activityType.config, input);
     return this.getById(actor, offering.id);
+  }
+
+  /**
+   * PROGRAMAR ES PONER EN EL PLAN, cuando la formacion es del plan (Decision #75).
+   *
+   * Habia tres caminos para crear una jornada —el plan, la pestana Programacion de la ficha y el
+   * modulo Convocatorias— y solo el primero creaba el renglon. Por los otros dos la jornada
+   * quedaba huerfana: se dicta, la gente asiste, y no cuenta para el cumplimiento de nadie.
+   *
+   * Se hace en el SERVIDOR y no en la pantalla por la misma razon que la exigencia automatica
+   * (Decision #69): depender de que alguien pase por una pantalla es depender de que se acuerde.
+   *
+   * Solo en plan BORRADOR. Un renglon en un plan vivo nace obligando a gente real y la Decision
+   * #55 exige decir por que; un motivo no se inventa por detras, asi que ahi lo pregunta la ficha.
+   * Se escribe la fila directamente y no via `PlansService` porque un renglon de borrador es solo
+   * eso —una fila, sin obligaciones que materializar— y porque el modulo del plan ya importa este.
+   */
+  private async entraSolaAlPlan(
+    actor: AuthUser,
+    tenantId: string,
+    offeringId: string,
+    offeringCode: string,
+    typeConfig: unknown,
+    input: CreateOfferingInput,
+  ): Promise<void> {
+    const config = (typeConfig ?? {}) as Record<string, unknown>;
+    const fecha = input.scheduledDate ?? input.windowStart ?? null;
+    const planes = await this.prisma.scoped.trainingPlan.findMany({ select: { id: true, year: true, status: true } });
+
+    const destino = renglonAutomatico(config.participatesInPlan === true, fecha, planes, new Date());
+    if (!destino) return;
+
+    // `skipDuplicates` no aplica sin indice unico, asi que se comprueba: quien crea la jornada
+    // DESDE el plan agrega el renglon el mismo justo despues, y dos renglones de la misma
+    // convocatoria contarian dos veces en el cumplimiento.
+    const yaEsta = await this.prisma.scoped.planItem.findFirst({
+      where: { planId: destino.planId, offeringId },
+      select: { id: true },
+    });
+    if (yaEsta) return;
+
+    const item = await this.prisma.scoped.planItem.create({
+      data: { tenantId, planId: destino.planId, offeringId, plannedMonth: destino.plannedMonth },
+    });
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'PLAN_ITEM_ADDED',
+      resourceType: 'plan_items',
+      resourceId: item.id,
+      newValues: {
+        planId: destino.planId,
+        offering: offeringCode,
+        plannedMonth: destino.plannedMonth,
+        automatico: 'La formacion es del plan y el plan del ano estaba en borrador (Decision #75).',
+      },
+    });
   }
 
   async update(actor: AuthUser, id: string, input: UpdateOfferingInput) {
@@ -231,7 +335,12 @@ export class OfferingsService {
 
     await this.prisma.scoped.offering.update({
       where: { id },
-      data: { ...this.writableFields(input), updatedBy: actor.id, version: { increment: 1 } },
+      data: {
+        ...this.writableFields(input),
+        ...(await this.resolveAudience(this.prisma.currentTenantId, input.audienceScope)),
+        updatedBy: actor.id,
+        version: { increment: 1 },
+      },
     });
     await this.audit.record({
       tenantId: this.prisma.currentTenantId,
@@ -253,7 +362,7 @@ export class OfferingsService {
       select: { activityId: true },
     });
     if (!version) throw new NotFoundException({ code: 'ACTIVITY_VERSION_NOT_FOUND' });
-    return this.projected.derive(version.activityId, offering.regionalId);
+    return this.projected.derive(version.activityId, { audienceId: offering.audienceId, regionalId: offering.regionalId });
   }
 
   /**
@@ -272,11 +381,23 @@ export class OfferingsService {
       where: { id: offering.activityVersionId },
       select: { activityId: true, status: true, activity: { select: { name: true } } },
     });
+    /**
+     * LA COMPUERTA DE VERDAD (Decision #77). Programar con el contenido en borrador se permite —es
+     * como se planea un ano— pero PUBLICAR la convocatoria es lo que cita a la gente y congela los
+     * proyectados, y eso no puede pasar sobre contenido que todavia puede cambiar.
+     *
+     * El mensaje dice QUE hacer, no solo que no se puede: quien llega aqui casi siempre no sabe
+     * que le falta publicar el contenido, porque la convocatoria ya la tiene delante y armada.
+     */
     if (!version || version.status !== 'PUBLISHED') {
-      throw new ConflictException({ code: 'VERSION_NOT_PUBLISHED' });
+      throw new ConflictException({
+        code: 'VERSION_NOT_PUBLISHED',
+        message:
+          'Publica primero el contenido de la formacion. Hasta entonces esta convocatoria puede quedar programada, pero no se puede abrir a la gente.',
+      });
     }
 
-    const derived = await this.projected.derive(version.activityId, offering.regionalId);
+    const derived = await this.projected.derive(version.activityId, { audienceId: offering.audienceId, regionalId: offering.regionalId });
     const projectedCount = input.projectedOverride ?? derived.count;
 
     const published = await this.prisma.scoped.offering.update({
@@ -400,6 +521,31 @@ export class OfferingsService {
       throw new ConflictException({ code: 'OFFERING_NOT_CANCELLABLE', status: offering.status });
     }
 
+    /**
+     * A quien estaba CITADO se le avisa, y las obligaciones que nacieron del plan se RETIRAN.
+     *
+     * Cancelar solo movia dos estados —la convocatoria y su renglon— y dejaba a la gente igual:
+     * quien estaba convocado seguia creyendo que tiene una sesion el 12 de marzo, y quien tenia
+     * la obligacion del plan la conservaba viva, venciendo el ultimo dia de un mes cuya jornada
+     * ya no se iba a dictar. Cancelar tiene que llegar hasta las personas o no es cancelar.
+     *
+     * Es la misma regla que cancelar el renglon desde el plan (Decision #73): se RETIRAN, no se
+     * borran, y lo ya EMPEZADO no se toca porque ese avance es de la persona.
+     */
+    const renglones = await this.prisma.scoped.planItem.findMany({
+      where: { offeringId: id },
+      select: { id: true },
+    });
+    // El nombre de la formacion se pide aparte: `requireOffering` devuelve escalares.
+    const nombre = await this.prisma.scoped.activityVersion.findUnique({
+      where: { id: offering.activityVersionId },
+      select: { activity: { select: { name: true } } },
+    });
+    const inscritos = await this.prisma.scoped.enrollment.findMany({
+      where: { offeringId: id, status: { in: ['ENROLLED', 'IN_PROGRESS'] } },
+      select: { user: { select: { id: true, email: true } } },
+    });
+
     await this.prisma.tx(async (tx) => {
       await tx.offering.update({
         where: { id },
@@ -407,7 +553,32 @@ export class OfferingsService {
       });
       // El renglon del plan refleja la realidad: una convocatoria cancelada no queda "planeada".
       await tx.planItem.updateMany({ where: { offeringId: id, status: 'PLANNED' }, data: { status: 'CANCELLED' } });
+      if (renglones.length > 0) {
+        await tx.assignment.updateMany({
+          where: {
+            planItemId: { in: renglones.map((row) => row.id) },
+            source: 'PLAN',
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+          data: { status: 'WITHDRAWN_PLAN_ITEM_CANCELLED' },
+        });
+      }
     });
+
+    if (inscritos.length > 0) {
+      await this.notifications.notifyMany(
+        this.prisma.currentTenantId,
+        inscritos.map((row) => ({
+          eventType: 'OFFERING_CANCELLED' as const,
+          recipientUserId: row.user.id,
+          recipientEmail: row.user.email,
+          subject: 'Se cancelo una formacion a la que estabas citado',
+          body: `${nombre?.activity.name ?? 'La formacion'}: ${input.cancelledReason}`,
+          referenceType: 'offerings',
+          referenceId: id,
+        })),
+      );
+    }
 
     await this.audit.record({
       tenantId: this.prisma.currentTenantId,
@@ -698,8 +869,151 @@ export class OfferingsService {
     return { ...plan, notify: plan.moving.map((e) => e.user) };
   }
 
+
+  /**
+   * PONER AL DIA LAS CONVOCATORIAS PERMANENTES al publicar una version nueva.
+   *
+   * La cautela de "una version nueva no cambia lo que entrega una convocatoria abierta" es
+   * correcta cuando hay gente CITADA a una sesion con fecha: cambiarles el contenido tres dias
+   * antes, sin avisar, no puede pasar solo.
+   *
+   * Pero en una convocatoria PERMANENTE no hay nadie citado: es una puerta abierta por la que la
+   * gente entra cuando puede. Dejarla anclada a la version vieja significa que quien ingrese
+   * manana hace la induccion desantiguada mientras la nueva espera a que alguien se acuerde de
+   * pulsar "actualizar". Es el mismo fallo silencioso de siempre: el sistema sabe lo que hay que
+   * hacer y espera a que alguien lo adivine.
+   *
+   * A quien esta a mitad lo decide la POLITICA DE MIGRACION que ya se eligio al publicar: aqui no
+   * se toma ninguna decision nueva, solo se aplica la que ya se tomo.
+   */
+  async ponerAlDiaLasPermanentes(actor: AuthUser, activityId: string, targetVersionId: string): Promise<number> {
+    const abiertas = await this.prisma.scoped.offering.findMany({
+      where: {
+        kind: 'PERMANENT',
+        status: { in: ['PUBLISHED', 'IN_PROGRESS'] },
+        activityVersion: { activityId },
+        activityVersionId: { not: targetVersionId },
+      },
+      select: { id: true },
+    });
+
+    let movidas = 0;
+    for (const offering of abiertas) {
+      try {
+        await this.migrateVersion(actor, offering.id, { targetVersionId, confirm: true });
+        movidas += 1;
+      } catch {
+        // Una que no se pueda mover no puede tumbar la publicacion: el contenido ya esta
+        // congelado, que es lo que importa. La convocatoria seguira avisando en su pantalla.
+      }
+    }
+    return movidas;
+  }
+
+
+  /**
+   * ABRIRLA SOLA al publicar, cuando el tipo dice que se hace "disponible siempre".
+   *
+   * Es el ultimo agujero del ciclo: se publicaba el contenido, la formacion quedaba exigida a
+   * quien tocara, y **nadie podia empezarla** porque no existia ninguna convocatoria. El candado
+   * de "todavia no esta abierta" salia en los pendientes de todo el mundo hasta que alguien se
+   * acordara de pulsar "Dejarla disponible".
+   *
+   * Y ahi no hay ninguna decision: una convocatoria permanente no tiene fecha, ni lugar, ni
+   * instructor, ni cupo que elegir. Es literalmente abrir la puerta.
+   *
+   * Solo si NO hay ninguna: si alguien ya programo una jornada con fecha, esa es su decision y no
+   * se le anade otra por detras.
+   */
+  async abrirlaSiEsDisponible(
+    actor: AuthUser,
+    activityId: string,
+    versionId: string,
+    modality: Modality,
+  ): Promise<boolean> {
+    const yaHay = await this.prisma.scoped.offering.count({
+      where: { activityVersion: { activityId }, status: { notIn: ['CANCELLED'] } },
+    });
+    if (yaHay > 0) return false;
+
+    try {
+      const offering = await this.create(actor, {
+        activityVersionId: versionId,
+        kind: 'PERMANENT',
+        modality,
+        executedBy: 'PROPIOS',
+      });
+      await this.publish(actor, offering.id, { confirm: true });
+      return true;
+    } catch {
+      // No puede tumbar la publicacion: el contenido ya quedo congelado. La pestana de
+      // convocatorias seguira avisando de que nadie puede hacerla.
+      return false;
+    }
+  }
+
   // ─────────────────────────── Inscritos ───────────────────────────
 
+  /**
+   * QUIEN FALTA POR CONVOCAR a esta jornada.
+   *
+   * Es la pregunta que el analista se hace de verdad —"¿ya cite a todos los que me tocan?"— y que
+   * antes solo se podia responder cruzando dos pantallas a ojo. La cuenta:
+   *
+   *     los OBLIGADOS abiertos de esta formacion
+   *     ∩ la TAJADA de esta jornada (a quienes atiende)
+   *     − quienes ya estan inscritos en CUALQUIER jornada de esta formacion
+   *
+   * Lo ultimo importa: a quien ya se cito el 12 de marzo en Antioquia no "le falta" nada porque no
+   * este en la del 19 en Cundinamarca. Si se restaran solo los de ESTA jornada, cada convocatoria
+   * reclamaria a la empresa entera y el numero seria inutil.
+   */
+  async pendingInvites(id: string) {
+    const offering = await this.requireOffering(id);
+    const version = await this.prisma.scoped.activityVersion.findUnique({
+      where: { id: offering.activityVersionId },
+      select: { activityId: true },
+    });
+    if (!version) throw new NotFoundException({ code: 'ACTIVITY_VERSION_NOT_FOUND' });
+
+    const proyectados = await this.projected.resolve(version.activityId, {
+      audienceId: offering.audienceId,
+      regionalId: offering.regionalId,
+    });
+
+    const yaCitados = await this.prisma.scoped.enrollment.findMany({
+      where: {
+        userId: { in: proyectados.userIds },
+        activityVersion: { activityId: version.activityId },
+      },
+      select: { userId: true, offeringId: true },
+    });
+    const citadoEn = new Map(yaCitados.map((row) => [row.userId, row.offeringId]));
+
+    const faltanIds = proyectados.userIds.filter((userId) => !citadoEn.has(userId));
+    const faltan = await this.prisma.scoped.user.findMany({
+      where: { id: { in: faltanIds } },
+      orderBy: { fullName: 'asc' },
+      select: {
+        id: true,
+        fullName: true,
+        documentNumber: true,
+        jobTitle: { select: { name: true } },
+        area: { select: { name: true } },
+      },
+    });
+
+    return {
+      /** A cuantos atiende esta jornada, hoy. */
+      proyectados: proyectados.count,
+      detalle: proyectados.detail,
+      /** Cuantos de esos ya estan citados, aqui o en otra jornada de la misma formacion. */
+      convocados: proyectados.userIds.length - faltanIds.length,
+      /** Cuantos estan inscritos en ESTA. */
+      enEstaJornada: yaCitados.filter((row) => row.offeringId === id).length,
+      faltan,
+    };
+  }
   async roster(id: string) {
     await this.requireOffering(id);
     const enrollments = await this.prisma.scoped.enrollment.findMany({
@@ -759,11 +1073,11 @@ export class OfferingsService {
         targetType: 'ACTIVITY',
         targetId: version.activityId,
         status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
-        // "Todos los obligados" significa los que ESTA convocatoria atiende: si es de una
-        // regional, no arrastra a la empresa entera a una jornada de otra ciudad. Es el mismo
-        // alcance con el que se derivan los proyectados, para que numerador y denominador
-        // hablen de la misma gente.
-        ...(offering.regionalId && input.allAssigned ? { user: { regionalId: offering.regionalId } } : {}),
+        // "Todos los obligados" significa los que ESTA jornada atiende: su TAJADA. Si no la
+        // declara, la sede; y si tampoco, la empresa entera. Es el mismo alcance con el que se
+        // derivan los proyectados, para que numerador y denominador hablen de la misma gente:
+        // convocar a mas de los proyectados es inflar el numerador de la cobertura.
+        ...(input.allAssigned ? { user: this.tajadaDeUsuarios(offering) } : {}),
         ...(input.allAssigned ? {} : { userId: { in: input.userIds } }),
       },
       select: { id: true, userId: true },
@@ -873,6 +1187,36 @@ export class OfferingsService {
     };
   }
 
+  /**
+   * La tajada declarada, resuelta a una audiencia.
+   *
+   * `undefined` (el campo no viaja) = no se toca lo que hubiera; `null` o sin facetas = atiende a
+   * todos los obligados. Reutiliza `AudiencesService.findOrCreate`, que reconoce el grupo por su
+   * FORMA: "los conductores" declarado aqui y marcado en Quienes son LA MISMA audiencia, no dos
+   * gemelas.
+   */
+  private async resolveAudience(
+    tenantId: string,
+    scope: AudienceRule | null | undefined,
+  ): Promise<{ audienceId: string | null } | Record<string, never>> {
+    if (scope === undefined) return {};
+    if (scope === null || ruleReachesEveryone(scope)) return { audienceId: null };
+    const audience = await this.audiences.findOrCreate(tenantId, scope);
+    return { audienceId: audience.id };
+  }
+
+
+  /**
+   * El filtro de personas de la tajada de una jornada, para usarlo dentro de otra consulta.
+   * Mismo criterio que `ProjectedAudienceService`: la audiencia declarada manda sobre la sede.
+   */
+  private tajadaDeUsuarios(offering: { audienceId: string | null; regionalId: string | null }): Prisma.UserWhereInput {
+    if (offering.audienceId) {
+      return { audienceMembers: { some: { audienceId: offering.audienceId, leftAt: null } } };
+    }
+    if (offering.regionalId) return { regionalId: offering.regionalId };
+    return {};
+  }
   private toDate(value: string | null | undefined): Date | null {
     return value ? new Date(`${value}T00:00:00-05:00`) : null;
   }

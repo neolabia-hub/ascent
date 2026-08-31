@@ -388,6 +388,9 @@ interface ActivityTypeSeedItem {
 }
 
 async function seedActivityTypes(tenantId: string): Promise<void> {
+  // El `config` de cada tipo es lo que GOBIERNA el formulario: a quien se le exige por defecto,
+  // como se dicta (y por tanto que campos pide su convocatoria), si se repite y si certifica.
+  // Es la razon de que crear una pildora no pregunte por instructor ni por lugar.
   const ACTIVITY_TYPES: ActivityTypeSeedItem[] = [
     {
       code: 'INDUCCION_GENERAL',
@@ -398,6 +401,7 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
         issuesCertificate: true,
         requiresBeforeHire: true,
         defaultAssignmentMode: 'ON_HIRE',
+        defaultOfferingKind: 'PERMANENT',
         participatesInPlan: false,
         isMicro: false,
       },
@@ -410,6 +414,7 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
         requiresAssessment: true,
         issuesCertificate: true,
         defaultAssignmentMode: 'BY_JOB_TITLE',
+        defaultOfferingKind: 'PERMANENT',
         participatesInPlan: false,
         isMicro: false,
       },
@@ -421,7 +426,16 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
       config: {
         requiresAssessment: true,
         issuesCertificate: true,
-        defaultRecurrenceMonths: 12,
+        // Se le exige a TODA la empresa, como la general, y ademas vuelve cada ano. Estaba sin
+        // modo de asignacion, asi que caia en MANUAL: la reinduccion anual de 116 personas
+        // quedaba dependiendo de que alguien se acordara de marcarla.
+        defaultAssignmentMode: 'ON_HIRE',
+        defaultOfferingKind: 'PERMANENT',
+        // CAMPANA ANUAL, no aniversario por persona: la reinduccion es una obligacion de
+        // calendario que cae sobre todos el mismo dia. Anclarla a "12 meses desde que cada quien
+        // la hizo" deja sin fecha a quien nunca hizo la induccion, y no es lo que pregunta el
+        // auditor: pregunta si se hizo LA REINDUCCION DE 2026.
+        defaultAnnualDate: '03-31',
         participatesInPlan: false,
         isMicro: false,
       },
@@ -434,6 +448,7 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
         requiresAssessment: true,
         requiresSurvey: true,
         issuesCertificate: true,
+        defaultOfferingKind: 'EVENT',
         participatesInPlan: true,
         isMicro: false,
       },
@@ -445,6 +460,7 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
       config: {
         requiresAssessment: true,
         issuesCertificate: true,
+        defaultOfferingKind: 'EVENT',
         participatesInPlan: false,
         isMicro: false,
       },
@@ -456,6 +472,7 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
       config: {
         requiresAssessment: false,
         issuesCertificate: false,
+        defaultOfferingKind: 'PERMANENT',
         participatesInPlan: false,
         isMicro: true,
       },

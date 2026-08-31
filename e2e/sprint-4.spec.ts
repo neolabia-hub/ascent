@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { loginAsAdmin, unique } from './helpers';
+import { elegirEnCombo, loginAsAdmin, unique } from './helpers';
 
 /**
  * E2E del Sprint 4 (Definition of Done de la experiencia del aprendiz):
@@ -50,6 +50,7 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
   // 2. Actividad de tipo Pildora con esa leccion, publicada.
   await page.goto('/contenido-formativo');
   await page.getByRole('button', { name: 'Nueva actividad' }).click();
+  await page.locator('#a-code-open').click();
   await page.locator('#a-code').fill(`S4_${suffix}`);
   await page.locator('#a-name').fill(pillName);
   await page.locator('#a-type').selectOption({ label: 'Pildora' });
@@ -73,7 +74,7 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(page.getByText('Contenido agregado')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Publicar version' }).click();
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
   await expect(page.getByText('Version 1 publicada')).toBeVisible();
 }
@@ -88,7 +89,7 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     // 3. Convocatoria PERMANENTE: es lo que permite que la persona la empiece por su cuenta.
     await page.goto('/convocatorias');
     await page.getByRole('button', { name: 'Nueva convocatoria' }).click();
-    await page.locator('#o-version').selectOption({ label: `${pillName} (v1)` });
+    await elegirEnCombo(page, 'o-version', pillName);
     await page.locator('#o-kind').selectOption('PERMANENT');
     await page.locator('#o-modality').selectOption('VIRTUAL');
     await page.getByRole('button', { name: 'Crear convocatoria' }).click();
@@ -112,9 +113,14 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
 
     // 5. Sus pendientes. La pildora esta ahi y se puede empezar sin que nadie lo inscriba.
     await page.goto('/hoy');
-    const card = page.locator('article').filter({ hasText: pillName }).first();
+    /*
+      La biblioteca es de CARATULAS (Decision #89): la tarjeta entera es el boton y no hay un
+      "Empezar" dentro de ella. Antes esto era un <article> con su boton; ahora se pulsa la
+      caratula, que es el mismo gesto que hace la gente en el telefono.
+    */
+    const card = page.getByRole('button').filter({ hasText: pillName }).first();
     await expect(card).toBeVisible({ timeout: 20_000 });
-    await card.getByRole('button', { name: /Empezar|Continuar/ }).click();
+    await card.click();
     await page.waitForURL('**/aprender/**', { timeout: 20_000 });
     await expect(page.getByText(pillName)).toBeVisible();
 

@@ -157,8 +157,25 @@ export class RequirementEngineService {
     tenantId: string,
     options: { userIds?: string[]; ruleId?: string },
   ): Promise<{ created: number; cyclesOpened: number }> {
+    /**
+     * Las reglas con disparador PLAN NO se materializan aqui (Decision #76).
+     *
+     * Guardan A QUIENES se le va a exigir una capacitacion del plan —que es una decision del
+     * analista y hay que poder consultarla antes de aprobar— pero no generan nada por su cuenta:
+     * las obligaciones nacen una sola vez, al aprobar el renglon, con el vencimiento del mes.
+     *
+     * Si generaran, pasarian las dos cosas que este producto no puede permitirse: cada persona
+     * tendria DOS obligaciones de la misma formacion con dos vencimientos que compiten, y quien
+     * ingresara en septiembre entraria en la jornada de marzo, que es exactamente lo que la regla
+     * de oro 2 existe para impedir.
+     */
     const rules = await db.assignmentRule.findMany({
-      where: { active: true, ...(options.ruleId ? { id: options.ruleId } : {}), audience: { active: true } },
+      where: {
+        active: true,
+        trigger: { not: 'PLAN' },
+        ...(options.ruleId ? { id: options.ruleId } : {}),
+        audience: { active: true },
+      },
     });
 
     const created: CreatedAssignment[] = [];
@@ -186,6 +203,10 @@ export class RequirementEngineService {
       where: {
         audienceId: rule.audienceId,
         leftAt: null,
+        // "Solo a quien entre desde ahora": el requisito no alcanza a quien ya estaba en la
+        // audiencia antes de esa fecha. Es lo que permite estrenar el sistema sin dejarle 116
+        // inducciones pendientes a gente que ya las hizo en papel hace anos.
+        ...(rule.appliesFrom ? { joinedAt: { gte: rule.appliesFrom } } : {}),
         ...(userIds ? { userId: { in: userIds } } : {}),
       },
       select: { userId: true, joinedAt: true, user: { select: { hiredAt: true } } },
@@ -338,22 +359,28 @@ export class RequirementEngineService {
       select: { id: true, email: true },
     });
 
-    for (const user of users) {
-      const items = byUser.get(user.id) ?? [];
-      const titles = items.map((i) => titleById.get(i.targetId) ?? 'Actividad formativa').slice(0, 5);
-      const extra = items.length > titles.length ? ` y ${items.length - titles.length} mas` : '';
-      await this.notifications.notify(tenantId, {
-        eventType: 'ASSIGNMENT_CREATED',
-        recipientUserId: user.id,
-        recipientEmail: user.email,
-        subject: items.length === 1 ? 'Tienes una formacion asignada' : `Tienes ${items.length} formaciones asignadas`,
-        body: `Se te asigno: ${titles.join(', ')}${extra}.`,
-        // A la FORMACION concreta cuando es UNA. Si el ciclo asigno varias de golpe no hay una
-        // sola a la que llevar, y el aviso lleva a Mi formacion, que es donde estan todas.
-        referenceType: 'activities',
-        referenceId: items.length === 1 ? (items[0]?.targetId ?? null) : null,
-      });
-    }
+    // UN SOLO viaje para todos los avisos. Uno por uno costaba una transaccion con `set_config`
+    // por persona, y exigir una formacion a toda la empresa se iba a mas de 40 segundos: la
+    // pantalla parecia colgada y el resultado solo aparecia al salir y volver.
+    await this.notifications.notifyMany(
+      tenantId,
+      users.map((user) => {
+        const items = byUser.get(user.id) ?? [];
+        const titles = items.map((i) => titleById.get(i.targetId) ?? 'Actividad formativa').slice(0, 5);
+        const extra = items.length > titles.length ? ` y ${items.length - titles.length} mas` : '';
+        return {
+          eventType: 'ASSIGNMENT_CREATED' as const,
+          recipientUserId: user.id,
+          recipientEmail: user.email,
+          subject: items.length === 1 ? 'Tienes una formacion asignada' : `Tienes ${items.length} formaciones asignadas`,
+          body: `Se te asigno: ${titles.join(', ')}${extra}.`,
+          // A la FORMACION concreta cuando es UNA. Si el ciclo asigno varias de golpe no hay una
+          // sola a la que llevar, y el aviso lleva a Mi formacion, que es donde estan todas.
+          referenceType: 'activities',
+          referenceId: items.length === 1 ? (items[0]?.targetId ?? null) : null,
+        };
+      }),
+    );
   }
 
   private async resolveTargetTitles(db: TenantPrisma, targetIds: string[]): Promise<Map<string, string>> {

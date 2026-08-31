@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { loginAsAdmin, unique } from './helpers';
+import { elegirEnCombo, loginAsAdmin, unique } from './helpers';
 
 /**
  * PUBLICAR UNA VERSION NUEVA NO ACTUALIZA SOLO LA CONVOCATORIA — y hasta esta prueba tampoco
@@ -25,6 +25,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
 
   await page.goto('/contenido-formativo');
   await page.getByRole('button', { name: 'Nueva actividad' }).click();
+  await page.locator('#a-code-open').click();
   await page.locator('#a-code').fill(`VER_${suffix}`);
   await page.locator('#a-name').fill(`${name} ${suffix}`);
   await page.locator('#a-type').selectOption({ label: 'Induccion general' });
@@ -45,7 +46,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(page.getByText('Contenido agregado')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Publicar version' }).click();
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
   await expect(page.getByText('Version 1 publicada')).toBeVisible();
 }
@@ -61,7 +62,7 @@ test.describe('La convocatoria y la version vigente', () => {
     // 1. Convocatoria sobre la v1, publicada.
     await page.goto('/convocatorias');
     await page.getByRole('button', { name: 'Nueva convocatoria' }).click();
-    await page.locator('#o-version').selectOption({ label: `${activityName} (v1)` });
+    await elegirEnCombo(page, 'o-version', activityName);
     await page.locator('#o-kind').selectOption('EVENT');
     await page.locator('#o-modality').selectOption('PRESENCIAL');
     await page.locator('#o-date').fill('2026-05-12');
@@ -79,9 +80,9 @@ test.describe('La convocatoria y la version vigente', () => {
 
     // 2. Se publica la v2 de la misma formacion.
     await page.goto(activityUrl);
-    await page.getByRole('button', { name: 'Nueva version' }).click();
+    await page.getByRole('button', { name: 'Editar el contenido' }).click();
     await expect(page.getByText('Version 2 creada en borrador')).toBeVisible();
-    await page.getByRole('button', { name: 'Publicar version' }).click();
+    await page.getByRole('button', { name: 'Publicar cambios' }).click();
     await page.getByRole('button', { name: 'Publicar y congelar' }).click();
     await expect(page.getByText('Version 2 publicada')).toBeVisible();
 

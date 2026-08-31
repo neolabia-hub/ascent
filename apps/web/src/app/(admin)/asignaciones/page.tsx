@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardCheck, Grid3x3, Plus, Search, Target, Users } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import { listCatalog, type CatalogRow } from '@/lib/admin-api';
@@ -51,6 +51,8 @@ const TRIGGER_LABEL: Record<RuleTrigger, string> = {
   ON_HIRE: 'Al ingresar a la empresa',
   ON_JOIN: 'Al entrar a la audiencia',
   SCHEDULED: 'Programado / recurrente',
+  // No dispara nada: guarda a quienes, y la obligacion nace al aprobar el renglon (Decision #76).
+  PLAN: 'Cuando lo programe el plan anual',
 };
 
 const ASSIGNMENT_STATUS: Record<AssignmentStatus, { kind: StatusPillKind; label: string }> = {
@@ -59,6 +61,9 @@ const ASSIGNMENT_STATUS: Record<AssignmentStatus, { kind: StatusPillKind; label:
   COMPLETED: { kind: 'ok', label: 'CUMPLIDA' },
   OVERDUE: { kind: 'danger', label: 'VENCIDA' },
   WITHDRAWN_LEFT_AUDIENCE: { kind: 'neutral', label: 'RETIRADA' },
+  // Se distingue de la anterior a proposito: "retirada" a secas deja sin respuesta la pregunta que
+  // hace la persona —"me asignaron esto y ya no esta"—, y aqui la respuesta existe y es concreta.
+  WITHDRAWN_PLAN_ITEM_CANCELLED: { kind: 'neutral', label: 'RENGLON CANCELADO' },
   WAIVED: { kind: 'neutral', label: 'EXIMIDA' },
 };
 
@@ -101,17 +106,42 @@ export default function AsignacionesPage() {
     void listCatalog('services').then((rows) => setServices(rows.filter((row) => row.active)));
   }, []);
 
+  /**
+   * SOLO SE PINTA LA ULTIMA RESPUESTA.
+   *
+   * Sin este guardia hay una carrera que empeora con el tamano de la base: al entrar a
+   * Obligaciones sale una peticion SIN filtro que, con miles de filas, tarda; se escribe en el
+   * buscador y sale otra, filtrada, que vuelve enseguida; y despues aterriza la primera y
+   * **pisa** el resultado. La pantalla acaba mostrando filas que no corresponden a lo que se
+   * busco, sin ningun error a la vista. Lo destapo el e2e cuando la base de desarrollo crecio.
+   */
+  const peticion = useRef(0);
+
   const loadTab = useCallback(async () => {
+    const miTurno = ++peticion.current;
+    const vigente = () => miTurno === peticion.current;
     try {
-      if (tab === 'requisitos') setRules(await listAssignmentRules());
-      if (tab === 'audiencias') setAudiences(await listAudiences());
-      if (tab === 'matriz') setMatrix(await getJobTitleMatrix());
+      if (tab === 'requisitos') {
+        const rows = await listAssignmentRules();
+        if (vigente()) setRules(rows);
+      }
+      if (tab === 'audiencias') {
+        const rows = await listAudiences();
+        if (vigente()) setAudiences(rows);
+      }
+      if (tab === 'matriz') {
+        const data = await getJobTitleMatrix();
+        if (vigente()) setMatrix(data);
+      }
       if (tab === 'obligaciones') {
-        const page = await listAssignments({ q: assignmentQuery.q || undefined, status: assignmentQuery.status || undefined });
-        setAssignments(page.items);
+        const page = await listAssignments({
+          q: assignmentQuery.q || undefined,
+          status: assignmentQuery.status || undefined,
+        });
+        if (vigente()) setAssignments(page.items);
       }
     } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar la informacion' });
+      if (vigente()) showToast({ kind: 'danger', title: 'No se pudo cargar la informacion' });
     }
   }, [tab, assignmentQuery, showToast]);
 
@@ -521,6 +551,7 @@ export default function AsignacionesPage() {
               <option value="OVERDUE">Vencidas</option>
               <option value="COMPLETED">Cumplidas</option>
               <option value="WITHDRAWN_LEFT_AUDIENCE">Retiradas</option>
+              <option value="WITHDRAWN_PLAN_ITEM_CANCELLED">Con el renglon cancelado</option>
               <option value="WAIVED">Eximidas</option>
             </Select>
           </div>

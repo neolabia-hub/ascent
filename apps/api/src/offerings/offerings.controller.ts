@@ -51,6 +51,13 @@ export class OfferingsController {
     return this.offerings.roster(id);
   }
 
+  /** A quien le falta ser citado a esta jornada: la pregunta "¿ya convoque a todos los mios?". */
+  @Get(':id/pendientes-por-convocar')
+  @RequirePermissions('offerings:read')
+  pendingInvites(@Param('id', ParseUUIDPipe) id: string) {
+    return this.offerings.pendingInvites(id);
+  }
+
   /** Que pasaria si se apuntara a la version vigente: a cuantos mueve y a cuantos no. */
   @Get(':id/version-upgrade')
   @RequirePermissions('offerings:read')

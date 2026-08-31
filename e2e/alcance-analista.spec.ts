@@ -20,6 +20,7 @@ const AJENO = 'Plan Estrategico de Seguridad Vial';
 async function createActivity(page: import('@playwright/test').Page, code: string, name: string, process: string) {
   await page.goto('/contenido-formativo');
   await page.getByRole('button', { name: 'Nueva actividad' }).click();
+  await page.locator('#a-code-open').click();
   await page.locator('#a-code').fill(code);
   await page.locator('#a-name').fill(name);
   await page.locator('#a-type').selectOption({ label: 'Induccion general' });

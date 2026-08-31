@@ -5,6 +5,7 @@ import {
   createAssignmentSchema,
   createAudienceSchema,
   listAssignmentsQuerySchema,
+  setActivityRequirementSchema,
   toggleJobTitleMatrixSchema,
   updateAssignmentRuleSchema,
   updateAudienceSchema,
@@ -98,6 +99,39 @@ export class AssignmentsController {
   @RequirePermissions('assignments:manage')
   toggleMatrix(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
     return this.assignments.toggleJobTitleMatrix(actor, toggleJobTitleMatrixSchema.parse(body));
+  }
+
+  // ──────────────── Exigirla desde la formacion ────────────────
+
+  /**
+   * Las tres rutas que hacen que el analista no tenga que salir de la formacion para decir a
+   * quien se le exige. Por debajo son audiencias y requisitos de siempre; la diferencia es que
+   * aqui se piden con las palabras del negocio y en una sola operacion.
+   */
+  @Get('activities/:activityId/requirements')
+  @RequirePermissions('assignments:manage')
+  activityRequirements(@Param('activityId', ParseUUIDPipe) activityId: string) {
+    return this.assignments.activityRequirements(activityId);
+  }
+
+  @Post('activities/:activityId/requirements')
+  @RequirePermissions('assignments:manage')
+  setActivityRequirement(
+    @CurrentUser() actor: AuthUser,
+    @Param('activityId', ParseUUIDPipe) activityId: string,
+    @Body() body: unknown,
+  ) {
+    const input = setActivityRequirementSchema.parse({ ...(body as object), activityId });
+    return this.assignments.setActivityRequirement(actor, input);
+  }
+
+  @Delete('activities/:activityId/requirements/:ruleId')
+  @RequirePermissions('assignments:manage')
+  retireActivityRequirement(
+    @CurrentUser() actor: AuthUser,
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+  ) {
+    return this.assignments.retireActivityRequirement(actor, ruleId);
   }
 
   // ─────────────────────────── Asignaciones ───────────────────────────

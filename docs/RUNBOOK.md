@@ -967,3 +967,270 @@ pnpm exec playwright test e2e/sprint-3.spec.ts -g "nace sola"
 ```
 
 Antes de dar por rota una prueba que falla en la suite completa, correrla sola. Si pasa, es carga.
+
+### 2026-08-30 — Una prueba que deja un REQUISITO vivo envenena a las demas
+
+Al escribir `e2e/quienes-desde-la-ficha.spec.ts` (exigir una formacion a un cargo), la prueba
+guardaba el requisito y **no lo retiraba**. Como es una regla permanente, cada persona creada
+despues con ese cargo nacia con esa obligacion: `sprint-3` crea una persona con el cargo
+`Director de Gestion Humana`, buscaba su fila por el nombre y leia la fecha de la obligacion
+EQUIVOCADA. Sintoma: `toContainText('30 de nov')` fallando con el texto de otra formacion.
+
+Es la misma leccion que ya estaba escrita en el paso 5 de `sprint-3`, ahora pagada dos veces:
+
+- **toda prueba que cree un requisito tiene que retirarlo al terminar** (y de paso comprueba que
+  retirar no borra: la obligacion queda `RETIRADA`);
+- si una corrida ya lo dejo suelto, se limpia en la base antes de volver a medir:
+
+```
+docker exec neo-pulse-postgres psql -U neopulse -d neopulse \
+  -c "UPDATE assignment_rules SET active=false WHERE id IN (SELECT r.id FROM assignment_rules r JOIN activities a ON a.id=r.target_id WHERE a.name LIKE '<nombre de la prueba>%');" \
+  -c "UPDATE assignments SET status='WITHDRAWN_LEFT_AUDIENCE' WHERE rule_id IN (SELECT r.id FROM assignment_rules r JOIN activities a ON a.id=r.target_id WHERE a.name LIKE '<nombre de la prueba>%') AND status IN ('PENDING','IN_PROGRESS','OVERDUE');"
+```
+
+Ojo con la magnitud: esa limpieza retiro **357 obligaciones** de tres corridas, porque la base de
+desarrollo acumula personas de decenas de pruebas anteriores con ese mismo cargo.
+
+### 2026-08-30 — Tras tocar `activity_types.config`, hay que volver a sembrar
+
+El `config` de cada tipo (a quien se le exige, como se dicta, si se repite) ahora **gobierna el
+formulario**. El seed lo actualiza en su `upsert`, pero una base ya sembrada conserva el config
+viejo: si al elegir "Reinduccion" la pantalla no dice "se le exige a toda la empresa", falta
+`pnpm db:seed` (es idempotente).
+
+### 2026-08-30 — El alcance del analista: `null` NO es lo mismo que `[]`
+
+`getAnalystScope()` devuelve **`null` cuando la persona no tiene alcance = ve TODO**, y **`[]`
+cuando esta acotada a ningun proceso = no ve NADA**. El servidor lo aplica bien
+(`scopeAllows: scope === null || scope.includes(id)`).
+
+Al llevar ese dato al panel se leyo al reves —`length === 0` como "ve todo"— y salieron dos
+efectos, uno visible y otro grave:
+
+- **Visible:** para el administrador (alcance `null`) el filtro reventaba dentro de un `.then()`
+  sin `catch`, la promesa quedaba rechazada en silencio y **el desplegable de procesos salia
+  vacio**. El sintoma en el e2e fue `selectOption` sin encontrar la opcion; la suite paso de 2,5
+  a **11,9 minutos** por los tiempos de espera de los fallos.
+- **Grave:** con la lectura invertida, a quien tiene alcance acotado a NINGUN proceso se le
+  habrian ofrecido todos.
+
+Reglas que quedan:
+
+- En el panel, el tipo es `string[] | null` y se compara `=== null`, nunca por longitud.
+- **Una cadena `.then()` que filtra o transforma datos lleva `catch`**: sin el, un fallo dentro
+  del callback no deja rastro y la pantalla se queda a medias sin decir nada.
+- Cuando un e2e tarde mucho mas de lo normal, sospechar de un fallo con espera larga antes que de
+  la maquina: 12 minutos en una suite de 2,5 es un sintoma, no lentitud.
+
+### 2026-08-30 — Un desplegable no puede sostener el catalogo (segunda vez)
+
+El plan traia las primeras **100** convocatorias y las pintaba todas en un `<select>`. Con **253**
+en la base, la recien publicada quedaba fuera de la pagina y el plan **no podia engancharla**. El
+sintoma, otra vez, es "no aparece", y la causa esta a dos capas.
+
+Es el mismo fallo que ya se pago con el orden de las fechas (`NULLS LAST`, 2026-08-27), y por eso
+la leccion sube de nivel: **cuando la lista puede crecer sin techo, se PREGUNTA al servidor; no se
+trae un trozo y se confia**. Ahora el picker del plan tiene busqueda (`q`) y la prueba escribe el
+nombre antes de elegir.
+
+Aviso para leer bien las corridas: la base de desarrollo acumula datos de decenas de e2e (253
+convocatorias, 43 borradores). Un fallo que aparece "de repente" sin que nadie tocara esa pantalla
+suele ser un tope alcanzado, no una regresion — y con un cliente real llega igual, solo que en dos
+anos en vez de en dos semanas.
+
+### 2026-08-30 — La respuesta lenta que pisa a la rapida
+
+En Obligaciones se escribia un nombre en el buscador y la tabla mostraba **otras filas**, sin
+ningun error a la vista. No era el filtro: era una **carrera**. Al entrar a la pestana sale una
+consulta SIN filtro que, con miles de asignaciones, tarda; se escribe y sale otra, filtrada, que
+vuelve enseguida; y despues aterriza la primera y **sobreescribe** el resultado.
+
+Se ve solo cuando la base pesa —por eso aparecio ahora y no en el Sprint 3—, y en produccion
+aparece igual, con el cliente delante y sin forma de explicarlo.
+
+**Regla:** toda pantalla que recargue segun lo que el usuario escribe o filtra tiene que
+**descartar las respuestas viejas**. En este proyecto se hace con un contador de peticion:
+
+```ts
+const peticion = useRef(0);
+const load = useCallback(async () => {
+  const miTurno = ++peticion.current;
+  const datos = await pedir();
+  if (miTurno === peticion.current) setDatos(datos);   // solo la ultima pinta
+}, [filtros]);
+```
+
+Las tres pantallas que ya lo necesitaban por tamano de datos: Obligaciones (arreglada), y a
+revisar cuando toque, el listado de convocatorias y el de personas.
+
+### 2026-08-31 — Crear un requisito "para toda la empresa" tarda, y se nota
+
+Con 459 personas en la base de desarrollo, crear un requisito sobre "toda la empresa" **tarda mas
+de 10 segundos**: inserta una obligacion y un aviso POR PERSONA dentro de la misma peticion. El
+e2e lo destapo fallando en el toast de confirmacion, que esperaba los 10 s por defecto.
+
+No es un fallo nuevo: es la deuda ya declarada de que el motor recorre persona por persona,
+asomando por primera vez. Con las 116 personas reales de Transprensa va sobrado; el dia que haya
+miles, ese trabajo tiene que salir de la peticion —los avisos a una cola, las obligaciones por
+lotes—.
+
+Sintoma a reconocer: guardar un requisito amplio parece que "no hace nada" y despues aparece todo
+de golpe. Antes de buscar el fallo en el codigo, mirar cuanta gente alcanza la audiencia.
+
+### 2026-08-31 — `String.replace` con `$` + comilla invertida en el reemplazo DUPLICA el archivo
+
+Editando un `.spec.ts` con un script de Node, el archivo paso de 320 a 638 lineas y quedo con
+todo su contenido dos veces. La causa no estaba en la logica del script:
+
+```js
+s.replace(viejo, '  await expect(page).toHaveURL(new RegExp(`${planUrl}$`));');
+//                                                                      ^^ aqui
+```
+
+En el segundo argumento de `String.prototype.replace`, `$` seguido de comilla invertida es un
+**patron de sustitucion** que significa "todo lo que hay ANTES de la coincidencia". El texto de
+reemplazo llevaba un `RegExp` cuyo `$` de fin de linea iba justo antes de la comilla que cierra la
+plantilla, asi que inserto el archivo entero. Lo mismo pasa con `$&`, `$'` y `$1`.
+
+**Regla:** cuando el reemplazo es texto literal —siempre, en estos scripts— usar la forma de
+FUNCION, que no interpreta nada:
+
+```js
+s.replace(viejo, () => nuevo);      // literal, sin sorpresas
+s.split(viejo).join(nuevo);         // igual de seguro para varias ocurrencias
+```
+
+Y comprobar el resultado por TAMANO antes de seguir (`wc -l`, o contar los `import` del archivo):
+una duplicacion no rompe la sintaxis en la linea que se toco, sino 300 lineas mas abajo, y el
+mensaje del compilador señala un sitio que esta perfecto.
+
+Los archivos del repo son **CRLF**. Un script que busca cadenas de varias lineas con `\n` no
+encuentra nada: hay que normalizar a `\n` al leer y volver a CRLF al escribir, o git marca el
+archivo entero como cambiado.
+
+### 2026-08-31 — `git checkout -- archivo` BORRA el trabajo sin confirmar (y como se recupero)
+
+Al intentar deshacer la duplicacion de arriba se ejecuto `git checkout -- e2e/sprint-3.spec.ts`.
+Eso no deshizo "lo del script": devolvio el archivo a HEAD y se llevo por delante **los cambios
+sin confirmar de la sesion anterior** (24 lineas en 7 bloques). No hay reflog para lo que nunca se
+indexo.
+
+En este repo eso es especialmente facil de provocar porque **hay trabajo sin confirmar casi
+siempre**: `git status` marca decenas de archivos modificados de sesiones anteriores.
+
+**Antes de tocar `git checkout`, `git restore` o `git stash` sobre un archivo, mirar si tiene
+cambios sin confirmar** (`git status --short <archivo>`). Si los tiene, la salida segura es copiar
+el archivo a un lado (`cp archivo archivo.bak`) y arreglarlo a mano, o `git stash push -- <archivo>`,
+que al menos deja algo que recuperar.
+
+**Como se recupero, que sirve la proxima vez:** las sesiones de Claude Code guardan la
+transcripcion completa en `~/.claude/projects/<proyecto>/<uuid>.jsonl`, un JSON por linea con cada
+llamada a herramienta y su resultado. Los cambios se habian hecho con `sed` y heredocs desde Bash,
+asi que los comandos —con el texto exacto— estaban ahi:
+
+```
+node -e "buscar en los .jsonl los bloques tool_use cuyo input mencione el archivo"
+```
+
+Se reconstruyeron los 7 bloques y se verifico que la reconstruccion era exacta con dos pruebas
+independientes: los numeros de linea que la sesion ANTERIOR habia impreso al correr Playwright
+(`sprint-3.spec.ts:297:5`) y los que se habian leido en ESTA sesion antes de perder el archivo.
+Si los dos coinciden despues de rehacerlo, la reconstruccion es fiel.
+
+### 2026-08-31 — `prisma generate` falla con EPERM si el stack de mirar esta levantado
+
+```
+EPERM: operation not permitted, rename '...\.prisma\client\query_engine-windows.dll.node.tmp...'
+```
+
+El proceso `node dist/main.js` de `scripts/mirar.ps1` tiene el motor de consultas abierto y Windows
+no deja renombrarlo. **Los tipos SI se regeneran** (`index.d.ts` se escribe antes), asi que
+`typecheck` pasa; lo que queda viejo es el binario, y el efecto se nota al ARRANCAR la API.
+
+Salida: bajar el stack de mirar, `pnpm --filter @neo-pulse/api run prisma:generate`, y volver a
+levantarlo con `.\scripts\mirar.ps1`.
+
+### 2026-08-31 — Una migracion que falla BLOQUEA todas las siguientes (P3009)
+
+Al aplicar `one_plan_per_year` fallo por duplicados (habia dos planes de 2026). Se limpio la causa
+y el segundo intento **no** volvio a correr: Prisma contesta
+
+```
+Error: P3009
+migrate found failed migrations in the target database, new migrations will not be applied.
+The `20260831100000_one_plan_per_year` migration started at ... failed
+```
+
+Prisma deja la fila del intento fallido en `_prisma_migrations` y se planta hasta que alguien diga
+que paso con ella. Como el fallo fue en la PRIMERA sentencia y Postgres corre cada migracion en su
+transaccion, la base quedo intacta y lo correcto es marcarla como revertida:
+
+```
+DATABASE_URL=<url del owner> npx prisma migrate resolve --rolled-back 20260831100000_one_plan_per_year
+DATABASE_URL=<url del owner> npx prisma migrate deploy
+```
+
+**`--rolled-back` solo si de verdad no quedo nada aplicado.** Si la migracion tiene varias
+sentencias y fallo a la mitad sin transaccion, hay que mirar el estado real antes: marcarla como
+revertida cuando SI aplico la mitad deja el esquema y el historial diciendo cosas distintas.
+
+Y de ahi la regla que ya estaba escrita en la propia migracion: **una migracion no deduplica
+datos**. Borrar el plan del ano de alguien no puede pasar dentro de un despliegue; que falle y
+obligue a decidir a mano es el comportamiento correcto.
+
+### 2026-08-31 — Los comentarios `/** */` NO son validos en `schema.prisma`
+
+```
+error: Error validating: This line is not a valid field or attribute definition.
+```
+...senalando la linea del campo, no la del comentario. Prisma admite `//` (comentario) y `///`
+(comentario de documentacion, que viaja al cliente generado); el bloque `/** */` de JS/TS no.
+El mensaje despista porque acusa a la linea siguiente, que esta perfecta.
+
+### 2026-08-31 — Los requisitos que deja el e2e se ACUMULAN, y acaban tumbando otras pruebas
+
+Sintoma: `alcance-analista` y `sprint-1 personas` fallan esperando el dialogo "Contrasena generada"
+al crear una persona. No es un fallo de esas pruebas ni de la pantalla de personas: es que **crear
+una persona tardaba mas de 10 segundos**.
+
+Causa: **67 reglas de asignacion activas**, casi todas sobre audiencias "Toda la empresa" —52 de
+ellas dejadas por corridas anteriores del e2e y 15 de pruebas a mano—. El motor evalua TODAS las
+reglas activas al dar de alta a alguien, asi que cada persona nueva disparaba 67 rondas —una
+obligacion y un aviso por regla— dentro de la misma peticion.
+
+Ya estaba escrita la leccion de que *una* prueba que deja un requisito vivo envenena a la
+siguiente; lo que faltaba es que **se suman**: cada corrida deja el suyo y a los dos dias la base
+tarda tanto que fallan pruebas que no tienen nada que ver con requisitos.
+
+Para verlo antes de buscar el fallo en el codigo:
+
+```sql
+select count(*) from assignment_rules where active;   -- si pasa de 20, es esto
+select a.name, au.name audiencia,
+       (select count(*) from assignments s where s.rule_id = r.id) obligaciones
+from assignment_rules r
+join activities a on a.id = r.target_id
+join audiences au on au.id = r.audience_id
+where r.active order by obligaciones desc limit 15;
+```
+
+**Se RETIRAN, no se borran.** Es la diferencia que importa: 154 de esas obligaciones ya tenian
+ejecucion, asi que borrarlas dejaria inscripciones apuntando a nada. Y retirar es justo lo que
+arregla el sintoma —el motor solo mira reglas ACTIVAS—, sin tocar una linea de historia:
+
+```sql
+UPDATE assignment_rules r SET active = false
+FROM activities a
+WHERE a.id = r.target_id AND r.active
+  AND a.name ~ '^(Induccion E2E|Version viva|Induccion automatica|Induccion S3|Capacitacion S3|Capacitacion desde el plan|Capacitacion S2|Formacion E2E) ';
+```
+
+De 67 a 15 reglas activas, y la suite paso de 17/19 a **19/19** sin tocar una linea de codigo.
+
+Regla: **si una prueba falla por un tiempo de espera y no por una asercion, mirar la basura de la
+base antes que el codigo.** Es la tercera vez que el sintoma es "lento" y la causa es
+"acumulacion", despues de los planes fantasma y de los desplegables recortados.
+
+Lo que falta para que deje de repetirse: cada spec que crea un requisito tiene que RETIRARLO al
+terminar, como ya hacen `quienes-desde-la-ficha` y el DoD del sprint 3. Las que lo dejan vivo son
+las de version y convocatoria.

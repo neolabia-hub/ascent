@@ -34,7 +34,9 @@ const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string
 
 const KIND_LABEL: Record<OfferingKind, string> = {
   EVENT: 'Sesion programada',
-  PERMANENT: 'Permanente (autoservicio)',
+  // "Autoservicio" suena a opcional y NO lo es: la obligacion sigue existiendo y venciendo. Lo
+  // unico que cambia es quien pulsa el boton de inscribir.
+  PERMANENT: 'Disponible: la hace cuando pueda',
   HYBRID: 'Mixta',
 };
 

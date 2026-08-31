@@ -6,6 +6,7 @@ import type {
   CreateTrainingPlanInput,
   DeletePlanInput,
   ListPlansQuery,
+  ReopenPlanInput,
   UpdatePlanItemInput,
   UpdateTrainingPlanInput,
 } from '@neo-pulse/shared';
@@ -14,6 +15,7 @@ import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { decidePlanDeletion, deletionNeedsJustification } from './plan-deletion.js';
+import { repartirObligaciones } from './plan-materialization.js';
 import { ProjectedAudienceService } from '../offerings/projected-audience.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { computePlanMetrics, type PlanItemFacts } from './plan-metrics.js';
@@ -25,6 +27,8 @@ interface PlanItemToMaterialize {
   status: PlanItemStatus;
   offering: {
     projectedCount: number | null;
+    /** La TAJADA de la jornada: sin ella, dos renglones del plan obligan a la misma gente. */
+    audienceId: string | null;
     regionalId: string | null;
     activityVersion: { activityId: string; activity: { name: string } };
   };
@@ -42,23 +46,54 @@ export class PlansService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async list(query: ListPlansQuery) {
+  /**
+   * El listado trae los INDICADORES de cada plan, no solo su nombre.
+   *
+   * Antes devolvia cuatro escalares y la pantalla los pintaba en una tabla, asi que para saber
+   * como va el ano habia que entrar. Con un plan por ano (Decision #71) la lista es corta —una
+   * fila por ano— y calcular sus numeros cuesta una consulta mas: la pregunta que trae a alguien
+   * a esta pantalla es "¿como vamos?", y ahora se contesta sin abrir nada.
+   *
+   * Se respeta el ALCANCE del analista igual que en la ficha: quien gestiona SST ve el
+   * cumplimiento de SUS renglones, no el de la empresa. Ensenarle el 62% global junto a sus ocho
+   * jornadas seria un numero que no puede explicar ni mover.
+   */
+  async list(actor: AuthUser, query: ListPlansQuery) {
+    const scoped = offeringScopeWhere(actor.scopeProcessIds);
     const plans = await this.prisma.scoped.trainingPlan.findMany({
       where: {
         ...(query.year ? { year: query.year } : {}),
         ...(query.status ? { status: query.status } : {}),
       },
-      orderBy: [{ year: 'desc' }, { name: 'asc' }],
-      include: { _count: { select: { items: true } } },
+      orderBy: [{ year: 'desc' }],
+      include: {
+        items: {
+          ...(Object.keys(scoped).length ? { where: { offering: scoped } } : {}),
+          select: { id: true, plannedMonth: true, status: true, projectedSnapshot: true },
+        },
+      },
     });
+
+    // Una sola pasada por TODOS los renglones visibles y despues se reparten: con un plan por ano
+    // son pocas filas, pero una consulta por plan volveria a ser el N+1 de siempre.
+    const facts = await this.factsFor(plans.flatMap((plan) => plan.items));
+    const factsById = new Map(facts.map((fact) => [fact.itemId, fact]));
+
     return plans.map((plan) => ({
       id: plan.id,
       year: plan.year,
       name: plan.name,
       status: plan.status,
+      goalPct: plan.goalPct,
       approvedAt: plan.approvedAt,
-      itemCount: plan._count.items,
+      itemCount: plan.items.length,
       updatedAt: plan.updatedAt,
+      metrics: computePlanMetrics(
+        plan.items.flatMap((item) => {
+          const fact = factsById.get(item.id);
+          return fact ? [fact] : [];
+        }),
+      ),
     }));
   }
 
@@ -98,8 +133,15 @@ export class PlansService {
                       select: {
                         id: true,
                         name: true,
+                        // La modalidad y el `config` del tipo viajan porque "otra jornada de esta
+                        // capacitacion" tiene que abrir el formulario con lo que ese tipo propone.
+                        // Antes el cajon lo buscaba en un `listActivities({ pageSize: 100 })`, asi
+                        // que a partir de la actividad 101 se armaba con los valores por defecto y
+                        // una capacitacion del plan dejaba de pedir fecha e instructor. Es la
+                        // tercera vez que un desplegable recortado produce un fallo (ver RUNBOOK).
+                        modality: true,
                         process: { select: { id: true, code: true, name: true } },
-                        activityType: { select: { code: true, name: true, colorHex: true } },
+                        activityType: { select: { code: true, name: true, colorHex: true, config: true } },
                       },
                     },
                   },
@@ -128,6 +170,17 @@ export class PlansService {
     };
   }
 
+  /**
+   * HAY UN PLAN POR ANO, y solo uno (Decision #71).
+   *
+   * El nombre formaba parte de la clave, asi que la misma empresa podia acabar con "Plan 2026",
+   * "Plan anual 2026" y "Plan SST 2026" a la vez, cada uno con su aprobacion, sus proyectados
+   * congelados y su propio cumplimiento. Ninguno estaba mal; el problema es que el auditor
+   * pregunta por EL plan de 2026 y habia tres numeros distintos.
+   *
+   * Cuando ya existe no se devuelve un error a secas: se devuelve CUAL es, para que la pantalla
+   * pueda ofrecer abrirlo. "Ya existe" sin decir donde obliga a salir a buscarlo.
+   */
   async create(actor: AuthUser, input: CreateTrainingPlanInput) {
     const tenantId = this.prisma.currentTenantId;
     const plan = await this.prisma.scoped.trainingPlan
@@ -137,15 +190,15 @@ export class PlansService {
           year: input.year,
           name: input.name,
           objective: input.objective ?? null,
-          goals: input.goals ?? null,
+          goalPct: input.goalPct ?? null,
           scope: input.scope ?? null,
           createdBy: actor.id,
           updatedBy: actor.id,
         },
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          throw new ConflictException({ code: 'DUPLICATE_PLAN', message: 'Ya existe un plan con ese nombre para el ano.' });
+          throw await this.yearTakenConflict(input.year);
         }
         throw error;
       });
@@ -203,15 +256,15 @@ export class PlansService {
           year: plan.status === 'DRAFT' ? input.year : undefined,
           name: input.name,
           objective: input.objective,
-          goals: input.goals,
+          goalPct: input.goalPct,
           scope: input.scope,
           updatedBy: actor.id,
           version: { increment: 1 },
         },
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          throw new ConflictException({ code: 'DUPLICATE_PLAN', message: 'Ya existe un plan con ese nombre para el ano.' });
+          throw await this.yearTakenConflict(input.year ?? plan.year);
         }
         throw error;
       });
@@ -221,7 +274,7 @@ export class PlansService {
       action: 'PLAN_UPDATED',
       resourceType: 'training_plans',
       resourceId: id,
-      oldValues: { name: plan.name, year: plan.year, objective: plan.objective, status: plan.status },
+      oldValues: { name: plan.name, year: plan.year, objective: plan.objective, goalPct: plan.goalPct, status: plan.status },
       newValues: input,
     });
     return this.getById(actor, id);
@@ -248,20 +301,30 @@ export class PlansService {
     if (!plan) throw new NotFoundException({ code: 'PLAN_NOT_FOUND' });
 
     const itemIds = plan.items.map((item) => item.id);
-    const assignments = itemIds.length
+    /**
+     * Todas las que este plan MIDE, hayan nacido de el o las haya adoptado (Decision #73). Se
+     * separan porque no se tratan igual al borrar: las que creo el plan desaparecen con el; las
+     * ADOPTADAS son del requisito que las creo y solo pierden el sello. Borrarlas seria quitarle
+     * a alguien una obligacion que sigue vigente por otro motivo.
+     */
+    const medidas = itemIds.length
       ? await this.prisma.scoped.assignment.findMany({
-          where: { planItemId: { in: itemIds }, source: 'PLAN' },
-          select: { id: true },
+          where: { planItemId: { in: itemIds } },
+          select: { id: true, source: true },
         })
       : [];
+    const assignments = medidas.filter((row) => row.source === 'PLAN');
+    const adoptadas = medidas.filter((row) => row.source !== 'PLAN');
     // "Empezar" es haber abierto la formacion: la inscripcion solo nace cuando la persona entra.
     // Con una basta para bloquear, pero se cuentan todas para poder DECIR cuantas son, que es lo
     // que hace entendible el rechazo en pantalla.
-    const started = assignments.length
-      ? await this.prisma.scoped.enrollment.count({ where: { assignmentId: { in: assignments.map((a) => a.id) } } })
+    const started = medidas.length
+      ? await this.prisma.scoped.enrollment.count({ where: { assignmentId: { in: medidas.map((a) => a.id) } } })
       : 0;
 
-    const verdict = decidePlanDeletion({ status: plan.status, obligations: assignments.length, started });
+    // El veredicto mira TODAS las que el plan obligo, adoptadas incluidas: a esa gente se le
+    // anuncio la formacion por culpa de este plan, y eso es lo que decide si se puede borrar.
+    const verdict = decidePlanDeletion({ status: plan.status, obligations: medidas.length, started });
     if (!verdict.allowed) {
       throw new ConflictException({ code: verdict.code, message: verdict.message });
     }
@@ -275,6 +338,13 @@ export class PlansService {
     await this.prisma.tx(async (tx) => {
       if (assignments.length > 0) {
         await tx.assignment.deleteMany({ where: { id: { in: assignments.map((a) => a.id) } } });
+      }
+      // Las adoptadas sobreviven: solo dejan de estar contadas por un plan que ya no existe.
+      if (adoptadas.length > 0) {
+        await tx.assignment.updateMany({
+          where: { id: { in: adoptadas.map((a) => a.id) } },
+          data: { planItemId: null },
+        });
       }
       // Los renglones caen con el plan (onDelete: Cascade en plan_items.plan_id).
       await tx.trainingPlan.delete({ where: { id } });
@@ -328,6 +398,7 @@ export class PlansService {
         status: true,
         scheduledDate: true,
         projectedCount: true,
+        audienceId: true,
         regionalId: true,
         activityVersion: { select: { activityId: true, activity: { select: { name: true } } } },
       },
@@ -338,11 +409,39 @@ export class PlansService {
     }
 
 
+    /**
+     * SI YA ESTA, NO ES UN ERROR: es que entro sola (Decision #75).
+     *
+     * Desde que programar una jornada de una capacitacion del plan la mete en el plan del ano
+     * cuando esta en borrador, quien la crea DESDE el plan se encuentra el renglon ya hecho. Antes
+     * eso era un 409 "esa convocatoria ya esta en el plan", que es cierto y es inutil: lo que la
+     * persona quiso hacer ya esta hecho.
+     *
+     * Se pone al dia el MES, porque es el unico dato que pudo elegir distinto: el servidor lo
+     * dedujo de la fecha y ella pudo pedir otro a proposito ("se dicta el 3 de abril pero cuenta
+     * para marzo"). Lo elegido a mano manda sobre lo deducido, siempre.
+     */
     const duplicate = await this.prisma.scoped.planItem.findFirst({
       where: { planId, offeringId: input.offeringId },
+      select: { id: true, plannedMonth: true },
     });
     if (duplicate) {
-      throw new ConflictException({ code: 'PLAN_ITEM_DUPLICATED', message: 'Esa convocatoria ya esta en el plan.' });
+      if (duplicate.plannedMonth !== input.plannedMonth) {
+        await this.prisma.scoped.planItem.update({
+          where: { id: duplicate.id },
+          data: { plannedMonth: input.plannedMonth },
+        });
+        await this.audit.record({
+          tenantId,
+          userId: actor.id,
+          action: 'PLAN_ITEM_UPDATED',
+          resourceType: 'plan_items',
+          resourceId: duplicate.id,
+          oldValues: { plannedMonth: duplicate.plannedMonth },
+          newValues: { plannedMonth: input.plannedMonth, motivo: 'El mes elegido manda sobre el deducido de la fecha.' },
+        });
+      }
+      return this.getById(actor, planId);
     }
 
     const item = await this.prisma.scoped.planItem.create({
@@ -398,6 +497,7 @@ export class PlansService {
 
     // Mover el mes es REPROGRAMAR, y se dice: el indicador debe distinguir lo que se movio.
     const rescheduled = input.plannedMonth !== undefined && input.plannedMonth !== item.plannedMonth;
+    const cancelling = input.status === 'CANCELLED' && item.status !== 'CANCELLED';
     const updated = await this.prisma.scoped.planItem.update({
       where: { id: itemId },
       data: {
@@ -406,14 +506,46 @@ export class PlansService {
         status: input.status ?? (rescheduled ? 'RESCHEDULED' : undefined),
       },
     });
+
+    /**
+     * CANCELAR EL RENGLON RETIRA LO QUE OBLIGABA.
+     *
+     * Cancelar solo lo sacaba del indicador —`computePlanMetrics` filtra los CANCELLED— y dejaba
+     * las obligaciones vivas: la jornada no se iba a dictar y su gente seguia con la formacion
+     * pendiente, venciendo el ultimo dia de ese mes. El unico que se enteraba era quien la tenia
+     * encima, y no tenia forma de hacerla.
+     *
+     * Se RETIRAN, no se borran (a diferencia de borrar el plan entero, donde el renglon desaparece
+     * y la asignacion no puede quedar apuntando a nada): a esas personas se les anuncio la
+     * formacion y ese aviso sigue en su bandeja. Sin la traza, "me asignaron X y no esta" no tiene
+     * respuesta — que es exactamente el caso que ya se investigo una vez.
+     *
+     * Lo ya EMPEZADO no se toca: ese avance es de la persona. Por eso solo caen las abiertas.
+     */
+    let withdrawn = 0;
+    if (cancelling) {
+      // Solo se retiran las que NACIERON del plan. Una adoptada (Decision #73) la creo un
+      // requisito que sigue vigente: cancelar la jornada no lo cancela a el, asi que la
+      // obligacion se queda y lo unico que pierde es el sello de este renglon.
+      const result = await this.prisma.scoped.assignment.updateMany({
+        where: { planItemId: itemId, source: 'PLAN', status: { in: ['PENDING', 'OVERDUE'] } },
+        data: { status: 'WITHDRAWN_PLAN_ITEM_CANCELLED' },
+      });
+      withdrawn = result.count;
+      await this.prisma.scoped.assignment.updateMany({
+        where: { planItemId: itemId, source: { not: 'PLAN' } },
+        data: { planItemId: null },
+      });
+    }
+
     await this.audit.record({
       tenantId: this.prisma.currentTenantId,
       userId: actor.id,
-      action: rescheduled ? 'PLAN_ITEM_RESCHEDULED' : 'PLAN_ITEM_UPDATED',
+      action: cancelling ? 'PLAN_ITEM_CANCELLED' : rescheduled ? 'PLAN_ITEM_RESCHEDULED' : 'PLAN_ITEM_UPDATED',
       resourceType: 'plan_items',
       resourceId: itemId,
       oldValues: { plannedMonth: item.plannedMonth, status: item.status },
-      newValues: input,
+      newValues: cancelling ? { ...input, withdrawnAssignments: withdrawn } : input,
     });
     return updated;
   }
@@ -455,7 +587,7 @@ export class PlansService {
     const tenantId = this.prisma.currentTenantId;
     const plan = await this.prisma.scoped.trainingPlan.findUnique({
       where: { id },
-      include: { items: { include: { offering: { select: { id: true, code: true, status: true, projectedCount: true, regionalId: true, activityVersion: { select: { activityId: true, activity: { select: { name: true } } } } } } } } },
+      include: { items: { include: { offering: { select: { id: true, code: true, status: true, projectedCount: true, audienceId: true, regionalId: true, activityVersion: { select: { activityId: true, activity: { select: { name: true } } } } } } } } },
     });
     if (!plan) throw new NotFoundException({ code: 'PLAN_NOT_FOUND' });
     if (plan.status !== 'DRAFT') throw new ConflictException({ code: 'PLAN_ALREADY_APPROVED', status: plan.status });
@@ -519,6 +651,47 @@ export class PlansService {
     return updated;
   }
 
+  /**
+   * REABRIR el plan del ano, con motivo.
+   *
+   * Cerrar es lo que convierte al plan en la evidencia del ano, y por eso la regla era que no se
+   * reabria. Con un plan por ano (Decision #71) esa regla dejo de ser estricta y paso a ser una
+   * TRAMPA: un plan cerrado —de ensayo o por error— se queda con el ano y ya no hay forma de
+   * planear 2026 ni de programar nada en el, porque el unico plan posible de ese ano esta cerrado.
+   *
+   * La salida no es dar un permiso de "control total" que se salte las reglas: es que la operacion
+   * EXISTA y deje rastro. Reabrir queda en la auditoria con quien, cuando y por que; borrar no
+   * dejaria nada, y por eso borrar sigue reservado al plan que nunca obligo a nadie.
+   *
+   * Vuelve a EN EJECUCION y no a BORRADOR: sus renglones ya materializaron obligaciones reales, y
+   * mandarlo a borrador diria que el ano esta sin aprobar cuando hay gente con la formacion encima.
+   */
+  async reopen(actor: AuthUser, id: string, input: ReopenPlanInput) {
+    const plan = await this.requirePlan(id);
+    if (plan.status !== 'CLOSED') {
+      throw new ConflictException({
+        code: 'PLAN_NOT_CLOSED',
+        message: 'Solo se reabre un plan cerrado.',
+        status: plan.status,
+      });
+    }
+
+    const updated = await this.prisma.scoped.trainingPlan.update({
+      where: { id },
+      data: { status: 'ACTIVE', updatedBy: actor.id, version: { increment: 1 } },
+    });
+    await this.audit.record({
+      tenantId: this.prisma.currentTenantId,
+      userId: actor.id,
+      action: 'PLAN_REOPENED',
+      resourceType: 'training_plans',
+      resourceId: id,
+      oldValues: { status: 'CLOSED' },
+      newValues: { status: 'ACTIVE', justification: input.justification },
+    });
+    return updated;
+  }
+
   // ─────────────────────────── Apoyo ───────────────────────────
 
   /**
@@ -532,8 +705,20 @@ export class PlansService {
     if (items.length === 0) return [];
     const itemIds = items.map((item) => item.id);
 
+    /**
+     * Se filtra por `plan_item_id` y YA NO por `source = PLAN` (Decision #73).
+     *
+     * Desde que el plan ADOPTA la obligacion que ya existe en vez de crear una segunda, la fila
+     * que el plan mide puede haber nacido de un requisito: su `source` es RULE y su
+     * `plan_item_id` es este renglon. Seguir filtrando por `source` dejaria fuera justo a la
+     * gente del caso normal y la cobertura marcaria 0% con todo el mundo capacitado.
+     *
+     * La regla de oro 2 sigue en pie, porque lo que la sostiene es el ESTAMPADO, no la columna
+     * `source`: solo entra en los numeros del plan lo que el plan marco al aprobar o al agregar
+     * el renglon. Lo que se asigne despues por fuera no lleva ese sello y no los mueve.
+     */
     const assignments = await this.prisma.scoped.assignment.findMany({
-      where: { planItemId: { in: itemIds }, source: 'PLAN' },
+      where: { planItemId: { in: itemIds } },
       select: { id: true, planItemId: true },
     });
     const itemByAssignment = new Map(assignments.map((a) => [a.id, a.planItemId as string]));
@@ -622,6 +807,29 @@ export class PlansService {
    * Idempotente a proposito (mira que asignaciones ya existen antes de crear): aprobar dos veces,
    * o agregar y reintentar, no puede duplicar obligaciones —duplicar corrompe todo indicador de
    * cumplimiento, Decision #35—.
+   *
+   * ADOPTA LA OBLIGACION QUE YA EXISTE en vez de crear una segunda (Decision #73).
+   *
+   * Antes creaba siempre la suya, y el solape no era un caso raro sino el CAMINO NORMAL: una
+   * capacitacion del plan obliga a marcar Quienes, y `projected.resolve` deriva a quien obliga el
+   * plan precisamente DE LOS YA OBLIGADOS. Es decir, el 100% de las veces. Cada persona acababa
+   * con dos obligaciones de la misma formacion, y de ahi salian tres danos:
+   *
+   *   - la formacion aparecia dos veces en sus pendientes, con dos vencimientos distintos;
+   *   - terminarla cerraba UNA (`closeAssignment` cierra la de vencimiento mas cercano) y la otra
+   *     quedaba viva hasta vencer: la persona figuraba incumplida despues de haber cumplido;
+   *   - y la peor: la inscripcion se ataba a esa misma obligacion mas cercana —normalmente la del
+   *     requisito—, asi que la cobertura del plan, que solo miraba ejecuciones colgadas de
+   *     obligaciones suyas, podia quedarse en 0% con toda la empresa capacitada.
+   *
+   * La obligacion de una persona con una formacion es UNA. Lo que el plan necesita no es una fila
+   * propia: es saber CUAL cuenta para el. Eso es `plan_item_id`, y por eso ahora la estampa sobre
+   * la que ya hay. `source` sigue diciendo quien la CREO; `plan_item_id`, que renglon la MIDE.
+   *
+   * La regla de oro 2 no se debilita, que es lo que habria que temer: sigue contando solo lo que
+   * el plan estampo, y estampar ocurre una vez —al aprobar o al agregar el renglon—. Quien entre
+   * en agosto no queda estampado y por tanto no entra en los numeros del plan de marzo, que es
+   * exactamente lo que esa regla existe para garantizar.
    */
   private async materialize(
     actor: AuthUser,
@@ -632,22 +840,62 @@ export class PlansService {
   ): Promise<number> {
     if (item.status === 'CANCELLED') return 0;
 
-    const people = await this.projected.resolve(item.offering.activityVersion.activityId, item.offering.regionalId);
+    const people = await this.projected.resolve(item.offering.activityVersion.activityId, { audienceId: item.offering.audienceId, regionalId: item.offering.regionalId });
     const dueAt = this.endOfMonth(planYear, item.plannedMonth);
 
-    const existing = await this.prisma.scoped.assignment.findMany({
-      where: { planItemId: item.id, userId: { in: people.userIds } },
-      select: { userId: true },
+    if (people.userIds.length === 0) {
+      await this.prisma.scoped.planItem.update({
+        where: { id: item.id },
+        data: { projectedSnapshot: item.offering.projectedCount ?? people.count },
+      });
+      return 0;
+    }
+
+    /**
+     * Que obligacion tiene ya cada uno con esta formacion. Se miran TODAS las suyas, no solo las
+     * de este renglon: es justo la que antes no se miraba y por eso nacia la segunda.
+     *
+     * Se incluyen las COMPLETADAS a proposito. `projected.resolve` ya las cuenta en el
+     * denominador —quien ya la hizo sigue siendo alguien a quien habia que capacitar—, asi que
+     * dejarlas fuera del numerador condenaria al renglon a no llegar nunca al 100%.
+     */
+    const suyas = await this.prisma.scoped.assignment.findMany({
+      where: {
+        userId: { in: people.userIds },
+        targetType: 'ACTIVITY',
+        targetId: item.offering.activityVersion.activityId,
+        status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE', 'COMPLETED'] },
+      },
+      select: { id: true, userId: true, planItemId: true },
+      orderBy: { assignedAt: 'asc' },
     });
-    const already = new Set(existing.map((row) => row.userId));
-    const recipients = people.userIds.filter((userId) => !already.has(userId));
+
+    const reparto = repartirObligaciones(item.id, people.userIds, suyas);
+    const recipients = reparto.crear;
 
     await this.prisma.scoped.planItem.update({
       where: { id: item.id },
       data: { projectedSnapshot: item.offering.projectedCount ?? people.count },
     });
 
-    if (recipients.length === 0) return 0;
+    // ADOPTAR: la obligacion es la misma, solo pasa a estar contada por este renglon. No se le
+    // toca el vencimiento: a esa persona ya se le dijo una fecha, y moverla por detras es
+    // exactamente lo que el plan no puede hacer.
+    let adoptadas = 0;
+    if (reparto.adoptar.length > 0) {
+      const result = await this.prisma.scoped.assignment.updateMany({
+        // `planItemId: null` otra vez en el WHERE y no solo en el reparto: entre leer y
+        // escribir puede haberla estampado otro renglon, y estampar dos veces la misma fila la
+        // quitaria del renglon que la conto primero.
+        where: { id: { in: reparto.adoptar }, planItemId: null },
+        data: { planItemId: item.id },
+      });
+      adoptadas = result.count;
+    }
+
+    // A quien NO tenia ninguna se le crea, que es el caso de una jornada agregada a un plan vivo
+    // para gente que todavia no estaba obligada.
+    if (recipients.length === 0) return adoptadas;
 
     await this.prisma.scoped.assignment.createMany({
       data: recipients.map((userId) => ({
@@ -668,7 +916,30 @@ export class PlansService {
       titles.push(item.offering.activityVersion.activity.name);
       perUser.set(userId, titles);
     }
-    return recipients.length;
+    // Solo se AVISA a quien recibe una obligacion NUEVA. A quien ya la tenia no se le manda nada:
+    // "se te asigno X" seria falso —ya estaba asignada— y ademas un aviso repetido por algo que no
+    // cambio para esa persona es como se ensena a ignorar la campana.
+    return recipients.length + adoptadas;
+  }
+
+  /**
+   * "Ya existe el plan de 2026" — Y CUAL ES.
+   *
+   * Se busca el que choca para poder devolver su id: la pantalla lo usa para ofrecer "Abrir el
+   * plan de 2026" en vez de dejar a alguien reescribiendo el nombre a ver si con otro entra.
+   */
+  private async yearTakenConflict(year: number): Promise<ConflictException> {
+    const existing = await this.prisma.scoped.trainingPlan.findFirst({
+      where: { year },
+      select: { id: true, name: true, status: true },
+    });
+    return new ConflictException({
+      code: 'PLAN_YEAR_TAKEN',
+      message: `Ya existe el plan de ${year}. Hay uno por ano: abrelo y agregale renglones.`,
+      year,
+      planId: existing?.id ?? null,
+      planName: existing?.name ?? null,
+    });
   }
 
   private async requirePlan(id: string) {

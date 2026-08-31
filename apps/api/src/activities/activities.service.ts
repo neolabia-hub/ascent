@@ -21,7 +21,9 @@ const ACTIVITY_LIST_SELECT = {
   modality: true,
   active: true,
   updatedAt: true,
-  activityType: { select: { id: true, code: true, name: true, colorHex: true } },
+  // El `config` viaja tambien en el listado: el formulario de convocatoria necesita saber, ANTES
+  // de pintarse, si la formacion elegida se dicta en jornada o queda disponible.
+  activityType: { select: { id: true, code: true, name: true, colorHex: true, config: true } },
   process: { select: { id: true, code: true, name: true } },
   currentVersionId: true,
   versions: {
@@ -196,6 +198,9 @@ export class ActivitiesService {
           modality: input.modality,
           tags: input.tags,
           active: input.active,
+          // La PORTADA no se congela con la version (Decision #88): una foto no es evidencia, asi
+          // que cambiarla no puede costar publicar la formacion de nuevo.
+          coverKey: input.coverKey,
           updatedBy: actor.id,
         },
       });
@@ -270,7 +275,7 @@ export class ActivitiesService {
         config: input.config as Prisma.InputJsonValue,
         lessonId: input.lessonId ?? null,
         contentPackageId: input.contentPackageId ?? null,
-        assessmentVersionId: input.assessmentVersionId ?? null,
+        assessmentId: input.assessmentId ?? null,
         surveyTemplateId: input.surveyTemplateId ?? null,
       },
     });
@@ -299,7 +304,7 @@ export class ActivitiesService {
         config: input.config as Prisma.InputJsonValue | undefined,
         lessonId: input.lessonId,
         contentPackageId: input.contentPackageId,
-        assessmentVersionId: input.assessmentVersionId,
+        assessmentId: input.assessmentId,
         surveyTemplateId: input.surveyTemplateId,
       },
     });

@@ -1,5 +1,12 @@
 import { audienceRuleSchema } from '@neo-pulse/shared';
-import { buildAudienceWhere, personMatchesRule, ruleReachesEveryone, singleJobTitleOf, type PersonProfile } from './audience-rule.js';
+import {
+  buildAudienceWhere,
+  personMatchesRule,
+  ruleReachesEveryone,
+  sameAudienceRule,
+  singleJobTitleOf,
+  type PersonProfile,
+} from './audience-rule.js';
 
 // Las reglas guardan ids reales del catalogo: los ids del ejemplo son UUID como los de verdad.
 const CARGO_CONDUCTOR = '11111111-1111-4111-8111-111111111111';
@@ -83,5 +90,39 @@ describe('regla de audiencia', () => {
     expect(singleJobTitleOf(rule({ jobTitleIds: [CARGO_CONDUCTOR], areaIds: [AREA_LOGISTICA] }))).toBeNull();
     expect(singleJobTitleOf(rule({ jobTitleIds: [CARGO_CONDUCTOR, CARGO_ANALISTA] }))).toBeNull();
     expect(singleJobTitleOf(rule({}))).toBeNull();
+  });
+});
+
+describe('reconocer la misma audiencia', () => {
+  it('el orden dentro de una faceta no la cambia', () => {
+    expect(
+      sameAudienceRule(
+        rule({ jobTitleIds: [CARGO_CONDUCTOR, CARGO_ANALISTA] }),
+        rule({ jobTitleIds: [CARGO_ANALISTA, CARGO_CONDUCTOR] }),
+      ),
+    ).toBe(true);
+  });
+
+  it('dos audiencias de toda la empresa son la misma', () => {
+    expect(sameAudienceRule(rule({}), rule({}))).toBe(true);
+  });
+
+  it('la misma lista en facetas distintas NO es la misma audiencia', () => {
+    // "los del area de Logistica" y "los de la regional de Neiva" pueden dar la misma gente hoy
+    // y gente distinta manana: lo que se compara es la regla, nunca su resultado.
+    expect(sameAudienceRule(rule({ areaIds: [AREA_LOGISTICA] }), rule({ regionalIds: [AREA_LOGISTICA] }))).toBe(false);
+  });
+
+  it('exigirla a un cargo desde la ficha reutiliza la audiencia de la matriz', () => {
+    const desdeLaMatriz = rule({ jobTitleIds: [CARGO_CONDUCTOR] });
+    const desdeLaFicha = rule({ match: 'ALL', jobTitleIds: [CARGO_CONDUCTOR] });
+    expect(sameAudienceRule(desdeLaMatriz, desdeLaFicha)).toBe(true);
+    expect(singleJobTitleOf(desdeLaFicha)).toBe(CARGO_CONDUCTOR);
+  });
+
+  it('cruzar (ALL) y sumar (ANY) los mismos criterios son audiencias distintas', () => {
+    const cruzando = rule({ match: 'ALL', jobTitleIds: [CARGO_CONDUCTOR], regionalIds: [REGIONAL_NEIVA] });
+    const sumando = rule({ match: 'ANY', jobTitleIds: [CARGO_CONDUCTOR], regionalIds: [REGIONAL_NEIVA] });
+    expect(sameAudienceRule(cruzando, sumando)).toBe(false);
   });
 });

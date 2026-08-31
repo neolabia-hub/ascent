@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, QuestionType } from '@prisma/client';
 import type { CreateQuestionInput, QuestionPayload } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
@@ -9,7 +9,7 @@ import { columnsToPayload, payloadToColumns } from './question-payload.js';
 interface ListQuestionsParams {
   categoryId?: string;
   q?: string;
-  qtype?: 'SINGLE' | 'MULTI' | 'TRUE_FALSE' | 'ESSAY';
+  qtype?: QuestionType;
   page: number;
   pageSize: number;
 }
@@ -127,7 +127,7 @@ export class QuestionsService {
         return {
           id: question.id,
           categoryId: question.categoryId,
-          categoryName: question.category.name,
+          categoryName: question.category?.name ?? null,
           versionCount: question._count.versions,
           currentVersionId: question.currentVersionId,
           qtype: current?.qtype ?? null,
@@ -156,7 +156,7 @@ export class QuestionsService {
     return {
       id: question.id,
       categoryId: question.categoryId,
-      categoryName: question.category.name,
+      categoryName: question.category?.name ?? null,
       currentVersionId: current.id,
       versionNumber: current.versionNumber,
       payload: columnsToPayload(current),
@@ -169,14 +169,22 @@ export class QuestionsService {
     };
   }
 
+  /**
+    * EL TEMA ES OPCIONAL (Decision #84). Solo hace falta para los bloques al azar, que sacan N
+    * preguntas de un tema. Exigirlo ponia una ceremonia delante de la primera pregunta del
+    * producto: salirse a crear una "categoria" antes de poder escribir nada.
+    */
   async create(actor: AuthUser, input: CreateQuestionInput) {
     const tenantId = this.prisma.currentTenantId;
-    const category = await this.prisma.scoped.questionCategory.findUnique({ where: { id: input.categoryId } });
-    if (!category) throw new NotFoundException({ code: 'CATEGORY_NOT_FOUND' });
+    const categoryId = input.categoryId ?? null;
+    if (categoryId) {
+      const category = await this.prisma.scoped.questionCategory.findUnique({ where: { id: categoryId } });
+      if (!category) throw new NotFoundException({ code: 'CATEGORY_NOT_FOUND' });
+    }
 
     const question = await this.prisma.tx(async (tx) => {
       const created = await tx.question.create({
-        data: { tenantId, categoryId: input.categoryId, active: true },
+        data: { tenantId, categoryId, active: true },
       });
       const version = await tx.questionVersion.create({
         data: {
@@ -196,7 +204,7 @@ export class QuestionsService {
       action: 'QUESTION_CREATED',
       resourceType: 'questions',
       resourceId: question.id,
-      newValues: { qtype: input.payload.qtype, categoryId: input.categoryId },
+      newValues: { qtype: input.payload.qtype, categoryId },
     });
     return this.getForEdit(question.id);
   }
@@ -234,6 +242,36 @@ export class QuestionsService {
       resourceType: 'questions',
       resourceId: id,
       newValues: { versionNumber: lastNumber + 1, qtype: payload.qtype },
+    });
+    return this.getForEdit(id);
+  }
+
+  /**
+   * CAMBIAR EL TEMA no es cambiar la pregunta.
+   *
+   * Por eso NO crea una version: el enunciado, las opciones y la respuesta correcta siguen
+   * siendo exactamente los que respondio quien la respondio. Lo unico que se mueve es de que
+   * monton la sacan los bloques al azar, y eso es archivar, no revisar.
+   */
+  async setCategory(actor: AuthUser, id: string, categoryId: string | null) {
+    const question = await this.prisma.scoped.question.findUnique({
+      where: { id },
+      select: { id: true, categoryId: true },
+    });
+    if (!question) throw new NotFoundException({ code: 'QUESTION_NOT_FOUND' });
+    if (categoryId) {
+      const category = await this.prisma.scoped.questionCategory.findUnique({ where: { id: categoryId } });
+      if (!category) throw new NotFoundException({ code: 'CATEGORY_NOT_FOUND' });
+    }
+    await this.prisma.scoped.question.update({ where: { id }, data: { categoryId } });
+    await this.audit.record({
+      tenantId: this.prisma.currentTenantId,
+      userId: actor.id,
+      action: 'QUESTION_RECATEGORIZED',
+      resourceType: 'questions',
+      resourceId: id,
+      oldValues: { categoryId: question.categoryId },
+      newValues: { categoryId },
     });
     return this.getForEdit(id);
   }

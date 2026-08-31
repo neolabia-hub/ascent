@@ -42,6 +42,28 @@ export class NotificationsService {
     }
   }
 
+
+  /**
+   * MUCHOS AVISOS DE UNA VEZ.
+   *
+   * `notify()` uno por uno cuesta, por cada persona, una llamada a `forTenant` —que abre su propia
+   * transaccion con el `set_config` de RLS— y un INSERT por canal. Con 459 personas eso son ~900
+   * transacciones y la peticion tardaba **mas de 40 segundos**: al exigir una induccion a toda la
+   * empresa, la pantalla parecia colgada y habia que salir y volver para ver el resultado.
+   *
+   * Aqui es UNA transaccion y un `createMany`. La bandeja del aprendiz lee de la misma tabla, asi
+   * que no cambia nada de lo que ve.
+   */
+  async notifyMany(tenantId: string, inputs: NotifyInput[]): Promise<void> {
+    if (inputs.length === 0) return;
+    try {
+      const data = inputs.flatMap((input) => this.buildRows(tenantId, input));
+      await this.prisma.forTenant(tenantId).notification.createMany({ data });
+    } catch (error) {
+      this.logger.error(`No se pudieron encolar ${inputs.length} notificaciones`, error as Error);
+    }
+  }
+
   /** Notifica a TODOS los usuarios del tenant con un permiso dado (p. ej. admins que deciden). */
   async notifyByPermission(tenantId: string, permissionCode: string, input: Omit<NotifyInput, 'recipientUserId'>): Promise<void> {
     const users = await this.prisma.forTenant(tenantId).user.findMany({

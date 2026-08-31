@@ -361,11 +361,22 @@ lo que HACEN:
 |---|---|---|---|
 | **Audiencia** | `audiences` | Un GRUPO definido por reglas (cargo, tipo de cargo, area, regional, tipo de contrato, servicio). Se recalcula solo: quien entra y cumple la regla, entra al grupo | **No.** Es el "a quienes" reutilizable |
 | **Requisito** | `assignment_rules` | La REGLA permanente: *a esta audiencia · esta formacion · disparada por X · vence en N dias · se repite cada M meses* | **Si**, y ademas hacia el futuro |
-| **Matriz** | `activity_job_titles` | La matriz de competencia: que formacion exige cada CARGO | Si, a traves del motor |
+| **Matriz** | *ninguna propia* | La matriz de competencia (que formacion exige cada CARGO) es una VISTA de los requisitos cuya audiencia tiene un unico cargo. Marcarla crea la audiencia "Cargo: X" y su requisito | Si, a traves del requisito |
 | **Obligacion** | `assignments` | El RESULTADO: una fila por persona y formacion, con vencimiento, estado y origen (`RULE`, `PLAN`, `MANUAL`) | Es lo unico que se mide |
 
-**Quienes**, en la ficha de la formacion, crea obligaciones `MANUAL`: el atajo para cuando no hay
-regla que lo cubra.
+> **Correccion (2026-08-30).** Este documento decia que la matriz vivia en `activity_job_titles`.
+> No es asi: `jobTitleMatrix()` se arma desde `assignment_rules` + `audiences`, y esa tabla **no la
+> lee nadie**. Se escribia desde la ficha de la formacion —donde tambien se pedian servicios y
+> regionales— y ninguna de las tres decidia nada. La ficha ya no las ofrece; la tabla sigue en el
+> esquema hasta que se decida la migracion que la borre.
+
+**Y todo eso se dice desde la formacion.** La pestana **Quienes** pregunta una sola vez a quien se
+le exige y por debajo busca o crea la audiencia y su requisito
+(`POST /activities/:id/requirements`). Nadie tiene que aprenderse las palabras "audiencia" y
+"requisito" para decir "esto lo hacen los conductores". La audiencia se reconoce por su FORMA
+(`sameAudienceRule`), asi que exigirlo aqui y marcarlo en la matriz por cargo producen LA MISMA
+fila, no dos gemelas. Ahi mismo se pueden crear obligaciones `MANUAL` sueltas, en segundo plano:
+no alcanzan a quien entre despues.
 
 **Y la convocatoria (`offerings`) es otra cosa**: la JORNADA —cuando, donde, quien dicta,
 modalidad, intensidad horaria, proyectados—. La inscripcion (`enrollments`) cuelga de ella.
@@ -385,13 +396,32 @@ registro de algo que paso y no un espejo del estado de hoy. Por eso pulsar un av
 llevar a una formacion que ya no esta entre las tuyas, y por eso la pantalla lo DICE en vez de
 quedarse muda (`(learner)/formacion/[activityId]`).
 
-### Lo que el tipo de formacion ya sabe y todavia nadie usa
+### El tipo de formacion gobierna el formulario (Decision #66)
 
-`activity_types.config` trae `defaultAssignmentMode` (`ON_HIRE` | `BY_JOB_TITLE` | `MANUAL`),
-`participatesInPlan`, `requiresBeforeHire`, `defaultRecurrenceMonths`… y **ninguna consulta lo
-lee**. Es la tercera semilla del proyecto que se guarda y no se aplica, despues de
-`analyst_scopes` y `norms.annual_hours_required`. Lo que deberia gobernar esta escrito en
-`docs/HANDOFF.md` (sesion del 2026-08-30) y es el trabajo que sigue.
+`activity_types.config` se sembro en el Sprint 1 y hasta el 2026-08-30 **no lo leia nadie**: todos
+los tipos preguntaban lo mismo, asi que crear una pildora pedia instructor y la induccion general
+obligaba a marcar a mano a las 116 personas de la empresa. Ahora lo lee un solo sitio
+—`apps/web/src/lib/activity-type.ts`— y desde ahi decide:
+
+| Campo del config | Que decide |
+|---|---|
+| `defaultAssignmentMode` | quien decide la audiencia: `ON_HIRE` = toda la empresa (no se ofrece marcar a nadie), `BY_JOB_TITLE` = la matriz de cargos con novedad justificada, `MANUAL` = lo marca el analista y es obligatorio |
+| `defaultOfferingKind` | como se dicta por defecto, y por tanto que campos pide su convocatoria (una jornada pide instructor, lugar y cupo; lo permanente no) |
+| `defaultRecurrenceMonths` | la recurrencia que viene propuesta (reinduccion: 12) |
+| `requiresBeforeHire` | ancla el vencimiento en la fecha de INGRESO (D1072) en vez de en "desde ahora" |
+| `issuesCertificate`, `requiresAssessment`, `participatesInPlan` | se enuncian al elegir el tipo, antes de crear nada |
+
+Al elegir el tipo, el alta ENUMERA lo que implica. La primera senal de que "induccion general"
+obliga a la empresa entera no puede ser que ya la obligo.
+
+**La trampa del anclaje, que la pantalla ahora avisa:** `ON_HIRE` cuenta desde la fecha de ingreso
+de cada persona. Para quien lleva cuatro anos en la empresa esa fecha ya paso y **la obligacion
+nace VENCIDA**. Es lo correcto para quien entra manana y un desastre para estrenar un requisito con
+la plantilla actual, y en pantalla las dos opciones se parecen demasiado como para no decirlo.
+
+Quedan dos semillas sin aplicar: `norms.annual_hours_required` (las 10 h/ano de BPM: la intensidad
+de las convocatorias se guarda y se muestra, pero no se suma contra nada) y las opciones de
+`ejecutada por`, que hoy son un enum del codigo y deberian ser catalogo del tenant.
 
 ---
 
@@ -402,15 +432,58 @@ metas, aprobacion, indicadores y un ciclo de vida. Sus renglones REFERENCIAN con
 no posee las capacitaciones, de modo que reprogramar una jornada o partirla en dos sedes no
 reescribe el plan.
 
+### Uno por ano
+
+`UNIQUE(tenant_id, year)`. Lo que identifica al plan es el **ano**; el nombre es un rotulo y se
+corrige. Hasta el 2026-08-31 la clave incluia el nombre, asi que la misma empresa podia tener
+"Plan 2026", "Plan anual 2026" y "Plan SST 2026" a la vez, cada uno con su aprobacion, sus
+proyectados congelados y su propio cumplimiento (Decision #71).
+
+Los planes **SST, PESV y BASC no son planes distintos**: son la vista por PROCESO del mismo plan
+anual, que ya existe como pestana y se exporta por separado para cada auditor.
+
+### Como entra una capacitacion al plan
+
+Crear una formacion de tipo "Capacitacion del plan" **no la mete en ningun plan**: el plan
+referencia convocatorias. Lo que la mete es un RENGLON, y para crearlo hay tres caminos, los tres
+al mismo sitio:
+
+| Desde | Que hace |
+|---|---|
+| El plan → "Agregar al plan" | crea la convocatoria y el renglon en un acto |
+| El plan → "Usar una que ya existe" | engancha una convocatoria creada desde Convocatorias |
+| **La ficha de la formacion** | dice si esta o no en el plan del ano, y ofrece programarla ahi |
+
+El ultimo es el que cierra el agujero que reporto el cliente: `activity_types.config` trae
+`participates_in_plan`, la pantalla promete "Cuenta para los indicadores del plan anual" y eso solo
+es cierto cuando hay renglon —los indicadores miran `assignments` con `source = PLAN`, regla de
+oro 2—. El MES no se automatiza porque es una decision del analista; lo que se arreglo es que el
+paso dejara de ser mudo (`components/modules/delivery/activity-plan-card.tsx`).
+
 ### Las dos tablas
 
 | Tabla | Que guarda |
 |---|---|
-| `training_plans` | El programa del ano: `year`, `name`, objetivo, metas, alcance, `status`, quien y cuando aprobo |
+| `training_plans` | El programa del ano: `year`, `name`, objetivo, `goal_pct` (la META), alcance, `status`, quien y cuando aprobo |
 | `plan_items` | Cada renglon: a que `offering` apunta, `planned_month`, su `status` y el `projected_snapshot` congelado |
 
-Un renglon **no** guarda a quien obliga: eso son `assignments` con `source = PLAN` y
-`plan_item_id` apuntando al renglon. Esa columna es la que sostiene la regla de oro 2.
+Un renglon **no** guarda a quien obliga: eso son `assignments` con `plan_item_id` apuntando al
+renglon. **Esa columna, y no `source`, es la que sostiene la regla de oro 2** (Decision #73): el
+plan ADOPTA la obligacion que la persona ya tenia —estampandole el renglon— en vez de crear una
+segunda, asi que la fila que el plan mide pudo nacer de un requisito y tener `source = RULE`.
+
+Los dos campos dicen cosas distintas y hay que leerlos asi:
+
+| Columna | Responde |
+|---|---|
+| `source` | quien CREO la obligacion (un requisito, el plan, una asignacion a mano) |
+| `plan_item_id` | que renglon del plan la MIDE (o ninguno) |
+
+Sin eso, el solape era el camino normal y no un caso raro: una capacitacion del plan obliga a
+marcar Quienes, y `projected.resolve` deriva a quien obliga el plan **de los ya obligados**. Cada
+persona acababa con dos obligaciones de la misma formacion, la formacion salia dos veces en sus
+pendientes, terminarla cerraba una y la otra vencia, y la cobertura del plan podia marcar 0% con
+todo el mundo capacitado porque la inscripcion se ataba a la otra.
 
 ### Los cuatro estados
 
@@ -430,8 +503,11 @@ BORRADOR ──aprobar──> APROBADO ──activar──> EN EJECUCION ──c
   No se aprueba un plan vacio ni uno con convocatorias en borrador: sin publicar no hay proyectados
   que congelar.
 - **EN EJECUCION** es el mismo plan, marcado como el que esta corriendo.
-- **CERRADO**: el ano termino. No admite renglones nuevos, no se edita, no se borra y **no se
-  reabre**: cerrar es exactamente lo que lo convierte en evidencia ante un auditor.
+- **CERRADO**: el ano termino. No admite renglones nuevos ni se edita: es lo que se le ensena al
+  auditor. Pero **si se REABRE** (CERRADO -> EN EJECUCION, con motivo auditado) y, si nunca obligo
+  a nadie, **tambien se borra**. La regla anterior —"cerrado no se borra ni se reabre"— era correcta
+  cuando podian convivir varios planes del mismo ano; con UNO POR ANO se volvio una trampa, porque
+  un plan cerrado por error se queda con el ano y no deja planear (Decision #72).
 
 ### Materializar: la operacion central
 
@@ -710,6 +786,7 @@ Honesta y priorizada:
 
 | Deuda | Impacto | Cuando resolverla |
 |---|---|---|
+| **El aprendiz no ve NADA de la jornada a la que lo convocan** | Alta para el uso real: se le inscribe en la sesion del 12 de marzo a las 8 a. m. en el Auditorio Norte, y en su tarjeta solo aparece el titulo y la fecha limite. Ni fecha de sesion, ni hora, ni lugar, ni instructor —tampoco en el correo de inscripcion, que solo lleva el codigo de la convocatoria—. Para una formacion presencial eso significa que la persona no sabe cuando ni donde presentarse | Con la asistencia (Sprint 5): son los mismos datos que hay que ensenar para que alguien se presente y firme |
 | Adaptador de almacenamiento en la nube | Bloquea el despliegue (a proposito) | Sprint de produccion |
 | El despachador de correo recorre todas las empresas cada 30 segundos | Irrelevante con una empresa; con decenas conviene una cola real | Cuando haya varias empresas |
 | La integracion continua nunca se ha ejecutado de verdad (no hay repositorio remoto) | El flujo esta escrito pero no probado | Al publicar el repositorio |
@@ -734,3 +811,140 @@ Honesta y priorizada:
 
 *Este documento se corrige cuando cambia la arquitectura. La historia de como se llego aqui esta
 en `docs/sprints/`.*
+
+### Cancelar un renglon: se retira lo que obligaba
+
+Cancelar (`PATCH /plans/items/:id` con `status: CANCELLED`) saca el renglon del indicador
+—`computePlanMetrics` filtra los cancelados antes de dividir— **y retira sus obligaciones
+abiertas**, dejandolas en `WITHDRAWN_PLAN_ITEM_CANCELLED`.
+
+Se **retiran, no se borran**, a diferencia de borrar el plan entero (ahi el renglon desaparece y la
+asignacion no puede quedar apuntando a nada): a esas personas se les anuncio la formacion y ese
+aviso sigue en su bandeja, asi que sin la traza la pregunta "me asignaron esto y ya no esta" no
+tiene respuesta. **Lo ya empezado no se toca** (`IN_PROGRESS`): ese avance es de la persona.
+
+El estado nuevo cae solo de todas las consultas porque lo abierto se pide siempre por lista blanca
+(`PENDING | IN_PROGRESS | OVERDUE`), nunca excluyendo los retirados uno a uno.
+
+### La META, y por que es un numero
+
+`training_plans.goal_pct` (1..100) es el porcentaje de CUMPLIMIENTO que la empresa se compromete a
+alcanzar en el ano. Antes era `goals`, texto libre, y por eso el plan ensenaba "62% de cumplimiento"
+sin nada contra que compararlo: un indicador sin meta deja al lector sin saber si eso esta bien, que
+es exactamente lo que el auditor viene a preguntar.
+
+Se mide contra el CUMPLIMIENTO (ejecutadas / programadas) y no contra la cobertura porque es el
+indicador del item 1.2.1 de la Res. 0312 —"¿se hizo el programa anual?"—. La cobertura se ensena al
+lado, sin meta: son dos preguntas distintas y darles una sola meta las confundiria.
+
+Es opcional: un plan puede armarse antes de que la meta este acordada, y la tarjeta lo dice ("Sin
+meta definida") en vez de inventarse un 100%.
+
+### Salir de un plan CERRADO
+
+Cerrar convierte el plan en la evidencia del ano, asi que durante meses fue un estado terminal:
+ni se editaba, ni se borraba, ni se reabria. Con UNO POR ANO (Decision #71) eso dejo de ser
+estricto y paso a ser una TRAMPA — el ano queda ocupado por un plan que no admite nada—, y por eso
+hay dos salidas, cada una para un caso distinto:
+
+| Situacion | Salida | Por que |
+|---|---|---|
+| Cerrado y **sin una sola obligacion** | **se borra** | No es evidencia de nada: es un ensayo. No hay registro de personas que proteger |
+| Cerrado y **ya obligo a gente** | **se reabre** (`POST /plans/:id/reopen`, motivo obligatorio) | Reabrir deja rastro en la auditoria; borrar no dejaria ninguno |
+
+Reabrir devuelve el plan a **EN EJECUCION**, no a BORRADOR: sus renglones ya materializaron
+obligaciones reales, y marcarlo como no aprobado diria que el ano esta sin aprobar mientras hay
+gente con la formacion encima. Va con `plans:approve`, el mismo permiso que cerrarlo.
+
+### Como entra la gente a una capacitacion del plan, y por que no es como en las demas
+
+Es la diferencia que mas confunde, asi que conviene verla en una tabla. La pregunta "a quienes" se
+hace siempre en el mismo sitio —la pestana Quienes de la formacion— y siempre guarda una AUDIENCIA
+y un REQUISITO. Lo que cambia es **quien dispara la obligacion**, y eso lo dice `trigger`:
+
+| Tipo de formacion | `trigger` | Quien crea la obligacion | Cuando vence |
+|---|---|---|---|
+| Induccion general, reinduccion | `ON_HIRE` | el motor, al ingresar cada persona | dias respecto al ingreso |
+| Induccion especifica | `ON_JOIN` | el motor, al entrar al cargo | dias desde que se le empieza a exigir |
+| Extraordinaria, pildora | `ON_JOIN` | el motor, al guardar el requisito | dias desde ahora |
+| **Capacitacion del plan** | **`PLAN`** | **el plan, al aprobar el renglon** | **ultimo dia del mes programado** |
+
+En los cuatro casos hay requisito y hay audiencia. En los tres primeros el requisito **dispara**: el
+motor lo evalua y crea las obligaciones, y sigue haciendolo con quien llegue despues. En el cuarto
+**no dispara**: guarda a quienes —que hay que poder consultar antes de aprobar el plan— y se queda
+quieto.
+
+Por que no puede disparar (Decision #76), con el caso concreto:
+
+> Se exige "Manejo defensivo" a los 20 conductores y se programa para marzo.
+>
+> **Antes:** al guardar Quienes nacian 20 obligaciones con vencimiento "a los 30 dias". Al aprobar
+> el plan nacian **otras 20** con vencimiento "31 de marzo". Cada conductor veia la formacion dos
+> veces en sus pendientes; al hacerla se le cerraba una y la otra vencia, asi que figuraba
+> incumplido despues de cumplir. Y si su inscripcion quedaba atada a la del requisito —la de
+> vencimiento mas cercano—, **la cobertura del plan no lo contaba**: podia marcar 0% con los 20
+> capacitados. Ademas, quien entrara de conductor en septiembre quedaba obligado a la jornada de
+> marzo, que la regla de oro 2 prohibe expresamente.
+>
+> **Ahora:** al guardar Quienes no nace ninguna obligacion —la pantalla lo dice: "20 personas
+> quedan en el alcance, sus obligaciones nacen al aprobar el plan"—. Al aprobar el plan nacen 20,
+> una por persona, con vencimiento el 31 de marzo. Y quien entre en septiembre no entra: el plan
+> congelo su gente al aprobarse.
+
+Y por eso la pestana Quienes **no pregunta** disparador, plazo ni recurrencia cuando la formacion
+es del plan: no son decisiones, son consecuencias. Los campos no se ocultan, se quitan — uno que se
+ve y no hace nada es peor que no tenerlo, porque quien lo rellena cree que decidio algo.
+
+El disparador lo fuerza el SERVIDOR (`setActivityRequirement`) ignorando lo que mande el cliente:
+es una consecuencia del tipo, y por una llamada directa a la API volveria a colarse un requisito
+que dispara solo.
+
+### Publicar el contenido y publicar la convocatoria: dos puertas, y solo una bloquea antes
+
+Es la pregunta que mas ralentiza el trabajo si se responde mal: **¿hace falta publicar la formacion
+para poder programarla?** No (Decision #77). Hacen falta las dos cosas para ABRIRLA a la gente, y
+esa es la unica puerta que se cierra antes de tiempo:
+
+| Se puede... | ¿Con el contenido en borrador? | Por que |
+|---|---|---|
+| Crear la convocatoria | **si** | reservar el sitio en el calendario no cita a nadie |
+| Meterla en el plan como renglon | **si** | un renglon de un plan en borrador no obliga a nadie |
+| **Publicar la convocatoria** | **no** | publicar CITA a la gente y CONGELA los proyectados |
+| Aprobar el plan | **no** | exige que todas sus convocatorias esten publicadas |
+
+El invariante que se defiende es **nadie queda citado a contenido que todavia puede cambiar**, y lo
+sostiene `publish()` —que ya lo comprobaba— no `create()`. La validacion al crear solo imponia un
+orden: primero termina el contenido, despues planea. Y el ano se planea al reves: en enero se
+aparta "Manejo defensivo, marzo, Cali" y el contenido se arma en febrero.
+
+En la pantalla, la pestana Convocatorias de una formacion sin publicar ya no es un muro: programa y
+avisa de hasta donde llega. Y el desplegable del plan marca las versiones en borrador
+(`(v1 — contenido en borrador)`): ofrecerlas sin decirlo seria peor que no ofrecerlas.
+
+### Que pasa cuando una jornada no se va a dictar
+
+Son dos acciones distintas y durante meses solo existio media (Decision #79):
+
+| Accion | Cuando | Que hace |
+|---|---|---|
+| **Quitar del plan** | plan en BORRADOR, sin obligaciones | borra el renglon. La convocatoria SIGUE existiendo |
+| **Cancelar la jornada** | siempre que la convocatoria sea cancelable | cancela la CONVOCATORIA, y eso arrastra todo lo demas |
+
+Cancelar la jornada es lo que ocurre de verdad, y llega hasta las personas:
+
+```
+cancelOffering(reason)
+  -> offering.status = CANCELLED
+  -> sus plan_items PLANNED -> CANCELLED        (sale del cumplimiento, ni a favor ni en contra)
+  -> assignments source=PLAN abiertas -> WITHDRAWN_PLAN_ITEM_CANCELLED
+  -> aviso a cada persona INSCRITA, con el motivo
+```
+
+Las dos ultimas lineas son nuevas. Antes cancelar movia dos estados y dejaba a la gente igual:
+quien estaba convocado seguia creyendo que tenia sesion el 12 de marzo, y quien tenia la obligacion
+del plan la conservaba viva, venciendo el ultimo dia de un mes cuya jornada ya no existia. **Lo ya
+EMPEZADO no se toca**: ese avance es de la persona.
+
+El motivo es obligatorio (minimo 10 caracteres) porque lo leen las personas citadas, no solo el
+auditor. Y el cajon dice ANTES de pulsar a cuantas se avisa y cuantas obligaciones se retiran: son
+tres consecuencias y ninguna se veia.

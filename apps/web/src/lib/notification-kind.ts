@@ -21,6 +21,8 @@ const KIND_BY_EVENT: Record<string, NotificationKind> = {
   ASSIGNMENT_CREATED: 'formacion',
   PLAN_ASSIGNMENTS_CREATED: 'formacion',
   ENROLLED: 'formacion',
+  // Le pasa a TU formacion, aunque la decision la tomara otro: la jornada a la que ibas ya no es.
+  OFFERING_CANCELLED: 'formacion',
   // Lo que tienes que hacer POR OTROS.
   APPROVAL_REQUESTED: 'gestion',
   ATTEMPTS_EXHAUSTED: 'gestion',
@@ -72,6 +74,13 @@ export function notificationHref(item: {
   if (eventType === 'OFFERING_PUBLISHED' && referenceType === 'offerings' && referenceId) {
     return `/convocatorias/${referenceId}`;
   }
+
+  /**
+   * La jornada cancelada lleva a MI FORMACION y no a la convocatoria: quien recibe este aviso es
+   * un aprendiz, y la pantalla de la convocatoria es del panel. Lo que necesita saber es que le
+   * queda pendiente ahora, no los datos de una sesion que ya no existe.
+   */
+  if (eventType === 'OFFERING_CANCELLED') return '/mi-formacion';
   if (eventType === 'ATTEMPTS_EXHAUSTED' && referenceType === 'activities' && referenceId) {
     return `/contenido-formativo/${referenceId}`;
   }

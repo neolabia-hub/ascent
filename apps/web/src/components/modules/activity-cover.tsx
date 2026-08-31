@@ -1,18 +1,27 @@
 'use client';
 
 import { cn } from '@/components/ui/cn';
+import { useMediaUrl } from '@/lib/use-media-url';
 
 /**
  * PORTADA de una formacion, dibujada por codigo.
  *
- * POR QUE NO HAY FOTOGRAFIAS: las plataformas de contenido (Netflix y compania) apoyan todo su
- * peso visual en el poster. Aqui no existe ese poster —una pildora sobre el uso del casco en
- * bodega no tiene cartel— y rellenar con fotos de banco de imagenes es peor que no poner nada:
- * no dice nada del contenido, se repite entre formaciones y envejece en un ano.
+ * DOS CAPAS, y el orden importa (Decision #88):
  *
- * La alternativa es una identidad GENERADA: el patron sale del id de la actividad, asi que la
- * misma formacion se ve siempre igual, en el catalogo del aprendiz y en el del administrador, y
- * entre sesiones. Tres familias de patron dan variedad de "portadas" sin caer en el ruido.
+ *   1. SIEMPRE hay una portada GENERADA. El patron sale del id de la actividad, asi que la misma
+ *      formacion se ve igual en el catalogo del aprendiz, en el del administrador y entre
+ *      sesiones: la gente acaba reconociendola por su color antes que por su nombre.
+ *   2. Si alguien SUBIO una foto, esa manda.
+ *
+ * Por que la generada es la base y no un error de carga: la pantalla "Hoy" es una biblioteca
+ * tipo plataforma de streaming, y ese lenguaje vive de la imagen. Si la foto fuera obligatoria,
+ * el primer dia media biblioteca estaria en gris —el analista de SST no es fotografo y no tiene
+ * banco de imagenes— y ademas habria un requisito estetico delante de publicar una capacitacion
+ * obligatoria. Con la generada por debajo, la pantalla funciona desde el minuto cero y la foto
+ * es una MEJORA, no un peaje.
+ *
+ * La foto no sustituye al degradado: se pinta ENCIMA. Asi, mientras la URL firmada llega —o si
+ * no llega—, no hay un rectangulo vacio, hay una portada.
  */
 
 export interface ActivityCoverProps {
@@ -23,8 +32,10 @@ export interface ActivityCoverProps {
   /** Texto corto sobre la portada (el tipo: "Pildora", "Induccion general"). */
   label?: string | null;
   className?: string;
-  /** `wide` para el heroe y la ficha; `tile` para las tarjetas del catalogo. */
-  variant?: 'tile' | 'wide';
+  /** `wide` para el heroe y la ficha; `tile` para las tarjetas del catalogo; `poster` vertical. */
+  variant?: 'tile' | 'wide' | 'poster';
+  /** La foto subida, si la hay. Se resuelve firmada y se pinta sobre la portada generada. */
+  coverKey?: string | null;
 }
 
 /** Hash determinista y estable entre sesiones (no se usa Math.random a proposito). */
@@ -37,7 +48,15 @@ function hash(seed: string): number {
   return Math.abs(value);
 }
 
-export function ActivityCover({ seed, colorHex, label, className, variant = 'tile' }: ActivityCoverProps) {
+export function ActivityCover({
+  seed,
+  colorHex,
+  label,
+  className,
+  variant = 'tile',
+  coverKey,
+}: ActivityCoverProps) {
+  const foto = useMediaUrl(coverKey);
   const base = colorHex && /^#[0-9a-fA-F]{6}$/.test(colorHex) ? colorHex : 'var(--brand-primary)';
   const noise = hash(seed);
   const family = noise % 3;
@@ -52,7 +71,7 @@ export function ActivityCover({ seed, colorHex, label, className, variant = 'til
     <div
       className={cn(
         'relative overflow-hidden rounded-lg',
-        variant === 'tile' ? 'aspect-[16/10]' : 'aspect-[21/9]',
+        variant === 'tile' ? 'aspect-[16/10]' : variant === 'poster' ? 'aspect-[2/3]' : 'aspect-[21/9]',
         className,
       )}
       style={{ backgroundColor: base }}
@@ -80,6 +99,26 @@ export function ActivityCover({ seed, colorHex, label, className, variant = 'til
         <rect width="100" height="60" fill={`url(#${id}-light)`} />
         <rect width="100" height="60" fill={`url(#${id}-foot)`} />
       </svg>
+
+      {/*
+        LA FOTO VA ENCIMA de la portada generada, no en su lugar: mientras la URL firmada llega
+        —o si no llega nunca— debajo sigue habiendo una portada y no un hueco gris.
+      */}
+      {foto ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={foto}
+          alt=""
+          className="absolute inset-0 h-full w-full animate-[ex-in-fade_400ms_ease-out] object-cover"
+        />
+      ) : null}
+      {/* Pie oscuro tambien sobre la foto: es lo que deja legible el titulo que va encima. */}
+      {foto ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"
+        />
+      ) : null}
 
       {label ? (
         <span className="absolute left-3 top-3 rounded-full bg-black/30 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.04em] text-white backdrop-blur-sm">

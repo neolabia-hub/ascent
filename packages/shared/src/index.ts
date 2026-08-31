@@ -1,3 +1,4 @@
+export { POINTS } from './constants/points.js';
 export { PERMISSIONS, SEED_ROLE_PERMISSIONS } from './constants/permissions.js';
 export type { PermissionCode } from './constants/permissions.js';
 
@@ -132,6 +133,7 @@ export {
   recurrenceSchema,
   createAssignmentRuleSchema,
   updateAssignmentRuleSchema,
+  setActivityRequirementSchema,
   toggleJobTitleMatrixSchema,
   assignmentStatusSchema,
   createAssignmentSchema,
@@ -145,6 +147,7 @@ export type {
   Recurrence,
   CreateAssignmentRuleInput,
   UpdateAssignmentRuleInput,
+  SetActivityRequirementInput,
   ToggleJobTitleMatrixInput,
   CreateAssignmentInput,
   WaiveAssignmentInput,
@@ -181,6 +184,7 @@ export {
   updatePlanItemSchema,
   approvePlanSchema,
   deletePlanSchema,
+  reopenPlanSchema,
   listPlansQuerySchema,
 } from './schemas/plans.js';
 export type {
@@ -190,6 +194,7 @@ export type {
   UpdatePlanItemInput,
   ApprovePlanInput,
   DeletePlanInput,
+  ReopenPlanInput,
   ListPlansQuery,
 } from './schemas/plans.js';
 
@@ -198,6 +203,7 @@ export {
   questionPayloadSchema,
   createQuestionSchema,
   reviseQuestionSchema,
+  setQuestionCategorySchema,
   createQuestionCategorySchema,
   listQuestionsQuerySchema,
   gradingPolicySchema,
@@ -206,6 +212,8 @@ export {
   assessmentSectionSchema,
   updateAssessmentDraftSchema,
   publishAssessmentSchema,
+  presentationSchema,
+  updatePresentationSchema,
 } from './schemas/assessments.js';
 export type {
   QuestionType,
@@ -213,4 +221,5 @@ export type {
   CreateQuestionInput,
   AssessmentSectionInput,
   UpdateAssessmentDraftInput,
+  PresentationInput,
 } from './schemas/assessments.js';

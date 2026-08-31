@@ -180,6 +180,45 @@ llegar al minimo—, que ademas elimina la barra suelta y el texto que hoy lo ac
 Distinguir: no es "sobrio contra vistoso", es **oficio contra decoracion**.
 
 ---
+
+## 8. Catalogo abierto: formacion que la persona elige, sin que nadie se la exija
+
+**La idea (planteada el 2026-08-30).** Que la empresa publique formaciones a las que **cualquiera
+pueda entrar por iniciativa propia** —para reforzar un tema o crecer hacia otra area—, en vez de
+que todo lo que existe sea algo que alguien le exigio.
+
+**Por que sale ahora:** hablando de *autoservicio*. Hoy autoservicio significa "te inscribes tu
+mismo **en algo que ya te exigen**": los pendientes del colaborador se arman desde sus
+OBLIGACIONES, asi que una formacion sin obligacion es invisible para el. La idea es el paso
+siguiente y es distinto: **elegir**, no solo pulsar el boton de algo ya decidido.
+
+**Que hay que construir, y no es poco.** El modelo aguanta la parte facil y no la que importa:
+
+- La **inscripcion sin obligacion ya funciona**: `enrollments.assignment_id` es opcional a
+  proposito, y al completar, el cierre busca una obligacion viva y si no hay, simplemente no
+  cierra ninguna. Nada se rompe.
+- Falta la **pantalla que no existe**: un catalogo navegable para el aprendiz. Hoy no hay ninguna
+  vista de "lo que hay disponible", solo "lo que me toca".
+- Falta decidir **que se publica ahi**: no todo el catalogo interno es apto (hay formaciones de un
+  cargo concreto, o con contenido que no se quiere abrir). Hace falta una marca por formacion
+  —"visible en el catalogo abierto"— y probablemente un alcance por area o cargo.
+- Y falta lo que de verdad cuesta: **que significa para los indicadores**. Una formacion elegida
+  por gusto NO puede mover la cobertura del plan ni la matriz de competencia (regla de oro 2). Se
+  mide aparte, como las extraordinarias.
+
+**Lo que hay que evitar:** convertirlo en "postularse". Postular a una vacante es seleccion, no
+formacion, y ya esta analizado en la **idea 3**, que ademas trae la mitad del camino hecho: las
+**rutas de aprendizaje** (`learning_paths`) estan modeladas desde el Sprint 0 y sin construir. Un
+"plan carrera" es una ruta que la persona elige, asi que estas dos ideas son la misma obra en dos
+tiempos: primero que se pueda elegir UNA formacion, despues que se pueda elegir una RUTA.
+
+**Recomendacion:** no antes del Sprint 6, y **no antes de que el piloto tenga contenido que
+sobre**. Un catalogo abierto con seis formaciones obligatorias dentro no es un catalogo: es la
+misma lista con otro nombre. Cuando haya contenido que de para elegir, el orden barato es:
+marca de "abierta" en la formacion -> catalogo del aprendiz -> ruta elegible (idea 3).
+
+---
+
 ## Resumen
 
 | Idea | Veredicto | Cuando |
@@ -190,6 +229,7 @@ Distinguir: no es "sobrio contra vistoso", es **oficio contra decoracion**.
 | Seleccion interna / vacantes | Fuera del LMS. Oportunidad comercial aparte | Producto propio |
 | Avisos segun lo fallado | Si, mejor relacion valor/esfuerzo | Con el Sprint 6 |
 | Repaso espaciado | Hecho | Sprint 4 |
+| Catalogo abierto (elegir formacion, no solo la exigida) | Si, pero despues: hoy el aprendiz solo ve lo que se le exige | Sprint 6+, y solo con contenido que sobre |
 | Notas privadas del aprendiz | No por ahora: encajan en cursos largos, no en piezas de 3-7 min asignadas | Si el piloto las pide |
 | Comentarios entre inscritos | No estan pedidos: lo que se pidio como "comentarios" ES la encuesta de satisfaccion, que ya esta en el Sprint 5 | — |
 | Estetica de auroras y gradientes | No: prohibido desde el Sprint 1 y contraproducente en un registro que va a auditoria. La salida es la firma "pulso", no la decoracion | — |

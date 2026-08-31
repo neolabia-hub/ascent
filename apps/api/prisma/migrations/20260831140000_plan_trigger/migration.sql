@@ -1,0 +1,16 @@
+-- LA OBLIGACION DE UNA CAPACITACION DEL PLAN LA DISPARA EL PLAN (Decision #76).
+--
+-- Un requisito es, por definicion, "una obligacion viva en el tiempo": nace al ingresar, al entrar
+-- a un grupo o por calendario, y sigue captando a quien llegue despues. Una capacitacion del plan
+-- no es eso. Pasa el mes que diga el plan y a la gente que el plan congelo al aprobarse.
+--
+-- Usar un requisito normal producia dos danos a la vez:
+--   - cada persona acababa con DOS obligaciones de la misma formacion —la del requisito y la del
+--     plan—, con dos vencimientos distintos que competian entre si;
+--   - y el requisito seguia obligando a quien ingresara en septiembre a la jornada de marzo, que
+--     es exactamente lo que la regla de oro 2 existe para impedir.
+--
+-- Con `PLAN` la regla sigue guardando A QUIENES —que es una decision del analista y hay que poder
+-- consultarla antes de aprobar el plan— pero el motor no la materializa: las obligaciones nacen
+-- una sola vez, al aprobar el renglon, con el vencimiento del mes.
+ALTER TYPE "RuleTrigger" ADD VALUE 'PLAN';

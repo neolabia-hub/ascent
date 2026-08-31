@@ -54,7 +54,7 @@ export type UpdateAudienceInput = z.infer<typeof updateAudienceSchema>;
 // ─────────────────────────── Requisito (regla de asignacion) ───────────────────────────
 
 export const assignmentTargetTypeSchema = z.enum(['ACTIVITY', 'PATH', 'CERTIFICATION']);
-export const ruleTriggerSchema = z.enum(['ON_JOIN', 'ON_HIRE', 'SCHEDULED']);
+export const ruleTriggerSchema = z.enum(['ON_JOIN', 'ON_HIRE', 'SCHEDULED', 'PLAN']);
 
 /**
  * Recurrencia del requisito (Decision #12). Dos anclajes, ambos reales en la operacion:
@@ -119,6 +119,79 @@ export const updateAssignmentRuleSchema = z.object({
 });
 export type UpdateAssignmentRuleInput = z.infer<typeof updateAssignmentRuleSchema>;
 
+/**
+ * EXIGIR UNA FORMACION, dicho desde la formacion misma.
+ *
+ * Es el mismo requisito de siempre —audiencia + regla— pero en UNA sola operacion, porque la
+ * secuencia anterior (ir a Asignaciones, crear una audiencia con nombre, volver, crear el
+ * requisito eligiendola de una lista) obliga al analista a aprenderse un vocabulario que no es
+ * suyo para decir algo tan simple como "esto lo hacen los conductores".
+ *
+ * La AUDIENCIA se busca o se crea sola a partir del alcance, y se reconoce por su FORMA, igual
+ * que hace la matriz por cargo: asi, exigir algo "a los conductores" desde aqui y marcarlo en la
+ * matriz son la misma fila, y no dos audiencias gemelas que despues nadie sabe cual mirar.
+ */
+export const setActivityRequirementSchema = z
+  .object({
+    activityId: z.string().uuid(),
+    /** Sin ninguna faceta = toda la empresa. La pantalla lo dice con esas palabras. */
+    scope: audienceRuleSchema,
+    /**
+     * ON_HIRE ancla en la fecha de ingreso (la induccion previa que exige D1072); ON_JOIN, en el
+     * momento en que se le empieza a exigir. SCHEDULED no se ofrece aqui: "cada N meses" se pide
+     * como recurrencia, que es como lo dice el negocio.
+     *
+     * PLAN es distinto de los tres: no dispara NADA. Lo pone el servidor cuando la formacion es
+     * del plan, y significa "esta regla guarda a quienes, y las obligaciones las crea el plan al
+     * aprobar el renglon" (Decision #76). El cliente no lo elige: se lo encuentra puesto.
+     */
+    trigger: z.enum(['ON_HIRE', 'ON_JOIN', 'PLAN']),
+    dueDaysAfterTrigger: z.number().int().min(-365).max(3650).default(0),
+    /** "Se repite cada N meses" (reinduccion). Null = una sola vez. */
+    everyMonths: z.number().int().min(1).max(120).nullable().default(null),
+    /**
+     * "Cada ano antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`, y la forma en que las
+     * empresas hacen de verdad la reinduccion: una CAMPANA anual, no un aniversario por persona.
+     *
+     * La diferencia importa al arrancar el sistema: con "cada 12 meses" la fecha de todos queda
+     * pegada al dia en que se subieron los usuarios —el mismo para 116 personas, que no es real—;
+     * con fecha fija, todos vencen el 31 de marzo, que es lo que el auditor pregunta ("¿hicieron
+     * la reinduccion 2026?").
+     */
+    fixedDate: z
+      .string()
+      .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Fecha MM-DD')
+      .nullable()
+      .default(null),
+    /**
+     * A QUIEN ALCANZA: `true` = solo a quien entre a la audiencia desde ahora; `false` (por
+     * defecto) = tambien a los que ya estan.
+     *
+     * Existe por la puesta en marcha. Al subir la plantilla, las inducciones que esa gente ya
+     * hizo en papel no pueden aparecerle como pendientes: eximir 116 veces no es una salida, y
+     * marcarlas cumplidas es mentir en el registro que despues mira el auditor.
+     */
+    soloNuevos: z.boolean().default(false),
+    /**
+     * La NOVEDAD: por que se cambia a quien se le exige.
+     *
+     * La pide la induccion especifica, donde el alcance lo dicta la matriz de cargos y apartarse
+     * de ella es una decision que alguien tendra que explicar en una auditoria. Queda en el
+     * registro junto al cambio.
+     */
+    reason: z.string().min(10).max(500).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.trigger === 'ON_HIRE' && value.dueDaysAfterTrigger > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dueDaysAfterTrigger'],
+        message: 'La induccion de ingreso vence ANTES de la fecha de ingreso (usa 0 o negativo).',
+      });
+    }
+  });
+export type SetActivityRequirementInput = z.infer<typeof setActivityRequirementSchema>;
+
 /** Matriz cargo -> actividad: la forma corta de declarar las inducciones especificas. */
 export const toggleJobTitleMatrixSchema = z.object({
   jobTitleId: z.string().uuid(),
@@ -137,6 +210,8 @@ export const assignmentStatusSchema = z.enum([
   'COMPLETED',
   'OVERDUE',
   'WITHDRAWN_LEFT_AUDIENCE',
+  /** El renglon del plan que la creo se cancelo. Ver `plans.service.updateItem`. */
+  'WITHDRAWN_PLAN_ITEM_CANCELLED',
   'WAIVED',
 ]);
 

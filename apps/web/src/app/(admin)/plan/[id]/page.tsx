@@ -3,18 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarRange, CheckCircle2, ClipboardList, Layers, Link2, Pencil, Plus, Rows3, Search, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarRange, CalendarX2, CheckCircle2, ClipboardList, Layers, Link2, Pencil, Plus, Rows3, RotateCcw, Search, ShieldCheck, Sparkles, Trash2, Unlink } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
   activatePlan,
   addPlanItem,
   adjustProjected,
   approvePlan,
+  cancelOffering,
   closePlan,
   deletePlan,
   getPlan,
   listOfferings,
+  listPlans,
   removePlanItem,
+  reopenPlan,
   updatePlan,
   updatePlanItem,
   type OfferingListItem,
@@ -23,6 +26,8 @@ import {
   type PlanItemStatus,
   type PlanStatus,
 } from '@/lib/delivery-api';
+import { readTypeConfig, type ActivityTypeConfig } from '@/lib/activity-type';
+import type { Modality } from '@/lib/catalog-api';
 import { formatDate, monthName, MONTHS } from '@/lib/format';
 import { NewOfferingDrawer } from '@/components/modules/delivery/new-offering-drawer';
 import { useCan } from '@/components/providers/session-provider';
@@ -34,6 +39,7 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Combo } from '@/components/ui/combo';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -70,6 +76,15 @@ const PLAN_STATUS: Record<PlanStatus, { kind: StatusPillKind; label: string }> =
   CLOSED: { kind: 'neutral', label: 'CERRADO' },
 };
 
+/** El estado de una convocatoria, con las mismas palabras que en su propia pantalla. */
+const OFFERING_BADGE: Record<string, { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' }> = {
+  DRAFT: { label: 'BORRADOR', tone: 'neutral' },
+  PUBLISHED: { label: 'PUBLICADA', tone: 'info' },
+  IN_PROGRESS: { label: 'EN CURSO', tone: 'warn' },
+  COMPLETED: { label: 'CERRADA', tone: 'ok' },
+  CANCELLED: { label: 'CANCELADA', tone: 'danger' },
+};
+
 const ITEM_STATUS: Record<PlanItemStatus, { kind: StatusPillKind; label: string }> = {
   PLANNED: { kind: 'neutral', label: 'PROGRAMADA' },
   EXECUTED: { kind: 'ok', label: 'EJECUTADA' },
@@ -93,6 +108,9 @@ interface ActivityGroup {
   processName: string;
   versionId: string;
   versionNumber: number;
+  /** Lo que decide que campos pide otra jornada de esta misma capacitacion. */
+  typeConfig: ActivityTypeConfig;
+  modality: Modality;
   items: PlanItemRow[];
   projected: number;
   trained: number;
@@ -123,6 +141,8 @@ function groupByActivity(items: PlanItemRow[]): ActivityGroup[] {
         processName: activity.process.name,
         versionId: item.offering.activityVersion.id,
         versionNumber: item.offering.activityVersion.versionNumber,
+        typeConfig: readTypeConfig(activity.activityType.config),
+        modality: activity.modality,
         items: [item],
         projected,
         trained: item.facts?.trained ?? 0,
@@ -162,16 +182,26 @@ export default function PlanDetallePage() {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   /** Cabecera y borrado: dos cajones porque son dos decisiones de distinto peso. */
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ year: '', name: '', objective: '', goals: '', scope: '', justification: '' });
+  const [editForm, setEditForm] = useState({ year: '', name: '', objective: '', goalPct: '', scope: '', justification: '' });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  /** Reabrir el ano cerrado. Pide motivo siempre: el auditor va a preguntar por que se movio. */
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
   const [offerings, setOfferings] = useState<OfferingListItem[]>([]);
+  /** Lo que se escribe para BUSCAR una convocatoria: la lista no cabe en un desplegable. */
+  const [offeringQuery, setOfferingQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<PlanView>('capacitacion');
 
   /** Cajon de crear la jornada desde el plan. `locked` = "otra jornada de esta misma". */
   const [newOpen, setNewOpen] = useState(false);
-  const [locked, setLocked] = useState<{ id: string; label: string } | null>(null);
+  const [locked, setLocked] = useState<{
+    id: string;
+    label: string;
+    config: ActivityTypeConfig;
+    modality: Modality;
+  } | null>(null);
   const [defaultMonth, setDefaultMonth] = useState<number | undefined>(undefined);
 
   /**
@@ -187,6 +217,9 @@ export default function PlanDetallePage() {
   /** Ajuste de proyectados: se abre desde la celda del renglon (Decision #56). */
   const [adjust, setAdjust] = useState<PlanItemRow | null>(null);
   const [adjustForm, setAdjustForm] = useState({ count: '', reason: '' });
+  /** Cancelar la jornada: es un hecho del mundo, y por eso pide motivo. */
+  const [cancelItem, setCancelItem] = useState<PlanItemRow | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   /** Camino secundario: enganchar una convocatoria que YA existe. */
   const [attachOpen, setAttachOpen] = useState(false);
@@ -208,9 +241,33 @@ export default function PlanDetallePage() {
     void load();
   }, [load]);
 
+  /**
+   * Los anos que YA tienen plan. Hacen falta para que el selector de ano del cajon de editar no
+   * ofrezca uno ocupado: hay un plan por ano (Decision #71) y elegirlo solo lleva a un rechazo.
+   * Falla en silencio a proposito — si no se pudieron traer, se ofrecen todos y contesta el
+   * servidor; un aviso de error aqui seria ruido en una pantalla que se abrio para otra cosa.
+   */
+  const [anosOcupados, setAnosOcupados] = useState<number[]>([]);
   useEffect(() => {
-    void listOfferings({ pageSize: 100 }).then((result) => setOfferings(result.items));
+    void listPlans()
+      .then((rows) => setAnosOcupados(rows.map((row) => row.year)))
+      .catch(() => undefined);
   }, []);
+
+  /**
+   * Las convocatorias que se ofrecen para enganchar al plan: las que CASAN con lo que se busca,
+   * pedidas al servidor. Sin busqueda se traen las primeras, que sirve para empezar; en cuanto se
+   * escribe algo, la respuesta es exacta y ya no depende de que quepa en una pagina.
+   */
+  useEffect(() => {
+    const termino = offeringQuery.trim();
+    const timer = setTimeout(() => {
+      void listOfferings({ pageSize: 100, ...(termino.length >= 2 ? { q: termino } : {}) })
+        .then((result) => setOfferings(result.items))
+        .catch(() => undefined);
+    }, termino.length >= 2 ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [offeringQuery]);
 
   const processes = useMemo(() => {
     const map = new Map<string, string>();
@@ -267,6 +324,42 @@ export default function PlanDetallePage() {
             ? 'Esa jornada ya se ejecuto: no se reprograma'
             : 'No se pudo reprogramar',
       });
+    }
+  };
+
+  const openCancel = (item: PlanItemRow) => {
+    setCancelReason('');
+    setCancelItem(item);
+  };
+
+  /**
+   * CANCELAR LA JORNADA, no "quitar el renglon".
+   *
+   * Se cancela la CONVOCATORIA, que es donde vive el hecho: el servidor pone el renglon en
+   * CANCELADA, retira las obligaciones que nacieron del plan y avisa a quien estaba citado. Si
+   * se cancelara solo el renglon, la jornada seguiria publicada y la gente seguiria esperandola.
+   */
+  const doCancel = async () => {
+    if (!cancelItem) return;
+    setBusy(true);
+    try {
+      const result = await cancelOffering(cancelItem.offering.id, cancelReason.trim());
+      setCancelItem(null);
+      await load();
+      showToast({
+        kind: 'success',
+        title: result.executed ? 'Jornada cancelada' : 'Solicitud enviada a aprobacion',
+        description: result.executed
+          ? 'El renglon queda CANCELADA, se retiran sus obligaciones y se avisa a los convocados.'
+          : undefined,
+      });
+    } catch (error) {
+      showToast({
+        kind: 'danger',
+        title: error instanceof ApiError && error.message ? error.message : 'No se pudo cancelar la jornada',
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -374,7 +467,7 @@ export default function PlanDetallePage() {
       year: String(plan.year),
       name: plan.name,
       objective: plan.objective ?? '',
-      goals: plan.goals ?? '',
+      goalPct: plan.goalPct === null ? '' : String(plan.goalPct),
       scope: plan.scope ?? '',
       justification: '',
     });
@@ -391,7 +484,7 @@ export default function PlanDetallePage() {
         ...(plan.status === 'DRAFT' ? { year: Number(editForm.year) } : {}),
         name: editForm.name.trim(),
         objective: editForm.objective.trim() || null,
-        goals: editForm.goals.trim() || null,
+        goalPct: editForm.goalPct.trim() ? Number(editForm.goalPct) : null,
         scope: editForm.scope.trim() || null,
         ...(plan.status === 'DRAFT' ? {} : { justification: editForm.justification.trim() }),
       });
@@ -453,6 +546,23 @@ export default function PlanDetallePage() {
     }
   };
 
+  const doReopen = async () => {
+    setBusy(true);
+    try {
+      await reopenPlan(id, reopenReason.trim());
+      showToast({ kind: 'success', title: 'Plan reabierto', description: 'Vuelve a admitir renglones. Queda en la auditoria.' });
+      setReopenOpen(false);
+      await load();
+    } catch (error) {
+      showToast({
+        kind: 'danger',
+        title: error instanceof ApiError && error.message ? error.message : 'No se pudo reabrir el plan',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!plan) return <Skeleton className="h-96 w-full" />;
 
   /**
@@ -460,7 +570,25 @@ export default function PlanDetallePage() {
    * obligan a personas reales, y agregarle cosas en silencio reescribiria el programa contra el
    * que se mide el cumplimiento.
    */
+  /**
+   * Las convocatorias que se pueden enganchar: ni canceladas, ni de tipos que no cuentan para
+   * el plan (Decision #78). Se calcula aparte para que el vacio pueda EXPLICARSE.
+   */
+  const elegibles = offerings.filter(
+    (offering) =>
+      offering.status !== 'CANCELLED' &&
+      readTypeConfig(offering.activityVersion.activity.activityType.config).participatesInPlan,
+  );
+
   const isDraft = plan.status === 'DRAFT';
+  /**
+   * Los anos que se pueden elegir en el cajon de editar: dos atras y uno adelante, sin los que ya
+   * tienen plan — pero SIEMPRE con el suyo, porque "dejarlo como esta" tiene que ser una opcion.
+   */
+  const enCurso = new Date().getFullYear();
+  const anosElegibles = [...new Set([plan.year, ...[enCurso - 2, enCurso - 1, enCurso, enCurso + 1]])]
+    .filter((year) => year === plan.year || !anosOcupados.includes(year))
+    .sort((a, b) => a - b);
   /**
    * AGREGAR y BORRAR dejaron de ser la misma pregunta (Decision #55).
    *
@@ -478,7 +606,18 @@ export default function PlanDetallePage() {
    * mes arranca en el de la ultima jornada, que es de donde se sigue contando.
    */
   const openNew = (group?: ActivityGroup) => {
-    setLocked(group ? { id: group.versionId, label: `${group.activityName} (v${group.versionNumber})` } : null);
+    // El tipo y la modalidad viajan con la version: son lo que decide que campos pide la
+    // jornada nueva, y buscarlos en un listado recortado a 100 actividades fallaba en silencio.
+    setLocked(
+      group
+        ? {
+            id: group.versionId,
+            label: `${group.activityName} (v${group.versionNumber})`,
+            config: group.typeConfig,
+            modality: group.modality,
+          }
+        : null,
+    );
     setDefaultMonth(group ? group.items.at(-1)?.plannedMonth : undefined);
     setNewOpen(true);
   };
@@ -509,21 +648,27 @@ export default function PlanDetallePage() {
                 capacitacion nueva hay que ARMARLA —contenido, evaluacion— y publicarla antes de
                 poder convocarla. Lo que si se puede es que el plan te lleve y te traiga de vuelta:
                 se va con `volverA` y la ficha de la actividad ofrece el regreso.
+
+                Y va con el TIPO puesto. Quien pulsa esto desde el plan esta creando una
+                capacitacion DEL PLAN; dejar el desplegable en blanco hacia que se creara con otro
+                tipo y despues no contara para nada del plan, sin que ninguna pantalla lo dijera.
               */}
               <Button
                 variant="outline"
-                onClick={() => router.push(`/contenido-formativo?nueva=1&volverA=${encodeURIComponent(`/plan/${id}`)}`)}
+                onClick={() =>
+                  router.push(`/contenido-formativo?nueva=1&tipo=PLAN&volverA=${encodeURIComponent(`/plan/${id}`)}`)
+                }
               >
                 <Sparkles size={16} />
-                Capacitacion nueva
+                Crear capacitacion
               </Button>
               <Button variant="outline" onClick={() => setAttachOpen(true)}>
                 <Link2 size={16} />
-                Usar una que ya existe
+                Agregar convocatoria existente
               </Button>
               <Button variant="outline" onClick={() => openNew()}>
                 <Plus size={16} />
-                Agregar al plan
+                Agregar convocatoria nueva
               </Button>
             </>
           ) : null}
@@ -549,9 +694,29 @@ export default function PlanDetallePage() {
             </Button>
           ) : null}
           {/*
-            CORREGIR Y BORRAR. El plan cerrado no ofrece ninguna de las dos: es la evidencia del
-            ano. Borrar pide el permiso de aprobar —puede revocar las obligaciones de mucha gente— y
-            quien puede se entera de si se puede al abrir el cajon, no despues de un 409 seco.
+            REABRIR. Cerrar es lo que convierte al plan en la evidencia del ano, asi que durante
+            meses esto no existia. Con un plan por ano (Decision #71) esa regla paso a ser una
+            trampa: un plan cerrado por error se queda con el ano y ya no se puede planear nada.
+            La salida no es saltarse la regla, es que la operacion EXISTA y deje rastro.
+          */}
+          {plan.status === 'CLOSED' && canApprove ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReopenReason('');
+                setReopenOpen(true);
+              }}
+            >
+              <RotateCcw size={16} />
+              Reabrir el ano
+            </Button>
+          ) : null}
+          {/*
+            CORREGIR Y BORRAR. Editar sigue siendo de los planes vivos: el cerrado es lo que se le
+            ensena al auditor. BORRAR si se ofrece tambien cerrado, porque un plan que se cerro sin
+            haber obligado a nadie no es evidencia de nada —es un ensayo— y desde que hay uno por
+            ano dejarlo puesto bloquea el ano entero. Quien no pueda lo sabra por el mensaje del
+            servidor, que dice el motivo real ("ya obligo a gente: reabrelo").
           */}
           {plan.status !== 'CLOSED' ? (
             <Button variant="ghost" onClick={openEdit}>
@@ -559,7 +724,7 @@ export default function PlanDetallePage() {
               Editar
             </Button>
           ) : null}
-          {plan.status !== 'CLOSED' && canApprove ? (
+          {canApprove ? (
             <Button
               variant="ghost"
               className="text-danger"
@@ -576,10 +741,23 @@ export default function PlanDetallePage() {
       </div>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/*
+          La META se lee AL LADO del cumplimiento, no en otra pantalla. Un "62%" solo deja al
+          lector sin saber si eso esta bien, que es justo lo que el auditor viene a preguntar.
+        */}
         <Stat
           label="Cumplimiento del programa"
           value={`${metrics.compliancePct}%`}
-          hint={`${metrics.executed} ejecutadas de ${metrics.programmed} programadas`}
+          hint={
+            // La frase de siempre —"N ejecutadas de M programadas"— NO se toca: es la que da
+            // sentido al numero y la que comprueba el e2e. La meta se ANADE detras, no sustituye.
+            `${metrics.executed} ejecutadas de ${metrics.programmed} programadas` +
+            (plan.goalPct === null
+              ? ' · sin meta definida'
+              : metrics.compliancePct >= plan.goalPct
+                ? ` · meta del ${plan.goalPct}% cumplida`
+                : ` · meta ${plan.goalPct}%, faltan ${(plan.goalPct - metrics.compliancePct).toFixed(1)} puntos`)
+          }
         />
         <Stat label="Cobertura" value={`${metrics.coveragePct}%`} hint={`${metrics.trained} capacitados de ${metrics.projected} proyectados`} />
         <Stat label="Obligaciones del plan" value={metrics.assigned} hint="Solo las nacidas de este plan" />
@@ -670,14 +848,16 @@ export default function PlanDetallePage() {
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button onClick={() => openNew()}>
                     <Plus size={16} />
-                    Agregar al plan
+                    Agregar convocatoria nueva
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => router.push(`/contenido-formativo?nueva=1&volverA=${encodeURIComponent(`/plan/${id}`)}`)}
+                    onClick={() =>
+                      router.push(`/contenido-formativo?nueva=1&tipo=PLAN&volverA=${encodeURIComponent(`/plan/${id}`)}`)
+                    }
                   >
                     <Sparkles size={16} />
-                    Capacitacion nueva
+                    Crear capacitacion
                   </Button>
                 </div>
               ) : undefined
@@ -694,6 +874,7 @@ export default function PlanDetallePage() {
               canAdd={canAdd}
               busy={busy}
               onRemove={removeItem}
+              onCancel={openCancel}
               onAddSession={() => openNew(group)}
               onAdjust={openAdjust}
             />
@@ -702,7 +883,7 @@ export default function PlanDetallePage() {
       ) : view === 'mes' ? (
         <MonthGrid groups={groups} canReschedule={plan.status !== 'CLOSED'} onReschedule={reschedule} />
       ) : view === 'tabla' ? (
-        <FlatTable items={filtered} canRemove={isDraft} busy={busy} onRemove={removeItem} onAdjust={openAdjust} />
+        <FlatTable items={filtered} canRemove={isDraft} busy={busy} onRemove={removeItem} onCancel={openCancel} onAdjust={openAdjust} />
       ) : (
         <ProcessTable plan={plan} />
       )}
@@ -731,6 +912,62 @@ export default function PlanDetallePage() {
           });
         }}
       />
+
+      <Drawer
+        open={cancelItem !== null}
+        onOpenChange={(open) => !open && setCancelItem(null)}
+        title="Cancelar la jornada"
+        description={
+          cancelItem
+            ? `${cancelItem.offering.activityVersion.activity.name} · ${cancelItem.offering.code}`
+            : undefined
+        }
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCancelItem(null)}>
+              Volver
+            </Button>
+            <Button onClick={() => void doCancel()} loading={busy} disabled={cancelReason.trim().length < 10}>
+              <CalendarX2 size={16} />
+              Cancelar la jornada
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/*
+            QUE PASA, dicho antes de pulsar y en el orden en que le importa a alguien: primero
+            las personas, despues los numeros. Cancelar tocaba tres cosas y no decia ninguna.
+          */}
+          <div className="rounded-lg border border-line bg-paper px-4 py-3 text-sm text-ink-700">
+            <p className="font-medium text-ink-900">Al cancelar:</p>
+            <ul className="mt-1.5 space-y-1">
+              <li>
+                Se avisa a <strong>{cancelItem?.facts?.enrolled ?? 0}</strong> personas que estaban citadas.
+              </li>
+              <li>
+                Se retiran <strong>{cancelItem?.facts?.assigned ?? 0}</strong> obligaciones que nacieron de este
+                renglon. Lo que alguien ya empezo no se toca: ese avance es suyo.
+              </li>
+              <li>El renglon queda CANCELADA y sale del cumplimiento, ni a favor ni en contra.</li>
+            </ul>
+          </div>
+          <Field
+            htmlFor="c-reason"
+            label="Por que se cancela"
+            required
+            hint="Lo van a leer las personas citadas, y queda en la auditoria. Ejemplo: el instructor externo no confirmo."
+          >
+            <Textarea
+              id="c-reason"
+              rows={3}
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder="Minimo 10 caracteres"
+            />
+          </Field>
+        </div>
+      </Drawer>
 
       {/* Ajustar el denominador de la cobertura. Nunca en linea: exige motivo (regla de oro 3). */}
       <Drawer
@@ -788,12 +1025,18 @@ export default function PlanDetallePage() {
         </div>
       </Drawer>
 
-      {/* Camino secundario: la jornada ya existia porque se creo desde Convocatorias. */}
+      {/*
+        ENGANCHAR UNA QUE YA EXISTE. Se planteo quitarlo —desde la Decision #75 una convocatoria
+        de una capacitacion del plan entra sola— y se queda, porque hay un caso en que es la UNICA
+        via: el plan ya APROBADO. Ahi nada entra solo (un renglon nuevo obliga a gente y exige
+        motivo), asi que sin este boton una convocatoria ya creada no tendria forma de entrar.
+        Tambien sirve para volver a enganchar un renglon que se quito por error.
+      */}
       <Drawer
         open={attachOpen}
         onOpenChange={setAttachOpen}
-        title="Usar una convocatoria que ya existe"
-        description="El plan la referencia; no se apropia de la actividad."
+        title="Agregar una convocatoria que ya existe"
+        description="Solo la engancha al plan: no crea nada y no se apropia de la capacitacion."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setAttachOpen(false)}>
@@ -810,17 +1053,56 @@ export default function PlanDetallePage() {
         }
       >
         <div className="space-y-4">
+          {/*
+            SE BUSCA, NO SE DESPLIEGA.
+
+            El desplegable pedia las primeras 100 convocatorias y las pintaba todas. Con 253 en la
+            base —un cliente llega ahi en dos anos— la que se acababa de publicar quedaba FUERA de
+            la pagina y el plan no podia engancharla: el sintoma es "no aparece", y la causa
+            estaba a dos capas. Ya paso una vez con el orden de las fechas (ver RUNBOOK); la
+            diferencia es que ahora se pregunta al servidor en vez de traer un trozo y confiar.
+          */}
+
+          {/*
+            SE ELIGE VIENDOLA, no de un desplegable.
+
+            Una convocatoria no es "CONV-2026-000420": es esa formacion, de ese tipo, en ese
+            estado y en esa fecha. Un `<select>` solo sabe ensenar lo primero y obliga a abrirlo
+            para comparar dos. Y como la lista ademas viene FILTRADA, el desplegable mentia por
+            omision: se buscaba algo, no aparecia, y no habia forma de saber si es que no existe
+            o que no se ofrece — que es justo lo que se reporto como "la busqueda no funciona".
+          */}
           <Field htmlFor="i-offering" label="Convocatoria" required>
-            <Select id="i-offering" value={attachForm.offeringId} onChange={(event) => setAttachForm({ ...attachForm, offeringId: event.target.value })}>
-              <option value="">Seleccionar...</option>
-              {offerings
-                .filter((offering) => offering.status !== 'CANCELLED')
-                .map((offering) => (
-                  <option key={offering.id} value={offering.id}>
-                    {offering.code} · {offering.activityVersion.activity.name}
-                  </option>
-                ))}
-            </Select>
+            <Combo
+              id="i-offering"
+              placeholder="Elegir la convocatoria..."
+              searchPlaceholder="Buscar por formacion o codigo..."
+              // Se pregunta al SERVIDOR, no se filtra un trozo: con 253 convocatorias en la base
+              // y un tope de 100, la recien publicada no estaria en la lista (ver RUNBOOK).
+              onSearchChange={setOfferingQuery}
+              searchHint="Se busca en todas las convocatorias, no solo en las que se ven."
+              value={attachForm.offeringId}
+              onChange={(offeringId) => setAttachForm({ ...attachForm, offeringId })}
+              emptyLabel='No hay convocatorias que agregar'
+              emptyHint="Solo aparecen las capacitaciones DEL PLAN: una induccion o una extraordinaria no puede mover sus indicadores."
+              options={elegibles.map((offering) => ({
+                id: offering.id,
+                code: offering.code,
+                label: offering.activityVersion.activity.name,
+                chip: {
+                  label: offering.activityVersion.activity.activityType.name,
+                  colorHex: offering.activityVersion.activity.activityType.colorHex,
+                },
+                badge: OFFERING_BADGE[offering.status],
+                meta: [
+                  offering.scheduledDate ? formatDate(offering.scheduledDate) : 'Sin fecha (permanente)',
+                  offering.regional?.name,
+                  offering.activityVersion.activity.process.name,
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              }))}
+            />
           </Field>
           <Field htmlFor="i-month" label="Mes programado" required>
             <Select id="i-month" value={attachForm.plannedMonth} onChange={(event) => setAttachForm({ ...attachForm, plannedMonth: event.target.value })}>
@@ -848,6 +1130,45 @@ export default function PlanDetallePage() {
               />
             </Field>
           ) : null}
+        </div>
+      </Drawer>
+
+      <Drawer
+        open={reopenOpen}
+        onOpenChange={setReopenOpen}
+        title={`Reabrir el plan de ${plan.year}`}
+        description="Vuelve a EN EJECUCION y admite renglones otra vez. Sus obligaciones y sus indicadores no se tocan."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setReopenOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void doReopen()} loading={busy} disabled={reopenReason.trim().length < 10}>
+              <RotateCcw size={16} />
+              Reabrir el ano
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+            Cerrar el ano es lo que convirtio este plan en la evidencia que se le ensena al auditor. Reabrirlo
+            no borra nada, pero si queda registrado quien lo hizo, cuando y por que.
+          </p>
+          <Field
+            htmlFor="r-reason"
+            label="Por que se reabre"
+            required
+            hint="Ejemplo: se cerro por error antes de registrar las jornadas de diciembre."
+          >
+            <Textarea
+              id="r-reason"
+              rows={3}
+              value={reopenReason}
+              onChange={(event) => setReopenReason(event.target.value)}
+              placeholder="Minimo 10 caracteres"
+            />
+          </Field>
         </div>
       </Drawer>
 
@@ -883,15 +1204,24 @@ export default function PlanDetallePage() {
       >
         <div className="space-y-4">
           {plan.status === 'DRAFT' ? (
-            <Field htmlFor="e-year" label="Ano" required>
-              <Input
+            /*
+              EL ANO SE ELIGE, no se teclea: identifica al plan y solo hay un punado de valores
+              posibles. Los anos que YA tienen plan no se ofrecen (hay uno por ano, Decision #71);
+              el suyo si, porque dejarlo como esta tiene que ser una opcion.
+            */
+            <Field htmlFor="e-year" label="Ano" required hint="Ancla el vencimiento de cada renglon al ultimo dia de su mes.">
+              <Select
                 id="e-year"
-                type="number"
-                min={2000}
-                max={2100}
                 value={editForm.year}
                 onChange={(event) => setEditForm({ ...editForm, year: event.target.value })}
-              />
+              >
+                {anosElegibles.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                    {year === new Date().getFullYear() ? ' (en curso)' : ''}
+                  </option>
+                ))}
+              </Select>
             </Field>
           ) : null}
           <Field htmlFor="e-name" label="Nombre" required>
@@ -911,13 +1241,23 @@ export default function PlanDetallePage() {
               onChange={(event) => setEditForm({ ...editForm, objective: event.target.value })}
             />
           </Field>
-          <Field htmlFor="e-goals" label="Metas">
-            <Textarea
-              id="e-goals"
-              rows={3}
-              maxLength={4000}
-              value={editForm.goals}
-              onChange={(event) => setEditForm({ ...editForm, goals: event.target.value })}
+          {/*
+            LA META ES UN NUMERO. Era texto libre y por eso el plan ensenaba "62% de cumplimiento"
+            sin nada contra que compararlo: un indicador sin meta deja al lector sin saber si eso
+            esta bien. Con ella, la pantalla puede decir "faltan 28 puntos" o "meta cumplida".
+          */}
+          <Field
+            htmlFor="e-goal"
+            label="Meta de cumplimiento (%)"
+            hint="Cuanto del programa se compromete la empresa a ejecutar este ano. Lo habitual es 90."
+          >
+            <Input
+              id="e-goal"
+              type="number"
+              min={1}
+              max={100}
+              value={editForm.goalPct}
+              onChange={(event) => setEditForm({ ...editForm, goalPct: event.target.value })}
             />
           </Field>
           <Field htmlFor="e-scope" label="Alcance">
@@ -966,7 +1306,10 @@ export default function PlanDetallePage() {
             <Button
               onClick={destroy}
               loading={busy}
-              disabled={plan.status !== 'DRAFT' && deleteReason.trim().length < 10}
+              disabled={
+                (plan.status === 'CLOSED' && metrics.assigned > 0) ||
+                (plan.status !== 'DRAFT' && deleteReason.trim().length < 10)
+              }
             >
               <Trash2 size={16} />
               Eliminar el plan
@@ -975,7 +1318,16 @@ export default function PlanDetallePage() {
         }
       >
         <div className="space-y-4">
-          {metrics.assigned > 0 ? (
+          {/*
+            El plan CERRADO que ya obligo a gente no se borra, y se dice AQUI y no con un 409 al
+            pulsar. Lo que si tiene es salida: reabrirlo, que deja rastro donde borrar no lo dejaria.
+          */}
+          {plan.status === 'CLOSED' && metrics.assigned > 0 ? (
+            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+              Este plan esta CERRADO y creo <strong>{metrics.assigned} obligaciones</strong>: es la evidencia del ano y no
+              se borra. Si hay que corregirlo, cierra esto y usa <strong>Reabrir el ano</strong>.
+            </p>
+          ) : metrics.assigned > 0 ? (
             <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
               Este plan creo <strong>{metrics.assigned} obligaciones</strong>: al borrarlo se revocan y desaparecen de la
               bandeja de esas personas. Si alguna ya empezo su formacion, el plan no se puede borrar — ese avance es suyo.
@@ -1048,6 +1400,7 @@ function ActivityCard({
   canAdd,
   busy,
   onRemove,
+  onCancel,
   onAddSession,
   onAdjust,
 }: {
@@ -1058,6 +1411,7 @@ function ActivityCard({
   canAdd: boolean;
   busy: boolean;
   onRemove: (itemId: string) => void;
+  onCancel: (item: PlanItemRow) => void;
   onAddSession: () => void;
   onAdjust: (item: PlanItemRow) => void;
 }) {
@@ -1123,13 +1477,42 @@ function ActivityCard({
               <Td>
                 <StatusPill kind={ITEM_STATUS[item.status].kind} label={ITEM_STATUS[item.status].label} />
               </Td>
-              {canRemove ? (
-                <Td className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)} disabled={busy}>
-                    Quitar
-                  </Button>
-                </Td>
-              ) : null}
+              <Td className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  {/*
+                    DOS ACCIONES, NO UNA. "Quitar del plan" es *esto no va en el plan* y solo cabe
+                    mientras el plan es un borrador que no obliga a nadie. "Cancelar la jornada" es
+                    *esto no se va a dictar*, que es un hecho del mundo: cancela la convocatoria,
+                    avisa a los convocados y retira las obligaciones. Llamar "Quitar" a las dos era
+                    lo que hacia imposible saber cual estabas usando.
+                  */}
+                  {canRemove ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemove(item.id)}
+                      disabled={busy}
+                      aria-label={`Quitar del plan la convocatoria ${item.offering.code}`}
+                      title="Quitar del plan: saca este renglon del programa del ano. La convocatoria NO se borra ni se cancela, sigue existiendo. Solo mientras el plan es un borrador."
+                    >
+                      <Unlink size={15} />
+                    </Button>
+                  ) : null}
+                  {item.status !== 'CANCELLED' && item.status !== 'EXECUTED' ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger"
+                      onClick={() => onCancel(item)}
+                      disabled={busy}
+                      aria-label={`Cancelar la jornada ${item.offering.code}`}
+                      title="Cancelar la jornada: no se va a dictar. Cancela la convocatoria, avisa a los convocados y retira sus obligaciones. Pide motivo."
+                    >
+                      <CalendarX2 size={15} />
+                    </Button>
+                  ) : null}
+                </div>
+              </Td>
             </Tr>
           ))}
         </TBody>
@@ -1139,7 +1522,7 @@ function ActivityCard({
         <div className="border-t border-line px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onAddSession}>
             <Plus size={15} />
-            Otra jornada de esta capacitacion
+            Agregar otra convocatoria
           </Button>
         </div>
       ) : null}
@@ -1414,12 +1797,14 @@ function FlatTable({
   canRemove,
   busy,
   onRemove,
+  onCancel,
   onAdjust,
 }: {
   items: PlanItemRow[];
   canRemove: boolean;
   busy: boolean;
   onRemove: (itemId: string) => void;
+  onCancel: (item: PlanItemRow) => void;
   onAdjust: (item: PlanItemRow) => void;
 }) {
   const sorted = [...items].sort((a, b) => a.plannedMonth - b.plannedMonth);
@@ -1467,13 +1852,42 @@ function FlatTable({
               <Td>
                 <StatusPill kind={ITEM_STATUS[item.status].kind} label={ITEM_STATUS[item.status].label} />
               </Td>
-              {canRemove ? (
-                <Td className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)} disabled={busy}>
-                    Quitar
-                  </Button>
-                </Td>
-              ) : null}
+              <Td className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  {/*
+                    DOS ACCIONES, NO UNA. "Quitar del plan" es *esto no va en el plan* y solo cabe
+                    mientras el plan es un borrador que no obliga a nadie. "Cancelar la jornada" es
+                    *esto no se va a dictar*, que es un hecho del mundo: cancela la convocatoria,
+                    avisa a los convocados y retira las obligaciones. Llamar "Quitar" a las dos era
+                    lo que hacia imposible saber cual estabas usando.
+                  */}
+                  {canRemove ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemove(item.id)}
+                      disabled={busy}
+                      aria-label={`Quitar del plan la convocatoria ${item.offering.code}`}
+                      title="Quitar del plan: saca este renglon del programa del ano. La convocatoria NO se borra ni se cancela, sigue existiendo. Solo mientras el plan es un borrador."
+                    >
+                      <Unlink size={15} />
+                    </Button>
+                  ) : null}
+                  {item.status !== 'CANCELLED' && item.status !== 'EXECUTED' ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger"
+                      onClick={() => onCancel(item)}
+                      disabled={busy}
+                      aria-label={`Cancelar la jornada ${item.offering.code}`}
+                      title="Cancelar la jornada: no se va a dictar. Cancela la convocatoria, avisa a los convocados y retira sus obligaciones. Pide motivo."
+                    >
+                      <CalendarX2 size={15} />
+                    </Button>
+                  ) : null}
+                </div>
+              </Td>
             </Tr>
           ))}
         </TBody>

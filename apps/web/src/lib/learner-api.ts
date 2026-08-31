@@ -16,7 +16,15 @@ export type ContentType = 'LESSON' | 'VIDEO' | 'PRESENTATION' | 'DOCUMENT' | 'AS
 export type EnrollmentStatus = 'ENROLLED' | 'IN_PROGRESS' | 'COMPLETED' | 'PASSED' | 'FAILED' | 'WITHDRAWN' | 'EXPIRED';
 export type ProgressStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 export type AttemptStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'GRADED' | 'EXPIRED';
-export type QuestionType = 'SINGLE' | 'MULTI' | 'TRUE_FALSE' | 'ESSAY';
+/**
+ * Los tipos de pregunta son UNA sola lista, no dos copias.
+ *
+ * Estaban duplicados —aqui y en `catalog-api`— y al anadir los cuatro de la Decision #86 las dos
+ * listas se separaron: el escenario del examen es la misma pieza para el aprendiz y para la vista
+ * previa del administrador, asi que una lista mas corta que la otra lo parte en dos.
+ */
+export type { QuestionType } from './catalog-api';
+import type { QuestionType } from './catalog-api';
 export type CardType = 'TEXT_IMAGE' | 'VIDEO_SHORT' | 'QUIZ' | 'FLIP' | 'POLL' | 'FILL_GAP';
 
 /** Las notas llegan como cadena (Decimal de Prisma) o numero segun el camino. */
@@ -37,6 +45,10 @@ export interface PendingItem {
   description: string | null;
   type: { code: string; name: string; colorHex: string | null } | null;
   estimatedMinutes: number | null;
+  /** La portada subida, si la hay. Sin ella se pinta la generada (Decision #88). */
+  coverKey: string | null;
+  /** Puntos al terminarla. Los manda el servidor, que es quien los otorga (Decision #90). */
+  pointsOnComplete: number;
   dueAt: string | null;
   overdue: boolean;
   cycleNumber: number | null;
@@ -103,7 +115,7 @@ export interface EnrollmentContent {
   isRequired: boolean;
   config: unknown;
   hasLesson: boolean;
-  assessmentVersionId: string | null;
+  assessmentId: string | null;
   status: ProgressStatus;
   pct: number;
   lastCardIndex: number;
@@ -115,7 +127,7 @@ export interface EnrollmentContent {
 
 export interface EnrollmentAttempt {
   id: string;
-  assessmentVersionId: string;
+  assessmentId: string;
   attemptNumber: number;
   status: AttemptStatus;
   score: Score;
@@ -182,7 +194,7 @@ export interface ContentDetail {
     config: unknown;
     lessonId: string | null;
     contentPackageId: string | null;
-    assessmentVersionId: string | null;
+    assessmentId: string | null;
     activityVersionId: string;
   };
   enrollmentId: string;
@@ -253,11 +265,20 @@ export function saveProgress(contentId: string, input: ProgressInput): Promise<S
 
 // ─────────────────────────── Evaluaciones ───────────────────────────
 
+/** Una respuesta. Cada tipo usa el campo que le corresponde y deja el resto sin poner. */
 export interface AnswerInput {
   optionId?: string;
   optionIds?: string[];
   value?: boolean;
   text?: string;
+  /** FILL_BLANK: lo escrito en cada hueco, por id de hueco. */
+  blanks?: Record<string, string>;
+  /** ORDER: los ids de los pasos en el orden en que los dejo. */
+  order?: string[];
+  /** MATCH: a que id de la derecha unio cada id de la izquierda. */
+  pairs?: Record<string, string>;
+  /** NUMERIC: el numero tecleado. */
+  number?: number;
 }
 
 export interface AttemptQuestion {
@@ -265,7 +286,13 @@ export interface AttemptQuestion {
   questionVersionId: string;
   qtype: QuestionType;
   stem: string;
+  /**
+   * Que son estas "opciones" depende del tipo: las respuestas en SINGLE/MULTI, los PASOS en
+   * ORDER, las DOS COLUMNAS con prefijo L/R en MATCH, y los HUECOS en FILL_BLANK.
+   */
   options: Array<{ id: string; text: string }>;
+  /** Solo en NUMERIC: la unidad se ensena junto al campo. El numero correcto no sale del servidor. */
+  unit?: string;
   points: number;
   answer: AnswerInput | null;
   pointsPossible: number;
@@ -278,6 +305,8 @@ export interface AttemptView {
     status: AttemptStatus;
     startedAt: string;
     timeLimitMin: number | null;
+    /** Como se ve el examen (Decision #85). Se lee con `readPresentation`. */
+    presentation: unknown;
   };
   questions: AttemptQuestion[];
 }
@@ -302,9 +331,9 @@ export interface AttemptReview {
   }>;
 }
 
-export function startAttempt(enrollmentId: string, assessmentVersionId: string): Promise<AttemptView> {
+export function startAttempt(enrollmentId: string, assessmentId: string): Promise<AttemptView> {
   return apiFetch<AttemptView>(
-    `/me/enrollments/${encodeURIComponent(enrollmentId)}/attempts?assessmentVersionId=${encodeURIComponent(assessmentVersionId)}`,
+    `/me/enrollments/${encodeURIComponent(enrollmentId)}/attempts?assessmentId=${encodeURIComponent(assessmentId)}`,
     { method: 'POST' },
   );
 }

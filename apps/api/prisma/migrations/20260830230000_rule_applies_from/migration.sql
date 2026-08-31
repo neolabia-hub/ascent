@@ -1,0 +1,11 @@
+-- SOLO A QUIEN ENTRE DESDE AHORA.
+--
+-- `assignment_rules.applies_from` acota el requisito a quien entre a la audiencia DESPUES de esa
+-- fecha. NULL = a todos, tambien a los que ya estaban, que es el comportamiento de siempre y por
+-- eso la columna es opcional y no necesita relleno.
+--
+-- El caso que la obliga es la puesta en marcha: la empresa sube su plantilla y las inducciones que
+-- esa gente ya hizo en papel hace anos no pueden aparecerles como pendientes. Sin esto, la unica
+-- salida era eximirlas una a una —116 veces— o marcarlas como cumplidas, que es mentir en el
+-- registro que despues mira el auditor.
+ALTER TABLE "assignment_rules" ADD COLUMN "applies_from" TIMESTAMP(3);

@@ -167,13 +167,27 @@ enum AssignmentStatus {
   COMPLETED
   OVERDUE
   WITHDRAWN_LEFT_AUDIENCE
+  // El renglon del plan que la creo se CANCELO. No se borra: quien recibio el aviso de "tu
+  // formacion del plan 2026" tiene que poder saber que paso con ella. Cae sola de todas las
+  // consultas porque lo abierto se pide por lista blanca (PENDING/IN_PROGRESS/OVERDUE).
+  WITHDRAWN_PLAN_ITEM_CANCELLED
   WAIVED
 }
 
+// QUE DISPARA la obligacion. El eje es siempre el mismo: quien decide que a esta persona le toca.
 enum RuleTrigger {
   ON_JOIN // al entrar a la audiencia
   ON_HIRE // ingreso: due ANTES de hired_at (induccion previa al inicio, D1072)
   SCHEDULED // programada/recurrente
+  // LA DISPARA EL PLAN ANUAL, y por eso el motor de requisitos NO la materializa (Decision #76).
+  //
+  // Una capacitacion del plan no cuelga del ingreso ni de entrar a un grupo ni del calendario:
+  // pasa el mes que diga el plan. La regla existe para guardar A QUIENES —que es una decision del
+  // analista y hay que poder consultarla antes de aprobar— pero no para generar nada por su
+  // cuenta: si generara, cada persona acabaria con dos obligaciones de la misma formacion, con dos
+  // vencimientos, y quien ingresara en septiembre entraria en el plan de marzo, que es justo lo
+  // que la regla de oro 2 prohibe.
+  PLAN
 }
 
 enum PlanStatus {
@@ -200,6 +214,14 @@ enum QuestionType {
   MULTI
   TRUE_FALSE
   ESSAY
+  /// Completar huecos: el enunciado lleva {{1}}, {{2}}... y se escriben.
+  FILL_BLANK
+  /// Ordenar pasos. El tipo que le faltaba a SST: un LOTO o una emergencia son secuencias.
+  ORDER
+  /// Emparejar dos columnas: senal <-> significado, EPP <-> riesgo.
+  MATCH
+  /// Un numero con tolerancia y unidad. Sin opciones a la vista que regalen la respuesta.
+  NUMERIC
 }
 
 enum GradingPolicy {
@@ -529,6 +551,9 @@ model User {
   @@unique([tenantId, documentNumber])
   @@unique([tenantId, email])
     @@index([tenantId, active, fullName])
+  // Lo creo la migracion `user_service` y nunca se declaro aqui: sin esta linea, la siguiente
+  // migracion generada lo BORRA. Lo usa el filtro de audiencias por linea de servicio.
+  @@index([tenantId, serviceId])
   @@index([tenantId, areaId])
   @@map("users")
 }
@@ -677,6 +702,16 @@ model Activity {
   currentVersionId  String?      @unique @map("current_version_id") @db.Uuid
   tags              String[]     @default([])
 
+  /// PORTADA de la formacion (Decision #88): la clave del archivo en el almacen, firmada al
+  /// servirla. Vive en la ACTIVIDAD y no en su version, por lo mismo que `presentation` en una
+  /// evaluacion: una foto no es evidencia —no cambia que se enseno ni como se califico— asi que
+  /// cambiarla no puede costar una version nueva de la formacion.
+  ///
+  /// NULL es un estado NORMAL, no un hueco: sin foto se pinta una portada generada a partir del
+  /// id y del tipo (ver `cover.tsx`). Exigirla dejaria media biblioteca en gris el primer dia, y
+  /// bloquear la publicacion de una capacitacion obligatoria por una foto seria absurdo.
+  coverKey          String?      @map("cover_key")
+
   versions   ActivityVersion[]  @relation("ActivityVersions")
   norms      ActivityNorm[]
   services   ActivityService[]
@@ -793,8 +828,8 @@ model ActivityContent {
   lesson              Lesson?           @relation(fields: [lessonId], references: [id])
   contentPackageId    String?           @map("content_package_id") @db.Uuid
   contentPackage      ContentPackage?   @relation(fields: [contentPackageId], references: [id])
-  assessmentVersionId String?           @map("assessment_version_id") @db.Uuid
-  assessmentVersion   AssessmentVersion? @relation(fields: [assessmentVersionId], references: [id])
+  assessmentId        String?           @map("assessment_id") @db.Uuid
+  assessment          Assessment?       @relation(fields: [assessmentId], references: [id])
   surveyTemplateId    String?           @map("survey_template_id") @db.Uuid
   surveyTemplate      SurveyTemplate?   @relation(fields: [surveyTemplateId], references: [id])
 
@@ -900,6 +935,18 @@ model Offering {
   regional   Regional? @relation(fields: [regionalId], references: [id])
   capacity   Int?
 
+  // A QUIENES ATIENDE esta jornada: la TAJADA de los obligados que le toca (Decision #68).
+  //
+  // Sin esto, dos jornadas de la misma formacion proyectan a los MISMOS obligados y el plan los
+  // suma: 40 obligados repartidos en dos jornadas salen como 80 proyectados, y la cobertura no
+  // puede pasar del 50% aunque se capacite a todo el mundo.
+  //
+  // Es una audiencia porque es exactamente eso —un grupo definido por reglas— y asi reutiliza el
+  // mismo selector, el mismo calculo de miembros y la misma deduplicacion por forma que Quienes.
+  // NULL = atiende a todos los obligados, que es el caso simple y el comportamiento de siempre.
+  audienceId String?   @map("audience_id") @db.Uuid
+  audience   Audience? @relation(fields: [audienceId], references: [id])
+
   // Derivado de la regla de asignacion y CONGELADO al publicar (Decision #5).
   projectedCount        Int?      @map("projected_count")
   projectedFrozenAt     DateTime? @map("projected_frozen_at")
@@ -926,6 +973,7 @@ model Offering {
   @@unique([tenantId, code])
     @@index([tenantId, status, scheduledDate])
   @@index([activityVersionId])
+  @@index([audienceId])
   @@map("offerings")
 }
 
@@ -1037,7 +1085,9 @@ model Audience {
   isDynamic Boolean @default(true) @map("is_dynamic")
   active    Boolean @default(true)
 
-  members AudienceMember[]
+  members   AudienceMember[]
+  // Jornadas cuya TAJADA es esta audiencia (Decision #68).
+  offerings Offering[]
   rules   AssignmentRule[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1072,6 +1122,12 @@ model AssignmentRule {
   trigger              RuleTrigger
   dueDaysAfterTrigger  Int?                 @map("due_days_after_trigger")
   recurrence           Json?                // {every_months} | {fixed_date: "01-31"}
+  /// Solo obliga a quien entre a la audiencia DESPUES de esta fecha. NULL = a todos, tambien a
+  /// los que ya estaban. Es el caso de la puesta en marcha: las inducciones que la plantilla
+  /// actual ya hizo en papel no deben aparecerle como pendientes, y eximir 116 veces no es una
+  /// salida. No es la GRACIA de `due-date.ts`: la gracia da PLAZO a quien ya estaba; esto decide
+  /// si se le exige siquiera.
+  appliesFrom          DateTime?            @map("applies_from")
   active               Boolean              @default(true)
   createdBy            String?              @map("created_by") @db.Uuid
   createdAt            DateTime             @default(now()) @map("created_at")
@@ -1126,13 +1182,27 @@ model Assignment {
 // ──────────────────── 6.7 Plan de capacitacion anual ────────────────────
 
 // ENTIDAD EMPRESARIAL PROPIA (Decision #3): referencia convocatorias, no posee actividades.
+//
+// UNO POR ANO (Decision #71). El nombre formaba parte de la clave, asi que "Plan 2026", "Plan
+// anual 2026" y "Plan SST 2026" podian convivir, cada uno con su aprobacion, sus proyectados
+// congelados y su propio cumplimiento. El auditor pregunta por el plan de 2026 y encontraba tres
+// numeros distintos sin forma de saber cual es el bueno. El nombre pasa a ser lo que siempre
+// debio ser —texto descriptivo— y el ANO es lo que identifica al plan.
+//
+// Los planes SST, PESV y BASC no son planes: son la VISTA POR PROCESO del mismo plan anual, que
+// ya existe en la pantalla. Es lo que dice CLAUDE.md 3.10 y lo que el modelo no obligaba.
 model TrainingPlan {
   id         String     @id @default(uuid()) @db.Uuid
   tenantId   String     @map("tenant_id") @db.Uuid
   year       Int
   name       String
   objective  String?
-  goals      String?
+  // LA META: el porcentaje de cumplimiento del programa que la empresa se compromete a alcanzar
+  // este ano (1..100). Antes era `goals`, texto libre, y por eso no se podia comparar contra nada:
+  // un indicador sin meta dice "62%" y deja al lector preguntandose si eso es bueno.
+  // Se mide contra el CUMPLIMIENTO (ejecutadas / programadas), el indicador del item 1.2.1 de la
+  // Res. 0312. Opcional: un plan puede armarse antes de acordar la meta.
+  goalPct    Int?       @map("goal_pct")
   scope      String?
   status     PlanStatus @default(DRAFT)
   approvedBy String?    @map("approved_by") @db.Uuid
@@ -1146,7 +1216,7 @@ model TrainingPlan {
   updatedAt DateTime @updatedAt @map("updated_at")
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  @@unique([tenantId, year, name])
+  @@unique([tenantId, year])
   @@map("training_plans")
 }
 
@@ -1243,8 +1313,10 @@ model QuestionCategory {
 model Question {
   id               String           @id @default(uuid()) @db.Uuid
   tenantId         String           @map("tenant_id") @db.Uuid
-  categoryId       String           @map("category_id") @db.Uuid
-  category         QuestionCategory @relation(fields: [categoryId], references: [id])
+  // El TEMA es opcional (Decision #84): solo hace falta para los bloques al azar, que sacan
+  // N preguntas de un tema. Obligarlo ponia una ceremonia delante de la primera pregunta.
+  categoryId       String?           @map("category_id") @db.Uuid
+  category         QuestionCategory? @relation(fields: [categoryId], references: [id])
   currentVersionId String?          @unique @map("current_version_id") @db.Uuid
   active           Boolean          @default(true)
 
@@ -1279,27 +1351,36 @@ model QuestionVersion {
   @@map("question_versions")
 }
 
+// UNA EVALUACION ES UN OBJETO PLANO, como una leccion (Decision #87).
+//
+// ANTES tenia su propia escalera de versiones (`assessment_versions`), y eso era una SEGUNDA
+// solucion al mismo problema que la formacion ya resolvia. Las dos escaleras no estaban
+// sincronizadas, y de ahi salian cuatro danos, uno de ellos capaz de romper el examen en
+// produccion:
+//
+//   1. publicar la v2 ponia la v1 en RETIRED, pero el contenido de la formacion seguia apuntando
+//      a la v1 —y `attempts.start` exige PUBLISHED—: el examen dejaba de poder abrirse para
+//      TODAS las formaciones publicadas que la usaran;
+//   2. los intentos se contaban por VERSION, asi que publicar una version nueva le regalaba
+//      intentos a todo el mundo y deshacia el "ya aprobaste";
+//   3. la completitud miraba `assessmentVersionId`, asi que repuntar el contenido dejaba
+//      incompleto a quien ya habia aprobado;
+//   4. quien administra tenia que sostener dos escaleras de versiones en la cabeza a la vez.
+//
+// AHORA se hace lo mismo que con las lecciones, que nunca dieron ninguno de esos problemas: la
+// evaluacion se edita libremente, y publicar la FORMACION congela una COPIA. La inmutabilidad la
+// da el unico escalon que de verdad la necesita —la version de la formacion—, y el historico de
+// lo respondido lo sigue dando `question_versions`, que es donde siempre estuvo (Decision #6).
 model Assessment {
-  id               String  @id @default(uuid()) @db.Uuid
-  tenantId         String  @map("tenant_id") @db.Uuid
-  title            String
-  currentVersionId String? @unique @map("current_version_id") @db.Uuid
+  id       String        @id @default(uuid()) @db.Uuid
+  tenantId String        @map("tenant_id") @db.Uuid
+  title    String
+  /// DRAFT = la que se edita en /evaluaciones. PUBLISHED = una copia congelada dentro de una
+  /// version de formacion; no sale en el listado y no se edita. Igual que en `lessons`.
+  status   VersionStatus @default(DRAFT)
 
-  versions AssessmentVersion[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("assessments")
-}
-
-// INMUTABLE al publicar.
-model AssessmentVersion {
-  id               String        @id @default(uuid()) @db.Uuid
-  tenantId         String        @map("tenant_id") @db.Uuid
-  assessmentId     String        @map("assessment_id") @db.Uuid
-  assessment       Assessment    @relation(fields: [assessmentId], references: [id])
-  versionNumber    Int           @map("version_number")
-  status           VersionStatus @default(DRAFT)
+  /// Las reglas del examen. Vivian en la version; al no haber versiones, viven aqui y se
+  /// congelan con la copia.
   timeLimitMin     Int?          @map("time_limit_min")
   maxAttempts      Int?          @map("max_attempts") // NULL = hereda de activity_version
   gradingPolicy    GradingPolicy @default(HIGHEST) @map("grading_policy")
@@ -1308,29 +1389,42 @@ model AssessmentVersion {
   shuffleOptions   Boolean       @default(true) @map("shuffle_options")
   reviewPolicy     Json          @default("{}") @map("review_policy")
 
+  /// COMO SE VE el examen para quien lo rinde: ritmo, acento, fondo, transicion (Decision #85).
+  /// No es evidencia —no cambia que se pregunto ni como se califico—, y por eso es lo unico que
+  /// se puede retocar sin publicar la formacion de nuevo: la copia congelada lo LEE de su origen.
+  presentation Json @default("{}")
+
+  /// De que evaluacion editable salio esta copia. NULL en la editable. Es lo que permite que un
+  /// retoque de presentacion llegue a las copias sin tocar nada mas.
+  sourceId String?      @map("source_id") @db.Uuid
+  source   Assessment?  @relation("AssessmentCopias", fields: [sourceId], references: [id])
+  copias   Assessment[] @relation("AssessmentCopias")
+
   sections AssessmentSection[]
   attempts Attempt[]
   contents ActivityContent[]
 
+  createdBy String?  @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  @@unique([assessmentId, versionNumber])
-    @@index([assessmentId, status])
-  @@map("assessment_versions")
+    @@index([tenantId, status, updatedAt])
+    @@index([sourceId])
+  @@map("assessments")
 }
 
 model AssessmentSection {
-  id                      String            @id @default(uuid()) @db.Uuid
-  tenantId                String            @map("tenant_id") @db.Uuid
-  assessmentVersionId     String            @map("assessment_version_id") @db.Uuid
-  assessmentVersion       AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Cascade)
+  id                      String      @id @default(uuid()) @db.Uuid
+  tenantId                String      @map("tenant_id") @db.Uuid
+  assessmentId            String      @map("assessment_id") @db.Uuid
+  assessment              Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   mode                    SectionMode
-  categoryId              String?           @map("category_id") @db.Uuid
-  pickCount               Int?              @map("pick_count")
-  fixedQuestionVersionIds String[]          @default([]) @map("fixed_question_version_ids") @db.Uuid
-  displayOrder            Int               @default(0) @map("display_order")
+  categoryId              String?     @map("category_id") @db.Uuid
+  pickCount               Int?        @map("pick_count")
+  fixedQuestionVersionIds String[]    @default([]) @map("fixed_question_version_ids") @db.Uuid
+  displayOrder            Int         @default(0) @map("display_order")
 
-    @@index([assessmentVersionId, displayOrder])
+    @@index([assessmentId, displayOrder])
   @@map("assessment_sections")
 }
 
@@ -1339,8 +1433,8 @@ model Attempt {
   tenantId            String            @map("tenant_id") @db.Uuid
   enrollmentId        String            @map("enrollment_id") @db.Uuid
   enrollment          Enrollment        @relation(fields: [enrollmentId], references: [id])
-  assessmentVersionId String            @map("assessment_version_id") @db.Uuid
-  assessmentVersion   AssessmentVersion @relation(fields: [assessmentVersionId], references: [id])
+  assessmentId        String            @map("assessment_id") @db.Uuid
+  assessment          Assessment        @relation(fields: [assessmentId], references: [id])
   userId              String            @map("user_id") @db.Uuid
   user                User              @relation(fields: [userId], references: [id])
   attemptNumber       Int               @map("attempt_number")
@@ -1353,7 +1447,7 @@ model Attempt {
 
   questions AttemptQuestion[]
 
-  @@unique([enrollmentId, assessmentVersionId, attemptNumber])
+  @@unique([enrollmentId, assessmentId, attemptNumber])
     @@index([enrollmentId, attemptNumber])
   @@map("attempts")
 }

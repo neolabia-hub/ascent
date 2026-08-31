@@ -11,7 +11,7 @@ import {
   listQuestionCategories,
   presentationCapabilities,
   listLessons,
-  updateAssessmentDraft,
+  updateAssessment,
   uploadMedia,
   uploadPresentation,
   type AssessmentListItem,
@@ -117,7 +117,7 @@ export function AddContentDrawer({
   const [busy, setBusy] = useState(false);
 
   const [lessonId, setLessonId] = useState('');
-  const [assessmentVersionId, setAssessmentVersionId] = useState('');
+  const [assessmentId, setAssessmentId] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [pickCount, setPickCount] = useState(5);
@@ -136,7 +136,7 @@ export function AddContentDrawer({
     setTitle('');
     setDescription('');
     setLessonId('');
-    setAssessmentVersionId('');
+    setAssessmentId('');
     setExternalUrl('');
     setFile(null);
     setIsRequired(true);
@@ -182,17 +182,15 @@ export function AddContentDrawer({
 
       if (type === 'ASSESSMENT') {
         if (mode === 'new') {
-          // Nace en BORRADOR con una seccion aleatoria del banco: es el caso comun y el que
-          // evita repetir el mismo examen a todo el mundo. Se afina despues si hace falta.
+          // Nace con un bloque al azar del banco: es el caso comun y el que evita repetir el
+          // mismo examen a todo el mundo. Se afina despues desde su pantalla si hace falta.
           const created = await createAssessment(finalTitle);
-          const draft = created.versions.find((version) => version.status === 'DRAFT') ?? created.versions[0];
-          if (!draft) throw new Error('La evaluacion nacio sin version');
-          await updateAssessmentDraft(draft.id, {
+          await updateAssessment(created.id, {
             sections: [{ mode: 'RANDOM_FROM_POOL', categoryId, pickCount }],
           });
-          body.assessmentVersionId = draft.id;
+          body.assessmentId = created.id;
         } else {
-          body.assessmentVersionId = assessmentVersionId;
+          body.assessmentId = assessmentId;
         }
       }
 
@@ -238,7 +236,7 @@ export function AddContentDrawer({
   const canSubmit = (() => {
     if (!type || title.trim().length < 2) return false;
     if (type === 'LESSON') return mode === 'new' || Boolean(lessonId);
-    if (type === 'ASSESSMENT') return mode === 'new' ? Boolean(categoryId) : Boolean(assessmentVersionId);
+    if (type === 'ASSESSMENT') return mode === 'new' ? Boolean(categoryId) : Boolean(assessmentId);
     if (type === 'DOCUMENT' || type === 'PRESENTATION') return Boolean(file);
     if (type === 'VIDEO') return Boolean(file) || externalUrl.trim().startsWith('http');
     if (type === 'LINK') return externalUrl.trim().startsWith('http');
@@ -387,6 +385,18 @@ export function AddContentDrawer({
                   onChange={(event) => setPickCount(Number(event.target.value))}
                 />
               </Field>
+              {/*
+                ESTE ES EL ATAJO, NO LA UNICA FORMA.
+                Nace con un bloque al azar del banco, que es el caso comun y resuelve en dos clics.
+                Pero desde aqui no se puede escribir una pregunta, y eso dejaba INVISIBLE el
+                constructor: quien queria diez preguntas concretas no tenia forma de saber que se
+                podia. Se dice, y desde la lista de contenidos se entra a armarla.
+              */}
+              <p className="rounded-md border border-line-strong bg-paper px-3 py-2 text-xs text-ink-500">
+                Nace con ese bloque al azar, que resuelve el caso comun. Si quieres escribir preguntas concretas,
+                agregala y despues pulsa <strong className="text-ink-700">Armar preguntas</strong> en la lista de
+                contenidos: ahi se escriben, se traen del banco y se ordenan.
+              </p>
             </>
           ) : null}
 
@@ -394,20 +404,21 @@ export function AddContentDrawer({
             <Field htmlFor="c-assessment" label="Evaluacion">
               <Select
                 id="c-assessment"
-                value={assessmentVersionId}
-                onChange={(event) => setAssessmentVersionId(event.target.value)}
+                value={assessmentId}
+                onChange={(event) => setAssessmentId(event.target.value)}
               >
                 <option value="">Seleccionar...</option>
-                {assessments.flatMap((assessment) =>
-                  assessment.versions
-                    .filter((version) => version.status === 'PUBLISHED' || version.status === 'DRAFT')
-                    .map((version) => (
-                      <option key={version.id} value={version.id}>
-                        {assessment.title} — v{version.versionNumber} (
-                        {version.status === 'PUBLISHED' ? 'publicada' : 'borrador'})
-                      </option>
-                    )),
-                )}
+                {/*
+                  Una evaluacion, una opcion. Antes se ofrecia una por VERSION —"Examen — v2
+                  (publicada)"—, que obligaba a elegir entre versiones de la misma cosa sin saber
+                  en que se diferencian. Ya no hay versiones que elegir (Decision #87).
+                */}
+                {assessments.map((assessment) => (
+                  <option key={assessment.id} value={assessment.id}>
+                    {assessment.title}
+                    {assessment._count.sections === 0 ? ' — sin preguntas todavia' : ''}
+                  </option>
+                ))}
               </Select>
             </Field>
           ) : null}

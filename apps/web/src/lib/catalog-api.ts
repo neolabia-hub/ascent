@@ -3,6 +3,7 @@
  * lecciones en tarjetas, banco de preguntas y evaluaciones.
  */
 import { apiFetch, getAccessToken } from './api';
+import type { Presentation } from '@/components/assessments/presentation';
 
 // ─────────────────────────── Actividades y versiones ───────────────────────────
 
@@ -30,7 +31,7 @@ export interface ActivityListItem {
   active: boolean;
   updatedAt: string;
   currentVersionId: string | null;
-  activityType: { id: string; code: string; name: string; colorHex: string | null };
+  activityType: { id: string; code: string; name: string; colorHex: string | null; config: Record<string, unknown> };
   process: { id: string; code: string; name: string };
   versions: VersionSummary[];
 }
@@ -50,6 +51,8 @@ export interface CatalogRef {
 
 export interface ActivityDetail extends Omit<ActivityListItem, 'versions'> {
   description: string | null;
+  /** Portada subida. `null` = se pinta la generada, que es un estado normal (Decision #88). */
+  coverKey: string | null;
   responsibleUserId: string | null;
   tags: string[];
   norms: CatalogRef[];
@@ -69,16 +72,20 @@ export interface VersionContent {
   config: Record<string, unknown>;
   lessonId: string | null;
   contentPackageId: string | null;
-  assessmentVersionId: string | null;
+  assessmentId: string | null;
+  /** La encuesta de esta pieza. Viene del servidor (include trae todos los escalares) y hace
+   *  falta para saber si un contenido de tipo SURVEY esta completo. */
+  surveyTemplateId: string | null;
   lesson: { id: string; title: string; estimatedMinutes: number | null; status: VersionStatus; _count: { cards: number } } | null;
   contentPackage: { id: string; kind: string; originalName: string; sizeBytes: number; storageKey: string } | null;
-  assessmentVersion: {
+  /** La evaluacion de esta pieza. En una version publicada es la COPIA congelada (Decision #87). */
+  assessment: {
     id: string;
-    versionNumber: number;
+    title: string;
     status: VersionStatus;
     passingScore: number | null;
     maxAttempts: number | null;
-    assessment: { id: string; title: string };
+    sourceId: string | null;
     _count: { sections: number };
   } | null;
 }
@@ -114,7 +121,7 @@ export function createActivity(body: {
   description?: string | null;
   activityTypeId: string;
   processId: string;
-  modality: Modality;
+  modality?: Modality;
   normIds?: string[];
   serviceIds?: string[];
   regionalIds?: string[];
@@ -161,7 +168,7 @@ export function discardDraft(versionId: string) {
 
 export function addContent(
   versionId: string,
-  body: { type: ContentType; title: string; description?: string | null; isRequired?: boolean; config?: Record<string, unknown>; lessonId?: string | null; contentPackageId?: string | null; assessmentVersionId?: string | null },
+  body: { type: ContentType; title: string; description?: string | null; isRequired?: boolean; config?: Record<string, unknown>; lessonId?: string | null; contentPackageId?: string | null; assessmentId?: string | null },
 ) {
   return apiFetch<VersionContent>(`/activities/versions/${versionId}/contents`, { method: 'POST', body });
 }
@@ -262,8 +269,18 @@ export function deleteLesson(id: string) {
 }
 
 // ─────────────────────────── Banco de preguntas ───────────────────────────
+// (el tipo Presentation vive con su paleta, en components/assessments/presentation.ts)
 
-export type QuestionType = 'SINGLE' | 'MULTI' | 'TRUE_FALSE' | 'ESSAY';
+export type QuestionType =
+  | 'SINGLE'
+  | 'MULTI'
+  | 'TRUE_FALSE'
+  | 'ESSAY'
+  // Decision #86: con solo opcion multiple, media formacion de SST se pregunta mal.
+  | 'FILL_BLANK'
+  | 'ORDER'
+  | 'MATCH'
+  | 'NUMERIC';
 
 export interface QuestionCategory {
   id: string;
@@ -274,8 +291,9 @@ export interface QuestionCategory {
 
 export interface QuestionListItem {
   id: string;
-  categoryId: string;
-  categoryName: string;
+  /** `null` = sin tema. El tema solo hace falta para los bloques al azar (Decision #84). */
+  categoryId: string | null;
+  categoryName: string | null;
   versionCount: number;
   currentVersionId: string | null;
   qtype: QuestionType | null;
@@ -302,12 +320,25 @@ export interface QuestionPayloadClient {
   rubric?: string;
   points: number;
   explanation?: string;
+
+  // ── Los tipos de la Decision #86 ──
+  /** FILL_BLANK: un hueco por entrada. `accept` son todas las formas que cuentan como buenas. */
+  blanks?: Array<{ id: string; accept: string[] }>;
+  /** ORDER: los pasos, y aparte el orden correcto. */
+  items?: Array<{ id: string; text: string }>;
+  correctOrder?: string[];
+  /** MATCH: las dos columnas, ya emparejadas. Al servir se barajan. */
+  pairs?: Array<{ id: string; left: string; right: string }>;
+  /** NUMERIC: el numero, su margen y la unidad que se ensena junto al campo. */
+  correctNumber?: number;
+  tolerance?: number;
+  unit?: string;
 }
 
 export interface QuestionDetail {
   id: string;
-  categoryId: string;
-  categoryName: string;
+  categoryId: string | null;
+  categoryName: string | null;
   currentVersionId: string;
   versionNumber: number;
   payload: QuestionPayloadClient;
@@ -334,8 +365,13 @@ export function getQuestion(id: string) {
   return apiFetch<QuestionDetail>(`/questions/${id}`, { method: 'GET' });
 }
 
-export function createQuestion(categoryId: string, payload: QuestionPayloadClient) {
+export function createQuestion(categoryId: string | null, payload: QuestionPayloadClient) {
   return apiFetch<QuestionDetail>('/questions', { method: 'POST', body: { categoryId, payload } });
+}
+
+/** Cambiar el tema NO crea una version: archiva, no revisa. */
+export function setQuestionCategory(id: string, categoryId: string | null) {
+  return apiFetch<QuestionDetail>(`/questions/${id}/category`, { method: 'PATCH', body: { categoryId } });
 }
 
 export function reviseQuestion(id: string, payload: QuestionPayloadClient) {
@@ -348,20 +384,51 @@ export function retireQuestion(id: string) {
 
 // ─────────────────────────── Evaluaciones ───────────────────────────
 
+/** Una pregunta ELEGIDA a mano, con lo que hace falta para ensenarla y volver a guardarla. */
+export interface FixedQuestionRef {
+  questionVersionId: string;
+  /** El id de la PREGUNTA: es lo que se manda al guardar, no el de la version. */
+  questionId: string;
+  versionNumber: number;
+  qtype: QuestionType;
+  stem: string;
+  points: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  /**
+   * La pregunta ENTERA, con sus opciones y la correcta. Es lo que permite pintarla y editarla en
+   * el lienzo sin pedirla una por una. Llega `null` a quien no puede editar el banco.
+   */
+  payload: QuestionPayloadClient | null;
+}
+
 export interface AssessmentSection {
   id: string;
   mode: 'FIXED' | 'RANDOM_FROM_POOL';
   categoryId: string | null;
   pickCount: number | null;
   fixedQuestionVersionIds: string[];
+  /** Las mismas preguntas, ya resueltas y EN ORDEN. Vacio en los bloques al azar. */
+  fixedQuestions: FixedQuestionRef[];
   displayOrder: number;
   availableInCategory: number | null;
 }
 
-export interface AssessmentVersion {
+/**
+ * UNA EVALUACION ES UN OBJETO PLANO (Decision #87).
+ *
+ * Ya no tiene versiones propias: se edita siempre, y publicar la FORMACION congela una copia.
+ * `sourceId` distingue las dos clases de fila —null = la editable, con valor = la copia—, y el
+ * listado solo trae las editables.
+ */
+export interface AssessmentDetail {
   id: string;
-  versionNumber: number;
+  title: string;
   status: VersionStatus;
+  sourceId: string | null;
+  /** Ya esta dentro de alguna formacion publicada: hay copias congeladas de ella. */
+  enUso: boolean;
+
   timeLimitMin: number | null;
   maxAttempts: number | null;
   passingScore: number | null;
@@ -369,29 +436,28 @@ export interface AssessmentVersion {
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
   reviewPolicy: Record<string, boolean>;
-  sections: AssessmentSection[];
-}
 
-export interface AssessmentDetail {
-  id: string;
-  title: string;
-  currentVersionId: string | null;
-  versions: AssessmentVersion[];
+  /** Como se ve el examen. Ver `components/assessments/presentation.ts`. */
+  presentation: Partial<Presentation>;
+  sections: AssessmentSection[];
 }
 
 export interface AssessmentListItem {
   id: string;
   title: string;
-  currentVersionId: string | null;
+  passingScore: number | null;
+  maxAttempts: number | null;
+  timeLimitMin: number | null;
   createdAt: string;
-  versions: Array<{
-    id: string;
-    versionNumber: number;
-    status: VersionStatus;
-    passingScore: number | null;
-    maxAttempts: number | null;
-    _count: { sections: number };
-  }>;
+  updatedAt: string;
+  _count: { sections: number; copias: number };
+}
+
+export function updateAssessmentPresentation(id: string, presentation: Presentation) {
+  return apiFetch<AssessmentDetail>(`/assessments/${id}/presentation`, {
+    method: 'PATCH',
+    body: { presentation },
+  });
 }
 
 export function listAssessments() {
@@ -406,17 +472,29 @@ export function createAssessment(title: string) {
   return apiFetch<AssessmentDetail>('/assessments', { method: 'POST', body: { title } });
 }
 
-export function updateAssessmentDraft(versionId: string, body: Record<string, unknown>) {
-  return apiFetch<AssessmentDetail>(`/assessments/versions/${versionId}`, { method: 'PATCH', body });
+/** Una seccion tal como se GUARDA: preguntas elegidas, o N al azar de una categoria. */
+export type AssessmentSectionInput =
+  | { mode: 'FIXED'; questionIds: string[] }
+  | { mode: 'RANDOM_FROM_POOL'; categoryId: string; pickCount: number };
+
+export interface AssessmentDraftBody {
+  timeLimitMin?: number | null;
+  maxAttempts?: number | null;
+  passingScore?: number | null;
+  gradingPolicy?: 'HIGHEST' | 'LAST' | 'FIRST' | 'AVERAGE';
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  reviewPolicy?: Record<string, boolean>;
+  sections?: AssessmentSectionInput[];
 }
 
-export function publishAssessment(versionId: string) {
-  return apiFetch(`/assessments/versions/${versionId}/publish`, { method: 'POST', body: { confirm: true } });
+export function updateAssessment(id: string, body: AssessmentDraftBody) {
+  return apiFetch<AssessmentDetail>(`/assessments/${id}`, { method: 'PATCH', body });
 }
 
-export function createNextAssessmentVersion(assessmentId: string) {
-  return apiFetch(`/assessments/${assessmentId}/versions`, { method: 'POST' });
-}
+
+
+
 
 // ─────────────────────────── Medios ───────────────────────────
 
@@ -500,4 +578,24 @@ export function presentationCapabilities(): Promise<{ office: boolean }> {
 export function mediaUrl(storageKey: string): string {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
   return `${apiUrl}/v1/media/file/${encodeURIComponent(storageKey)}`;
+}
+
+/**
+ * Eliminar una formacion. El servidor la marca como borrada, no la borra: el historico de quien
+ * la curso sigue existiendo. Y se niega si tiene convocatorias (`ACTIVITY_IN_USE`), porque ahi
+ * hay gente citada o inscrita.
+ */
+export function deleteActivity(id: string): Promise<void> {
+  return apiFetch<void>(`/activities/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * DESCARTAR el borrador de una evaluacion. La accion opuesta a publicar, y no existia: quien abria
+ * una version nueva "a ver que tal" se quedaba con ella para siempre.
+ */
+
+
+/** Eliminar la evaluacion entera. El servidor la protege si ya la respondio alguien o esta en uso. */
+export function deleteAssessment(assessmentId: string) {
+  return apiFetch<{ ok: true }>(`/assessments/${assessmentId}`, { method: 'DELETE' });
 }

@@ -107,6 +107,14 @@ export interface MeResponse {
   mustChangePassword: boolean;
   activated: boolean;
   permissions: string[];
+  /**
+   * Los procesos que esta persona puede administrar.
+   *
+   * **`null` = SIN ACOTAR (los ve todos). `[]` = acotada a NINGUNO.** No son lo mismo y confundirlos
+   * es grave en los dos sentidos: leer `[]` como "ve todo" le abre la empresa entera a quien no
+   * tiene nada asignado. Es la misma regla que aplica el servidor en `scopeAllows`.
+   */
+  scopeProcessIds: string[] | null;
 }
 
 export interface LoginResponse {

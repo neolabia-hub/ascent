@@ -80,6 +80,19 @@ export interface FirstDueContext {
 }
 
 /**
+ * Dias de gracia para quien YA estaba cuando el requisito aparecio.
+ *
+ * Sin esto, exigir una induccion anclada al ingreso condena de entrada a la plantilla actual: a
+ * quien entro en 2019, su obligacion le nace **vencida desde 2019**, y estrenar el requisito
+ * produce 116 vencidas el primer dia. Y no es cierto: la empresa no estaba incumpliendo, es que
+ * el sistema no existia. Decir lo contrario es inventar un incumplimiento.
+ *
+ * Treinta dias es el plazo razonable para ponerse al dia. Cuando haga falta afinarlo por empresa,
+ * este es el numero que se saca a la configuracion del tenant.
+ */
+export const DIAS_DE_GRACIA = 30;
+
+/**
  * Vencimiento de la PRIMERA ronda de una obligacion.
  *
  *   ON_HIRE   ancla en la fecha de ingreso. `dueDays` negativo = antes de empezar a trabajar,
@@ -89,6 +102,11 @@ export interface FirstDueContext {
  *   ON_JOIN   ancla en la entrada a la audiencia (alta, cambio de cargo, de area).
  *   SCHEDULED con fecha fija anual, vence en la proxima ocurrencia; con "cada N meses", cuenta
  *             desde la entrada a la audiencia.
+ *
+ * LA GRACIA. Si la fecha calculada cae ANTES del momento en que la obligacion nace —el caso de
+ * quien lleva anos en la empresa cuando se estrena el requisito—, se sustituye por "desde hoy,
+ * con `DIAS_DE_GRACIA` de plazo". A quien entra manana no le afecta: su ancla de ingreso es
+ * posterior a su entrada a la audiencia, asi que la fecha de D1072 se respeta intacta.
  */
 export function computeFirstDueAt(trigger: Trigger, dueDays: number, ctx: FirstDueContext): Date {
   const joined = toBogotaDate(ctx.joinedAt);
@@ -96,7 +114,9 @@ export function computeFirstDueAt(trigger: Trigger, dueDays: number, ctx: FirstD
     return endOfDay(nextFixedDate(ctx.recurrence.fixedDate, joined));
   }
   const anchor = trigger === 'ON_HIRE' && ctx.hiredAt ? fromDateOnly(ctx.hiredAt) : joined;
-  return endOfDay(addDays(anchor, dueDays));
+  const calculada = addDays(anchor, dueDays);
+  const nace = endOfDay(calculada) < endOfDay(joined) ? addDays(joined, DIAS_DE_GRACIA) : calculada;
+  return endOfDay(nace);
 }
 
 /**

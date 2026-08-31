@@ -784,9 +784,9 @@ function AssessmentGate({
   const { showToast } = useToast();
   const [starting, setStarting] = useState(false);
 
-  const versionId = detail.content.assessmentVersionId;
+  const versionId = detail.content.assessmentId;
   const mine: EnrollmentAttempt[] = (course?.attempts ?? []).filter(
-    (attempt) => attempt.assessmentVersionId === versionId,
+    (attempt) => attempt.assessmentId === versionId,
   );
   // Un intento sin terminar se RETOMA; abrir otro gastaria uno de los limitados.
   const open = mine.find((attempt) => attempt.status === 'IN_PROGRESS') ?? null;

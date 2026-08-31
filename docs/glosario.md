@@ -28,6 +28,48 @@ arruina las plataformas de formacion:
 Si estas cuatro fueran una sola cosa, repetir la misma capacitacion el ano siguiente obligaria a
 duplicarla, y no se podria responder "quien estaba obligado pero no lo hizo".
 
+### El recorrido completo, de punta a punta
+
+Los terminos se entienden mejor en el orden en que ocurren. Todo esto se hace **desde la
+formacion**; los modulos (Convocatorias, Asignaciones) son tableros de lectura que cruzan todas
+las formaciones.
+
+```
+  1. CREAR         Tipo (primero: decide el resto) + nombre + proceso
+        |          -> nace la version 1 en BORRADOR
+        v
+  2. CONTENIDO     Lecciones, videos, presentaciones, examen
+        |
+        v
+  3. PUBLICAR      Congela el contenido. Irreversible. La v1 ya no cambia
+        |          (para cambiar algo se crea la v2; NO para agregar jornadas)
+        v
+  4. QUIENES       A quien se le exige -> nacen las OBLIGACIONES
+        |          y quien entre manana y cumpla la regla, la tendra solo
+        v
+  5. PROGRAMAR     La JORNADA: cuando, donde, quien dicta, a quienes atiende
+        |          Al publicarla se congelan sus PROYECTADOS
+        v
+  6. CONVOCAR      De los obligados, quienes van a ESTA jornada -> CONVOCADOS
+        |          Lo que quede fuera: "faltan N por convocar"
+        v
+  7. EJECUTAR      Presencial: ASISTENTES (firma, QR, lista)   [Sprint 5]
+        |          Virtual:    la persona cursa y responde
+        v
+  8. CERRAR        Quien cumple el criterio queda CAPACITADO
+                   -> se cierra su obligacion
+                   -> sube la COBERTURA del plan
+                   -> si el requisito se repite, se abre la ronda siguiente
+```
+
+Los pasos 4 y 5 son **independientes** y pueden ir en cualquier orden: a quien se le exige no
+depende de cuando se dicte. Lo unico obligatorio es que **3 va antes que 5** (no se convoca un
+borrador) y que **6 va despues de 5** (no se cita a una jornada que no existe).
+
+En una formacion **de autoservicio** —induccion, pildora— los pasos 6 y 7 se funden: la persona
+entra sola desde sus pendientes y empieza. No hay a quien convocar ni lista que firmar.
+
+
 ---
 
 ## 2. Conceptos del catalogo
@@ -73,6 +115,43 @@ Los seis tipos de Transprensa:
 una capacitacion extraordinaria, esa ejecucion **no debe mejorar ni empeorar** el indicador de
 cumplimiento del Plan 2026. Son mediciones separadas.
 
+**Y "cuenta para el plan" NO es automatico: cuenta cuando esta PROGRAMADA en el plan.** Crear una
+formacion de tipo "Capacitacion del plan" no la mete en ningun plan — el plan referencia
+convocatorias, no se apropia de actividades (regla de oro 3), y sus indicadores solo miran
+obligaciones nacidas de un renglon suyo (regla de oro 2). Mientras nadie le programe una jornada
+en el plan del ano, esa capacitacion no cuenta ni para el cumplimiento ni para la cobertura. La
+ficha de la formacion lo dice y ofrece programarla ahi mismo; el mes lo decide el analista, que es
+la unica parte que el sistema no puede adivinar.
+
+#### Que pregunta cada tipo, y que numeros le aplican
+
+Esta es la tabla que responde *"¿esto aplica a todas las formaciones o solo a algunas?"*. **El
+tipo la gobierna** (`activity_types.config`), y por eso crear una pildora no pregunta por
+instructor y la induccion general no deja marcar a nadie.
+
+| | Induccion general | Induccion especifica | Reinduccion | Capacitacion del plan | Extraordinaria | Pildora |
+|---|---|---|---|---|---|---|
+| **Quien decide a quien se le exige** | nadie: **toda la empresa** | la **matriz de cargos** | toda la empresa | **el analista** | el analista | el analista |
+| **Se puede editar a quien** | no | si, **con novedad justificada** | no | si | si | si |
+| **Se repite** | no | no | **cada 12 meses** | no | no | no |
+| **Vence contando desde** | el **ingreso** (antes de empezar a trabajar) | el ingreso al cargo | la ultima vez que se hizo | la fecha de la jornada | cuando se asigna | cuando se asigna |
+| **Forma por defecto** | permanente | permanente | permanente | **jornada con fecha** | jornada con fecha | permanente |
+| **Pide instructor, lugar, cupo** | no | no | no | **si** | **si** | no |
+| **Autoservicio** | si | si | si | no | no | si |
+| **Emite constancia** | si | si | si | si | si | **no** |
+| **Cuenta para el plan anual** | no | no | no | **si** | no | no |
+
+Y los seis numeros (ver *Los seis numeros* en la seccion 4), por tipo:
+
+| Numero | Donde aplica |
+|---|---|
+| **Obligados** | **en todos.** Es la unidad de medida del cumplimiento; sin obligacion no hay vencimiento, ni "quien falta", ni denominador |
+| **Proyectados** | en todos, pero **solo importa de verdad en las de jornada**: en una permanente los proyectados son sencillamente los obligados |
+| **Convocados** | **en las de jornada.** En autoservicio "convocarse" lo hace la propia persona al entrar |
+| **Pendientes de convocar** | **solo en las de jornada.** En autoservicio no aplica: no hay a quien citar |
+| **Asistentes** | **solo en presencial o mixta.** En virtual no hay lista que firmar |
+| **Capacitados** | **en todos.** Es lo unico que cierra la obligacion |
+
 ### Version de una actividad
 **Que es:** el contenido congelado en un momento dado. Una actividad tiene varias versiones a lo
 largo del tiempo.
@@ -93,6 +172,36 @@ version siguiente en borrador, sin tocar la anterior.
 **Cuidado con lo que publicar NO hace:** publicar la version 2 no cambia lo que esta entregando
 una convocatoria ya abierta. La convocatoria avisa que hay una version mas nueva y hay que
 **actualizarla a proposito**, porque eso mueve a gente ya citada. Ver *Politica de migracion*.
+
+#### Que se versiona y que NO (y por que no todo)
+
+Solo el **contenido**. Todo lo demas se edita en vivo, y eso es la simplificacion, no un descuido:
+si la ficha estuviera versionada, corregir una falta de ortografia en el nombre costaria una
+version nueva y una decision sobre quien la esta cursando.
+
+| Qué cambias | ¿Versión nueva? | Qué pasa con lo ya hecho |
+|---|---|---|
+| Lecciones, videos, examen | **Sí** | Lo publicado es inmutable; se decide qué pasa con quien va a mitad |
+| **Ficha**: nombre, descripción, proceso, norma, modalidad | No | Se guarda y ya. Lo que la constancia imprime quedó **congelado al publicar** |
+| **Responsable** | No, pero **se congela** en la versión al publicar | La constancia dice quién respondía ese día |
+| **Quiénes**: a quién se le exige | No | Es dato vivo. Su historia está en las obligaciones y en la auditoría, no en versiones |
+| **Convocatorias** | No | Cada jornada es un hecho con su fecha; agregar diez no crea ninguna versión |
+
+**El caso que lo obliga, y que hay que entender:** alguien hace la capacitacion en **enero**. En
+**marzo** cambia la norma aplicable en la ficha. ¿Que dice su constancia?
+
+> **La norma de enero.** Al publicar, la version copia POR VALOR lo que la evidencia necesita —el
+> nombre, el proceso, la norma, el temario y quien responde—. La ficha sigue viva y se corrige
+> cuando haga falta, pero el registro de enero no se reescribe.
+
+Es el patron que usan SuccessFactors, Cornerstone y Absorb: **version inmutable del contenido +
+snapshot por valor en el registro**. Versionar la ficha entera seria pagar mucho por lo mismo.
+
+**Lo que NO resuelve el versionado, y se confunde con el:** *"que todo cambio lo apruebe el
+administrador"*. Eso es **aprobaciones**, un mecanismo distinto y que ya existe: una operacion
+compuertada se ejecuta si quien la pide tiene el permiso, y si no, queda como solicitud. Versionar
+responde *"¿que vio esta persona?"*; aprobar responde *"¿quien autorizo este cambio?"*. Son dos
+preguntas distintas y hacen falta las dos.
 
 ### Politica de migracion
 **Que es:** la respuesta a *"cuando salga la version nueva, ¿que pasa con los que ya estaban?"*.
@@ -196,19 +305,188 @@ solo a quienes les toco, y para defender una impugnacion. Sin eso, "el sistema d
 
 ## 3. Conceptos de ejecucion
 
-### Convocatoria
-**Que es:** una ejecucion concreta de una actividad: fecha, hora, lugar, instructor, regional,
-intensidad horaria y cuantas personas se esperan.
+### Convocatoria (la jornada)
+**Que es:** una entrega concreta de una formacion: cuando, donde, quien la dicta, a quienes
+atiende y cuantos caben.
 
-**Que NO es:** no es la actividad. La misma actividad "Seguridad Vial" puede tener la
-convocatoria de marzo en Cali y la de agosto en Bogota, sin duplicar el contenido.
+**Que NO es:** no es la formacion. La misma "Seguridad Vial" tiene la jornada de marzo en Cali y
+la de agosto en Bogota, sin duplicar el contenido. **Tampoco es la obligacion**: una dice *cuando
+se dicta*, la otra *a quien se le exige*. Por eso una formacion tiene UNA lista de obligados y
+VARIAS jornadas.
 
-**Como se llama:** "Convocatoria"; en la base `offerings`.
+**Como se llama:** "Convocatoria" en el modulo, "Programacion" dentro de la formacion; en la base
+`offerings`.
 
-**Tres formas:**
-- **Evento** (presencial): tiene fecha, instructor y lista de asistencia.
-- **Permanente** (virtual autoservicio): sin fecha; cada quien la hace cuando puede.
-- **Hibrida**: exige cumplir la parte presencial **y** la virtual.
+#### PUBLICAR NO ES PROGRAMAR (la confusion mas cara)
+
+Son dos actos distintos y en este orden:
+
+1. **Publicar la version** congela el CONTENIDO: lo que la gente va a ver ya no puede cambiar.
+2. **Programar una convocatoria** dice CUANDO se dicta, y cuelga de esa version publicada.
+
+**No hace falta crear una version 2 para agregar una convocatoria.** La v2 solo existe cuando
+cambia el contenido. Lo normal es: publicas la v1 → creas la jornada sobre la v1 → y la gente ve
+la v1 para siempre, mientras nadie edite el contenido.
+
+Por eso la pantalla dice *"Primero publica una version"* cuando intentas programar sin haber
+publicado: **no se puede convocar un borrador**, porque lo que veria la gente todavia puede
+cambiar (Decision #6).
+
+**¿Se puede publicar sin ninguna convocatoria?** Si, y es normal: la formacion queda lista en el
+catalogo y se programa cuando toque. Lo que hay que saber es el efecto: **una obligacion sin
+convocatoria se ve pero no se puede empezar**. En los pendientes del colaborador sale la tarjeta
+con candado y el texto *"Todavia no esta abierta"*. Para que pueda hacerla tiene que existir una
+jornada: **permanente** (se apunta sola) o **con fecha** (alguien la convoca).
+
+#### La FORMA: como entra la gente
+
+Es el campo que mas decide, y en pantalla se pregunta con las palabras de la pregunta real:
+**"¿Como la hace la gente?"**.
+
+| Forma | Como entra la gente | Pide fecha | Autoservicio | Ejemplo de Transprensa |
+|---|---|---|---|---|
+| **Se convoca a una sesion** (`EVENT`) | **la citan**: alguien la inscribe | Si, y lugar si no es virtual | **No** | Manejo defensivo, 12 de marzo, 8 a. m., Auditorio Norte |
+| **Disponible** (`PERMANENT`) | **entra sola** cuando puede | No; ventana opcional | **Si** | Induccion general: cada quien la hace su primer dia |
+| **Las dos** (`HYBRID`) | hay sesion y ademas contenido en linea | Si | Si | Taller presencial con una parte virtual previa |
+
+**Y decide QUE se pregunta.** No es una etiqueta: al elegirla, el formulario cambia.
+
+| | Con fecha | Disponible |
+|---|---|---|
+| Fecha y hora | **se piden** | no |
+| Lugar | **obligatorio** si no es virtual | no |
+| Quien la dicta (y ¿cual?, si es externa) | **se pide** | no |
+| Instructor | **se pide** | no |
+| Intensidad horaria | **se pide** | no |
+| Cupo | **se pide** | no |
+| Desde / hasta | no | **opcional** |
+
+Por eso crear una pildora ya no pregunta por instructor —no lo tiene— y una capacitacion del plan
+si. El **tipo propone la forma** (`defaultOfferingKind`): inducciones, reinduccion y pildora nacen
+*disponibles*; capacitacion del plan y extraordinaria nacen *con fecha*. **Se puede cambiar**: si
+alguien decide dictar una pildora en una sesion presencial, marca "se convoca a una sesion" y los
+campos aparecen. Manda lo elegido, no lo que el tipo suponia.
+
+##### Los dos casos completos, de punta a punta
+
+**Caso A — "Induccion general" (disponible).**
+Se publica el contenido y se crea **UNA** convocatoria permanente, sin fecha. Eso es todo, y sirve
+años. Entra una persona nueva el 3 de febrero: la obligacion le nace sola, ve la formacion en sus
+pendientes con el boton **"Empezar"**, la hace esa misma tarde desde el celular y queda capacitada.
+Nadie la cito, nadie firmo nada. **Nunca se crea una segunda convocatoria**: la misma permanente
+atiende a los 116 y a los que entren.
+
+**Caso B — "Manejo defensivo" (con fecha).**
+40 conductores obligados, 20 en Antioquia y 20 en Cundinamarca. Se crean **DOS** convocatorias
+—12 de marzo en Antioquia, 19 en Cundinamarca—, cada una con su lugar, su instructor y su tajada.
+Se publican: cada una congela **20 proyectados**. Se convoca a los 20 de cada sede. El dia de la
+jornada firman 18 y, si hay examen, quedan capacitados los que lo aprueben. Aqui la persona **no
+puede apuntarse sola**: el servidor lo impide con estas palabras —*"Esta convocatoria tiene fecha y
+cupo: te inscribe quien la programa"*—, y es correcto: en una sala con 20 sillas no entra quien
+quiera.
+
+**La regla que resume las dos:** una convocatoria **siempre**; varias **solo cuando hay varias
+jornadas reales**. La convocatoria no es "para cuando hay varias" — es donde cuelga la inscripcion,
+y sin ella nadie puede empezar nada.
+
+#### Autoservicio
+**Que es:** que la persona **se inscribe ella misma** desde sus pendientes, sin que nadie la cite.
+Ocurre solo en convocatorias permanentes o mixtas, publicadas y dentro de su ventana de fechas.
+
+**Que NO es:** no es "el curso es opcional". La obligacion sigue existiendo y venciendo; lo unico
+que cambia es **quien pulsa el boton de inscribir**.
+
+**Por que existe:** la induccion general la hacen 116 personas en momentos distintos, cada una su
+primer dia. Citarlas una por una seria trabajo puro: la formacion esta ahi y cada quien entra.
+
+**Que pasa si se intenta en una jornada con fecha:** el servidor lo impide con estas palabras —
+*"Esta convocatoria tiene fecha y cupo: te inscribe quien la programa"*—. Es correcto: en una sala
+con 20 sillas no puede entrar quien quiera.
+
+**Ejemplo de Transprensa:** "Induccion general" es permanente, sin ventana → siempre disponible.
+"Manejo defensivo" es sesion programada del 12 de marzo → el analista convoca a los 20 de esa
+regional.
+
+#### Convocar, y "faltan N por convocar"
+
+**Convocar es inscribir.** No hay una lista aparte: los convocados de una jornada SON sus
+inscripciones (`enrollments`). Solo se puede convocar a quien tiene la obligacion abierta.
+
+**Quien falta** (`GET /offerings/:id/pendientes-por-convocar`) se calcula asi:
+
+```
+  obligados abiertos de la formacion
+  ∩ tajada de esta jornada
+  − quienes ya estan inscritos en CUALQUIER jornada de esta formacion
+```
+
+Lo ultimo es lo que hace util el numero: a quien ya se cito el 12 de marzo en Antioquia **no le
+falta nada** por no estar en la del 19 en Cundinamarca. Si se restaran solo los de ESTA jornada,
+cada convocatoria reclamaria a la empresa entera.
+
+**En pantalla** salen los cuatro numeros en el orden en que se leen —proyectados, convocados,
+faltan por convocar, intensidad— y **la lista con nombre y apellido** de quien falta, con su boton.
+El numero dice que hay un hueco; la lista dice a quien hay que citar, que es lo que permite actuar.
+
+**"Convocar a los N que faltan"** cita a todos de una vez, y respeta la tajada: convocar a mas de
+los proyectados seria inflar el numerador de la cobertura.
+
+**En autoservicio no aplica**: no hay a quien citar, la persona entra sola.
+
+#### Cupo
+**Que es:** cuantas personas caben, como maximo. **Vacio = sin tope**, que es lo normal en una
+formacion virtual propia.
+
+**Que hace de verdad:** dos cosas. Impide inscribir a mas de N desde el panel (`El cupo es de 20
+personas`), e impide que alguien se apunte solo cuando ya esta lleno.
+
+**Cuando ponerlo:** cuando el limite es real —caben 20 en la sala, la ARL dicta para 30, hay 50
+licencias compradas—. Ponerlo "por si acaso" en un curso virtual solo sirve para bloquear a
+alguien sin motivo.
+
+#### Lugar, y por que no es la regional
+Se confunden porque las dos suenan a "donde".
+
+| | Que es | Ejemplo | Para que sirve |
+|---|---|---|---|
+| **Regional** | la **sede** a la que pertenece la gente; es catalogo | "Antioquia" | acota la tajada y sale en los reportes por sede |
+| **Lugar** | la **direccion fisica de esa jornada**; es texto libre | "Auditorio principal, sede Norte" | va impreso en el acta de asistencia |
+
+Una regional tiene varias salas posibles, y una jornada puede darse fuera de la empresa (un hotel,
+las instalaciones de la ARL). El lugar solo se pide —y es obligatorio— en jornada no virtual.
+
+#### Tajada de la jornada (a quienes atiende)
+
+**Que es:** que parte de los obligados atiende ESTA jornada, con los mismos criterios de Quienes
+(cargo, area, regional, servicio). Vacia = atiende a **todos** los obligados. En la base,
+`offerings.audience_id`.
+
+**Para que sirve:** es lo que hace que los **proyectados** de dos jornadas de la misma formacion
+no sean los mismos. Sin ella, "Gestion de servicios" con 40 obligados y dos jornadas proyecta 40 y
+40 → el plan divide por 80 y la cobertura no puede pasar del 50% aunque se capacite a todo el
+mundo.
+
+**Ejemplo:** jornada del 12 de marzo, tajada "regional: Antioquia" → proyectados 20 de los 40.
+
+Al elegir la **regional como sede**, la tajada se propone con esa regional: marcada y quitable.
+Sugerencia visible, no decision por detras.
+
+#### Intensidad horaria
+Horas **teoricas** y **practicas**, siempre separadas (lo exige el PESV en su Paso 10) y sumando
+para las 10 h/ano de BPM. Hoy se guarda y se muestra; el indicador anual de horas por persona
+todavia no existe (`norms.annual_hours_required` sigue sin leerse).
+
+#### Ejecutada por, y "¿cual?"
+Quien la dicta: la empresa con personal propio, la ARL, la EPS, la temporal u otro tercero. **Si es
+externa se pregunta CUAL**, porque "la ARL Sura dicto 14 jornadas este ano" es una metrica y "un
+tercero" no lo es. Cuando la dicta la empresa, se elige el **instructor** de entre su gente, con el
+mismo selector que el responsable del proceso.
+
+> **Estado hoy (2026-08-30):** la pregunta "¿cual?" ya se hace en toda ejecucion externa —antes
+> solo la abria "otros"—, pero **la lista de opciones sigue fija en el codigo** y la entidad es
+> **texto libre**. Es decir: se puede registrar, todavia no se puede medir bien, porque "Sura",
+> "ARL SURA" y "Arl sura" cuentan como tres. Falta el catalogo por tenant, con su bandera de "pide
+> entidad", y que la entidad sea tambien catalogo.
 
 **Cuelga de una version, y ahi se queda hasta que alguien la mueva:** si se publica una version
 nueva de la formacion, la convocatoria sigue entregando la que tenia y lo **avisa en pantalla**.
@@ -248,6 +526,58 @@ fueran lo mismo, ese estado no existiria.
 
 Nunca se borra ninguna: un cumplimiento del que se puede borrar evidencia no es evidencia.
 
+#### "Se le exige": desde ahora, o al ingresar
+
+Es **desde cuando se cuenta el plazo**, y cambia por completo a quien afecta:
+
+| Opcion | Cuenta desde | Ejemplo |
+|---|---|---|
+| **Desde ahora** | el momento en que se le empieza a exigir | Se marca SARLAFT para Comercial hoy: los 12 comerciales actuales tienen 30 dias **desde hoy**; quien entre en marzo, 30 dias desde su alta |
+| **Al ingresar a la empresa** | la **fecha de ingreso** de cada persona | Induccion general: quien entra el 3 de febrero la debe tener **antes** de ese dia (D1072) |
+
+**Los dias, y el negativo.** Es el plazo contado desde ese ancla, y **negativo significa antes**:
+
+- `30` con *desde ahora* → vence en 30 dias.
+- `0` con *al ingresar* → vence **el mismo dia** que entra.
+- `-1` con *al ingresar* → vence **el dia antes** de empezar a trabajar. Es literal en la norma: la
+  induccion es PREVIA al inicio de labores.
+
+**La gracia, que evita el desastre.** Si la fecha calculada cae antes del momento en que la
+obligacion nace —quien entro en 2019 y hoy se estrena el requisito— se sustituye por **"desde hoy,
+30 dias"** (`DIAS_DE_GRACIA`). Sin eso, estrenar una induccion anclada al ingreso produciria 116
+vencidas el primer dia, y seria falso: la empresa no estaba incumpliendo, es que el sistema no
+existia. A quien entra manana no le afecta.
+
+**"Se repite cada N meses"** es la reinduccion: al cumplirla, la ronda siguiente se abre contando
+**desde que la completo** (no desde que vencia) y aparece en sus pendientes 60 dias antes de
+vencer, no el mismo dia. Vacio = una sola vez.
+
+**Y en la induccion general no se pregunta ninguna de las tres.** Se aplica sola al publicar, con
+lo que dice el tipo: al ingresar, dia 0, sin repeticion. Lo que queda en pantalla es *Retirar*.
+
+
+#### El ORDEN de la puesta en marcha (importante, y facil de hacer al reves)
+
+El corte de "solo a quien entre desde ahora" es **el momento en que se crea el requisito**, no la
+fecha de ingreso de la persona. De ahi sale una receta con un orden que hay que respetar:
+
+```
+1. Subir PRIMERO a toda la plantilla actual.
+2. Despues crear y publicar la induccion general.
+   -> a los que ya estaban NO se les exige (ya la hicieron en papel)
+3. A partir de ahi, cada alta nueva la recibe automaticamente.
+4. La reinduccion se publica cuando sea: esa SI alcanza a todos, y es la que cubre
+   a la plantilla actual.
+```
+
+**Al reves no funciona:** si se publica la induccion antes de subir a la gente, todos los que se
+suban despues contaran como "nuevos" y les caera.
+
+**El caso raro que hay que mirar:** alguien que ingreso la semana pasada, todavia no hizo la
+induccion, y se sube en el lote de los antiguos. A esa persona **no** le va a caer, porque entro al
+sistema antes que el requisito. Si ese caso existe, se le asigna a mano desde "personas concretas"
+o se mueve el corte.
+
 ### Ronda (ciclo de una obligacion)
 **Que es:** cada vuelta de una obligacion que se repite. La reinduccion de 2026 y la de 2027 son
 la **misma regla** pero **dos rondas distintas**, cada una con su fecha y su resultado.
@@ -276,12 +606,26 @@ aprobo siendo auxiliar de bodega, y asi debe constar.
 ## 4. El plan de capacitacion
 
 ### Plan de capacitacion
-**Que es:** el documento empresarial donde se planea la formacion de un ano: objetivos, metas,
+**Que es:** el documento empresarial donde se planea la formacion de un ano: objetivo, META,
 alcance y el calendario de lo que se va a dictar. Tiene su propio ciclo de aprobacion.
+
+**La META es un PORCENTAJE**, no un parrafo: cuanto del programa se compromete la empresa a
+ejecutar ese ano (lo habitual, 90%). Sin ella el plan ensena "62% de cumplimiento" y nadie sabe si
+eso esta bien; con ella la pantalla puede decir "faltan 28 puntos" o "meta cumplida". Se mide
+contra el CUMPLIMIENTO (ejecutadas / programadas), no contra la cobertura.
 
 **Que NO es:** **no es un tipo de actividad**. Es una entidad aparte con vida propia.
 
 **Como se llama:** "Plan de capacitacion"; en la base `training_plans`.
+
+**HAY UNO POR ANO, y solo uno.** Lo identifica el **ano**; el nombre es un rotulo y se puede
+corregir. Antes la clave incluia el nombre, asi que "Plan 2026", "Plan anual 2026" y "Plan SST
+2026" podian convivir con tres cumplimientos distintos, y a la pregunta del auditor —"enseneme el
+plan de 2026"— habia tres respuestas sin forma de saber cual valia.
+
+**El plan SST, el PESV y el BASC NO son planes distintos:** son la **vista por proceso** del mismo
+plan anual, que se exporta por separado para cada auditor. La pestana "Por proceso" del plan es
+exactamente eso.
 
 **Regla fundamental — el plan NO posee las actividades, las referencia.** Cada renglon del plan
 apunta a una convocatoria programada. Asi, reprogramar una capacitacion de marzo a mayo, o
@@ -291,26 +635,80 @@ partirla en dos sedes, no obliga a reescribir el plan.
 proyectados". La actividad "Seguridad Vial" sigue existiendo por su cuenta en el catalogo y
 tambien se usa fuera del plan.
 
-### Proyectados, ejecutados, cobertura y cumplimiento
-Los cuatro numeros del plan. Se confunden constantemente:
+### Los seis numeros, y cual es de quien
 
-| Termino | Que mide | Formula |
+Son los que mas se confunden porque los seis hablan de personas. Se distinguen por **de quien
+son**: unos son de la FORMACION, otros de cada JORNADA, otro de la PERSONA.
+
+| Numero | De quien es | Que afirma | En la base |
+|---|---|---|---|
+| **Obligados** | de la **FORMACION** | "a estas personas se les exige, y vence tal dia" | `assignments` abiertas |
+| **Proyectados** | de cada **JORNADA** | "esta jornada debe atender a estas" | `offerings.projected_count`, congelado |
+| **Convocados** | de cada **JORNADA** | "a estas las inscribi en esta jornada" | `enrollments` de esa convocatoria |
+| **Pendientes de convocar** | de la **JORNADA** | "obligados que esta jornada atiende y no estan citados en ninguna" | `GET /offerings/:id/pendientes-por-convocar` |
+| **Asistentes** | de la **SESION** | "estas estuvieron el 12 de marzo" | `attendance_records` (Sprint 5) |
+| **Capacitados** | de la **PERSONA** | "estas cumplieron" | `enrollments` en COMPLETED/PASSED |
+
+#### El ejemplo que los ordena
+
+**"Gestion de servicios", exigida a los cargos SGI y Comercial: 40 personas, 20 en Antioquia y 20
+en Cundinamarca.**
+
+1. En **Quienes** se marcan los dos cargos → nacen **40 obligados**. Cada uno con su vencimiento.
+   Quien entre manana con uno de esos cargos entra solo en la lista.
+2. Se programan **dos jornadas**: 12 de marzo en Antioquia, 19 de marzo en Cundinamarca. Cada una
+   **declara la tajada que atiende** (ver *Tajada de la jornada*), asi que al publicarlas se
+   congelan **20 y 20 proyectados**, no 40 y 40.
+3. Se **convoca**: en la jornada de Antioquia se inscribe a esos 20 → **20 convocados**. Igual en
+   la otra. **Pendientes de convocar: 0.** Si solo se hubiera convocado a 15 en Antioquia, la
+   formacion diria **"faltan 5 por convocar"**, que es la frase que evita que el reparto acabe en
+   un Excel al lado.
+4. El 12 de marzo firman 18 → **18 asistentes**. Dos faltaron.
+5. De esos 18, uno reprueba el examen → **17 capacitados**. Ese uno sigue obligado.
+
+**Cobertura de esa jornada = 17 / 20.** Y en el plan, las dos jornadas suman 40 proyectados —los
+40 obligados— y no 80.
+
+> **Que de este ejemplo funciona HOY (2026-08-30):** los pasos 1, 2 y 3 completos —la tajada ya se
+> declara en el formulario de la convocatoria y los proyectados salen de ella—; el 4 nada, la
+> asistencia es el Sprint 5; y el 5 solo en formaciones con contenido digital, porque hoy lo unico
+> que cierra una obligacion es el reproductor o un examen aprobado. Lo que falta en el 3 es la
+> PANTALLA que diga "faltan N por convocar": los datos ya estan.
+
+#### Las tres confusiones que hay que tener claras
+
+- **Obligado no es convocado.** Se le exige, pero todavia no esta citado a ninguna jornada. Ese
+  hueco es justo lo que mide "pendientes de convocar".
+- **Convocado no es asistente.** Lo cite; puede no aparecer.
+- **Asistente no es capacitado.** Estuvo; puede no haber aprobado. Y al reves en lo virtual:
+  quien completa el contenido **queda capacitado sin que exista ninguna lista de asistencia**,
+  porque ahi la evidencia es la telemetria (que vio, cuanto tiempo, que respondio), que dice mas
+  que una firma.
+
+#### De donde sale cada uno, y que NO se teclea
+
+**Los proyectados no se digitan** (salvo ajuste justificado y auditado). Si fueran un numero
+libre, el indicador de cobertura seria una opinion, y es justo lo que audita el SG-SST.
+
+Se derivan asi, en orden: los **ya obligados** a esa formacion, acotados a la tajada de la
+jornada; si todavia no hay ninguna obligacion, las personas que **alcanzarian los requisitos**
+activos; si tampoco, cero, y la pantalla pide ajustarlo con motivo.
+
+> **Corregido el 2026-08-30:** este documento decia que, a falta de requisitos, los proyectados
+> salian de "los cargos a los que la actividad esta dirigida". Ese paso se elimino (Decision #59):
+> obligaba a marcar los cargos dos veces —en la ficha para el numero y en Quienes para la
+> obligacion— y las dos listas se separaban en cuanto alguien cambiaba una.
+
+#### Los dos indicadores del plan
+
+| Indicador | Formula | Que responde |
 |---|---|---|
-| **Proyectados** | Cuantas personas se esperaba que hicieran esa convocatoria | Se **deriva** de la regla de asignacion y se **congela** al publicar |
-| **Ejecutados / asistentes** | Cuantas la hicieron de verdad | Conteo real |
-| **Cobertura** | Que tanto del publico objetivo se alcanzo | asistentes / proyectados x 100 |
-| **Cumplimiento del plan** | Que tanto de lo planeado se dicto | convocatorias ejecutadas / programadas x 100 |
+| **Cumplimiento del programa** | jornadas ejecutadas / programadas | "¿dicte lo que dije que iba a dictar?" |
+| **Cobertura** | capacitados / proyectados | "¿se formo la gente que debia formarse?" |
 
-**Proyectados no se digita a mano** (salvo ajuste justificado y auditado). Si fuera un numero
-libre, el indicador de cumplimiento seria una opinion, y eso es justo lo que audita el SG-SST.
-
-**De donde sale el numero, en orden:** de los **requisitos** que exigen esa actividad (su
-audiencia es la respuesta exacta); si no hay requisitos, de los **cargos a los que la actividad
-esta dirigida**; si tampoco, queda en cero y la pantalla pide ajustarlo con justificacion.
-
-**Si la convocatoria es de una regional, el alcance se acota a esa regional.** Una jornada en
-Neiva no le promete nada a Barranquilla, y por eso "inscribir a todos los obligados" tampoco
-arrastra a la empresa entera: numerador y denominador tienen que hablar de la misma gente.
+Son independientes a proposito, y hoy pueden discrepar de forma reveladora: una capacitacion
+**presencial** se dicta, se marca ejecutada y sube el cumplimiento, pero **la cobertura se queda
+en cero** porque todavia no existe el puente asistencia → capacitado (Sprint 5). Ver *Asistencia*.
 
 ### La regla de las metricas congeladas
 **El caso que la origina:** el Plan 2026 programo "Seguridad Vial" para marzo con 50 proyectados
@@ -350,6 +748,41 @@ hace la induccion general", "el carne de manipulacion de alimentos vence al ano"
 **Como funciona:** un proceso automatico las evalua y **genera las asignaciones** cuando toca. No
 depende de que alguien se acuerde.
 
+
+#### Reinduccion: obligacion de CALENDARIO, no aniversario por persona
+
+Es el punto donde mas facil es equivocarse, y se equivoco una vez en este proyecto (2026-08-31).
+
+**Que NO es:** no es "la induccion otra vez, 12 meses despues de que cada quien la hizo". Con ese
+modelo, alguien que lleva anos en la empresa y nunca hizo una induccion **no tendria de donde
+contar** sus 12 meses, y se quedaria sin reinduccion para siempre. Absurdo, porque la reinduccion
+es justamente lo que cubre a esa persona.
+
+**Que es:** una obligacion **anual de toda la empresa**, que cae por calendario. "La reinduccion de
+2026 se hace antes del 31 de marzo". No se ancla a nada de cada persona: el 31 de marzo llega igual
+para el que entro ayer y para el que lleva quince anos. Es tambien como lo pregunta el auditor:
+*"¿hicieron la reinduccion de 2026?"*, no *"¿cuando la hizo cada uno?"*.
+
+Por eso el tipo Reinduccion se siembra con `defaultAnnualDate` (Transprensa: `03-31`) y no con
+`defaultRecurrenceMonths`.
+
+**Y su contenido es propio.** La norma pide que cubra los CAMBIOS del ano: novedades, incidentes,
+politicas nuevas. Se crea, se le pone contenido y se publica como cualquier otra formacion.
+
+#### Entonces, ¿para que sirve "se repite"?
+
+Para decir **"esta formacion hay que volver a hacerla"**. Que el contenido haya cambiado o no es
+otro eje distinto —eso lo llevan las versiones—, y por eso no se contradicen:
+
+| | Se repite | Contenido |
+|---|---|---|
+| **Reinduccion** | cada ano, fecha fija | cada ano se publica una version NUEVA con los cambios del ano |
+| **Carne de manipulacion** | cada 12 meses desde que lo saco | el mismo, hasta que cambie la norma |
+| **Induccion general** | no se repite | se versiona cuando cambia algo |
+
+La obligacion vuelve; lo que la persona ve cuando vuelve es **la version vigente ese dia**. Las dos
+cosas encajan sin pisarse.
+
 ### Certificacion y vigencia
 **Que es:** una acreditacion con **fecha de vencimiento**. No es el papel: es el estado de estar
 acreditado.
@@ -366,6 +799,28 @@ guardan como un campo que un proceso pueda dejar desactualizado.
 ---
 
 ## 6. Evidencia y documentos
+
+### Asistencia, y por que no es lo mismo que estar capacitado
+**Que es:** el registro de que una persona **estuvo** en una jornada. Tres mecanismos combinables:
+lista del instructor (presente / ausente / justificado), codigo QR de sesion que la persona
+escanea desde su celular, y **firma en pantalla**, que junto con el ingreso individual y el sello
+de tiempo tiene validez legal (Ley 527/1999 y D2364/2012); el acuerdo de firma electronica se
+acepta en el primer ingreso. En la base `attendance_records`, y el PDF resultante en
+`session_acts`.
+
+**Que NO es:** no es haber cumplido la formacion. Se puede asistir y reprobar el examen.
+
+**Donde aplica:** **solo en presencial o mixta.** En una formacion virtual **no hay nada que
+firmar y no hace falta**: la evidencia es la telemetria —que tarjetas vio, cuanto tiempo estuvo,
+que respondio—, que dice mas que una firma porque describe lo que aprendio, no solo que estuvo.
+Por eso en virtual, **completar ya implica haber "asistido"**.
+
+**Estado hoy (2026-08-30):** las tablas existen y el grupo de permisos tambien, pero **no hay
+codigo que las escriba ni las lea**: es el Sprint 5. La consecuencia concreta y medible es que una
+capacitacion **presencial** se dicta, se marca ejecutada, sube el cumplimiento del programa, y la
+cobertura se queda en cero — porque lo unico que hoy cierra una obligacion es el reproductor o un
+examen aprobado. Lo que falta es el puente: **asistir a una jornada presencial completa la
+ejecucion**, y si hay examen hay que aprobarlo.
 
 | Concepto | Que es | Quien lo pide |
 |---|---|---|

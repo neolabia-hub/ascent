@@ -4,6 +4,7 @@ import {
   approvePlanSchema,
   createTrainingPlanSchema,
   deletePlanSchema,
+  reopenPlanSchema,
   listPlansQuerySchema,
   updatePlanItemSchema,
   updateTrainingPlanSchema,
@@ -22,8 +23,8 @@ export class PlansController {
 
   @Get()
   @RequirePermissions('plans:manage')
-  list(@Query() query: Record<string, string>) {
-    return this.plans.list(listPlansQuerySchema.parse(query));
+  list(@CurrentUser() actor: AuthUser, @Query() query: Record<string, string>) {
+    return this.plans.list(actor, listPlansQuerySchema.parse(query));
   }
 
   @Get(':id')
@@ -82,6 +83,14 @@ export class PlansController {
   @RequirePermissions('plans:approve')
   activate(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.plans.changeStatus(actor, id, 'ACTIVE');
+  }
+
+  // REABRIR: la salida para un plan cerrado por error, que desde la Decision #71 se queda con el
+  // ano entero y no deja planear. Va con `plans:approve`, igual que cerrarlo, y exige motivo.
+  @Post(':id/reopen')
+  @RequirePermissions('plans:approve')
+  reopen(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.plans.reopen(actor, id, reopenPlanSchema.parse(body));
   }
 
   @Post(':id/close')

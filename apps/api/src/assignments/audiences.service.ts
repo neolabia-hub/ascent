@@ -4,7 +4,14 @@ import { audienceRuleSchema, type AudienceRule, type CreateAudienceInput, type U
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
-import { buildAudienceWhere, personMatchesRule, ruleReachesEveryone, type PersonProfile } from './audience-rule.js';
+import {
+  buildAudienceWhere,
+  personMatchesRule,
+  ruleReachesEveryone,
+  sameAudienceRule,
+  singleJobTitleOf,
+  type PersonProfile,
+} from './audience-rule.js';
 
 export interface AudienceSyncResult {
   joined: number;
@@ -92,6 +99,75 @@ export class AudiencesService {
       }),
     ]);
     return { count, sample, reachesEveryone: ruleReachesEveryone(rule) };
+  }
+
+  /**
+   * La audiencia que corresponde a un alcance: la que ya existe con esa FORMA, o una nueva con un
+   * nombre que se lee solo ("Toda la empresa", "Cargo: Conductor", "2 cargos · Neiva").
+   *
+   * Vive aqui y no en quien la usa porque la piden dos sitios que no se conocen entre si: la
+   * pestana **Quienes** (a quien se le exige la formacion) y la **convocatoria** (a que tajada de
+   * los obligados atiende esa jornada). Si cada uno la creara por su cuenta, "los conductores"
+   * serian dos audiencias gemelas y nadie sabria cual mirar.
+   *
+   * Se reconoce por la FORMA y no por el nombre (`sameAudienceRule`): asi, renombrarla no la
+   * desconecta, y la casilla de la matriz por cargo produce exactamente la misma fila.
+   */
+  async findOrCreate(tenantId: string, scope: AudienceRule) {
+    const audiences = await this.prisma.scoped.audience.findMany({ where: { active: true } });
+    const found = audiences.find((audience) => sameAudienceRule(this.parseRule(audience.rule), scope));
+    if (found) return found;
+
+    const created = await this.prisma.scoped.audience.create({
+      data: {
+        tenantId,
+        name: await this.nameForScope(scope),
+        rule: scope as unknown as Prisma.InputJsonValue,
+        isDynamic: true,
+      },
+    });
+    await this.reevaluate(this.prisma.scoped, tenantId, created.id);
+    return created;
+  }
+
+  /** Nombre legible del alcance. Es lo que se vera despues en la lista de audiencias. */
+  private async nameForScope(scope: AudienceRule): Promise<string> {
+    if (ruleReachesEveryone(scope)) return 'Toda la empresa';
+
+    const [jobTitles, areas, regionals, services] = await Promise.all([
+      scope.jobTitleIds.length > 0
+        ? this.prisma.scoped.jobTitle.findMany({ where: { id: { in: scope.jobTitleIds } }, select: { name: true } })
+        : [],
+      scope.areaIds.length > 0
+        ? this.prisma.scoped.area.findMany({ where: { id: { in: scope.areaIds } }, select: { name: true } })
+        : [],
+      scope.regionalIds.length > 0
+        ? this.prisma.scoped.regional.findMany({ where: { id: { in: scope.regionalIds } }, select: { name: true } })
+        : [],
+      scope.serviceIds.length > 0
+        ? this.prisma.scoped.service.findMany({ where: { id: { in: scope.serviceIds } }, select: { name: true } })
+        : [],
+    ]);
+
+    // Un solo cargo se nombra como lo nombra la matriz, para que las dos vias produzcan
+    // exactamente la misma audiencia tambien en el nombre.
+    if (singleJobTitleOf(scope) && jobTitles[0]) return `Cargo: ${jobTitles[0].name}`;
+
+    const partes = [
+      ...this.namePart('cargos', jobTitles.map((row) => row.name)),
+      ...this.namePart('areas', areas.map((row) => row.name)),
+      ...this.namePart('regionales', regionals.map((row) => row.name)),
+      ...this.namePart('servicios', services.map((row) => row.name)),
+    ];
+    const nombre = partes.join(' · ');
+    return nombre.length > 0 ? nombre.slice(0, 160) : 'Alcance a medida';
+  }
+
+  /** Hasta dos nombres; a partir de ahi se cuenta, que un titulo de 300 caracteres no se lee. */
+  private namePart(etiqueta: string, nombres: string[]): string[] {
+    if (nombres.length === 0) return [];
+    if (nombres.length <= 2) return [nombres.join(' y ')];
+    return [`${nombres.length} ${etiqueta}`];
   }
 
   async create(actor: AuthUser, input: CreateAudienceInput) {

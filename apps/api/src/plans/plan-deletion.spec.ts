@@ -33,14 +33,27 @@ describe('decidePlanDeletion', () => {
     expect(verdict.message).toContain('12 personas');
   });
 
-  it('el plan cerrado no se borra ni estando vacio: cerrar es lo que lo hace evidencia', () => {
-    const verdict = decidePlanDeletion(facts({ status: 'CLOSED' }));
-    if (verdict.allowed) throw new Error('inalcanzable');
-    expect(verdict.code).toBe('PLAN_CLOSED_IS_EVIDENCE');
+  /**
+   * El plan CERRADO que nunca obligo a nadie SI se borra (Decision #71).
+   *
+   * La regla anterior lo prohibia siempre, y con un plan por ano eso dejo de ser estricto y paso a
+   * ser una trampa: un plan de ensayo que alguien cerro por probar el boton se queda con 2026 y ya
+   * no hay forma de planear el ano. Lo que se protege sigue siendo el registro de PERSONAS, y sin
+   * una sola obligacion no hay registro que proteger.
+   */
+  it('el cerrado que nunca obligo a nadie SI se borra: no es evidencia de nada, es un ensayo', () => {
+    expect(decidePlanDeletion(facts({ status: 'CLOSED' }))).toEqual({ allowed: true, revokes: 0 });
   });
 
-  it('el cierre manda sobre el avance: cerrado y con gente que empezo sigue siendo CLOSED', () => {
+  it('el cerrado que SI obligo no se borra, y el mensaje ofrece la salida: reabrirlo', () => {
     const verdict = decidePlanDeletion(facts({ status: 'CLOSED', obligations: 9, started: 4 }));
+    if (verdict.allowed) throw new Error('inalcanzable');
+    expect(verdict.code).toBe('PLAN_CLOSED_IS_EVIDENCE');
+    expect(verdict.message).toContain('reabrelo');
+  });
+
+  it('cerrado con obligaciones pero sin que nadie empezara tampoco se borra: ya se anuncio', () => {
+    const verdict = decidePlanDeletion(facts({ status: 'CLOSED', obligations: 40 }));
     if (verdict.allowed) throw new Error('inalcanzable');
     expect(verdict.code).toBe('PLAN_CLOSED_IS_EVIDENCE');
   });

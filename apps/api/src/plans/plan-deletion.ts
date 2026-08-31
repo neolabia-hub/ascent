@@ -10,6 +10,10 @@
  * la frontera no es el estado, es si alguien EMPEZO.
  *
  *   - BORRADOR              → se borra. Nunca obligo a nadie; no hay nada que reescribir.
+ *   - CERRADO SIN NINGUNA OBLIGACION
+ *                           → se borra. Un plan que se cerro sin haber obligado a nadie no es
+ *                             evidencia de nada: es un ensayo. Desde que hay UN plan por ano
+ *                             (Decision #71) dejarlo puesto bloquea el ano entero.
  *   - APROBADO / EN EJECUCION sin que nadie haya empezado
  *                           → se borra, REVOCANDO sus obligaciones y diciendo cuantas. Un plan
  *                             aprobado por error el viernes y detectado el lunes es un error, no
@@ -18,8 +22,9 @@
  *   - Con alguien que YA EMPEZO → NO. Ese avance es de una persona, no del plan, y borrarlo seria
  *                             borrarle a alguien lo que hizo. Se cancelan los renglones o se
  *                             cierra el ano, que es lo que el auditor espera encontrar.
- *   - CERRADO               → NO, nunca. Cerrar es exactamente lo que lo convierte en evidencia
- *                             (por eso tampoco se reabre).
+ *   - CERRADO CON OBLIGACIONES → NO. Cerrar es lo que lo convierte en evidencia. Pero ya no es un
+ *                             callejon sin salida: se REABRE con motivo auditado, que deja rastro
+ *                             donde borrar no lo dejaria.
  *
  * Vive aparte y pura, como `version-migration.ts` y `progress-rules.ts`: es una decision
  * irreversible sobre datos de personas y tiene que poder leerse y probarse sin levantar nada.
@@ -41,10 +46,29 @@ export type PlanDeletionVerdict =
 
 export function decidePlanDeletion(facts: PlanDeletionFacts): PlanDeletionVerdict {
   if (facts.status === 'CLOSED') {
+    /**
+     * UN PLAN CERRADO QUE NUNCA OBLIGO A NADIE NO ES EVIDENCIA DE NADA.
+     *
+     * La regla anterior —"cerrado no se borra ni se reabre"— protegia lo correcto y lo aplicaba a
+     * todo, y desde que hay UN plan por ano (Decision #71) eso dejo de ser una molestia y paso a
+     * ser una TRAMPA: un plan de ensayo que alguien cerro por probar el boton ocupa 2026 para
+     * siempre, y ya no se puede planear el ano ni programar nada en el. Sin salida en la interfaz,
+     * la unica salida real era entrar a la base de datos.
+     *
+     * Lo que hay que proteger sigue siendo lo mismo que en el resto de esta funcion: el registro
+     * de PERSONAS. Si el plan no creo ni una obligacion, no hay registro que defender.
+     *
+     * Cuando SI obligo a alguien, borrar sigue prohibido — pero ya no es un callejon sin salida:
+     * se REABRE (`changeStatus` a ACTIVE, con motivo auditado). Reabrir deja rastro; borrar no.
+     */
+    if (facts.obligations === 0 && facts.started === 0) {
+      return { allowed: true, revokes: 0 };
+    }
     return {
       allowed: false,
       code: 'PLAN_CLOSED_IS_EVIDENCE',
-      message: 'El plan cerrado es la evidencia del ano: no se borra ni se reabre.',
+      message:
+        'El plan cerrado ya obligo a gente: es la evidencia del ano y no se borra. Si hay que corregirlo, reabrelo.',
     };
   }
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { modalitySchema } from './activities.js';
+import { audienceRuleSchema } from './assignments.js';
 
 /**
  * Contratos de CONVOCATORIA (CLAUDE.md seccion 2, capa 3; negocio 3.7).
@@ -47,6 +48,18 @@ const offeringBaseSchema = z.object({
   regionalId: z.string().uuid().nullable().optional(),
   capacity: z.number().int().min(1).max(10000).nullable().optional(),
   observations: z.string().max(4000).nullable().optional(),
+
+  /**
+   * A QUIENES ATIENDE esta jornada: la TAJADA de los obligados que le toca (Decision #68).
+   *
+   * Se pide como los criterios de Quienes —cargo, area, regional, servicio— y el servidor busca o
+   * crea la audiencia correspondiente. La pantalla nunca dice "audiencia".
+   *
+   * Sin facetas, o ausente, atiende a TODOS los obligados: es el caso simple y el comportamiento
+   * de siempre. Con facetas, es lo que evita que dos jornadas de la misma formacion proyecten a
+   * la misma gente y el plan las sume.
+   */
+  audienceScope: audienceRuleSchema.nullable().optional(),
 });
 
 /**

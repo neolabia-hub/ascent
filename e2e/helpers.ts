@@ -22,3 +22,107 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 export function unique(): string {
   return String(Date.now()).slice(-8);
 }
+
+/**
+ * UN PLAN POR ANO (Decision #71), y las pruebas tienen que convivir con eso.
+ *
+ * Antes cada prueba creaba "Plan S3 <sufijo>" en el ano en curso y el sufijo las mantenia
+ * separadas: la base de desarrollo acabo con 168 planes de 2026. Ahora el ano ES la clave, asi que
+ * dos pruebas del mismo ano chocan entre si y con el plan de verdad.
+ *
+ * Cada prueba trabaja en SU ano y empieza BORRANDO el suyo. Limpiar al empezar y no solo al
+ * terminar es a proposito: una corrida interrumpida deja el plan puesto, y si la limpieza viviera
+ * solo al final la siguiente corrida no arrancaria.
+ *
+ * Los anos se CALCULAN desde el actual y no se clavan: el selector del formulario solo ofrece de
+ * dos anos atras a uno adelante —fuera de eso no hay opcion que elegir—, asi que unas constantes
+ * fijas dejarian de existir en el desplegable al cambiar de ano. Y el ANO EN CURSO se deja libre a
+ * proposito: es el que usa la empresa de verdad.
+ */
+const ANO_ACTUAL = new Date().getFullYear();
+export const ANO_PLAN_DOD = ANO_ACTUAL - 2;
+export const ANO_PLAN_DESECHABLE = ANO_ACTUAL - 1;
+/**
+ * El de "ida y vuelta" va al ano SIGUIENTE, no a uno pasado, porque esa prueba comprueba que la
+ * ficha de una capacitacion del plan dice en que plan esta: la tarjeta de la ficha solo mira
+ * planes del ano en curso o posteriores —en 2026 nadie programa dentro de 2024— y con un ano
+ * pasado diria, con razon, que no hay ningun plan abierto al que agregarla.
+ */
+export const ANO_PLAN_IDA_Y_VUELTA = ANO_ACTUAL + 1;
+
+/**
+ * Borra el plan de ese ano si existe. Sirve en borrador, aprobado (pide motivo) y cerrado sin
+ * obligaciones (Decision #72).
+ *
+ * Se localiza por el rotulo accesible del boton —"Eliminar el plan de 2027"— y no por la fila de
+ * una tabla: el listado son TARJETAS desde que dejo de ser una tabla, y ese rotulo lleva el ano
+ * dentro, que es justo lo que hace falta para no borrar el de al lado.
+ */
+export async function limpiarPlanDelAno(page: Page, year: number): Promise<void> {
+  await page.goto('/plan');
+  /**
+   * Se espera a que la LISTA llegue, y se espera por una senal POSITIVA.
+   *
+   * Dos intentos fallaron antes, y los dos por la misma razon de fondo:
+   *   - esperar el TITULO no espera nada: es estatico y esta desde el primer render;
+   *   - esperar a que el esqueleto DESAPAREZCA acierta igual cuando todavia no ha llegado a
+   *     aparecer, que es lo que pasa justo despues de `goto`.
+   * En los dos casos se contaban los botones con la lista vacia, se concluia "no hay plan de 2024
+   * que borrar", y el fallo salia dos pasos despues —el desplegable sin la opcion 2024— en un
+   * sitio que no tenia la culpa.
+   *
+   * `aria-busy="false"` sobre un contenedor que esta SIEMPRE no tiene ese problema: solo puede ser
+   * cierto cuando la respuesta ya llego.
+   */
+  await page
+    .locator('[role="region"][aria-label="Planes de capacitacion"][aria-busy="false"]')
+    .waitFor({ timeout: 20_000 });
+
+  const borrar = page.getByRole('button', { name: `Eliminar el plan de ${year}` });
+  if ((await borrar.count()) === 0) return;
+
+  await borrar.first().click();
+  const motivo = page.locator('#d-reason');
+  // El cajon solo pide motivo si el plan ya estaba aprobado: en borrador no obligo a nadie.
+  if (await motivo.isVisible().catch(() => false)) {
+    await motivo.fill('Limpieza de la corrida anterior de las pruebas automatizadas.');
+  }
+  await page.getByRole('button', { name: 'Eliminar el plan' }).click();
+  await page.getByText('Plan eliminado').waitFor({ timeout: 20_000 });
+}
+
+/**
+ * Deja creado y abierto el plan de ese ano, partiendo de cero. Devuelve su ruta.
+ *
+ * El boton lleva el ano en el texto ("Crear el plan de 2026") porque propone el primer ano libre,
+ * asi que se busca por prefijo. Y el ano se ELIGE en un selector: escribirlo dejo de ser posible
+ * cuando dejo de tener sentido teclear 2062.
+ */
+export async function crearPlanDelAno(page: Page, year: number, nombre: string): Promise<string> {
+  await limpiarPlanDelAno(page, year);
+  await page
+    .getByRole('button', { name: /^Crear el plan de/ })
+    .first()
+    .click();
+  await page.locator('#p-year').selectOption(String(year));
+  await page.locator('#p-name').fill(nombre);
+  await page.getByRole('button', { name: 'Crear plan' }).click();
+  await page.waitForURL('**/plan/**', { timeout: 20_000 });
+  return new URL(page.url()).pathname;
+}
+
+/**
+ * Elegir una opcion en un `Combo` (`components/ui/combo.tsx`).
+ *
+ * No es un `<select>`: es un boton que abre una lista, con buscador cuando la lista es larga o
+ * cuando se pregunta al servidor. Se escribe el termino a proposito en vez de recorrer la lista —
+ * es lo que hace de verdad una persona, y ademas ejercita la busqueda.
+ */
+export async function elegirEnCombo(page: Page, comboId: string, nombre: string): Promise<void> {
+  await page.locator(`#${comboId}`).click();
+  const buscador = page.getByRole('textbox', { name: /Buscar/ });
+  if (await buscador.isVisible().catch(() => false)) {
+    await buscador.fill(nombre);
+  }
+  await page.getByRole('option', { name: new RegExp(nombre) }).first().click();
+}

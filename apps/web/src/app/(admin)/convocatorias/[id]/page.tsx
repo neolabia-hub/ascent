@@ -9,6 +9,8 @@ import {
   cancelOffering,
   completeOffering,
   enrollOffering,
+  getPendingInvites,
+  type PendingInvites,
   getOffering,
   getRoster,
   migrateOfferingVersion,
@@ -78,11 +80,19 @@ export default function ConvocatoriaDetallePage() {
   const [migrateOpen, setMigrateOpen] = useState(false);
   const [migrateReason, setMigrateReason] = useState('');
 
+  /** Quien falta por convocar. Se pide junto con lo demas: es parte de la foto, no un extra. */
+  const [pendientes, setPendientes] = useState<PendingInvites | null>(null);
+
   const load = useCallback(async () => {
     try {
-      const [detail, rosterResult] = await Promise.all([getOffering(id), getRoster(id)]);
+      const [detail, rosterResult, pendingResult] = await Promise.all([
+        getOffering(id),
+        getRoster(id),
+        getPendingInvites(id).catch(() => null),
+      ]);
       setOffering(detail);
       setRoster(rosterResult.items);
+      setPendientes(pendingResult);
     } catch {
       showToast({ kind: 'danger', title: 'No se pudo cargar la convocatoria' });
     }
@@ -129,6 +139,30 @@ export default function ConvocatoriaDetallePage() {
       await load();
     } catch {
       showToast({ kind: 'danger', title: 'No se pudo cancelar' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+
+  /** Convocar a UNA persona. El reparto no siempre es "todos": a veces se cita de a uno. */
+  const convocarA = async (userId: string) => {
+    setBusy(true);
+    try {
+      const result = await enrollOffering(id, { userIds: [userId] });
+      showToast({
+        kind: result.enrolled > 0 ? 'success' : 'info',
+        title: result.enrolled > 0 ? 'Convocada' : 'Ya estaba convocada',
+      });
+      await load();
+    } catch (error) {
+      showToast({
+        kind: 'danger',
+        title:
+          error instanceof ApiError && error.code === 'OFFERING_CAPACITY_EXCEEDED'
+            ? 'Se supera el cupo'
+            : 'No se pudo convocar',
+      });
     } finally {
       setBusy(false);
     }
@@ -206,6 +240,12 @@ export default function ConvocatoriaDetallePage() {
   const state = STATUS_LABEL[offering.status];
   const isDraft = offering.status === 'DRAFT';
   const isOpen = offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS';
+  /**
+   * AUTOSERVICIO: la persona entra sola. Aqui "convocar" no significa nada —nadie cita a nadie— y
+   * ensenar "faltan por convocar" invita a inscribir a mano a gente que iba a entrar sola, lo que
+   * ademas cuenta como inscrita antes de que haya hecho nada.
+   */
+  const esAutoservicio = offering.kind !== 'EVENT';
   const upgrade = offering.versionUpgrade;
 
   return (
@@ -217,8 +257,24 @@ export default function ConvocatoriaDetallePage() {
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-[28px] font-semibold text-ink-900">{activity.name}</h1>
+            {/*
+              QUE TIPO DE FORMACION ES, aqui y con su color.
+              La cabecera decia el nombre, el codigo, la version y el proceso, pero no el TIPO — y
+              el tipo es lo que decide si esto cuenta para el plan, si se repite y si emite
+              constancia. Sin el, dos convocatorias que se leen igual pueden significar cosas
+              distintas, y hay que salirse a la ficha para saber cual es cual.
+            */}
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${activity.activityType.colorHex ?? '#5b6572'} 12%, white)`,
+                color: activity.activityType.colorHex ?? 'var(--ink-700)',
+              }}
+            >
+              {activity.activityType.name}
+            </span>
             <StatusPill kind={state.kind} label={state.label} />
           </div>
           <p className="mt-1 text-sm text-ink-500">
@@ -233,17 +289,25 @@ export default function ConvocatoriaDetallePage() {
               Publicar
             </Button>
           ) : null}
+          {/*
+            CONVOCAR solo aparece cuando hay a quien convocar y donde significa algo.
+
+            En AUTOSERVICIO no significa nada: la persona entra sola, y citarla a mano la cuenta
+            como inscrita antes de que haya hecho nada. Y cuando no falta nadie, el boton seguia
+            ahi cambiando de texto a "Convocar a los obligados" para responder "no habia obligados
+            sin inscribir": un boton que solo sabe decir que no hacia falta pulsarlo.
+          */}
+          {isOpen && !esAutoservicio && pendientes && pendientes.faltan.length > 0 ? (
+            <Button variant="ghost" onClick={enrollObliged} loading={busy}>
+              <UserPlus size={16} />
+              Convocar a los {pendientes.faltan.length} que faltan
+            </Button>
+          ) : null}
           {isOpen ? (
-            <>
-              <Button variant="ghost" onClick={enrollObliged} loading={busy}>
-                <UserPlus size={16} />
-                Inscribir a los obligados
-              </Button>
-              <Button onClick={complete} loading={busy}>
-                <CheckCircle2 size={16} />
-                Cerrar convocatoria
-              </Button>
-            </>
+            <Button onClick={complete} loading={busy}>
+              <CheckCircle2 size={16} />
+              Cerrar convocatoria
+            </Button>
           ) : null}
           {offering.status !== 'CANCELLED' && offering.status !== 'COMPLETED' ? (
             <Button variant="ghost" onClick={() => setCancelOpen(true)}>
@@ -281,14 +345,50 @@ export default function ConvocatoriaDetallePage() {
         </div>
       ) : null}
 
+      {/*
+        LOS CUATRO NUMEROS DE LA JORNADA, en el orden en que se leen: a cuantos DEBE atender, a
+        cuantos ya cito, y a cuantos le FALTAN. El tercero es la pregunta que el analista se hace
+        de verdad y que antes no estaba en ninguna pantalla: habia que cruzar dos listas a ojo.
+      */}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Proyectados"
           value={offering.projectedCount ?? '—'}
           hint={offering.projectedFrozenAt ? `Congelados el ${formatDate(offering.projectedFrozenAt)}` : offering.derivedProjected.detail}
         />
-        <Stat label="Inscritos" value={offering._count.enrollments} hint="Personas con ejecucion abierta" />
-        <Stat label="Obligados a esta actividad" value={offering.obligedCount} hint="En toda la empresa, sin importar la sede" />
+        {/*
+          INSCRITOS, y no "convocados": eran DOS NOMBRES para la misma fila de la base. La tarjeta
+          decia una cosa y la tabla de abajo otra, y quien las lee cree que son dos cifras. Se
+          convoca —el verbo— para que alguien quede INSCRITO; el sustantivo es uno solo.
+        */}
+        <Stat
+          label="Inscritos"
+          value={offering._count.enrollments}
+          hint={esAutoservicio ? 'Entraron por su cuenta o los inscribieron' : 'Personas citadas a esta jornada'}
+        />
+        {/*
+          "Faltan por convocar" no aplica en autoservicio: no hay a quien citar. Ensenarlo ahi
+          invita a inscribir a mano a gente que iba a entrar sola.
+        */}
+        {esAutoservicio ? (
+          <Stat
+            label="Obligados a esta formacion"
+            value={pendientes ? pendientes.proyectados : '—'}
+            hint="Entran por su cuenta cuando puedan: no hay que citar a nadie"
+          />
+        ) : (
+          <Stat
+            label="Faltan por convocar"
+            value={pendientes ? pendientes.faltan.length : '—'}
+            hint={
+              pendientes
+                ? pendientes.faltan.length === 0
+                  ? 'Nadie: todos los que atiende ya estan citados'
+                  : 'Obligados de esta jornada sin citar en ninguna'
+                : 'Calculando...'
+            }
+          />
+        )}
         <Stat
           label="Intensidad"
           value={`${Number(offering.intensityTheoryHours ?? 0) + Number(offering.intensityPracticeHours ?? 0)} h`}
@@ -296,6 +396,46 @@ export default function ConvocatoriaDetallePage() {
         />
       </div>
 
+
+      {/*
+        QUIENES FALTAN, con nombre y apellido. El numero solo dice que hay un hueco; la lista dice
+        A QUIEN hay que citar, que es lo que se necesita para actuar. Se ensena solo cuando la
+        jornada esta abierta: en borrador todavia no se puede inscribir a nadie.
+      */}
+      {isOpen && !esAutoservicio && pendientes && pendientes.faltan.length > 0 ? (
+        <section className="card mb-6 p-5">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-base font-semibold text-ink-900">Faltan por convocar</h2>
+            <span className="text-sm text-ink-500">
+              {pendientes.convocados} de {pendientes.proyectados} ya citados
+            </span>
+          </div>
+          <p className="mb-4 text-sm text-ink-500">
+            Estas personas tienen la formacion exigida y esta jornada las atiende, pero no estan
+            citadas a ninguna. {pendientes.detalle}
+          </p>
+          <ul className="divide-y divide-line">
+            {pendientes.faltan.slice(0, 12).map((persona) => (
+              <li key={persona.id} className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink-900">{persona.fullName}</p>
+                  <p className="truncate text-xs text-ink-500">
+                    {persona.jobTitle.name} · {persona.area.name}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => void convocarA(persona.id)} disabled={busy}>
+                  Convocar
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {pendientes.faltan.length > 12 ? (
+            <p className="mt-3 text-xs text-ink-500">
+              y {pendientes.faltan.length - 12} mas. El boton de arriba las cita a todas de una vez.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
       <div className="mb-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="card p-5">
           <h2 className="font-display text-base font-semibold text-ink-900">Datos de la jornada</h2>

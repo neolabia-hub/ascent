@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { loginAsAdmin, unique } from './helpers';
+import {
+  ANO_PLAN_DESECHABLE,
+  ANO_PLAN_DOD,
+  ANO_PLAN_IDA_Y_VUELTA,
+  crearPlanDelAno,
+  elegirEnCombo,
+  limpiarPlanDelAno,
+  loginAsAdmin,
+  unique,
+} from './helpers';
 
 /**
  * E2E del Sprint 3 (Definition of Done de la entrega de la formacion):
@@ -13,8 +22,21 @@ import { loginAsAdmin, unique } from './helpers';
  * que la prueba sea repetible sobre la misma base.
  */
 
-/** Crea una actividad con una leccion y la deja PUBLICADA (requisito para convocarla). */
-async function publishedActivity(page: import('@playwright/test').Page, suffix: string, name: string) {
+/**
+ * Crea una actividad con una leccion y la deja PUBLICADA.
+ *
+ * El TIPO se pasa porque las dos pruebas necesitan uno distinto y por razones opuestas:
+ *   - la de "nace sola" usa EXTRAORDINARIA para controlar ella misma a quien se le exige;
+ *   - la del plan usa CAPACITACION DEL PLAN, porque desde la Decision #78 el plan solo engancha
+ *     convocatorias de formaciones que cuentan para el — una extraordinaria no puede mover su
+ *     cumplimiento (regla de oro 2), y ofrecerla seria ofrecer un error.
+ */
+async function publishedActivity(
+  page: import('@playwright/test').Page,
+  suffix: string,
+  name: string,
+  tipo = 'Capacitacion extraordinaria',
+) {
   await page.goto('/lecciones');
   await page.getByRole('button', { name: 'Nueva leccion' }).click();
   await page.getByRole('dialog').getByRole('textbox').first().fill(`Leccion ${name} ${suffix}`);
@@ -23,9 +45,15 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
 
   await page.goto('/contenido-formativo');
   await page.getByRole('button', { name: 'Nueva actividad' }).click();
+  await page.locator('#a-code-open').click();
   await page.locator('#a-code').fill(`S3_${suffix}`);
   await page.locator('#a-name').fill(`${name} ${suffix}`);
-  await page.locator('#a-type').selectOption({ label: 'Induccion general' });
+  // CAPACITACION EXTRAORDINARIA y no induccion general, a proposito: desde la Decision #69, una
+  // induccion general se EXIGE SOLA al publicarse, y estas dos pruebas necesitan controlar ellas
+  // mismas a quien se le exige —una crea su requisito de ingreso, la otra mide proyectados—. Con
+  // una induccion, el requisito automatico se sumaria al suyo y mediria otra cosa. Que se exija
+  // sola tiene su propia prueba en `quienes-desde-la-ficha.spec.ts`.
+  await page.locator('#a-type').selectOption({ label: tipo });
   await page.locator('#a-process').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Crear actividad' }).click();
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
@@ -46,7 +74,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(page.getByText('Contenido agregado')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Publicar version' }).click();
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
   await expect(page.getByText('Version 1 publicada')).toBeVisible();
 }
@@ -82,7 +110,10 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await page.locator('#r-trigger').selectOption('ON_HIRE');
     await page.locator('#r-due').fill('-1');
     await page.getByRole('button', { name: 'Crear requisito' }).click();
-    await expect(page.getByText('Requisito creado')).toBeVisible();
+    // 30 s y no los 10 por defecto: crear un requisito de TODA la empresa inserta una obligacion
+    // y un aviso por persona en la misma peticion, y la base de desarrollo ya tiene 459. Es la
+    // deuda de "el motor recorre persona por persona" asomando; con 116 reales va sobrado.
+    await expect(page.getByText('Requisito creado')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('row').filter({ hasText: activityName }).getByText('1 dia antes')).toBeVisible();
 
     // 3. Alta de una persona con fecha de ingreso futura.
@@ -102,7 +133,14 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await page.goto('/asignaciones');
     await page.getByRole('button', { name: 'Obligaciones' }).click();
     await page.getByPlaceholder('Buscar por nombre o documento').fill(`Persona S3 ${suffix}`);
-    const row = page.getByRole('row').filter({ hasText: `Persona S3 ${suffix}` }).first();
+    // Por persona Y FORMACION: una persona nueva recibe TODAS las obligaciones de reglas vivas
+    // de la empresa, asi que `.first()` a secas cogia la fila de otra capacitacion y leia su
+    // fecha. Con la base de desarrollo llena, ese error aparece solo cuando ya hay ruido.
+    const row = page
+      .getByRole('row')
+      .filter({ hasText: `Persona S3 ${suffix}` })
+      .filter({ hasText: activityName })
+      .first();
     await expect(row).toBeVisible({ timeout: 20_000 });
     await expect(row.getByText('Requisito')).toBeVisible();
     await expect(row.getByText('PENDIENTE')).toBeVisible();
@@ -129,15 +167,16 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await loginAsAdmin(page);
     const suffix = unique();
     const activityName = `Capacitacion S3 ${suffix}`;
-    await publishedActivity(page, suffix, 'Capacitacion S3');
+    // Del PLAN: es lo unico que el plan admite enganchar (Decision #78).
+    await publishedActivity(page, suffix, 'Capacitacion S3', 'Capacitacion del plan');
 
     // 1. Convocatoria presencial.
     await page.goto('/convocatorias');
     await page.getByRole('button', { name: 'Nueva convocatoria' }).click();
-    await page.locator('#o-version').selectOption({ label: `${activityName} (v1)` });
+    await elegirEnCombo(page, 'o-version', activityName);
     await page.locator('#o-kind').selectOption('EVENT');
     await page.locator('#o-modality').selectOption('PRESENCIAL');
-    await page.locator('#o-date').fill('2026-03-10');
+    await page.locator('#o-date').fill(`${ANO_PLAN_DOD}-03-10`);
     await page.locator('#o-location').fill('Auditorio principal');
     await page.getByRole('button', { name: 'Crear convocatoria' }).click();
     await page.waitForURL('**/convocatorias/**', { timeout: 20_000 });
@@ -152,23 +191,22 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(page.getByText(/Congelados el/)).toBeVisible();
 
     // 3. Plan anual con esa convocatoria.
-    await page.goto('/plan');
-    await page.getByRole('button', { name: 'Nuevo plan' }).click();
-    await page.locator('#p-year').fill('2026');
-    await page.locator('#p-name').fill(`Plan S3 ${suffix}`);
-    await page.getByRole('button', { name: 'Crear plan' }).click();
-    await page.waitForURL('**/plan/**', { timeout: 20_000 });
+    //    El plan se crea DESPUES de la convocatoria a proposito: si existiera antes, la
+    //    convocatoria entraria sola (Decision #75) y este paso no probaria el camino de
+    //    enganchar una que YA existe, que es la unica via cuando el plan ya esta aprobado.
+    // Cada prueba trabaja en SU ano: desde la Decision #71 hay UN plan por ano, asi que dos
+    // pruebas sobre el mismo ano se pisarian entre si y con el plan real de la empresa.
+    await crearPlanDelAno(page, ANO_PLAN_DOD, `Plan S3 ${suffix}`);
 
     // El plan ofrece DOS caminos: crear la jornada ahi mismo, o enganchar una que ya existe.
     // Este DoD engancha la que se acaba de publicar, asi que usa el segundo.
-    await page.getByRole('button', { name: 'Usar una que ya existe' }).first().click();
-    // Por NOMBRE y no por indice: el desplegable trae las convocatorias de demostracion primero,
-    // asi que un indice fijo planificaba una capacitacion distinta de la que acaba de publicarse.
-    const offeringValue = await page
-      .locator('#i-offering option', { hasText: activityName })
-      .first()
-      .getAttribute('value');
-    await page.locator('#i-offering').selectOption(offeringValue as string);
+    await page.getByRole('button', { name: 'Agregar convocatoria existente' }).first().click();
+    // Se BUSCA la convocatoria en vez de recorrer un desplegable: con 253 en la base, la recien
+    // publicada quedaba fuera de las primeras 100 y el plan no podia engancharla.
+    // Se ELIGE viendola: la lista dice codigo, formacion, tipo, estado y fecha, que es lo que
+    // hace falta para saber si es la que uno busca. Y el buscador pregunta al SERVIDOR, no
+    // filtra las 100 que quepan (Decision #80).
+    await elegirEnCombo(page, 'i-offering', activityName);
     await page.locator('#i-month').selectOption('3');
     await page.getByRole('button', { name: 'Agregar', exact: true }).click();
     await expect(page.getByText('Renglon agregado')).toBeVisible();
@@ -187,13 +225,19 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
 
     // ...pero AGREGAR ya no (Decision #55). Si en agosto abren una regional, esa jornada tiene
     // que entrar en el plan del ano; prohibirlo no evitaba el cambio, lo sacaba del sistema.
-    await page.getByRole('button', { name: 'Otra jornada de esta capacitacion' }).click();
+    await page.getByRole('button', { name: 'Agregar otra convocatoria' }).click();
     await page.locator('#o-month').selectOption('9');
-    await page.locator('#o-date').fill('2026-09-15');
+    // El formulario nace con lo que propone el TIPO —una induccion queda disponible, no se cita a
+    // una sesion—, asi que aqui se cambia a proposito: esta jornada si tiene fecha y sede.
+    await page.locator('#o-kind').selectOption('EVENT');
+    // Y a presencial: la modalidad ahora se HEREDA de la ficha (esta formacion es virtual), asi
+    // que el lugar solo se pide cuando de verdad hay donde presentarse.
+    await page.locator('#o-modality').selectOption('PRESENCIAL');
+    await page.locator('#o-date').fill(`${ANO_PLAN_DOD}-09-15`);
     await page.locator('#o-location').fill('Sede Neiva');
 
     // Y no se agrega a la ligera: sin motivo el boton no deja.
-    const agregar = page.getByRole('button', { name: 'Agregar al plan' });
+    const agregar = page.getByRole('button', { name: 'Crear y agregar al plan' });
     await expect(agregar).toBeDisabled();
     await page.locator('#o-justification').fill('Se abrio la regional de Neiva en agosto y hay que cubrirla.');
     await agregar.click();
@@ -220,6 +264,12 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(page.getByText('Movida a Junio')).toBeVisible();
     await expect(page.locator(`td[aria-label="Junio · ${activityName}"] a`)).toHaveCount(1);
     await expect(marzo.locator('a')).toHaveCount(0);
+
+    // 8. Y se retira al terminar. Un plan aprobado que sobrevive a la prueba es lo que llenaba la
+    //    base de planes fantasma —168 de 2026 llego a haber—, y desde que hay uno por ano ademas
+    //    le quita el ano al de al lado. Borrarlo comprueba de paso la otra mitad de la Decision
+    //    #62: aprobado pero sin que nadie empezara, se borra revocando sus obligaciones.
+    await limpiarPlanDelAno(page, ANO_PLAN_DOD);
   });
 });
 
@@ -235,18 +285,14 @@ test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan',
   await loginAsAdmin(page);
   const suffix = unique();
 
-  await page.goto('/plan');
-  await page.getByRole('button', { name: 'Nuevo plan' }).click();
-  await page.locator('#p-name').fill(`Plan ida y vuelta ${suffix}`);
-  await page.getByRole('button', { name: 'Crear plan' }).click();
-  await page.waitForURL('**/plan/**', { timeout: 20_000 });
-  const planUrl = new URL(page.url()).pathname;
+  const planUrl = await crearPlanDelAno(page, ANO_PLAN_IDA_Y_VUELTA, `Plan ida y vuelta ${suffix}`);
 
   // Hay dos botones iguales: el de la cabecera y el del estado vacio. Vale cualquiera.
-  await page.getByRole('button', { name: 'Capacitacion nueva' }).first().click();
+  await page.getByRole('button', { name: 'Crear capacitacion' }).first().click();
   await page.waitForURL('**/contenido-formativo?**', { timeout: 20_000 });
 
   // El cajon llega ABIERTO: quien pulso "capacitacion nueva" ya dijo lo que queria.
+  await page.locator('#a-code-open').click();
   await page.locator('#a-code').fill(`P2P_${suffix}`);
   await page.locator('#a-name').fill(`Capacitacion desde el plan ${suffix}`);
   await page.locator('#a-type').selectOption({ label: 'Capacitacion del plan' });
@@ -254,12 +300,26 @@ test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan',
   await page.getByRole('button', { name: 'Crear actividad' }).click();
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
+  // LA FICHA DICE QUE TODAVIA NO ESTA EN EL PLAN. Es lo que reporto el cliente: crear una
+  // "capacitacion del plan" no la mete en ningun plan, su tipo promete en pantalla que cuenta
+  // para los indicadores del plan anual, y no cuenta para nada. Ninguna pantalla lo decia.
+  //
+  // El ANO no se fija: la tarjeta elige el plan del ano en curso y solo cae al siguiente si el
+  // de este no existe o esta cerrado. Cual sea depende de lo que haya en la base —si alguien
+  // creo el plan de este ano mientras corre la suite, y esta bien que la ficha apunte a ese—.
+  // Clavarlo hacia fallar la prueba por un comportamiento correcto.
+  await expect(page.getByText(/^Esta capacitacion no esta en el plan de \d{4}\.$/)).toBeVisible();
+  // Sin contenido publicado no se ofrece programarla: solo se convoca lo publicado.
+  await expect(page.getByText('Publica el contenido para poder programarla.')).toBeVisible();
+
   // Y la ficha ofrece el regreso, que es lo que se estaba perdiendo.
   const back = page.getByRole('link', { name: 'Volver al plan' });
   await expect(back).toBeVisible();
   await back.click();
   await expect(page).toHaveURL(new RegExp(`${planUrl}$`));
   await expect(page.getByText(`Plan ida y vuelta ${suffix}`)).toBeVisible();
+
+  await limpiarPlanDelAno(page, ANO_PLAN_IDA_Y_VUELTA);
 });
 
 /**
@@ -276,11 +336,7 @@ test('un plan en borrador se corrige y se elimina desde el listado', async ({ pa
   const nombre = `Plan desechable ${suffix}`;
   const corregido = `Plan corregido ${suffix}`;
 
-  await page.goto('/plan');
-  await page.getByRole('button', { name: 'Nuevo plan' }).click();
-  await page.locator('#p-name').fill(nombre);
-  await page.getByRole('button', { name: 'Crear plan' }).click();
-  await page.waitForURL('**/plan/**', { timeout: 20_000 });
+  await crearPlanDelAno(page, ANO_PLAN_DESECHABLE, nombre);
 
   // 1. Corregir la cabecera. En borrador se puede cambiar hasta el ano, y sin pedir motivo.
   await page.getByRole('button', { name: 'Editar' }).click();
@@ -293,7 +349,8 @@ test('un plan en borrador se corrige y se elimina desde el listado', async ({ pa
   // 2. Eliminarlo desde el LISTADO, que es donde estorban los planes de prueba.
   await page.goto('/plan');
   await expect(page.getByText(corregido)).toBeVisible();
-  await page.getByRole('button', { name: `Eliminar ${corregido}` }).click();
+  // El rotulo del boton lleva el ANO, que es lo que identifica al plan desde la Decision #71.
+  await page.getByRole('button', { name: `Eliminar el plan de ${ANO_PLAN_DESECHABLE}` }).click();
   // En borrador el cajon no pide motivo: nunca obligo a nadie.
   await expect(page.getByText('Esta en borrador: nunca obligo a nadie', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Eliminar el plan' }).click();

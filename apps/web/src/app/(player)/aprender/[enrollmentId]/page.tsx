@@ -142,11 +142,11 @@ export default function EnrollmentPage() {
       router.push(`/aprender/${params.enrollmentId}/contenido/${content.id}`);
       return;
     }
-    if (!content.assessmentVersionId) return;
+    if (!content.assessmentId) return;
 
     // Un intento sin terminar se retoma; no se abre otro (gastaria un intento de los limitados).
     const openAttempt = attempts.find(
-      (attempt) => attempt.assessmentVersionId === content.assessmentVersionId && attempt.status === 'IN_PROGRESS',
+      (attempt) => attempt.assessmentId === content.assessmentId && attempt.status === 'IN_PROGRESS',
     );
     if (openAttempt) {
       router.push(`/aprender/${params.enrollmentId}/examen/${openAttempt.id}`);
@@ -155,7 +155,7 @@ export default function EnrollmentPage() {
 
     setStartingId(content.id);
     try {
-      const attempt = await startAttempt(params.enrollmentId, content.assessmentVersionId);
+      const attempt = await startAttempt(params.enrollmentId, content.assessmentId);
       router.push(`/aprender/${params.enrollmentId}/examen/${attempt.attempt.id}`);
     } catch (error) {
       const message =
@@ -279,8 +279,8 @@ export default function EnrollmentPage() {
                 const Icon = ICON_BY_TYPE[content.type];
                 const completed = content.status === 'COMPLETED';
                 const isNext = content.id === next?.id;
-                const attempt = content.assessmentVersionId
-                  ? attempts.filter((row) => row.assessmentVersionId === content.assessmentVersionId).at(-1)
+                const attempt = content.assessmentId
+                  ? attempts.filter((row) => row.assessmentId === content.assessmentId).at(-1)
                   : undefined;
                 const score = attempt ? toScore(attempt.score) : null;
 

@@ -34,6 +34,11 @@ export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 
 export const updateActivitySchema = createActivitySchema.omit({ code: true }).partial().extend({
   active: z.boolean().optional(),
+  /**
+   * PORTADA (Decision #88): la clave del archivo ya subido a `/media/upload`. `null` la quita y
+   * devuelve la portada generada, que es un estado normal y no un hueco.
+   */
+  coverKey: z.string().max(500).nullable().optional(),
 });
 export type UpdateActivityInput = z.infer<typeof updateActivitySchema>;
 
@@ -98,7 +103,7 @@ export const createContentSchema = z.object({
   config: contentConfigSchema,
   lessonId: z.string().uuid().nullable().optional(),
   contentPackageId: z.string().uuid().nullable().optional(),
-  assessmentVersionId: z.string().uuid().nullable().optional(),
+  assessmentId: z.string().uuid().nullable().optional(),
   surveyTemplateId: z.string().uuid().nullable().optional(),
 });
 export type CreateContentInput = z.infer<typeof createContentSchema>;

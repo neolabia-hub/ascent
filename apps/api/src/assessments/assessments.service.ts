@@ -1,20 +1,31 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { UpdateAssessmentDraftInput } from '@neo-pulse/shared';
+import type { PresentationInput, UpdateAssessmentDraftInput } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { columnsToPayload } from './question-payload.js';
 
 /**
  * CONSTRUCTOR DE EVALUACIONES (CLAUDE.md 3.6).
  *
- * Una evaluacion se compone de SECCIONES: fijas (preguntas elegidas a mano) o aleatorias
- * (N preguntas al azar de una categoria). La seleccion concreta NO se resuelve aqui: se
- * materializa por intento cuando alguien rinde el examen (Sprint 4), de modo que dos personas
- * no vean el mismo examen y se pueda recalificar una pregunta defectuosa sin adivinar a quien
- * le toco.
+ * UNA EVALUACION ES UN OBJETO PLANO, como una leccion (Decision #87). Se edita siempre, sin
+ * publicar nada, y publicar la FORMACION congela una COPIA (`clonarParaPublicar`).
  *
- * Igual que las actividades, la version publicada es INMUTABLE.
+ * Antes tenia su propia escalera de versiones, que era una SEGUNDA solucion al mismo problema que
+ * la version de la formacion ya resolvia. Las dos escaleras no estaban sincronizadas, y de ahi
+ * salian cuatro danos —el peor: publicar la v2 retiraba la v1 mientras el contenido de la
+ * formacion seguia apuntando a ella, y el examen dejaba de poder abrirse—.
+ *
+ * DOS CLASES DE FILA, y la diferencia es `sourceId`:
+ *
+ *   EDITABLE  `sourceId = null`. Es la que sale en /evaluaciones y la unica que se toca.
+ *   COPIA     `sourceId = <la editable>`, estado PUBLISHED. Nace al publicar una formacion, vive
+ *             dentro de ella y no se edita jamas. Es lo que sostiene los intentos.
+ *
+ * La seleccion concreta de preguntas NO se resuelve aqui: se materializa por intento cuando
+ * alguien rinde el examen, de modo que dos personas no vean lo mismo y se pueda recalificar una
+ * pregunta defectuosa sin adivinar a quien le toco.
  */
 @Injectable()
 export class AssessmentsService {
@@ -23,70 +34,106 @@ export class AssessmentsService {
     private readonly audit: AuditService,
   ) {}
 
+  /** Solo las EDITABLES: las copias congeladas viven dentro de una formacion, no en el listado. */
   async list() {
-    const assessments = await this.prisma.scoped.assessment.findMany({
-      orderBy: { createdAt: 'desc' },
+    return this.prisma.scoped.assessment.findMany({
+      where: { sourceId: null },
+      orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
         title: true,
-        currentVersionId: true,
+        passingScore: true,
+        maxAttempts: true,
+        timeLimitMin: true,
         createdAt: true,
-        versions: {
-          orderBy: { versionNumber: 'desc' },
-          select: {
-            id: true,
-            versionNumber: true,
-            status: true,
-            passingScore: true,
-            maxAttempts: true,
-            _count: { select: { sections: true } },
-          },
-        },
+        updatedAt: true,
+        _count: { select: { sections: true, copias: true } },
       },
     });
-    return assessments;
   }
 
-  async getById(id: string) {
+  /**
+   * EL LIENZO NECESITA LA PREGUNTA ENTERA (Decision #84).
+   *
+   * La pantalla de armado no es una lista de enunciados: cada pregunta se ve y se edita como la
+   * vera el empleado, con sus opciones y la correcta marcada. Para eso hace falta el payload
+   * completo —`options` y `correct`—, que antes obligaba a pedir cada pregunta por separado.
+   *
+   * `correct` SOLO viaja si quien pregunta puede editar el banco: este endpoint es `catalog:read`
+   * y por ahi tambien entra quien solo esta mirando el catalogo.
+   */
+  async getById(id: string, conRespuestas = false) {
     const assessment = await this.prisma.scoped.assessment.findUnique({
       where: { id },
       include: {
-        versions: {
-          orderBy: { versionNumber: 'desc' },
-          include: { sections: { orderBy: { displayOrder: 'asc' } } },
-        },
+        sections: { orderBy: { displayOrder: 'asc' } },
+        _count: { select: { copias: true } },
       },
     });
     if (!assessment) throw new NotFoundException({ code: 'ASSESSMENT_NOT_FOUND' });
 
-    // Cuantas preguntas hay disponibles hoy en cada categoria usada por secciones aleatorias:
-    // es lo que le dice al administrador si el examen se puede armar.
-    const categoryIds = assessment.versions
-      .flatMap((v) => v.sections)
-      .map((s) => s.categoryId)
-      .filter((id): id is string => Boolean(id));
+    // Cuantas preguntas hay disponibles HOY en cada tema usado por bloques al azar: es lo que le
+    // dice a quien administra si el examen se puede armar.
+    const categoryIds = assessment.sections
+      .map((section) => section.categoryId)
+      .filter((value): value is string => Boolean(value));
     const availability = await this.countAvailable([...new Set(categoryIds)]);
+
+    const versionIds = assessment.sections.flatMap((section) => section.fixedQuestionVersionIds);
+    const preguntas = versionIds.length
+      ? await this.prisma.scoped.questionVersion.findMany({
+          where: { id: { in: [...new Set(versionIds)] } },
+          select: {
+            id: true,
+            questionId: true,
+            versionNumber: true,
+            qtype: true,
+            stem: true,
+            points: true,
+            options: true,
+            correct: true,
+            feedback: true,
+            question: { select: { category: { select: { id: true, name: true } } } },
+          },
+        })
+      : [];
+    const porVersion = new Map(preguntas.map((row) => [row.id, row]));
 
     return {
       ...assessment,
-      versions: assessment.versions.map((version) => ({
-        ...version,
-        sections: version.sections.map((section) => ({
-          ...section,
-          availableInCategory: section.categoryId ? (availability.get(section.categoryId) ?? 0) : null,
-        })),
+      /** `true` = ya esta dentro de alguna formacion publicada, con copias congeladas. */
+      enUso: assessment._count.copias > 0,
+      sections: assessment.sections.map((section) => ({
+        ...section,
+        availableInCategory: section.categoryId ? (availability.get(section.categoryId) ?? 0) : null,
+        // En el ORDEN en que se guardaron: el orden de las preguntas es una decision de quien
+        // arma el examen, y `findMany` no lo respeta.
+        fixedQuestions: section.fixedQuestionVersionIds.flatMap((versionId) => {
+          const row = porVersion.get(versionId);
+          return row
+            ? [
+                {
+                  questionVersionId: row.id,
+                  questionId: row.questionId,
+                  versionNumber: row.versionNumber,
+                  qtype: row.qtype,
+                  stem: row.stem,
+                  points: Number(row.points),
+                  categoryId: row.question.category?.id ?? null,
+                  categoryName: row.question.category?.name ?? null,
+                  payload: conRespuestas ? columnsToPayload(row) : null,
+                },
+              ]
+            : [];
+        }),
       })),
     };
   }
 
   async create(actor: AuthUser, title: string) {
     const tenantId = this.prisma.currentTenantId;
-    const assessment = await this.prisma.tx(async (tx) => {
-      const created = await tx.assessment.create({ data: { tenantId, title } });
-      const version = await tx.assessmentVersion.create({
-        data: { tenantId, assessmentId: created.id, versionNumber: 1, status: 'DRAFT' },
-      });
-      return tx.assessment.update({ where: { id: created.id }, data: { currentVersionId: version.id } });
+    const assessment = await this.prisma.scoped.assessment.create({
+      data: { tenantId, title, createdBy: actor.id },
     });
     await this.audit.record({
       tenantId,
@@ -96,17 +143,31 @@ export class AssessmentsService {
       resourceId: assessment.id,
       newValues: { title },
     });
-    return this.getById(assessment.id);
+    return this.getById(assessment.id, true);
   }
 
-  /** Configuracion y secciones del borrador. Reemplaza el set completo de secciones si viene. */
-  async updateDraft(actor: AuthUser, versionId: string, input: UpdateAssessmentDraftInput) {
+  /**
+   * Guardar la evaluacion: sus reglas y su secuencia. Reemplaza el set completo de secciones.
+   *
+   * NO HAY ESTADO QUE COMPROBAR: una evaluacion editable se edita siempre. Lo que queda congelado
+   * es la COPIA que se hizo al publicar la formacion, y esa no pasa por aqui.
+   */
+  async update(actor: AuthUser, id: string, input: UpdateAssessmentDraftInput) {
     const tenantId = this.prisma.currentTenantId;
-    const version = await this.assertDraft(versionId);
+    const antes = await this.assertEditable(id);
+
+    if (input.sections) {
+      const vacias = input.sections.filter(
+        (section) => section.mode === 'FIXED' && section.questionIds.length === 0,
+      );
+      if (vacias.length > 0) {
+        throw new BadRequestException({ code: 'EMPTY_FIXED_SECTION', message: 'Hay un bloque de preguntas vacio.' });
+      }
+    }
 
     await this.prisma.tx(async (tx) => {
-      await tx.assessmentVersion.update({
-        where: { id: versionId },
+      await tx.assessment.update({
+        where: { id },
         data: {
           timeLimitMin: input.timeLimitMin,
           maxAttempts: input.maxAttempts,
@@ -119,18 +180,18 @@ export class AssessmentsService {
       });
 
       if (input.sections) {
-        await tx.assessmentSection.deleteMany({ where: { assessmentVersionId: versionId } });
+        await tx.assessmentSection.deleteMany({ where: { assessmentId: id } });
         for (const [index, section] of input.sections.entries()) {
           await tx.assessmentSection.create({
             data: {
               tenantId,
-              assessmentVersionId: versionId,
+              assessmentId: id,
               displayOrder: index,
               mode: section.mode,
               categoryId: section.mode === 'RANDOM_FROM_POOL' ? section.categoryId : null,
               pickCount: section.mode === 'RANDOM_FROM_POOL' ? section.pickCount : null,
-              // Se guardan las VERSIONES vigentes de cada pregunta: el examen queda atado a lo
-              // que el administrador vio al armarlo, no a una revision futura.
+              // Se guardan las VERSIONES vigentes de cada pregunta: el examen queda atado a lo que
+              // quien administra vio al armarlo, no a una revision futura.
               fixedQuestionVersionIds:
                 section.mode === 'FIXED' ? await this.resolveCurrentVersionIds(tx, section.questionIds) : [],
             },
@@ -142,154 +203,215 @@ export class AssessmentsService {
     await this.audit.record({
       tenantId,
       userId: actor.id,
-      action: 'ASSESSMENT_DRAFT_UPDATED',
-      resourceType: 'assessment_versions',
-      resourceId: versionId,
-      oldValues: { passingScore: version.passingScore, maxAttempts: version.maxAttempts },
+      action: 'ASSESSMENT_UPDATED',
+      resourceType: 'assessments',
+      resourceId: id,
+      oldValues: { passingScore: antes.passingScore, maxAttempts: antes.maxAttempts },
       newValues: input,
     });
-    return this.getById(version.assessmentId);
+    return this.getById(id, true);
   }
 
-  /** Publica el borrador tras comprobar que el examen se puede armar de verdad. */
-  async publish(actor: AuthUser, versionId: string) {
-    const version = await this.assertDraft(versionId);
-    const sections = await this.prisma.scoped.assessmentSection.findMany({
-      where: { assessmentVersionId: versionId },
-      orderBy: { displayOrder: 'asc' },
+  /**
+   * COMO SE VE el examen (Decision #85).
+   *
+   * Se puede cambiar aunque la evaluacion ya este dentro de formaciones publicadas, y llega
+   * tambien a esas: el acento y la transicion no son evidencia —no cambian que se pregunto ni
+   * como se califico— y las copias congeladas leen la presentacion de su origen.
+   */
+  async updatePresentation(actor: AuthUser, id: string, presentation: PresentationInput) {
+    const assessment = await this.prisma.scoped.assessment.findUnique({
+      where: { id },
+      select: { id: true, presentation: true },
     });
-    if (sections.length === 0) {
-      throw new BadRequestException({ code: 'ASSESSMENT_EMPTY', message: 'La evaluacion necesita al menos una seccion.' });
-    }
-
-    // Una seccion aleatoria que pida mas preguntas de las que existen dejaria el examen
-    // imposible de armar en tiempo de ejecucion: se detecta ANTES de publicar.
-    const categoryIds = sections.map((s) => s.categoryId).filter((id): id is string => Boolean(id));
-    const availability = await this.countAvailable([...new Set(categoryIds)]);
-    const insufficient = sections
-      .filter((s) => s.mode === 'RANDOM_FROM_POOL' && s.categoryId && s.pickCount)
-      .filter((s) => (availability.get(s.categoryId as string) ?? 0) < (s.pickCount as number))
-      .map((s) => ({
-        sectionId: s.id,
-        categoryId: s.categoryId,
-        requested: s.pickCount,
-        available: availability.get(s.categoryId as string) ?? 0,
-      }));
-    if (insufficient.length > 0) {
-      throw new BadRequestException({
-        code: 'NOT_ENOUGH_QUESTIONS',
-        message: 'Alguna seccion aleatoria pide mas preguntas de las que hay en su categoria.',
-        sections: insufficient,
-      });
-    }
-    const emptyFixed = sections.filter((s) => s.mode === 'FIXED' && s.fixedQuestionVersionIds.length === 0);
-    if (emptyFixed.length > 0) {
-      throw new BadRequestException({ code: 'EMPTY_FIXED_SECTION', message: 'Hay secciones fijas sin preguntas.' });
-    }
-
-    const published = await this.prisma.tx(async (tx) => {
-      const previous = await tx.assessmentVersion.findFirst({
-        where: { assessmentId: version.assessmentId, status: 'PUBLISHED' },
-      });
-      if (previous) {
-        await tx.assessmentVersion.update({ where: { id: previous.id }, data: { status: 'RETIRED' } });
-      }
-      const result = await tx.assessmentVersion.update({ where: { id: versionId }, data: { status: 'PUBLISHED' } });
-      await tx.assessment.update({ where: { id: version.assessmentId }, data: { currentVersionId: result.id } });
-      return result;
+    if (!assessment) throw new NotFoundException({ code: 'ASSESSMENT_NOT_FOUND' });
+    await this.prisma.scoped.assessment.update({
+      where: { id },
+      data: { presentation: presentation as unknown as Prisma.InputJsonValue },
     });
-
     await this.audit.record({
       tenantId: this.prisma.currentTenantId,
       userId: actor.id,
-      action: 'ASSESSMENT_PUBLISHED',
-      resourceType: 'assessment_versions',
-      resourceId: versionId,
-      newValues: { versionNumber: published.versionNumber, sections: sections.length },
+      action: 'ASSESSMENT_PRESENTATION_UPDATED',
+      resourceType: 'assessments',
+      resourceId: id,
+      oldValues: assessment.presentation as Prisma.JsonObject,
+      newValues: presentation,
     });
-    return published;
+    return this.getById(id, true);
   }
 
-  /** Version N+1 en borrador copiando la publicada (la publicada no se toca). */
-  async createNextDraft(actor: AuthUser, assessmentId: string) {
-    const tenantId = this.prisma.currentTenantId;
-    const existingDraft = await this.prisma.scoped.assessmentVersion.findFirst({
-      where: { assessmentId, status: 'DRAFT' },
-      select: { id: true },
-    });
-    if (existingDraft) {
-      throw new ConflictException({ code: 'DRAFT_ALREADY_EXISTS', versionId: existingDraft.id });
-    }
-    const source = await this.prisma.scoped.assessmentVersion.findFirst({
-      where: { assessmentId, status: 'PUBLISHED' },
+  /**
+   * LA COPIA CONGELADA, que se hace al publicar la FORMACION. Es el equivalente exacto de
+   * `cloneLesson`: a partir de aqui, editar la evaluacion no toca a quien ya la esta cursando.
+   *
+   * Aqui se comprueba lo que antes se comprobaba al publicar la evaluacion —que un bloque al azar
+   * no pida mas preguntas de las que hay—, porque este es ahora el momento en que el examen tiene
+   * que poder armarse de verdad.
+   */
+  async clonarParaPublicar(tx: Prisma.TransactionClient, tenantId: string, assessmentId: string): Promise<string> {
+    const source = await tx.assessment.findUniqueOrThrow({
+      where: { id: assessmentId },
       include: { sections: { orderBy: { displayOrder: 'asc' } } },
     });
-    if (!source) throw new NotFoundException({ code: 'NO_PUBLISHED_VERSION' });
+    // Ya es una copia (republicar una formacion sin tocar su examen): se reutiliza tal cual.
+    if (source.sourceId) return source.id;
 
-    const draft = await this.prisma.tx(async (tx) => {
-      const created = await tx.assessmentVersion.create({
-        data: {
-          tenantId,
-          assessmentId,
-          versionNumber: source.versionNumber + 1,
-          status: 'DRAFT',
-          timeLimitMin: source.timeLimitMin,
-          maxAttempts: source.maxAttempts,
-          passingScore: source.passingScore,
-          gradingPolicy: source.gradingPolicy,
-          shuffleQuestions: source.shuffleQuestions,
-          shuffleOptions: source.shuffleOptions,
-          reviewPolicy: source.reviewPolicy as Prisma.InputJsonValue,
-        },
-      });
-      for (const section of source.sections) {
-        await tx.assessmentSection.create({
-          data: {
-            tenantId,
-            assessmentVersionId: created.id,
-            displayOrder: section.displayOrder,
-            mode: section.mode,
-            categoryId: section.categoryId,
-            pickCount: section.pickCount,
-            fixedQuestionVersionIds: section.fixedQuestionVersionIds,
-          },
-        });
-      }
-      return created;
-    });
-
-    await this.audit.record({
-      tenantId,
-      userId: actor.id,
-      action: 'ASSESSMENT_DRAFT_CREATED',
-      resourceType: 'assessment_versions',
-      resourceId: draft.id,
-      newValues: { fromVersionId: source.id, versionNumber: draft.versionNumber },
-    });
-    return draft;
-  }
-
-  private async assertDraft(versionId: string) {
-    const version = await this.prisma.scoped.assessmentVersion.findUnique({ where: { id: versionId } });
-    if (!version) throw new NotFoundException({ code: 'ASSESSMENT_VERSION_NOT_FOUND' });
-    if (version.status !== 'DRAFT') {
-      throw new ConflictException({
-        code: 'ASSESSMENT_NOT_EDITABLE',
-        message: 'Esta evaluacion esta publicada. Crea una version nueva para modificarla.',
+    if (source.sections.length === 0) {
+      throw new BadRequestException({
+        code: 'ASSESSMENT_EMPTY',
+        message: `La evaluacion "${source.title}" no tiene ninguna pregunta.`,
       });
     }
-    return version;
+
+    const categoryIds = source.sections
+      .map((section) => section.categoryId)
+      .filter((value): value is string => Boolean(value));
+    const disponibles = await this.countAvailableWith(tx, [...new Set(categoryIds)]);
+    const cortos = source.sections.filter(
+      (section) =>
+        section.mode === 'RANDOM_FROM_POOL' &&
+        section.categoryId &&
+        (disponibles.get(section.categoryId) ?? 0) < (section.pickCount ?? 0),
+    );
+    if (cortos.length > 0) {
+      throw new BadRequestException({
+        code: 'NOT_ENOUGH_QUESTIONS',
+        message: `Un bloque al azar de "${source.title}" pide mas preguntas de las que hay en su tema.`,
+      });
+    }
+
+    const clone = await tx.assessment.create({
+      data: {
+        tenantId,
+        title: source.title,
+        status: 'PUBLISHED',
+        sourceId: source.id,
+        timeLimitMin: source.timeLimitMin,
+        maxAttempts: source.maxAttempts,
+        passingScore: source.passingScore,
+        gradingPolicy: source.gradingPolicy,
+        shuffleQuestions: source.shuffleQuestions,
+        shuffleOptions: source.shuffleOptions,
+        reviewPolicy: source.reviewPolicy as Prisma.InputJsonValue,
+        presentation: source.presentation as Prisma.InputJsonValue,
+        createdBy: source.createdBy,
+      },
+    });
+    for (const section of source.sections) {
+      await tx.assessmentSection.create({
+        data: {
+          tenantId,
+          assessmentId: clone.id,
+          displayOrder: section.displayOrder,
+          mode: section.mode,
+          categoryId: section.categoryId,
+          pickCount: section.pickCount,
+          fixedQuestionVersionIds: section.fixedQuestionVersionIds,
+        },
+      });
+    }
+    return clone.id;
   }
 
-  /** Preguntas activas por categoria (para validar y para avisar en la UI). */
-  private async countAvailable(categoryIds: string[]): Promise<Map<string, number>> {
+  /**
+   * ELIMINAR la evaluacion.
+   *
+   * La frontera es la misma que en el resto del producto: no se borra lo que ya es EVIDENCIA. Una
+   * evaluacion que alguien respondio sostiene su nota, y una que esta dentro de una formacion es
+   * parte de lo que esa gente curso.
+   *
+   * Se mira tambien a traves de las COPIAS: los intentos cuelgan de ellas y no de la editable, asi
+   * que preguntar solo por la editable diria que no la ha respondido nadie.
+   */
+  async remove(actor: AuthUser, id: string) {
+    const assessment = await this.prisma.scoped.assessment.findUnique({
+      where: { id },
+      select: { id: true, title: true, sourceId: true, copias: { select: { id: true } } },
+    });
+    if (!assessment) throw new NotFoundException({ code: 'ASSESSMENT_NOT_FOUND' });
+    if (assessment.sourceId) {
+      throw new ConflictException({
+        code: 'ASSESSMENT_IS_COPY',
+        message: 'Esta es la copia congelada dentro de una formacion. Se quita desde la formacion.',
+      });
+    }
+
+    const familia = [id, ...assessment.copias.map((row) => row.id)];
+    const [enUso, intentos] = await Promise.all([
+      this.prisma.scoped.activityContent.count({ where: { assessmentId: { in: familia } } }),
+      this.prisma.scoped.attempt.count({ where: { assessmentId: { in: familia } } }),
+    ]);
+    if (intentos > 0) {
+      throw new ConflictException({
+        code: 'ASSESSMENT_HAS_ATTEMPTS',
+        message:
+          intentos === 1
+            ? 'Una persona ya la respondio: esa nota es suya y no se borra.'
+            : `Ya hay ${intentos} intentos respondidos: esas notas son de personas y no se borran.`,
+      });
+    }
+    if (enUso > 0) {
+      throw new ConflictException({
+        code: 'ASSESSMENT_IN_USE',
+        message:
+          enUso === 1
+            ? 'Esta dentro de una formacion: quitala de ahi antes de eliminarla.'
+            : `Esta dentro de ${enUso} formaciones: quitala de ellas antes de eliminarla.`,
+      });
+    }
+
+    await this.prisma.tx(async (tx) => {
+      await tx.assessmentSection.deleteMany({ where: { assessmentId: { in: familia } } });
+      await tx.assessment.deleteMany({ where: { id: { in: assessment.copias.map((row) => row.id) } } });
+      await tx.assessment.delete({ where: { id } });
+    });
+    await this.audit.record({
+      tenantId: this.prisma.currentTenantId,
+      userId: actor.id,
+      action: 'ASSESSMENT_DELETED',
+      resourceType: 'assessments',
+      resourceId: id,
+      oldValues: { title: assessment.title, copias: assessment.copias.length },
+    });
+    return { ok: true as const };
+  }
+
+  /** Una copia congelada no se edita: es lo que sostiene los intentos de quien ya la rindio. */
+  private async assertEditable(id: string) {
+    const assessment = await this.prisma.scoped.assessment.findUnique({ where: { id } });
+    if (!assessment) throw new NotFoundException({ code: 'ASSESSMENT_NOT_FOUND' });
+    if (assessment.sourceId) {
+      throw new ConflictException({
+        code: 'ASSESSMENT_NOT_EDITABLE',
+        message: 'Esta es la copia congelada dentro de una formacion y no se modifica.',
+      });
+    }
+    return assessment;
+  }
+
+  /** Preguntas activas por tema (para validar y para avisar en la UI). */
+  private countAvailable(categoryIds: string[]): Promise<Map<string, number>> {
+    return this.countAvailableWith(this.prisma.scoped, categoryIds);
+  }
+
+  private async countAvailableWith(
+    // Sirve tanto al cliente con alcance de tenant como al de una transaccion: publicar la
+    // formacion lo llama DENTRO de la suya y no puede salirse de ella a preguntar.
+    db: { question: { groupBy: (args: never) => Promise<Array<{ categoryId: string | null; _count: { _all: number } }>> } },
+    categoryIds: string[],
+  ): Promise<Map<string, number>> {
     if (categoryIds.length === 0) return new Map();
-    const grouped = await this.prisma.scoped.question.groupBy({
+    const grouped = await db.question.groupBy({
       by: ['categoryId'],
       where: { categoryId: { in: categoryIds }, active: true, currentVersionId: { not: null } },
       _count: { _all: true },
-    });
-    return new Map(grouped.map((row) => [row.categoryId, row._count._all]));
+    } as never);
+    // `categoryId` es nullable desde la Decision #84, pero aqui se pregunto por ids concretos: el
+    // grupo "sin tema" no puede salir, y si saliera no le corresponde ningun bloque al azar.
+    return new Map(
+      grouped.flatMap((row) => (row.categoryId ? [[row.categoryId, row._count._all] as [string, number]] : [])),
+    );
   }
 
   /** Traduce ids de pregunta a los ids de su VERSION vigente. */
@@ -303,7 +425,7 @@ export class AssessmentsService {
     if (missing.length > 0) {
       throw new NotFoundException({ code: 'QUESTION_NOT_FOUND', missing });
     }
-    // Se conserva el orden en que el administrador las eligio.
+    // Se conserva el orden en que quien administra las eligio.
     return questionIds.map((id) => byId.get(id) as string);
   }
 }

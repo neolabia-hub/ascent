@@ -13,6 +13,7 @@ import { PersonPicker } from '@/components/ui/person-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { useSession } from '@/components/providers/session-provider';
 
 /**
  * FICHA DE LA FORMACION: todo lo que describe QUE se aprende y A QUIEN va dirigido.
@@ -23,8 +24,13 @@ import { useToast } from '@/components/ui/toast';
  * capricho:
  *
  *   AQUI (la actividad, se llena UNA vez y se reutiliza por anos):
- *     proceso, responsable, tipo, nombre, descripcion, modalidad por defecto,
- *     norma aplicable, servicios, regionales y cargos a los que va dirigida.
+ *     proceso, responsable, tipo, nombre, descripcion,
+ *     modalidad por defecto y norma aplicable.
+ *
+ *   EN QUIENES (a quien se le exige): cargos, areas, regionales y servicios.
+ *     Estuvieron aqui y se quitaron: eran una LISTA DECORATIVA que no obligaba a nadie, y tener
+ *     los cargos en dos sitios obligaba a marcarlos dos veces y a que las dos listas se
+ *     separaran en cuanto alguien cambiaba una (misma causa que la Decision #59).
  *
  *   EN PROGRAMACION (la convocatoria, cambia cada vez que se dicta):
  *     fecha, intensidad horaria, instructor, ejecutada por, lugar y observaciones.
@@ -42,6 +48,7 @@ export function ActivityInfoTab({
   canEdit: boolean;
 }) {
   const { showToast } = useToast();
+  const { scopeProcessIds } = useSession();
   const [catalogs, setCatalogs] = useState<{
     processes: CatalogRow[];
     types: CatalogRow[];
@@ -70,9 +77,6 @@ export function ActivityInfoTab({
     responsibleUserId: activity.responsibleUserId ?? '',
     modality: activity.modality,
     normIds: activity.norms.map((row) => row.id),
-    serviceIds: activity.services.map((row) => row.id),
-    regionalIds: activity.regionals.map((row) => row.id),
-    jobTitleIds: activity.jobTitles.map((row) => row.id),
   });
 
   useEffect(() => {
@@ -126,6 +130,16 @@ export function ActivityInfoTab({
    */
   const areaDelProceso = catalogs.processes.find((row) => row.id === form.processId)?.areaId ?? null;
 
+  /**
+   * Los procesos que se ofrecen: los de su alcance, mas el que la formacion ya tiene puesto.
+   * `null` = sin acotar; `[]` = acotada a ninguno. Incluir el actual evita que abrir la ficha de
+   * una formacion de otro proceso y guardar el telefono le cambie el proceso sin decirlo.
+   */
+  const procesosOfrecidos = catalogs.processes.filter(
+    (row) =>
+      row.id === activity.process.id || scopeProcessIds === null || scopeProcessIds.includes(row.id),
+  );
+
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
@@ -143,7 +157,12 @@ export function ActivityInfoTab({
                   value={form.processId}
                   onChange={(event) => setForm({ ...form, processId: event.target.value })}
                 >
-                  {catalogs.processes.map((row) => (
+                  {/*
+                    Solo los procesos que esta persona puede administrar, mas el que la formacion
+                    ya tiene: si la formacion vive en un proceso fuera de su alcance, esconderlo
+                    del desplegable haria que guardar la ficha se lo cambiara en silencio.
+                  */}
+                  {procesosOfrecidos.map((row) => (
                     <option key={row.id} value={row.id}>
                       {row.code} — {row.name}
                     </option>
@@ -291,8 +310,8 @@ export function ActivityInfoTab({
           <div>
             <dt className="font-medium text-ink-900">Aqui, en la ficha</dt>
             <dd className="text-ink-500">
-              Proceso, responsable, tipo, nombre, descripcion, modalidad, norma, servicios, regionales y cargos.
-              Se escribe una vez y sirve para siempre.
+              Proceso, responsable, tipo, nombre, descripcion, modalidad y norma. Se escribe una vez
+              y sirve para siempre.
             </dd>
           </div>
           <div>
@@ -308,7 +327,10 @@ export function ActivityInfoTab({
           </div>
           <div>
             <dt className="font-medium text-ink-900">En Quienes</dt>
-            <dd className="text-ink-500">A quienes se les exige de verdad, con su fecha limite.</dd>
+            <dd className="text-ink-500">
+              A quienes se les exige: cargos, areas, regionales y servicios, con su plazo. Es el unico
+              sitio donde se marca.
+            </dd>
           </div>
         </dl>
       </aside>

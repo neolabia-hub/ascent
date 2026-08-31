@@ -87,9 +87,20 @@ export class AuthController {
     return this.auth.activate(user.id, user.tenantId, requestContext(req));
   }
 
+  /**
+   * El perfil de quien pregunta, con su ALCANCE.
+   *
+   * `scopeProcessIds` viaja aqui porque las pantallas tienen que ofrecer solo lo que la persona
+   * puede usar. Sin el, el alta de una formacion ensenaba los 13 procesos de la empresa a un
+   * analista que solo puede crear en el suyo, y el servidor rechazaba el guardado con un generico
+   * "revisa los campos": ofrecer una opcion que va a fallar es peor que no ofrecerla.
+   *
+   * No cuesta una consulta extra: el alcance ya viene resuelto en el token validado.
+   */
   @Get('me')
   async me(@CurrentUser() user: AuthUser) {
-    return this.auth.me(user.id, user.tenantId);
+    const profile = await this.auth.me(user.id, user.tenantId);
+    return { ...profile, scopeProcessIds: user.scopeProcessIds };
   }
 
   /** Extrae el tenantId del payload del access recien emitido (evita otra consulta). */

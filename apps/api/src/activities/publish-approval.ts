@@ -26,7 +26,7 @@ export class PublishApprovalRegistrar implements OnModuleInit {
 
   onModuleInit(): void {
     this.approvals.registerApplier(APPROVAL_ENTITY_ACTIVITY_VERSION, async (payload, entityId, approver) => {
-      const { migrationPolicy = 'MOVE_NOT_STARTED' } = payload as PublishPayload;
+      const { migrationPolicy = "MOVE_NOT_STARTED" } = payload as PublishPayload;
       // El aprobador es quien publica de verdad: queda en la auditoria a su nombre, que es lo
       // que corresponde porque es quien tiene la responsabilidad del contenido publicado.
       await this.versioning.publish(approver, entityId, { migrationPolicy, confirm: true });

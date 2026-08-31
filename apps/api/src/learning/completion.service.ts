@@ -57,7 +57,7 @@ export class CompletionService {
             activityId: true,
             passingScore: true,
             contents: {
-              select: { id: true, title: true, type: true, isRequired: true, assessmentVersionId: true },
+              select: { id: true, title: true, type: true, isRequired: true, assessmentId: true },
               orderBy: { displayOrder: 'asc' },
             },
           },
@@ -68,16 +68,16 @@ export class CompletionService {
 
     const [progress, passedAttempts] = await Promise.all([
       db.activityProgress.findMany({ where: { enrollmentId }, select: { activityContentId: true, status: true } }),
-      db.attempt.findMany({ where: { enrollmentId, passed: true }, select: { assessmentVersionId: true } }),
+      db.attempt.findMany({ where: { enrollmentId, passed: true }, select: { assessmentId: true } }),
     ]);
     const doneContents = new Set(progress.filter((row) => row.status === 'COMPLETED').map((row) => row.activityContentId));
-    const passedAssessments = new Set(passedAttempts.map((row) => row.assessmentVersionId));
+    const passedAssessments = new Set(passedAttempts.map((row) => row.assessmentId));
 
     const required = enrollment.activityVersion.contents.filter((content) => content.isRequired);
     const missing = required
       .filter((content) =>
-        content.type === 'ASSESSMENT' && content.assessmentVersionId
-          ? !passedAssessments.has(content.assessmentVersionId)
+        content.type === 'ASSESSMENT' && content.assessmentId
+          ? !passedAssessments.has(content.assessmentId)
           : !doneContents.has(content.id),
       )
       .map((content) => content.title);

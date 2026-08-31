@@ -80,3 +80,35 @@ describe('rondas siguientes', () => {
     expect(nextFixedDate('01-31', { year: 2026, month: 2, day: 5 })).toEqual({ year: 2027, month: 1, day: 31 });
   });
 });
+
+describe('la gracia de quien ya estaba', () => {
+  // Quien entro en 2019 y hoy entra a la audiencia porque se acaba de crear el requisito.
+  const entraHoy = new Date('2026-08-20T15:00:00-05:00');
+  const ingreso2019 = new Date('2019-03-15T00:00:00.000Z');
+
+  it('un requisito nuevo NO nace vencido para la plantilla actual', () => {
+    const dueAt = computeFirstDueAt('ON_HIRE', -1, { hiredAt: ingreso2019, joinedAt: entraHoy, recurrence: null });
+    // 2019 + (-1 dia) cae SIETE ANOS antes de que la obligacion exista. Se sustituye por la
+    // gracia: 30 dias desde que entro a la audiencia.
+    expect(civil(dueAt)).toBe('2026-09-19');
+    expect(dueAt.getTime()).toBeGreaterThan(entraHoy.getTime());
+  });
+
+  it('a quien entra manana NO le afecta: su fecha de D1072 se respeta intacta', () => {
+    // El alta se registra el 20 de agosto y la persona ingresa el 1 de diciembre: la fecha
+    // calculada (30 de noviembre) es POSTERIOR a su entrada a la audiencia, asi que manda ella.
+    const ingreso1Dic = new Date('2026-12-01T00:00:00.000Z');
+    const dueAt = computeFirstDueAt('ON_HIRE', -1, { hiredAt: ingreso1Dic, joinedAt: entraHoy, recurrence: null });
+    expect(civil(dueAt)).toBe('2026-11-30');
+  });
+
+  it('con "desde ahora" la gracia no cambia nada: ya cuenta desde la entrada', () => {
+    const dueAt = computeFirstDueAt('ON_JOIN', 30, { hiredAt: ingreso2019, joinedAt: entraHoy, recurrence: null });
+    expect(civil(dueAt)).toBe('2026-09-19');
+  });
+
+  it('vencer el MISMO dia en que nace sigue siendo valido: no dispara la gracia', () => {
+    const dueAt = computeFirstDueAt('ON_JOIN', 0, { hiredAt: null, joinedAt: entraHoy, recurrence: null });
+    expect(civil(dueAt)).toBe('2026-08-20');
+  });
+});
