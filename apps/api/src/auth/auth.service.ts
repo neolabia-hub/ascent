@@ -17,7 +17,9 @@ export interface AuthUserView {
 export interface LoginResult {
   accessToken: string;
   expiresIn: string;
-  refreshToken: string; // el controller lo pone en cookie httpOnly (userId.tenantId.token)
+  refreshToken: string; // el controller lo pone en cookie httpOnly (sessionId.tenantId.token)
+  /** Cual de las sesiones de esta persona es (Decision #91). Viaja en la cookie. */
+  sessionId: string;
   user: AuthUserView;
 }
 
@@ -30,6 +32,11 @@ export interface AuthContext {
 // Anti-fuerza-bruta: bloqueo por CUENTA (ademas del rate limit por IP del edge).
 const MAX_FAILED_ATTEMPTS = Number(process.env.AUTH_MAX_FAILED_ATTEMPTS ?? 5);
 const LOCK_MINUTES = Number(process.env.AUTH_LOCK_MINUTES ?? 15);
+
+/** Lo que dura una sesion sin usarse. Coincide con la cookie del controlador. */
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Ventana en la que el token ANTERIOR sigue valiendo tras rotar. Ver `rotarSesion`. */
+const GRACE_MS = 30_000;
 
 // Versiones vigentes de las politicas aceptadas en la activacion (quedan registradas por usuario).
 const HABEAS_DATA_POLICY_VERSION = process.env.HABEAS_DATA_POLICY_VERSION ?? '1.0';
@@ -115,27 +122,55 @@ export class AuthService {
       userAgent: ctx.userAgent,
     });
 
-    return this.issueTokens(user.id, tenant.id);
+    return this.abrirSesion(user.id, tenant.id, ctx);
   }
 
-  /** Rotacion de refresh token (compara hash SHA-256 con pepper; rota en cada uso). */
-  async refresh(userId: string, tenantId: string, presentedToken: string): Promise<LoginResult> {
-    const user = await this.prisma
-      .forTenant(tenantId)
-      .user.findUnique({ where: { id: userId } })
+  /**
+   * ROTA EL TOKEN DE **ESA** SESION, no el unico del usuario (Decision #91).
+   *
+   * Y acepta el token ANTERIOR durante unos segundos. Sin esa gracia, dos pestanas que refrescan a
+   * la vez se tumban entre si: la primera rota, la segunda presenta el viejo y se queda fuera. Es
+   * el fallo que se veia como "se cerro la sesion sola" en mitad del trabajo.
+   */
+  async refresh(sessionId: string, tenantId: string, presentedToken: string): Promise<LoginResult> {
+    const scoped = this.prisma.forTenant(tenantId);
+    const session = await scoped.userSession
+      .findUnique({ where: { id: sessionId }, include: { user: true } })
       .catch(() => null);
-    if (!user?.refreshTokenHash || !user.active) throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+    if (!session || !session.user.active || session.user.deletedAt) {
+      throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+    }
+    if (session.expiresAt.getTime() <= Date.now()) {
+      await scoped.userSession.delete({ where: { id: session.id } }).catch(() => undefined);
+      throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+    }
 
-    const expected = Buffer.from(user.refreshTokenHash, 'hex');
-    const actual = Buffer.from(this.hashRefresh(presentedToken), 'hex');
-    const ok = expected.length === actual.length && timingSafeEqual(expected, actual);
-    if (!ok) throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+    const presentado = this.hashRefresh(presentedToken);
+    const coincide = (esperado: string | null) => {
+      if (!esperado) return false;
+      const a = Buffer.from(esperado, 'hex');
+      const b = Buffer.from(presentado, 'hex');
+      return a.length === b.length && timingSafeEqual(a, b);
+    };
+    const enGracia =
+      session.previousValidUntil !== null &&
+      session.previousValidUntil.getTime() > Date.now() &&
+      coincide(session.previousHash);
 
-    return this.issueTokens(user.id, tenantId);
+    if (!coincide(session.tokenHash) && !enGracia) {
+      throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
+    }
+
+    return this.rotarSesion(session.id, session.userId, tenantId);
   }
 
-  async logout(userId: string, tenantId: string): Promise<void> {
-    await this.prisma.forTenant(tenantId).user.update({ where: { id: userId }, data: { refreshTokenHash: null } });
+  /** Cierra SOLO la sesion desde la que se pulsa: las de los otros aparatos siguen vivas. */
+  async logout(sessionId: string | null, tenantId: string): Promise<void> {
+    if (!sessionId) return;
+    await this.prisma
+      .forTenant(tenantId)
+      .userSession.delete({ where: { id: sessionId } })
+      .catch(() => undefined);
   }
 
   /** Auto-servicio: cambia contrasena verificando la actual; limpia el flag de cambio forzado. */
@@ -214,7 +249,56 @@ export class AuthService {
     });
   }
 
-  private async issueTokens(userId: string, tenantId: string): Promise<LoginResult> {
+  /** Abre una sesion NUEVA. Las que ya tuviera esta persona siguen vivas (Decision #91). */
+  private async abrirSesion(userId: string, tenantId: string, ctx: AuthContext = {}): Promise<LoginResult> {
+    const scoped = this.prisma.forTenant(tenantId);
+    const refreshToken = randomBytes(48).toString('base64url');
+    const session = await scoped.userSession.create({
+      data: {
+        tenantId,
+        userId,
+        tokenHash: this.hashRefresh(refreshToken),
+        userAgent: ctx.userAgent ?? null,
+        ipAddress: ctx.ipAddress ?? null,
+        expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+      },
+    });
+    // Higiene: se retiran las caducadas de esta persona. Sin esto la tabla solo crece.
+    await scoped.userSession
+      .deleteMany({ where: { userId, expiresAt: { lte: new Date() } } })
+      .catch(() => undefined);
+    return this.armarResultado(session.id, userId, tenantId, refreshToken);
+  }
+
+  /**
+   * Rota el token de una sesion existente, dejando el anterior valido unos segundos.
+   *
+   * Esa gracia es lo que permite que dos peticiones que caducan a la vez refresquen sin tumbarse:
+   * la segunda llega con el token que la primera acaba de rotar y aun asi entra.
+   */
+  private async rotarSesion(sessionId: string, userId: string, tenantId: string): Promise<LoginResult> {
+    const scoped = this.prisma.forTenant(tenantId);
+    const refreshToken = randomBytes(48).toString('base64url');
+    const anterior = await scoped.userSession.findUnique({ where: { id: sessionId }, select: { tokenHash: true } });
+    await scoped.userSession.update({
+      where: { id: sessionId },
+      data: {
+        tokenHash: this.hashRefresh(refreshToken),
+        previousHash: anterior?.tokenHash ?? null,
+        previousValidUntil: new Date(Date.now() + GRACE_MS),
+        lastUsedAt: new Date(),
+        expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+      },
+    });
+    return this.armarResultado(sessionId, userId, tenantId, refreshToken);
+  }
+
+  private async armarResultado(
+    sessionId: string,
+    userId: string,
+    tenantId: string,
+    refreshToken: string,
+  ): Promise<LoginResult> {
     const scoped = this.prisma.forTenant(tenantId);
     const user = await scoped.user.findUniqueOrThrow({ where: { id: userId } });
     const payload: JwtPayload = {
@@ -222,19 +306,16 @@ export class AuthService {
       tenantId: user.tenantId,
       roleId: user.roleId,
       email: user.email,
+      sessionId,
     };
     const accessToken = await this.jwt.signAsync(payload);
-
-    const refreshToken = randomBytes(48).toString('base64url');
-    await scoped.user.update({
-      where: { id: user.id },
-      data: { refreshTokenHash: this.hashRefresh(refreshToken), lastLogin: new Date() },
-    });
+    await scoped.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
 
     return {
       accessToken,
       expiresIn: process.env.JWT_ACCESS_TTL ?? '15m',
       refreshToken,
+      sessionId,
       user: this.toView(user),
     };
   }

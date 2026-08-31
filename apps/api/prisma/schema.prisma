@@ -504,7 +504,10 @@ model User {
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until")
   lastLogin           DateTime? @map("last_login")
+  /// OBSOLETA (Decision #91): las sesiones viven en `user_sessions`. Se conserva la columna para
+  /// no romper la migracion; deja de escribirse y de leerse.
   refreshTokenHash    String?   @map("refresh_token_hash")
+  sessions            UserSession[]
 
   jobTitleId String    @map("job_title_id") @db.Uuid
   jobTitle   JobTitle  @relation(fields: [jobTitleId], references: [id])
@@ -1371,6 +1374,43 @@ model QuestionVersion {
 // evaluacion se edita libremente, y publicar la FORMACION congela una COPIA. La inmutabilidad la
 // da el unico escalon que de verdad la necesita —la version de la formacion—, y el historico de
 // lo respondido lo sigue dando `question_versions`, que es donde siempre estuvo (Decision #6).
+// UNA PERSONA PUEDE TENER VARIAS SESIONES A LA VEZ (Decision #91).
+//
+// El refresco vivia en una columna de `users`, asi que solo cabia UNA sesion: entrar desde el
+// telefono cerraba la del computador, y una segunda pestana o cualquier segundo login tumbaba la
+// primera al cabo de quince minutos —cuando caducaba el token de acceso y el refresco ya no valia—.
+// Eso es lo que se veia como "se cerro sola sin motivo".
+//
+// Ahora cada sesion es una FILA: se cierra la suya y no la de los demas.
+model UserSession {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 del token de refresco. El token en claro solo existe en la cookie del navegador.
+  tokenHash String @map("token_hash")
+
+  /// EL TOKEN ANTERIOR, valido unos segundos mas (`previousValidUntil`).
+  ///
+  /// El refresco ROTA el token, y dos pestanas que refrescan a la vez se invalidarian entre si:
+  /// la primera rota, la segunda presenta el viejo y se queda fuera. Con una ventana de gracia,
+  /// la segunda entra igual. Es lo minimo para que el rotado no cueste sesiones.
+  previousHash       String?   @map("previous_hash")
+  previousValidUntil DateTime? @map("previous_valid_until")
+
+  /// Para que la persona pueda reconocer sus sesiones si algun dia se listan.
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+
+    @@index([userId, expiresAt])
+    @@index([tokenHash])
+  @@map("user_sessions")
+}
+
 model Assessment {
   id       String        @id @default(uuid()) @db.Uuid
   tenantId String        @map("tenant_id") @db.Uuid

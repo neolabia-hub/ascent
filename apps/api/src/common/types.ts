@@ -3,6 +3,8 @@ import type { AnalystScope } from './analyst-scope.js';
 
 /** Payload del access token (JWT RS256). */
 export interface JwtPayload {
+  /** Cual de las sesiones de la persona es (Decision #91): permite cerrar solo esta. */
+  sessionId?: string;
   sub: string;
   tenantId: string;
   roleId: string;

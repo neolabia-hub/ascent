@@ -9,12 +9,17 @@ const REFRESH_COOKIE = 'np_refresh';
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias (JWT_REFRESH_TTL)
 
 /**
- * Cookie de refresh: httpOnly, path restringido a /v1/auth, valor `userId.tenantId.token`.
- * El tenantId viaja en la cookie porque el refresh corre pre-JWT y RLS exige conocer el tenant
- * para leer al usuario (no hay cliente owner en runtime).
+ * Cookie de refresh: httpOnly, path restringido a /v1/auth, valor `sessionId.tenantId.token`.
+ *
+ * Lleva el ID DE SESION y no el del usuario (Decision #91): una persona puede tener varias
+ * abiertas —telefono y computador— y el refresco tiene que saber CUAL renovar. Con el id del
+ * usuario solo cabia una, y entrar desde otro sitio tumbaba la anterior.
+ *
+ * El tenantId viaja tambien porque el refresco corre pre-JWT y RLS exige conocer el tenant para
+ * leer la sesion (no hay cliente owner en runtime).
  */
-function setRefreshCookie(res: Response, result: LoginResult, userId: string, tenantId: string): void {
-  res.cookie(REFRESH_COOKIE, `${userId}.${tenantId}.${result.refreshToken}`, {
+function setRefreshCookie(res: Response, result: LoginResult, tenantId: string): void {
+  res.cookie(REFRESH_COOKIE, `${result.sessionId}.${tenantId}.${result.refreshToken}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -23,12 +28,12 @@ function setRefreshCookie(res: Response, result: LoginResult, userId: string, te
   });
 }
 
-function parseRefreshCookie(req: Request): { userId: string; tenantId: string; token: string } | null {
+function parseRefreshCookie(req: Request): { sessionId: string; tenantId: string; token: string } | null {
   const raw = (req.cookies as Record<string, string> | undefined)?.[REFRESH_COOKIE];
   if (!raw) return null;
-  const [userId, tenantId, token] = raw.split('.');
-  if (!userId || !tenantId || !token) return null;
-  return { userId, tenantId, token };
+  const [sessionId, tenantId, token] = raw.split('.');
+  if (!sessionId || !tenantId || !token) return null;
+  return { sessionId, tenantId, token };
 }
 
 function requestContext(req: Request): { ipAddress: string | null; userAgent: string | null } {
@@ -48,7 +53,7 @@ export class AuthController {
   async login(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const input = loginSchema.parse(body);
     const result = await this.auth.login(input.tenantSlug, input.identifier, input.password, requestContext(req));
-    setRefreshCookie(res, result, result.user.id, this.tenantIdFromAccess(result.accessToken));
+    setRefreshCookie(res, result, this.tenantIdFromAccess(result.accessToken));
     const { refreshToken: _refreshToken, ...safe } = result;
     return safe;
   }
@@ -59,16 +64,17 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const parsed = parseRefreshCookie(req);
     if (!parsed) throw new UnauthorizedException({ code: 'INVALID_REFRESH' });
-    const result = await this.auth.refresh(parsed.userId, parsed.tenantId, parsed.token);
-    setRefreshCookie(res, result, parsed.userId, parsed.tenantId);
+    const result = await this.auth.refresh(parsed.sessionId, parsed.tenantId, parsed.token);
+    setRefreshCookie(res, result, parsed.tenantId);
     const { refreshToken: _refreshToken, ...safe } = result;
     return safe;
   }
 
   @Post('logout')
   @HttpCode(200)
-  async logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
-    await this.auth.logout(user.id, user.tenantId);
+  async logout(@CurrentUser() user: AuthUser, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    // Se cierra SOLO esta sesion. Las de los otros aparatos de la misma persona siguen vivas.
+    await this.auth.logout(parseRefreshCookie(req)?.sessionId ?? null, user.tenantId);
     res.clearCookie(REFRESH_COOKIE, { path: '/v1/auth' });
     return { ok: true };
   }

@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { getPublicTenant, me, refresh, setAccessToken, type MeResponse } from '@/lib/api';
+import { getPublicTenant, me, refresh, setAccessToken, type MeResponse, onSessionLost } from '@/lib/api';
 import { LEARNER_HOME, isLearnerOnly } from '@/lib/landing';
 import { resolveTenantSlug } from '@/lib/tenant';
 import { SessionProvider } from '@/components/providers/session-provider';
@@ -61,6 +61,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [session, setSession] = useState<SessionState>({ status: 'loading' });
+
+  /*
+    LA SESION MURIO DE VERDAD (Decision #91). `apiFetch` ya intenta renovarla sola ante un 401;
+    solo avisa por aqui cuando ni con el refresco se pudo, que es cuando toca ir al login. Antes no
+    habia nada de esto: a los 15 minutos el token caducaba y la pantalla se quedaba muerta.
+  */
+  useEffect(() => {
+    onSessionLost(() => router.push('/login'));
+    return () => onSessionLost(null);
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
