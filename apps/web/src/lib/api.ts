@@ -158,9 +158,22 @@ export interface TenantBranding {
   logoKey: string | null;
 }
 
+/**
+ * Convierte una ruta firmada del servidor en una URL absoluta contra la API.
+ *
+ * Hace falta porque el front y la API viven en origenes distintos: un `<img src="/v1/media/...">`
+ * lo resolveria contra el front y daria 404. Lo descubrimos con el logo de la pantalla de ingreso,
+ * que salia como texto alternativo.
+ */
+export function mediaUrlFromPath(path: string | null): string | null {
+  return path ? `${API_URL}${path}` : null;
+}
+
 export interface PublicTenant {
   name: string;
   branding: TenantBranding;
+  /** El logo YA firmado: la pantalla de ingreso no tiene sesion para pedir la firma. */
+  logoUrl: string | null;
 }
 
 export interface AuthUser {

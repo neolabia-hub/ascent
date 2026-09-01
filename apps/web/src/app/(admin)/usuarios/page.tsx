@@ -268,7 +268,18 @@ export default function UsuariosPage() {
     }
   };
 
+  /*
+    RESTABLECER PIDE CONFIRMACION (Decision #95).
+
+    No es un boton mas de la fila: invalida la contrasena que la persona esta usando AHORA y la
+    sustituye por una aleatoria que solo se ve una vez. Pulsarlo por error deja a alguien fuera
+    hasta que le entreguen la nueva — y eso, en un turno de bodega, es medio dia sin poder hacer
+    su formacion.
+  */
+  const [aRestablecer, setARestablecer] = useState<UserRow | null>(null);
+
   const resetPassword = async (user: UserRow) => {
+    setARestablecer(null);
     try {
       const { generatedPassword } = await resetUserPassword(user.id);
       setCredential({ name: user.fullName, document: user.documentNumber, password: generatedPassword });
@@ -426,7 +437,7 @@ export default function UsuariosPage() {
                         >
                           <ShieldCheck size={14} />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => resetPassword(user)} aria-label={`Nueva contrasena para ${user.fullName}`} title="Generar nueva contrasena">
+                        <Button variant="ghost" size="sm" onClick={() => setARestablecer(user)} aria-label={`Nueva contrasena para ${user.fullName}`} title="Generar una contrasena nueva y sacarle de sus sesiones">
                           <KeyRound size={14} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => toggleActive(user)}>
@@ -696,6 +707,37 @@ export default function UsuariosPage() {
       </Drawer>
 
       {/* Credencial generada — se muestra UNA vez */}
+      <Drawer
+        open={aRestablecer !== null}
+        onOpenChange={(open) => {
+          if (!open) setARestablecer(null);
+        }}
+        title={aRestablecer ? `Restablecer la contrasena de ${aRestablecer.fullName}` : ''}
+        description="Se genera una contrasena nueva al azar y la actual deja de servir."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setARestablecer(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => aRestablecer && void resetPassword(aRestablecer)}>
+              Generar contrasena nueva
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-sm text-ink-700">
+          <p>
+            <span className="font-medium text-ink-900">La contrasena actual dejara de funcionar</span> y se cerraran
+            todas sus sesiones. La nueva se ensena <span className="font-medium text-ink-900">una sola vez</span>:
+            copiala antes de cerrar, porque despues no se puede volver a ver.
+          </p>
+          <p className="rounded-lg bg-paper px-3 py-2 text-ink-500">
+            Al entrar con ella, el sistema le obligara a poner una suya. Nadie mas la conoce en ningun momento — ni
+            siquiera quien la genera.
+          </p>
+        </div>
+      </Drawer>
+
       <Drawer
         open={credential !== null}
         onOpenChange={(open) => { if (!open) setCredential(null); }}

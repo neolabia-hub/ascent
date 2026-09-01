@@ -4,12 +4,19 @@ import { Eye, EyeOff, HelpCircle, IdCard, Lock } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveTenantSlug } from '@/lib/tenant';
-import { ApiError, getPublicTenant, login, me, setAccessToken, type TenantBranding } from '@/lib/api';
+import {
+  ApiError,
+  getPublicTenant,
+  login,
+  me,
+  mediaUrlFromPath,
+  setAccessToken,
+  type TenantBranding,
+} from '@/lib/api';
 import { ADMIN_HOME, landingFor } from '@/lib/landing';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { useMediaUrl } from '@/lib/use-media-url';
 
 /**
  * NO_FOUND y UNREACHABLE son cosas distintas y hay que decirlas distinto.
@@ -21,7 +28,7 @@ import { useMediaUrl } from '@/lib/use-media-url';
  */
 type BrandingState =
   | { status: 'loading' }
-  | { status: 'ready'; tenantSlug: string; branding: TenantBranding }
+  | { status: 'ready'; tenantSlug: string; branding: TenantBranding; logoUrl: string | null }
   | { status: 'not_found' }
   | { status: 'unreachable' };
 
@@ -47,7 +54,12 @@ export function LoginForm() {
     getPublicTenant(tenantSlug)
       .then((tenant) => {
         applyBranding(tenant.branding);
-        setBrandingState({ status: 'ready', tenantSlug, branding: tenant.branding });
+        setBrandingState({
+          status: 'ready',
+          tenantSlug,
+          branding: tenant.branding,
+          logoUrl: mediaUrlFromPath(tenant.logoUrl),
+        });
       })
       .catch((error: unknown) => {
         // Solo un 404 significa que esa empresa no existe. Todo lo demas es que no se pudo
@@ -135,185 +147,227 @@ export function LoginForm() {
     );
   }
 
-  const { branding } = brandingState;
+  const { branding, logoUrl } = brandingState;
 
   return (
     /*
-      UNA TARJETA QUE FLOTA, partida en dos (Decision #94).
+      A SANGRE Y PARTIDA EN DOS (Decision #94).
 
-      QUE SE TOMA DE LAS REFERENCIAS Y QUE NO. Las dos que trajo el cliente coinciden en lo mejor
-      que tienen: la tarjeta despegada de los bordes sobre un fondo tenido, y campos generosos con
-      su icono dentro. Eso se toma, y ademas encaja con el resto del producto —las dos barras
-      laterales ya son tarjetas que flotan—.
+      SE VOLVIO A ESTO despues de probar la tarjeta flotante de las referencias, y el cliente tenia
+      razon: encerrar la marca en una tarjeta de 1000 px la convierte en un recuadro decorativo. A
+      sangre, el color de la empresa ES la pantalla — y esta es la unica pantalla del producto donde
+      eso corresponde, porque no hay ningun dato con el que competir.
 
-      Lo que NO se toma, y es la mitad de cada referencia: la foto de banco de imagenes y la
-      ilustracion comprada (no dicen nada de esta empresa y envejecen en un ano), el "Sign Up"
-      (aqui nadie se registra solo: las cuentas las crea quien administra) y el "entrar con Google"
-      (no existe ese proveedor). Copiar esas piezas seria poner botones que no llevan a ninguna
-      parte para que la pantalla se parezca a un pantallazo de Dribbble.
+      De las referencias se conserva lo que si se sostiene: los campos generosos con su icono
+      dentro. Lo que no: la foto de banco de imagenes, el "Sign Up" —aqui nadie se registra solo— y
+      el "entrar con Google", que no existe.
 
-      El lado de la marca ocupa superficie de color SOLO aqui. Dentro, con datos por delante, ese
-      mismo color a esta escala pelearia con el contenido; ahi es acento.
+      En telefono el lado de la marca se pliega a una banda: cuando la pantalla mide 375 px, una
+      imagen bonita que empuja el campo de la contrasena por debajo del teclado es un estorbo con
+      buena intencion.
     */
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-4 py-6 lg:px-8">
-      {/* El fondo tenido de las referencias, con el color de la empresa y muy diluido. */}
-      <span
-        aria-hidden="true"
-        className="aurora-a pointer-events-none absolute -left-40 -top-40 h-[60vh] w-[60vh] rounded-full opacity-[0.07] blur-3xl"
+    <div className="flex min-h-screen flex-col bg-paper lg:flex-row">
+      {/* ─────────────── El lado de la empresa ─────────────── */}
+      <div
+        className="relative isolate flex shrink-0 flex-col justify-between overflow-hidden px-6 py-7 lg:min-h-screen lg:w-[52%] lg:px-14 lg:py-12"
         style={{ backgroundColor: 'var(--brand-primary)' }}
-      />
-      <span
-        aria-hidden="true"
-        className="aurora-b pointer-events-none absolute -bottom-40 -right-40 h-[55vh] w-[55vh] rounded-full opacity-[0.07] blur-3xl"
-        style={{ backgroundColor: 'var(--brand-accent)' }}
-      />
+      >
+        {/* Dos manchas que respiran, muy despacio. Ver `.aurora-a` / `.aurora-b`. */}
+        <span
+          aria-hidden="true"
+          className="aurora-a pointer-events-none absolute -left-1/4 -top-1/3 h-[80vh] w-[80vh] rounded-full opacity-70 blur-3xl"
+          style={{ backgroundColor: 'var(--brand-accent)' }}
+        />
+        <span
+          aria-hidden="true"
+          className="aurora-b pointer-events-none absolute -bottom-1/3 -right-1/4 h-[70vh] w-[70vh] rounded-full opacity-40 blur-3xl"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 30%, white)' }}
+        />
+        {/*
+          UNA RETICULA FINISIMA sobre el color. Es lo que separa "un fondo de color" de "una
+          superficie": sin ella el degradado se ve plano, y con ella el ojo encuentra donde
+          apoyarse. Al 4% no se ve; se nota.
+        */}
+        {/*
+          EL PULSO: la firma de la marca, en grande (skill pulse-ui, "Firma 1 — anillo de pulso").
 
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-line bg-surface shadow-card-hover lg:grid-cols-2">
-        {/* ─────────────── El formulario ─────────────── */}
-        <div className="order-2 flex items-center justify-center px-6 py-10 sm:px-10 lg:order-1 lg:px-12 lg:py-14">
-          <div className="w-full max-w-[360px]">
-            <h1 className="font-display text-[28px] font-bold leading-tight text-ink-900">Ingresa</h1>
-            <p className="mt-1.5 text-sm text-ink-500">Con tu cedula o tu correo de la empresa.</p>
+          Aqui iban tres filas de icono y frase, y el cliente las rechazo con razon: es el recurso
+          de todas las paginas de producto —tres ventajas con un cuadradito al lado— y no dice nada
+          que el parrafo de arriba no diga ya. Ademas repartia la atencion justo donde la pantalla
+          solo pide una cosa: entrar.
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-              {/*
-                EL ICONO DENTRO DEL CAMPO es lo unico que se copia tal cual de las referencias, y
-                se gana el sitio: distingue los dos campos de un vistazo sin leer la etiqueta, que
-                es como se rellena un formulario que ya se conoce.
-              */}
-              <Field htmlFor="identifier" label="Cedula o correo">
-                <div className="aurora-focus relative rounded-xl">
-                  <IdCard
-                    className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-ink-300"
-                    strokeWidth={1.75}
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id="identifier"
-                    name="identifier"
-                    type="text"
-                    autoComplete="username"
-                    autoFocus
-                    required
-                    className="relative h-12 rounded-xl pl-11 text-base"
-                    value={identifier}
-                    onChange={(event) => setIdentifier(event.target.value)}
-                  />
-                </div>
-              </Field>
+          En su lugar va lo que ESTE producto ya usa para significar avance: anillos concentricos
+          que laten muy despacio. No es adorno importado: es el mismo gesto que el anillo de
+          cumplimiento del plan y el de una formacion terminada. Y es CSS, no una ilustracion
+          comprada que envejece.
+        */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-40 top-1/2 hidden -translate-y-1/2 lg:block"
+        >
+          {[0, 1, 2, 3].map((anillo) => (
+            <span
+              key={anillo}
+              className="aurora-a absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/[0.09]"
+              style={{
+                width: `${18 + anillo * 13}rem`,
+                height: `${18 + anillo * 13}rem`,
+                // Cada anillo late con su propio retraso: juntos parecen una onda que sale.
+                animationDelay: `${anillo * 1.6}s`,
+                animationDuration: `${16 + anillo * 3}s`,
+              }}
+            />
+          ))}
+        </span>
 
-              <Field htmlFor="password" label="Contraseña">
-                <div className="aurora-focus relative rounded-xl">
-                  <Lock
-                    className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-ink-300"
-                    strokeWidth={1.75}
-                    aria-hidden="true"
-                  />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={verContrasena ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    className="relative h-12 rounded-xl pl-11 pr-11 text-base"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                  {/*
-                    VER LA CONTRASENA. En un telefono, con guantes o con prisa, teclear a ciegas
-                    una contrasena generada de catorce caracteres es la primera causa de intento
-                    fallido — y cinco fallidos bloquean la cuenta quince minutos.
-                  */}
-                  <button
-                    type="button"
-                    onClick={() => setVerContrasena((valor) => !valor)}
-                    aria-label={verContrasena ? 'Ocultar la contraseña' : 'Ver la contraseña'}
-                    title={verContrasena ? 'Ocultar la contraseña' : 'Ver la contraseña'}
-                    className="focus-ring absolute right-1 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-ink-500 transition-colors hover:text-ink-900"
-                  >
-                    {verContrasena ? (
-                      <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                    ) : (
-                      <Eye className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                    )}
-                  </button>
-                </div>
-              </Field>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
+            backgroundSize: '56px 56px',
+          }}
+        />
 
-              {errorMessage ? (
-                <p role="alert" className="animate-card-in rounded-xl bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
-                  {errorMessage}
-                </p>
-              ) : null}
-
-              <Button type="submit" loading={submitting} size="lg" className="w-full rounded-xl">
-                {submitting ? 'Ingresando...' : 'Ingresar'}
-              </Button>
-            </form>
-
-            {/*
-              "NO PUEDO ENTRAR" dice la verdad y nada mas.
-
-              No hay recuperacion por correo todavia, y sin correo verificado cualquier
-              auto-recuperacion es una forma de que quien conozca una cedula se lleve la cuenta —la
-              cedula es semipublica dentro de la empresa—. Aqui no se promete un enlace que no
-              existe: se dice a quien pedirselo.
-
-              En Sprint 6 esto trae el CONTACTO REAL de quien administra en cada empresa
-              (parametrizable por tenant) y, con correo verificado, el enlace de un solo uso.
-            */}
-            <details className="mt-6">
-              <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900">
-                <HelpCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                No puedo entrar
-              </summary>
-              <div className="animate-card-in mt-3 rounded-xl bg-paper p-4">
-                <p className="text-sm leading-relaxed text-ink-700">
-                  Todavia no se puede recuperar la contraseña por correo. Pideselo a quien administra
-                  la plataforma en tu empresa: puede restablecerla y darte una nueva.
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-ink-500">
-                  Si te equivocaste cinco veces, la cuenta se bloquea quince minutos y despues vuelve
-                  a funcionar sola.
-                </p>
-              </div>
-            </details>
+        <div className="relative flex items-center gap-3.5">
+          <LogoEmpresa logoUrl={logoUrl} nombre={branding.companyDisplayName} />
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-bold leading-tight text-white">
+              {branding.companyDisplayName}
+            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">NEO PULSE</p>
           </div>
         </div>
 
-        {/* ─────────────── El lado de la empresa ─────────────── */}
-        <div
-          className="relative isolate order-1 flex min-h-[180px] flex-col justify-between overflow-hidden p-7 lg:order-2 lg:min-h-[620px] lg:p-10"
-          style={{ backgroundColor: 'var(--brand-primary)' }}
-        >
-          <span
-            aria-hidden="true"
-            className="aurora-a pointer-events-none absolute -right-1/3 -top-1/3 h-[60vh] w-[60vh] rounded-full opacity-60 blur-3xl"
-            style={{ backgroundColor: 'var(--brand-accent)' }}
-          />
-          <span
-            aria-hidden="true"
-            className="aurora-b pointer-events-none absolute -bottom-1/3 -left-1/4 h-[50vh] w-[50vh] rounded-full opacity-40 blur-3xl"
-            style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 35%, white)' }}
-          />
-
-          <div className="relative flex items-center gap-3">
-            <LogoEmpresa branding={branding} />
-            <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold leading-tight text-white">
-                {branding.companyDisplayName}
-              </p>
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/55">NEO PULSE</p>
-            </div>
-          </div>
-
-          <div className="relative mt-8 hidden lg:block">
-            <FraseQueSeEscribe />
-          </div>
-
-          <p className="relative mt-8 hidden text-xs text-white/40 lg:block">
-            Formacion y cumplimiento · {new Date().getFullYear()}
+        <div className="relative mt-10 hidden lg:block">
+          <FraseQueSeEscribe />
+          {/*
+            LA DESCRIPCION, quieta debajo de la frase que rota. Faltaba: una frase que cambia sola
+            sin nada fijo al lado se lee como un eslogan y no explica nada. Esta se queda, y es la
+            que contesta "¿que es esto?" de una vez.
+          */}
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/65">
+            La plataforma donde {branding.companyDisplayName} lleva la formacion de su gente: lo
+            obligatorio y lo que suma, con la evidencia lista para cuando la pidan.
           </p>
+
+        </div>
+
+        <p className="relative mt-8 hidden text-xs text-white/35 lg:block">
+          Formacion y cumplimiento · {new Date().getFullYear()}
+        </p>
+      </div>
+
+      {/* ─────────────── El formulario ─────────────── */}
+      {/*
+        EL FORMULARIO VA EN UNA TARJETA, sobre papel.
+
+        Era blanco plano de borde a borde: al lado de un panel de marca con profundidad, esa mitad
+        se leia como el hueco que queda, no como la pieza principal. Elevarla sobre papel la
+        convierte en un objeto —el mismo lenguaje que las barras laterales y las tarjetas del
+        catalogo— y ademas la centra sola a cualquier ancho.
+
+        En telefono NO lleva tarjeta: ahi el formulario ya ocupa toda la pantalla y meterle un
+        borde alrededor solo roba ancho al unico contenido que hay.
+      */}
+      <div className="flex flex-1 items-center justify-center px-5 py-10 lg:px-14">
+        <div className="w-full max-w-[400px] lg:rounded-3xl lg:border lg:border-line lg:bg-surface lg:p-10 lg:shadow-card">
+          <h1 className="font-display text-[30px] font-bold leading-tight text-ink-900">Ingresa</h1>
+          <p className="mt-1.5 text-sm text-ink-500">Con tu cedula o tu correo de la empresa.</p>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <Field htmlFor="identifier" label="Cedula o correo">
+              <div className="aurora-focus relative rounded-xl">
+                <IdCard
+                  className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-ink-300"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+                <Input
+                  id="identifier"
+                  name="identifier"
+                  type="text"
+                  autoComplete="username"
+                  autoFocus
+                  required
+                  className="relative h-12 rounded-xl pl-11 text-base"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                />
+              </div>
+            </Field>
+
+            <Field htmlFor="password" label="Contraseña">
+              <div className="aurora-focus relative rounded-xl">
+                <Lock
+                  className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-ink-300"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+                <Input
+                  id="password"
+                  name="password"
+                  type={verContrasena ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  className="relative h-12 rounded-xl pl-11 pr-11 text-base"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                {/*
+                  VER LA CONTRASENA. Teclear a ciegas una generada de catorce caracteres, en un
+                  telefono y con prisa, es la primera causa de intento fallido — y cinco fallidos
+                  bloquean la cuenta quince minutos.
+                */}
+                <button
+                  type="button"
+                  onClick={() => setVerContrasena((valor) => !valor)}
+                  aria-label={verContrasena ? 'Ocultar' : 'Mostrar'}
+                  title={verContrasena ? 'Ocultar la contraseña' : 'Ver la contraseña'}
+                  className="focus-ring absolute right-1 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-ink-500 transition-colors hover:text-ink-900"
+                >
+                  {verContrasena ? (
+                    <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  ) : (
+                    <Eye className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  )}
+                </button>
+              </div>
+            </Field>
+
+            {errorMessage ? (
+              <p role="alert" className="animate-card-in rounded-xl bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+                {errorMessage}
+              </p>
+            ) : null}
+
+            <Button type="submit" loading={submitting} size="lg" className="w-full rounded-xl">
+              {submitting ? 'Ingresando...' : 'Ingresar'}
+            </Button>
+          </form>
+
+          {/*
+            "NO PUEDO ENTRAR" dice la verdad y nada mas. Sin correo verificado, cualquier
+            auto-recuperacion es una forma de que quien conozca una cedula se lleve la cuenta —la
+            cedula es semipublica dentro de la empresa—. Aqui no se promete un enlace que no existe.
+          */}
+          <details className="mt-6">
+            <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900">
+              <HelpCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+              No puedo entrar
+            </summary>
+            <div className="animate-card-in mt-3 rounded-xl bg-paper p-4">
+              <p className="text-sm leading-relaxed text-ink-700">
+                Todavia no se puede recuperar la contraseña por correo. Pideselo a quien administra la
+                plataforma en tu empresa: puede generarte una nueva.
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-ink-500">
+                Si te equivocaste cinco veces, la cuenta se bloquea quince minutos y despues vuelve a
+                funcionar sola.
+              </p>
+            </div>
+          </details>
         </div>
       </div>
     </div>
@@ -323,23 +377,19 @@ export function LoginForm() {
 /**
  * LA FRASE QUE SE ESCRIBE SOLA.
  *
- * Lo pregunto el cliente y la respuesta es que si, pero NO con saludos. "Bienvenido" o "Hola de
- * nuevo" rotando no informa de nada y a la tercera vez cansa. Lo que si se gana el movimiento es
- * decir QUE ES esto, que es la pregunta real de alguien que entra por primera vez y no sabe por
- * que le dieron un usuario.
+ * NO son saludos: "bienvenido" rotando no informa de nada y a la tercera vez cansa. Son frases del
+ * negocio de ESTA empresa —lo que la plataforma hace por quien entra—, que es la pregunta real de
+ * alguien que recibe un usuario y no sabe para que.
  *
- * Se escribe y se borra como si alguien tecleara: es lo unico que hace que la vista vuelva a una
- * frase que ya leyo. Cuatro lineas, todas ciertas y todas del negocio de esta empresa.
- *
- * SE APAGA con `prefers-reduced-motion` y entonces se queda la primera fija — que sigue diciendo
- * lo mismo—. Un texto que se reescribe es de lo peor que hay para quien se marea o usa lector de
- * pantalla, asi que el bloque entero es `aria-hidden` y debajo va la frase completa para ellos.
+ * SE APAGA con `prefers-reduced-motion` y queda la primera fija, que dice lo mismo. El bloque es
+ * `aria-hidden` y debajo va el texto completo para lector de pantalla: un parrafo que se reescribe
+ * solo es de lo peor que existe para quien navega escuchando.
  */
 const FRASES = [
   'Lo que te toca hacer, y cuando vence.',
-  'Tus certificados, siempre a la mano.',
-  'Desde el computador o desde el telefono.',
-  'Con senal o sin ella.',
+  'Tus constancias, siempre a la mano.',
+  'Tu formacion, aunque estes en ruta.',
+  'Lo aprendido no se olvida: vuelve.',
 ];
 
 function FraseQueSeEscribe() {
@@ -356,9 +406,9 @@ function FraseQueSeEscribe() {
     if (!animar) return;
     const frase = FRASES[indice] as string;
 
-    // Escribir rapido y borrar mas rapido: borrar es transito, no contenido.
+    // Se escribe despacio y se borra rapido: borrar es transito, no contenido.
     if (!borrando && texto === frase) {
-      const espera = setTimeout(() => setBorrando(true), 2200);
+      const espera = setTimeout(() => setBorrando(true), 2600);
       return () => clearTimeout(espera);
     }
     if (borrando && texto === '') {
@@ -368,24 +418,20 @@ function FraseQueSeEscribe() {
     }
     const paso = setTimeout(
       () => setTexto(borrando ? frase.slice(0, texto.length - 1) : frase.slice(0, texto.length + 1)),
-      borrando ? 22 : 45,
+      borrando ? 20 : 42,
     );
     return () => clearTimeout(paso);
   }, [texto, borrando, indice, animar]);
 
   return (
     <>
-      <p
-        aria-hidden="true"
-        className="min-h-[6.5rem] font-display text-[30px] font-bold leading-[1.2] text-white"
-      >
+      {/* Alto fijo: sin el, el bloque de abajo sube y baja con cada letra. */}
+      <p aria-hidden="true" className="min-h-[5.2rem] font-display text-[38px] font-bold leading-[1.15] text-white">
         {animar ? texto : FRASES[0]}
         {animar ? (
-          // El cursor solo mientras escribe: parado detras de una frase quieta parece un error.
-          <span className="ml-0.5 inline-block h-[0.9em] w-[3px] translate-y-[0.08em] animate-pulse rounded-full bg-white/80" />
+          <span className="ml-1 inline-block h-[0.85em] w-[3px] translate-y-[0.06em] animate-pulse rounded-full bg-[var(--brand-accent)]" />
         ) : null}
       </p>
-      {/* Para lector de pantalla: la idea completa, de una vez y sin reescribirse. */}
       <p className="sr-only">{FRASES.join(' ')}</p>
     </>
   );
@@ -394,21 +440,32 @@ function FraseQueSeEscribe() {
 /**
  * EL LOGO de la empresa.
  *
- * Si hay archivo subido (`logoKey`), manda ese. Si no, se dibuja la marca TP —la T verde y la P
- * blanca del logotipo— en vez de una inicial suelta: un hueco donde deberia ir el logo se lee como
- * que la pagina esta rota, y una letra sola se lee como que nadie lo configuro. Esto se lee como
- * una decision, y desaparece en cuanto se suba el archivo de verdad.
+ * La URL llega YA FIRMADA del endpoint publico (Decision #96): esta pantalla no tiene sesion, asi
+ * que no puede pedir la firma como hace el resto del producto. Sin eso, la unica pantalla donde la
+ * marca de verdad importa seria la unica que no la puede ensenar.
+ *
+ * Mientras no haya archivo se pinta la inicial sobre vidrio: un hueco donde deberia ir el logo se
+ * lee como que la pagina esta rota.
  */
-function LogoEmpresa({ branding }: { branding: TenantBranding }) {
-  const logo = useMediaUrl(branding.logoKey);
-
-  if (logo) {
+function LogoEmpresa({ logoUrl, nombre }: { logoUrl: string | null; nombre: string }) {
+  if (logoUrl) {
     return (
+      /*
+        `contain` Y NO `cover`, y sobre una pastilla clara.
+
+        Un logotipo puede ser cuadrado, redondo o una palabra alargada, y no se sabe cual sube cada
+        empresa. Con `cover` se recorta: el primero que se subio aqui era un logotipo con texto y
+        salio cortado por la mitad, ilegible. Con `contain` cabe entero sea cual sea su forma.
+
+        Y va sobre blanco porque muchos logotipos llevan tinta oscura: sobre el azul de la marca
+        desaparecerian. El blanco es el fondo que cualquier logotipo espera.
+      */
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={logo}
-        alt={branding.companyDisplayName}
-        className="h-11 w-11 shrink-0 rounded-xl bg-white/95 object-contain p-1.5"
+        src={logoUrl}
+        alt={nombre}
+        className="h-12 shrink-0 rounded-xl bg-white object-contain p-1.5 shadow-lg ring-1 ring-white/20"
+        style={{ maxWidth: '120px' }}
       />
     );
   }
@@ -416,17 +473,9 @@ function LogoEmpresa({ branding }: { branding: TenantBranding }) {
   return (
     <span
       aria-hidden="true"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 backdrop-blur-sm"
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 font-display text-xl font-bold text-white backdrop-blur-sm"
     >
-      <svg viewBox="0 0 40 40" className="h-7 w-7" role="presentation">
-        {/* La T, en el verde de la empresa. */}
-        <path d="M4 8h17v6h-5.5v18H9.5V14H4z" fill="var(--brand-accent)" />
-        {/* La P, en blanco, montada sobre la T como en el logotipo. */}
-        <path
-          d="M19 8h11a7.5 7.5 0 0 1 0 15h-4.5v9H19zm6.5 6v3H29a1.5 1.5 0 0 0 0-3z"
-          fill="#ffffff"
-        />
-      </svg>
+      {nombre.charAt(0).toUpperCase()}
     </span>
   );
 }

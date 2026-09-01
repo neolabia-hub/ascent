@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { uploadMedia } from '@/lib/catalog-api';
+import { useMediaUrl } from '@/lib/use-media-url';
 import { applyTenantBranding } from '@/components/providers/tenant-provider';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -187,7 +189,20 @@ export default function PreferenciasPage() {
         {!branding ? (
           <Skeleton className="h-28 w-full" />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+            {/*
+              EL LOGO SE SUBE, no se pega un enlace (Decision #96). Un enlace a un archivo que vive
+              en otro sitio se rompe el dia que alguien mueve esa carpeta, y entonces la pantalla de
+              ingreso de la empresa aparece sin marca sin que nadie sepa por que. Subido, el archivo
+              es nuestro y se sirve firmado como el resto de medios.
+            */}
+            <LogoDeLaMarca
+              logoKey={branding.logoKey}
+              nombre={branding.companyDisplayName}
+              primario={branding.primaryColor}
+              onChange={(logoKey) => setBranding({ ...branding, logoKey })}
+            />
+            <div className="grid gap-4">
             <Field htmlFor="brand-name" label="Nombre visible de la empresa">
               <Input
                 id="brand-name"
@@ -216,6 +231,7 @@ export default function PreferenciasPage() {
                 />
               </Field>
             </div>
+            </div>
           </div>
         )}
         <div className="mt-5 flex justify-end">
@@ -224,6 +240,82 @@ export default function PreferenciasPage() {
           </Button>
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * EL LOGO DE LA EMPRESA: se sube el archivo y se guarda su clave.
+ *
+ * Se sube al mismo almacen que el resto de medios —con validacion de tipo real por magic bytes— y
+ * se sirve con URL firmada. NO se acepta un enlace externo: se rompe el dia que alguien mueve esa
+ * carpeta, y el sintoma es la pantalla de ingreso de la empresa sin marca y sin explicacion.
+ *
+ * Se ve donde de verdad importa —el ingreso— asi que la vista previa se pinta sobre el color
+ * primario, que es el fondo que va a tener alli. Sobre blanco, un logo blanco parece que falta.
+ */
+function LogoDeLaMarca({
+  logoKey,
+  nombre,
+  primario,
+  onChange,
+}: {
+  logoKey: string | null;
+  nombre: string;
+  primario: string;
+  onChange: (logoKey: string | null) => void;
+}) {
+  const { showToast } = useToast();
+  const url = useMediaUrl(logoKey);
+  const [subiendo, setSubiendo] = useState(false);
+  const input = useRef<HTMLInputElement | null>(null);
+
+  return (
+    <div className="w-40 shrink-0">
+      <p className="mb-1.5 text-sm font-medium text-ink-700">Logo</p>
+      <div
+        className="flex h-28 w-full items-center justify-center rounded-xl border border-line p-3"
+        style={{ backgroundColor: primario }}
+      >
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={nombre} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <span className="text-xs text-white/60">Sin logo</span>
+        )}
+      </div>
+      <div className="mt-2 flex gap-1.5">
+        <Button variant="outline" size="sm" loading={subiendo} onClick={() => input.current?.click()}>
+          {logoKey ? 'Cambiar' : 'Subir'}
+        </Button>
+        {logoKey ? (
+          <Button variant="ghost" size="sm" className="text-danger" onClick={() => onChange(null)}>
+            Quitar
+          </Button>
+        ) : null}
+      </div>
+      <p className="mt-1.5 text-[11px] leading-tight text-ink-300">PNG o SVG con fondo transparente.</p>
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        className="hidden"
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (!file) return;
+          setSubiendo(true);
+          try {
+            const subido = await uploadMedia(file, 'logo');
+            onChange(subido.storageKey);
+            showToast({ kind: 'success', title: 'Logo subido', description: 'Pulsa "Guardar marca" para aplicarlo.' });
+          } catch {
+            showToast({ kind: 'danger', title: 'No se pudo subir el logo' });
+          } finally {
+            setSubiendo(false);
+          }
+        }}
+      />
     </div>
   );
 }
