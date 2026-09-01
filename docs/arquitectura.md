@@ -73,15 +73,127 @@ Si esa prueba falla, no se integra el cambio.
 1. El subdominio determina la empresa (en desarrollo, un parametro en la URL).
 2. La pantalla de ingreso carga la marca de esa empresa (endpoint publico, solo nombre y colores).
 3. El usuario entra con **cedula o correo** y su contrasena.
-4. Se emite un token de acceso (15 minutos) y una cookie de renovacion (7 dias, httpOnly).
+4. Se abre una **sesion** y se emiten un token de acceso (15 minutos) y una cookie de renovacion
+   (7 dias, httpOnly, `path=/v1/auth`).
 5. Si es su primer ingreso: cambio de contrasena obligatorio y aceptacion de Habeas Data y del
    acuerdo de firma electronica.
 
 **Por que el tenant va primero:** con ingreso por cedula, dos empresas pueden tener la misma. Sin
 saber la empresa, el ingreso seria ambiguo.
 
-**Proteccion contra fuerza bruta:** bloqueo por cuenta tras varios intentos fallidos (no solo por
-IP, porque 18 personas detras del mismo NAT corporativo comparten IP). Todo intento queda auditado.
+### 3.0 Las sesiones (Decision #91)
+
+**Una persona puede tener varias sesiones a la vez.** Cada una es una fila en `user_sessions`, con
+su `tenant_id` bajo la misma politica de aislamiento que el resto de tablas.
+
+| Pieza | Donde vive | Duracion |
+|---|---|---|
+| Token de acceso | En **memoria** del navegador, nunca en `localStorage` | 15 min |
+| Token de renovacion | Cookie httpOnly `sessionId.tenantId.token` | 7 dias |
+| Su hash | `user_sessions.token_hash` (SHA-256 + pepper) | — |
+
+**Por que el token de acceso no se guarda en disco:** en `localStorage` lo lee cualquier script
+inyectado. En memoria muere al cerrar la pestana, y la sesion se recupera con la cookie httpOnly,
+que el JavaScript de la pagina no puede leer.
+
+**Por que SHA-256 y no argon2 para el token de renovacion:** es un secreto ALEATORIO de 384 bits.
+argon2 solo aporta contra contrasenas de baja entropia, y cuesta cientos de milisegundos — criticos
+en 1 vCPU. Para las contrasenas si se usa argon2.
+
+#### Las tres cosas que hacian que la sesion se cayera sola
+
+Las tres estaban a la vez y por eso el sintoma era desconcertante: *"se salio de la nada y no me
+deja entrar"*. Quedan aqui escritas porque cualquiera de las tres se puede reintroducir sin darse
+cuenta.
+
+1. **No se renovaba NUNCA.** El token de acceso dura 15 minutos y el unico sitio donde se pedia uno
+   nuevo era al montar el armazon, o sea al recargar la pagina entera. A los quince minutos de
+   trabajo toda peticion daba 401 y la pantalla se moria. Hoy `apiFetch` renueva ante un 401 y
+   reintenta la peticion **una** vez.
+2. **Los refrescos en paralelo se tumbaban entre si.** La pantalla lanza varias peticiones a la vez;
+   si el token caduca ahi, todas refrescan, y como el servidor **rota** el token, la primera
+   invalida a las demas. Hoy se coalescen en una sola promesa (`renovarToken`), y ademas el
+   servidor acepta el token **anterior durante 30 segundos** (`previous_hash` +
+   `previous_valid_until`) para cubrir las pestanas, que son contextos de JavaScript distintos y no
+   se pueden coalescer entre si.
+3. **Solo cabia UNA sesion por persona.** El hash del refresco vivia en una columna de `users`, asi
+   que entrar desde el telefono cerraba la del computador. Hoy es una fila por sesion.
+
+#### Que cierra que
+
+| Accion | Efecto |
+|---|---|
+| Cerrar sesion | **Solo esa** sesion. Las de los otros aparatos siguen vivas |
+| Cambiar la contrasena | Cierra **todas menos la que lo pide** (Decision #93) |
+| Restablecer contrasena desde Usuarios | Cierra todas |
+| Sesion caducada | Se retira sola al abrir una nueva |
+
+Cambiar la contrasena es, casi siempre, el gesto de *"creo que alguien entro en mi cuenta"*: si las
+sesiones de otros aparatos sobrevivieran, el cambio no serviria de nada — quien estuviera dentro
+seguiria dentro siete dias mas con su token de refresco intacto.
+
+### 3.05 Defensa del ingreso (Decision #93)
+
+Son **dos** frenos y protegen de cosas distintas. Tener solo uno deja un hueco entero.
+
+| Freno | Contra que | Valores |
+|---|---|---|
+| Bloqueo por **cuenta** | Adivinar la contrasena de UNA persona | 5 fallos → 15 min |
+| Limite por **IP** | Volumen: probar una contrasena comun contra muchas cedulas | 300/min general, 60/min en login |
+
+**Por que hacen falta los dos.** El bloqueo por cuenta no ve pasar el *password spraying* —probar
+`Transprensa2026` contra las seiscientas cedulas—, porque ese ataque nunca falla cinco veces en la
+misma cuenta. Y el limite por IP no protege a una cuenta concreta, porque un atacante paciente
+puede ir despacio.
+
+**LOS NUMEROS SON ALTOS A PROPOSITO, y es lo que mas cuesta acertar aqui.** Toda la empresa sale por
+una sola IP, asi que "por IP" significa "por toda la empresa a la vez". Se probo con 30/min y rompio
+el uso normal —cargar una pantalla del aprendiz son cinco peticiones—; lo cazo la suite e2e con ocho
+fallos. Un limite bajo no para al atacante, que viene solo y de fuera; deja fuera al turno de las 6
+de la manana.
+
+**Inyeccion SQL:** todo el SQL crudo del proyecto usa plantillas etiquetadas de Prisma
+(`Prisma.sql`, `$executeRaw\`\``), que parametrizan. No hay una sola concatenacion de cadenas. El
+resto de consultas pasan por el cliente de Prisma, que parametriza siempre.
+
+**Todo intento de ingreso queda auditado** (`LOGIN_SUCCESS`, `LOGIN_FAILED`, `ACCOUNT_LOCKED`) con
+IP y navegador.
+
+#### Lo que falta, y por que no es un fallo de hoy
+
+Va a Sprint 6 (endurecimiento). Ninguna de estas es una brecha con el despliegue actual —una sola
+instancia, sin balanceador—, pero las cuatro lo serian en produccion:
+
+1. **Leer la IP real del proxy** (`X-Forwarded-For` + `trust proxy`). Sin eso, detras de un
+   balanceador todas las peticiones parecen venir del proxy y el limite se aplicaria a todo el
+   mundo junto.
+2. **Almacen compartido para el limite.** El contador vive en la memoria del proceso: con varias
+   instancias, cada una lleva el suyo y el limite efectivo se multiplica. Redis ya esta en el
+   compose.
+3. **Pantalla de "mis sesiones"** para verlas y cerrarlas. La tabla ya guarda navegador, IP y
+   ultimo uso; falta solo la pantalla.
+4. **Tope de sesiones por persona.** Hoy podrian acumularse cientos.
+
+### 3.06 Contrasenas: cambio y olvido
+
+**Cambiarla** es auto-servicio: se verifica la actual, no se admite repetir la misma —limpiaba el
+flag de cambio forzado sin haber cambiado nada— y se cierran las demas sesiones.
+
+**Olvidarla NO tiene auto-recuperacion, y es deliberado.** Sin correo verificado, cualquier
+mecanismo de "recuperala tu mismo" es una forma de que quien conozca una cedula se lleve la cuenta,
+y la cedula es semipublica dentro de la empresa. Las preguntas de seguridad son peores: sus
+respuestas —el nombre de la madre, la ciudad de nacimiento— las sabe media oficina.
+
+El camino previsto (Sprint 6) es **"No puedo entrar" → contacto del administrador de SU empresa**,
+parametrizable por tenant, con tres condiciones:
+
+1. **Sin enumeracion.** La pantalla responde lo mismo exista o no la cedula. Decir "esa cedula no
+   existe" regalaria la lista de empleados a cualquiera.
+2. **Con traza.** Queda auditado quien pidio y quien restablecio.
+3. **La entrega es por canal interno**, nunca por la propia aplicacion.
+
+Cuando exista correo verificado, se anade el enlace con token de un solo uso y vida corta, y esto
+pasa a ser el respaldo para quien no tenga correo — que en operacion es mucha gente.
 
 ### Permisos, nunca nombres de rol
 Los guards evaluan **codigos de permiso** (`catalog:publish`, `users:manage`). En el codigo no

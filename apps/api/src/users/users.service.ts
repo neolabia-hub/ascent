@@ -248,6 +248,26 @@ export class UsersService {
     });
     if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
 
+    /*
+      NADIE SE RESTABLECE LA CONTRASENA A SI MISMO (Decision #95).
+
+      Esto no es teorico: paso cinco veces en una tarde. Alguien que no puede entrar va a Usuarios,
+      se busca, pulsa "Restablecer contrasena" —que genera una ALEATORIA, la ensena UNA vez y
+      obliga a cambiarla— y si no la copia se queda fuera otra vez. Y al reintentar, cada pulsacion
+      invalida la anterior: se hunde mas.
+
+      Es la unica accion de esa pantalla que puede dejar fuera a quien la pulsa, y para uno mismo
+      NUNCA es la correcta: para eso esta "Cambiar contrasena", que pide la actual, no genera nada
+      aleatorio y no cierra tu propia sesion.
+    */
+    if (id === actor.id) {
+      throw new ConflictException({
+        code: 'CANNOT_RESET_OWN_PASSWORD',
+        message:
+          'No puedes restablecer tu propia contrasena aqui: te dejaria fuera con una generada al azar. Usa "Cambiar contrasena" desde tu perfil.',
+      });
+    }
+
     const generatedPassword = generateInitialPassword(user.documentNumber);
     await this.prisma.scoped.user.update({
       where: { id },

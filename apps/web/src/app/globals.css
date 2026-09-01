@@ -313,6 +313,88 @@
   animation: stage-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/*
+ * LA AURORA (Decision #94): dos manchas de color de la EMPRESA que se mueven muy despacio.
+ *
+ * Es el unico sitio del producto donde el color de marca ocupa superficie grande, y esta bien que
+ * asi sea: la pantalla de ingreso es lo primero que ve alguien y es donde la empresa se presenta.
+ * Dentro, con datos por delante, el mismo color a esa escala pelearia con el contenido — por eso
+ * ahi es acento y aqui no.
+ *
+ * DOS manchas y no cinco, 22 segundos y no tres: tiene que notarse que respira, no que se mueve.
+ * Una animacion rapida en una pantalla donde alguien esta tecleando una contrasena distrae de la
+ * unica tarea que hay.
+ *
+ * Se apaga sola con `prefers-reduced-motion` (regla global del final): queda el degradado quieto,
+ * que sigue funcionando.
+ */
+@keyframes aurora-a {
+  0%,
+  100% {
+    transform: translate3d(-8%, -6%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(10%, 8%, 0) scale(1.18);
+  }
+}
+
+@keyframes aurora-b {
+  0%,
+  100% {
+    transform: translate3d(8%, 10%, 0) scale(1.12);
+  }
+  50% {
+    transform: translate3d(-10%, -8%, 0) scale(1);
+  }
+}
+
+.aurora-a {
+  animation: aurora-a 22s ease-in-out infinite;
+}
+.aurora-b {
+  animation: aurora-b 26s ease-in-out infinite;
+}
+
+/*
+ * EL BORDE AURORA de un campo enfocado: los dos colores de la empresa en un degradado detras de
+ * una mascara de pixel y medio, asi que se lee como un filo iluminado y no como un marco.
+ *
+ * NO GIRA, y eso costo verlo. La primera version animaba `rotate` sobre el pseudo-elemento para
+ * que el degradado diera vueltas — pero rotar el elemento rota TAMBIEN su mascara, asi que el
+ * anillo salia disparado y cruzaba la pantalla en diagonal. Girar solo el degradado exige
+ * `@property` para animar un angulo, que no esta en todas partes. Un degradado quieto que se
+ * enciende al enfocar hace el mismo trabajo y no se puede romper.
+ */
+.aurora-focus {
+  position: relative;
+}
+.aurora-focus::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(120deg, var(--brand-primary), var(--brand-accent), var(--brand-primary));
+  /* La mascara deja ver SOLO el anillo: sin esto el degradado tapa el campo entero. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 220ms var(--ease-pulse);
+  pointer-events: none;
+}
+.aurora-focus:hover::before {
+  opacity: 0.4;
+}
+.aurora-focus:focus-within::before {
+  opacity: 1;
+}
+
 @layer base {
   * {
     @apply border-line;

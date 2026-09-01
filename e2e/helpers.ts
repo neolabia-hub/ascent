@@ -12,8 +12,13 @@ export const TENANT_SLUG = 'transprensa';
  */
 export async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto(`/login?tenant=${TENANT_SLUG}`);
-  await page.getByLabel('Cedula o correo').fill(E2E_DOCUMENT);
-  await page.getByLabel('Contraseña').fill(E2E_PASSWORD);
+  /*
+    EXACTO, no por parte del texto. `getByLabel` busca por SUBCADENA, y el ojo de "ver la
+    contraseña" que hay dentro del campo tambien lleva esa palabra en su etiqueta accesible: sin
+    `exact` la busqueda encuentra dos elementos y falla. Lo cazo la suite entera en rojo.
+  */
+  await page.getByLabel('Cedula o correo', { exact: true }).fill(E2E_DOCUMENT);
+  await page.getByLabel('Contraseña', { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await page.waitForURL('**/inicio', { timeout: 20_000 });
 }
