@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { activationSchema, changePasswordSchema, loginSchema } from '@neo-pulse/shared';
 import type { Request, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { AuthService, type LoginResult } from './auth.service.js';
@@ -48,6 +49,17 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
+  /*
+    EL LOGIN ES EL ENDPOINT MAS ATACADO y lleva su propio limite: 60 por minuto y por IP.
+    
+    Corta el "password spraying" —probar una contrasena comun contra seiscientas cedulas—, que el
+    bloqueo por cuenta NO ve pasar porque nunca falla cinco veces seguidas en la misma cuenta.
+    
+    Y sesenta y no diez porque TODA LA EMPRESA SALE POR UNA IP: con diez, el segundo turno
+    entrando a la vez se quedaria fuera. Contra adivinar UNA cuenta ya esta el bloqueo por cuenta
+    (5 fallos, 15 minutos), que es la defensa que de verdad aplica ahi.
+  */
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
   @Post('login')
   @HttpCode(200)
   async login(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -81,9 +93,15 @@ export class AuthController {
 
   @Post('change-password')
   @HttpCode(200)
-  async changePassword(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+  async changePassword(@CurrentUser() user: AuthUser, @Req() req: Request, @Body() body: unknown) {
     const input = changePasswordSchema.parse(body);
-    return this.auth.changePassword(user.id, input.currentPassword, input.newPassword);
+    // Se le pasa la sesion ACTUAL para que sea la unica que sobreviva (Decision #93).
+    return this.auth.changePassword(
+      user.id,
+      input.currentPassword,
+      input.newPassword,
+      parseRefreshCookie(req)?.sessionId ?? null,
+    );
   }
 
   @Post('activate')

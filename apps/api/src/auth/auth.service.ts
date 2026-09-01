@@ -173,17 +173,51 @@ export class AuthService {
       .catch(() => undefined);
   }
 
-  /** Auto-servicio: cambia contrasena verificando la actual; limpia el flag de cambio forzado. */
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ ok: true }> {
+  /**
+   * Auto-servicio: cambia la contrasena verificando la actual y limpia el flag de cambio forzado.
+   *
+   * Y CIERRA LAS DEMAS SESIONES (Decision #93). Cambiar la contrasena es, casi siempre, el gesto
+   * de "creo que alguien entro en mi cuenta": si las sesiones abiertas en otros aparatos
+   * sobreviven, el cambio no sirve de nada —quien estuviera dentro sigue dentro, con su token de
+   * refresco intacto durante siete dias—. La de quien lo pide se respeta, porque echarse a uno
+   * mismo al cambiar la contrasena es un final absurdo.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    sessionId: string | null = null,
+  ): Promise<{ ok: true; sesionesCerradas: number }> {
     const user = await this.prisma.scoped.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
     if (!user) throw new UnauthorizedException({ code: 'USER_NOT_FOUND' });
     const ok = await argon2.verify(user.passwordHash, currentPassword).catch(() => false);
     if (!ok) throw new BadRequestException({ code: 'INVALID_CURRENT_PASSWORD' });
+
+    // La misma no se admite: dejaria el flag de cambio forzado limpio sin haber cambiado nada.
+    if (await argon2.verify(user.passwordHash, newPassword).catch(() => false)) {
+      throw new BadRequestException({
+        code: 'SAME_PASSWORD',
+        message: 'La contrasena nueva no puede ser la misma que la actual.',
+      });
+    }
+
     await this.prisma.scoped.user.update({
       where: { id: userId },
       data: { passwordHash: await argon2.hash(newPassword), mustChangePassword: false },
     });
-    return { ok: true };
+    const { count } = await this.prisma.scoped.userSession.deleteMany({
+      where: { userId, ...(sessionId ? { id: { not: sessionId } } : {}) },
+    });
+
+    await this.audit.record({
+      tenantId: this.prisma.currentTenantId,
+      userId,
+      action: 'PASSWORD_CHANGED',
+      resourceType: 'auth',
+      resourceId: userId,
+      newValues: { sesionesCerradas: count },
+    });
+    return { ok: true, sesionesCerradas: count };
   }
 
   /**
