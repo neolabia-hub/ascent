@@ -27,6 +27,22 @@ export interface MultiSelectProps {
  * quitar desde su propio chip, sin volver a abrir el desplegable.
  *
  * El desplegable se cierra al hacer clic fuera y con Escape; navegable por teclado.
+ *
+ * ─── DOS TRAMPAS CONOCIDAS, encontradas persiguiendo un e2e que fallaba ───
+ *
+ * 1. **El aspa de quitar un chip vive DENTRO del boton que abre y cierra.** Con una sola opcion
+ *    marcada y una etiqueta larga, esa aspa puede caer justo donde alguien pulsaria para volver a
+ *    cerrar la lista: en vez de cerrarse, se queda abierta y ademas se pierde la seleccion. El
+ *    `stopPropagation` del aspa impide lo segundo pero no lo primero. Pendiente: sacar el aspa del
+ *    boton, o cerrar solo desde el chevron.
+ *
+ * 2. **La lista se abre HACIA ABAJO y tapa lo que hay debajo.** Es lo normal en un desplegable,
+ *    pero conviene tenerlo presente: dentro de un cajon estrecho puede cubrir el campo siguiente
+ *    entero, y quien quiera pulsarlo tiene que cerrar esto primero.
+ *
+ * Las dos estan documentadas aqui y no arregladas todavia porque ninguna rompe nada hoy: se llega
+ * a ellas por caminos poco frecuentes, y arreglar la primera implica rehacer la estructura del
+ * control. Quien lo toque, que empiece por aqui.
  */
 export function MultiSelect({ options, value, onChange, placeholder = 'Seleccionar...', disabled = false, id }: MultiSelectProps) {
   const generatedId = useId();

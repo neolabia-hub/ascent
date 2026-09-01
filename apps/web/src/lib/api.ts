@@ -5,7 +5,7 @@
  * que usa la cookie httpOnly de refresh (por eso credentials:'include' siempre).
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
 const API_PREFIX = '/v1';
 
 let accessToken: string | null = null;
@@ -169,11 +169,49 @@ export function mediaUrlFromPath(path: string | null): string | null {
   return path ? `${API_URL}${path}` : null;
 }
 
+/**
+ * A QUIEN ACUDIR si no se puede entrar (Decision #97).
+ *
+ * El campo `scope` dice de QUIEN es el contacto y cambia lo que la pantalla escribe alrededor: el
+ * de la empresa resuelve en minutos porque puede restablecer la contrasena; el nuestro es el
+ * respaldo de cuando la empresa todavia no ha puesto el suyo, y ahi hay que avisar de que la
+ * respuesta tarda mas. Sin distinguirlos, la pantalla prometeria lo mismo en los dos casos.
+ */
+export interface TenantSupport {
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  note: string;
+  scope: 'tenant' | 'platform';
+}
+
 export interface PublicTenant {
   name: string;
   branding: TenantBranding;
   /** El logo YA firmado: la pantalla de ingreso no tiene sesion para pedir la firma. */
   logoUrl: string | null;
+  /** `null` cuando no hay ninguno de los dos configurados. */
+  support: TenantSupport | null;
+}
+
+/**
+ * Deja constancia de que alguien no puede entrar. Responde igual exista la cuenta o no.
+ *
+ * Por eso NUNCA lanza por 404 ni por 429: la pantalla no puede reaccionar distinto segun la
+ * respuesta —eso convertiria el formulario en un comprobador de cedulas de la empresa— y quien
+ * espera solo necesita saber que su aviso quedo puesto.
+ */
+export async function solicitarAyudaDeIngreso(tenantSlug: string, identifier: string): Promise<void> {
+  await fetch(`${API_URL}/v1/auth/help-request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenantSlug, identifier }),
+  }).catch(() => undefined);
+}
+
+/** Guarda o quita la foto de perfil. Opera siempre sobre la sesion actual, nunca sobre otro. */
+export function setMyAvatar(avatarKey: string | null): Promise<{ avatarKey: string | null }> {
+  return apiFetch('/auth/me/avatar', { method: 'PUT', body: { avatarKey } });
 }
 
 export interface AuthUser {
@@ -189,6 +227,8 @@ export interface MeResponse {
   fullName: string;
   /** El cargo, para la barra superior. `null` si el catalogo aun no lo tiene. */
   jobTitle: string | null;
+  /** La foto de perfil que subio la persona. `null` = iniciales (Decision #105). */
+  avatarKey: string | null;
   email: string;
   mustChangePassword: boolean;
   activated: boolean;

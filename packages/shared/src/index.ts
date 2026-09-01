@@ -5,8 +5,26 @@ export type { PermissionCode } from './constants/permissions.js';
 export { tenantSettingsSchema, tenantBrandingSchema } from './schemas/tenant-settings.js';
 export type { TenantSettings, TenantBranding } from './schemas/tenant-settings.js';
 
-export { loginSchema, changePasswordSchema, activationSchema } from './schemas/auth.js';
-export type { LoginInput, ChangePasswordInput, ActivationInput } from './schemas/auth.js';
+export {
+  loginSchema,
+  changePasswordSchema,
+  activationSchema,
+  avatarSchema,
+  helpRequestSchema,
+  platformLoginSchema,
+  platformSettingsSchema,
+  revokeCertificateSchema,
+} from './schemas/auth.js';
+export type {
+  LoginInput,
+  ChangePasswordInput,
+  ActivationInput,
+  AvatarInput,
+  HelpRequestInput,
+  PlatformLoginInput,
+  PlatformSettingsInput,
+  RevokeCertificateInput,
+} from './schemas/auth.js';
 
 export {
   catalogBaseSchema,
@@ -223,3 +241,29 @@ export type {
   UpdateAssessmentDraftInput,
   PresentationInput,
 } from './schemas/assessments.js';
+
+export {
+  campoSchema,
+  certificateFieldsSchema,
+  firmanteSchema,
+  certificateTemplateSchema,
+  CAMPOS_CONSTANCIA,
+  CAMPOS_POR_DEFECTO,
+} from './schemas/certificate-layout.js';
+export type {
+  CampoConstancia,
+  CampoClave,
+  CertificateFields,
+  FirmanteConstancia,
+  CertificateTemplateInput,
+} from './schemas/certificate-layout.js';
+
+export {
+  surveyQuestionSchema,
+  surveyTemplateSchema,
+  surveyAnswersSchema,
+  surveyResponseSchema,
+  PREGUNTAS_SATISFACCION,
+  PREGUNTAS_EFICACIA,
+} from './schemas/survey.js';
+export type { SurveyQuestion, SurveyTemplateInput, SurveyResponseInput } from './schemas/survey.js';

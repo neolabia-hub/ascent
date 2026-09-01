@@ -58,6 +58,24 @@ export interface PendingItem {
   started: boolean;
   /** Convocatoria de autoservicio donde puede empezarla por su cuenta. */
   selfServiceOfferingId: string | null;
+  /**
+   * EL ESTADO YA RESUELTO POR EL SERVIDOR (Decision #101).
+   *
+   * No se recalcula aqui. Con las banderas sueltas, esta pantalla llego a decir "Vencio hace 3
+   * dias" y "todavia no esta abierta, deben convocarte" en la misma tarjeta —un retraso
+   * reclamado a quien no podia empezar—, y eso vuelve en cuanto un cliente reconcilia mal.
+   */
+  state: 'EN_CURSO' | 'ESPERANDO' | 'ATRASADA' | 'PRONTO' | 'ABIERTA';
+  stateLabel: string;
+  /** Si puede hacer algo AHORA. Lo que no es accionable no se le puede reclamar. */
+  actionable: boolean;
+  /**
+   * Cuanto lleva hecho, de 0 a 100. Lo calcula el SERVIDOR contando piezas terminadas.
+   *
+   * `null` = no aplica (sin inscripcion, o la version no tiene piezas). Es distinto de 0, que
+   * significa "empezada y sin nada hecho", y la pantalla los pinta distinto.
+   */
+  progressPct: number | null;
 }
 
 export interface HistoryItem {
@@ -116,6 +134,8 @@ export interface EnrollmentContent {
   config: unknown;
   hasLesson: boolean;
   assessmentId: string | null;
+  /** Solo en una pieza de tipo SURVEY: la plantilla que hay que responder. */
+  surveyTemplateId: string | null;
   status: ProgressStatus;
   pct: number;
   lastCardIndex: number;
@@ -195,6 +215,8 @@ export interface ContentDetail {
     lessonId: string | null;
     contentPackageId: string | null;
     assessmentId: string | null;
+    /** Solo en una pieza de tipo SURVEY: la plantilla que hay que responder. */
+    surveyTemplateId: string | null;
     activityVersionId: string;
   };
   enrollmentId: string;

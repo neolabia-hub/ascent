@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { getPublicTenant, me, refresh, setAccessToken, type MeResponse, onSessionLost } from '@/lib/api';
 import { LEARNER_HOME, isLearnerOnly } from '@/lib/landing';
@@ -12,38 +12,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 
-const BREADCRUMB_LABELS: Record<string, string> = {
-  inicio: 'Inicio',
-  'contenido-formativo': 'Formaciones',
-  convocatorias: 'Convocatorias',
-  plan: 'Plan',
-  usuarios: 'Usuarios',
-  aprobaciones: 'Aprobaciones',
-  reportes: 'Reportes',
-  configuracion: 'Configuracion',
-};
+/*
+  EL ESQUELETO TIENE QUE SER LA MISMA PANTALLA que va a aparecer despues (Decision #98).
 
-function breadcrumbFromPathname(pathname: string | null): string {
-  const segment = pathname?.split('/').filter(Boolean)[0] ?? '';
-  return BREADCRUMB_LABELS[segment] ?? 'Inicio';
-}
-
+  Se quedo dibujando la barra lateral OSCURA y la barra superior con filo que ya no existen, asi
+  que cada carga ensenaba medio segundo del diseno viejo y despues saltaba al nuevo. Un esqueleto
+  que no coincide con lo que llega es peor que no tener esqueleto: promete una cosa y entrega otra,
+  y ese salto se lee como que la aplicacion se recargo sola.
+*/
 function ShellSkeleton() {
   return (
-    <div className="flex h-screen w-full">
-      <div className="flex h-full w-[248px] shrink-0 flex-col gap-2 bg-ink-900 p-4">
-        <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
-        <div className="mt-6 space-y-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-9 w-full rounded-md bg-white/10" />
-          ))}
+    <div className="flex h-screen w-full bg-paper">
+      <div className="hidden w-[264px] shrink-0 p-3 lg:block">
+        <div className="flex h-full flex-col rounded-3xl border border-line bg-surface p-4 shadow-card">
+          <Skeleton className="h-9 w-9 rounded-lg" />
+          <div className="mt-6 space-y-2">
+            {Array.from({ length: 7 }).map((_, index) => (
+              <Skeleton key={index} className="h-9 w-full rounded-md" />
+            ))}
+          </div>
         </div>
       </div>
-      <div className="flex flex-1 flex-col">
-        <div className="flex h-14 shrink-0 items-center border-b border-line bg-surface px-6">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-16 shrink-0 items-center justify-between gap-4 px-6">
           <Skeleton className="h-4 w-32" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-10 w-32 rounded-full" />
+          </div>
         </div>
-        <div className="flex-1 space-y-4 p-8">
+        <div className="mx-auto w-full max-w-[1280px] flex-1 space-y-4 px-8 py-8">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-32 w-full" />
         </div>
@@ -59,7 +58,6 @@ type SessionState =
 
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [session, setSession] = useState<SessionState>({ status: 'loading' });
 
   /*
@@ -150,9 +148,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SessionProvider value={session.profile}>
         <ToastProvider>
           <div className="flex h-screen w-full overflow-hidden bg-paper">
-            <Sidebar userFullName={session.profile.fullName} />
+            <Sidebar />
             <div className="flex min-w-0 flex-1 flex-col">
-              <Topbar breadcrumb={breadcrumbFromPathname(pathname)} userFullName={session.profile.fullName} />
+              <Topbar userFullName={session.profile.fullName} />
               <main className="flex-1 overflow-y-auto">
                 <div className="mx-auto max-w-[1280px] px-8 py-8">{children}</div>
               </main>

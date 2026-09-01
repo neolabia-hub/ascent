@@ -15,15 +15,18 @@ import {
   Target,
   Users,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getInbox, logout, markAllNotificationsRead, markNotificationRead, type InboxItem } from '@/lib/api';
 import { listUsers } from '@/lib/admin-api';
 import { listActivities } from '@/lib/catalog-api';
+import { SpaceSwitcher } from './space-switcher';
+import { Avatar } from '@/components/ui/avatar';
+import { saludoDe } from '@/lib/greeting';
 import { cn } from '@/components/ui/cn';
+import { useSession } from '@/components/providers/session-provider';
 import { CommandPalette, type Command } from './command-palette';
 import { useRouter } from 'next/navigation';
 import { KIND_LABEL, notificationHref, notificationKind } from '@/lib/notification-kind';
-import { SpaceSwitcher } from './space-switcher';
 
 /** Destinos del panel. Mismo buscador que el aprendiz, contenidos distintos. */
 const ADMIN_COMMANDS: Command[] = [
@@ -171,9 +174,21 @@ function NotificationsMenu() {
         type="button"
         onClick={handleToggle}
         aria-label="Notificaciones"
-        className="focus-ring relative flex h-9 w-9 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+        /*
+          LA MISMA PASTILLA QUE EN EL APRENDIZ: borde, superficie y sombra propios, siempre
+          puestos. Los tres controles de la derecha son una familia y tienen que verse como tal;
+          sobre una barra sin fondo, un icono suelto no se lee como algo que se pulsa.
+        */
+        className={cn(
+          'focus-ring group/bell relative flex h-10 w-10 items-center justify-center rounded-full border shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
+          open ? 'border-transparent text-ink-900' : 'border-line text-ink-500 hover:border-line-strong hover:text-ink-900',
+        )}
+        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
-        <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
+        <Bell
+          className="h-[18px] w-[18px] origin-top transition-transform duration-300 ease-pulse group-hover/bell:-rotate-12"
+          strokeWidth={1.75}
+        />
         {unread > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
             {unread > 9 ? '9+' : unread}
@@ -257,7 +272,7 @@ function NotificationsMenu() {
   );
 }
 
-function UserMenu({ userFullName }: { userFullName: string }) {
+function UserMenu({ userFullName, avatarKey }: { userFullName: string; avatarKey: string | null }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useOutsideClick(ref, () => setOpen(false));
@@ -275,10 +290,21 @@ function UserMenu({ userFullName }: { userFullName: string }) {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="focus-ring flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-700 transition-colors duration-150 hover:bg-paper"
+        className={cn(
+          'group/av focus-ring flex h-10 items-center gap-2 rounded-full border p-1 pr-2.5 text-sm text-ink-700 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
+          open ? 'border-transparent' : 'border-line hover:border-line-strong',
+        )}
+        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
-        <span className="max-w-[140px] truncate">{userFullName}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-ink-500" strokeWidth={1.75} />
+        {/*
+          SOLO LA CARA, y el nombre al pasar (Decision #108) — igual que en el aprendiz. Estaba
+          siempre puesto y ocupaba 140 px de barra para decirle a alguien como se llama.
+        */}
+        <Avatar avatarKey={avatarKey} fullName={userFullName} size={32} />
+        <span className="hidden grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-visible/av:grid-cols-[1fr] group-hover/av:grid-cols-[1fr] lg:grid">
+          <span className="min-w-0 overflow-hidden whitespace-nowrap">{userFullName}</span>
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={1.75} />
       </button>
       {open ? (
         <div className="card absolute right-0 top-11 z-50 w-48 overflow-hidden animate-card-in">
@@ -297,11 +323,11 @@ function UserMenu({ userFullName }: { userFullName: string }) {
 }
 
 export interface TopbarProps {
-  breadcrumb: ReactNode;
   userFullName: string;
 }
 
-export function Topbar({ breadcrumb, userFullName }: TopbarProps) {
+export function Topbar({ userFullName }: TopbarProps) {
+  const profile = useSession();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -316,8 +342,38 @@ export function Topbar({ breadcrumb, userFullName }: TopbarProps) {
   }, []);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-6">
-      <div className="min-w-0 text-sm text-ink-500">{breadcrumb}</div>
+    /*
+      LA MISMA BARRA QUE LA DEL APRENDIZ (Decision #98). Era la ultima pieza con lenguaje propio.
+
+      SIN FONDO Y SIN LINEA INFERIOR. Antes era una franja blanca con un filo debajo, y ese filo
+      no separaba nada: la barra lateral ya se despego del borde para ser una tarjeta, asi que la
+      franja pegada arriba dejaba la pantalla con una esquina cuadrada y un lado redondeado. Lo
+      que separa la barra del contenido es el aire.
+
+      Y por eso mismo LOS TRES CONTROLES llevan superficie propia siempre puesta, no solo al pasar
+      el raton: sobre un fondo que no es suyo, un icono suelto no se lee como algo que se pulsa. Es
+      literalmente lo que pidio el cliente —"los iconos tienen que verse, no el fondo"— y valia
+      igual para las dos superficies.
+    */
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 bg-transparent px-6">
+      {/*
+        EL SALUDO, NO EL NOMBRE DE LA PANTALLA (Decision #109).
+
+        Ahi iba un breadcrumb que decia "Formaciones" estando en la pantalla de Formaciones, con
+        el titulo "Formaciones" cincuenta pixeles mas abajo y el item "Formaciones" marcado en la
+        barra lateral: la misma palabra tres veces sin que ninguna aportara nada. Un breadcrumb
+        sirve para volver atras en una jerarquia, y este no era navegable ni tenia jerarquia.
+
+        En su sitio va lo mismo que en el aprendiz y con la misma tipografia: quien administra es
+        una persona de la empresa igual que el resto, y esta es la unica linea de la barra que le
+        habla a ella. Las dos superficies dejan de sentirse dos productos.
+      */}
+      <p className="min-w-0 shrink-0 truncate">
+        <span className="text-sm text-ink-500">{saludoDe()}, </span>
+        <span className="font-display text-base font-semibold text-ink-900">
+          {profile.fullName.trim().split(/\s+/)[0]}
+        </span>
+      </p>
 
       {/*
         Buscar es la accion mas repetida de quien administra: con doscientas formaciones y
@@ -326,23 +382,36 @@ export function Topbar({ breadcrumb, userFullName }: TopbarProps) {
       <button
         type="button"
         onClick={() => setPaletteOpen(true)}
-        className="focus-ring hidden min-w-[220px] items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-ink-500 transition-colors duration-150 hover:border-line-strong hover:text-ink-700 md:flex"
+        /*
+          EL MISMO BUSCADOR QUE EL DEL APRENDIZ (Decision #108): mismo alto, misma forma, mismo
+          borde que se enciende con los colores de la empresa al enfocar. Eran dos cajas distintas
+          para la misma accion en las dos mitades del producto, y quien administra usa las dos el
+          mismo dia.
+
+          Aqui tambien se lleva el espacio sobrante (`flex-1`), asi que la barra se reparte sola a
+          cualquier ancho en vez de dejar un vacio en medio.
+        */
+        /*
+          ANCHO ACOTADO, no todo el sobrante. Con `flex-1` a secas se estiraba hasta ochocientos
+          pixeles en un monitor ancho: un campo de buscar de ese tamano promete que ahi se escribe
+          mucho, cuando lo que se teclea es un apellido. Con un maximo de 420 la barra respira y el
+          saludo se queda pegado a su esquina en vez de flotar en medio.
+        */
+        className="aurora-focus focus-ring mx-auto hidden h-10 w-full max-w-[420px] min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-transparent hover:text-ink-700 md:flex"
       >
-        <Search className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-        <span className="flex-1 text-left">Buscar</span>
-        <kbd className="rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
+        <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        <span className="flex-1 truncate text-left">Buscar</span>
+        <kbd className="shrink-0 rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
       </button>
 
       <div className="flex items-center gap-2">
         {/*
-          QUIEN ADMINISTRA TAMBIEN SE FORMA. Va antes de la campana y del nombre porque es
-          navegacion —lleva a otro sitio— y no un desplegable de la barra; y lleva el contador de
-          lo que le falta POR HACER, que es lo unico que consigue que su propia formacion no sea
-          siempre lo ultimo de la lista.
+          QUIEN ADMINISTRA TAMBIEN SE FORMA. Va antes de la campana y de la cuenta porque es
+          navegacion —lleva a otro sitio— y no un desplegable de la barra.
         */}
         <SpaceSwitcher to="learner" />
         <NotificationsMenu />
-        <UserMenu userFullName={userFullName} />
+        <UserMenu userFullName={userFullName} avatarKey={profile.avatarKey} />
       </div>
 
       <CommandPalette

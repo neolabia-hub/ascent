@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CertificatesModule } from '../certificates/certificates.module.js';
 import { EngagementService } from '../engagement/engagement.service.js';
 import { AttemptsService } from './attempts.service.js';
 import { CompletionService } from './completion.service.js';
@@ -12,6 +13,7 @@ import { PlayerService } from './player.service.js';
  * del Sprint 5 tambien debe poder dar por completada una formacion.
  */
 @Module({
+  imports: [CertificatesModule],
   controllers: [LearningController],
   providers: [LearnerService, PlayerService, AttemptsService, CompletionService, EngagementService],
   exports: [CompletionService, EngagementService],

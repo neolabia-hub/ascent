@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTenant } from '@/components/providers/tenant-provider';
+import { TenantMark } from '@/components/layout/tenant-mark';
 import { cn } from '@/components/ui/cn';
 import { LearnerTopbar } from '@/components/layout/learner-topbar';
 
@@ -104,30 +105,39 @@ function PlayerRail() {
   const [expanded, setExpanded] = useState(false);
 
   return (
+    /*
+      LA MISMA BARRA QUE EN EL RESTO DEL APRENDIZ (Decision #109).
+
+      Era la unica del producto con forma propia: pegada al borde, con un filo a la derecha y un
+      fondo tenido, mientras las otras dos ya eran tarjetas blancas que flotan. Y sobre todo, NO
+      TRAIA EL LOGO —pintaba la inicial de la empresa en un cuadro de color, que es el respaldo de
+      cuando no hay logo—, asi que justo en la pantalla donde alguien pasa media hora seguida
+      desaparecia la marca de su empresa.
+
+      Ahora es la misma tarjeta flotante, con `TenantMark` como las demas. Lo que NO se copia es el
+      ancho: aqui se presenta PLEGADA a 64 px, porque el escenario manda y una barra de 264 px le
+      come un tercio de la pantalla a alguien que esta leyendo.
+
+      Los colores salen de la superficie de lectura (`--reading-*`) y no de la paleta general: esta
+      pantalla tiene su propio papel calido, y una tarjeta blanca pura encima se veria como un
+      parche recortado de otra pantalla.
+    */
     <aside
-      className="hidden shrink-0 flex-col border-r transition-[width] duration-[220ms] ease-pulse lg:flex"
-      style={{
-        width: expanded ? 232 : 64,
-        borderColor: 'var(--reading-line)',
-        backgroundColor: 'color-mix(in srgb, var(--reading-ink) 3%, transparent)',
-      }}
+      className={cn(
+        'hidden shrink-0 flex-col p-3 transition-[width] duration-[220ms] ease-pulse lg:flex',
+        expanded ? 'w-[248px]' : 'w-[80px]',
+      )}
     >
+      <div
+        className="flex min-h-0 flex-1 flex-col rounded-3xl border shadow-card"
+        style={{ borderColor: 'var(--reading-line)', backgroundColor: 'var(--reading-paper)' }}
+      >
       <Link
         href="/hoy"
         aria-label={`Ir al inicio de ${tenant.name}`}
-        className="focus-ring flex h-16 shrink-0 items-center gap-3 px-[15px]"
+        className={cn('focus-ring flex shrink-0 items-center px-4 py-4', !expanded && 'justify-center px-0')}
       >
-        <span
-          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] font-display text-sm font-bold text-white"
-          style={{ backgroundColor: 'var(--brand-primary)' }}
-        >
-          {tenant.name.charAt(0).toUpperCase()}
-        </span>
-        {expanded ? (
-          <span className="truncate font-display text-sm font-semibold" style={{ color: 'var(--reading-ink)' }}>
-            {tenant.name}
-          </span>
-        ) : null}
+        <TenantMark collapsed={!expanded} />
       </Link>
 
       <nav aria-label="Navegacion principal" className="flex-1 space-y-1 px-3 py-2">
@@ -181,6 +191,7 @@ function PlayerRail() {
         />
         {expanded ? <span>Plegar</span> : null}
       </button>
+      </div>
     </aside>
   );
 }
@@ -235,7 +246,14 @@ export function PlayerShell({
                 type="button"
                 onClick={onExit}
                 aria-label="Volver a la formacion"
-                className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+                /*
+                  MISMA PASTILLA QUE LA CAMPANA Y LA CUENTA (Decision #109): borde, superficie y
+                  sombra propios siempre puestos. Eran dos iconos desnudos en una barra sin fondo,
+                  asi que en esta pantalla —la unica donde la barra va sobre una superficie de
+                  lectura— no se leian como botones.
+                */
+                className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-500 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:text-ink-900 hover:shadow-card-hover"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
               >
                 <ChevronLeft className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
               </button>
@@ -258,7 +276,8 @@ export function PlayerShell({
               onClick={onToggleIndex}
               aria-label={indexOpen ? 'Ocultar el contenido de la formacion' : 'Ver el contenido de la formacion'}
               aria-pressed={indexOpen}
-              className="focus-ring hidden h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900 lg:flex"
+              className="focus-ring hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-500 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:text-ink-900 hover:shadow-card-hover lg:flex"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
             >
               {indexOpen ? (
                 <PanelRightClose className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />

@@ -15,6 +15,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:rls": "tsx scripts/apply-rls.ts",
+    "cuenta:plataforma": "tsx scripts/crear-cuenta-plataforma.ts",
+    "dev:limpiar-reglas": "tsx scripts/limpiar-reglas-de-prueba.ts",
+    "demo:encuesta": "tsx scripts/demo-encuesta.ts",
     "db:verify-rls": "tsx scripts/verify-rls.ts"
   },
   "prisma": {
@@ -41,7 +44,9 @@
     "nestjs-cls": "^4.4.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "4.8.69",
+    "qrcode": "1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.23.8"
@@ -55,6 +60,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^20.16.10",
     "@types/passport-jwt": "^4.0.1",
+    "@types/qrcode": "1.5.5",
     "jest": "^29.7.0",
     "prisma": "^5.20.0",
     "ts-jest": "^29.2.5",

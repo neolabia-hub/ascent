@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
+import { CertificatesService } from '../certificates/certificates.service.js';
 import { EngagementService } from '../engagement/engagement.service.js';
 
 export interface CompletionOutcome {
@@ -28,6 +29,7 @@ export class CompletionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly engagement: EngagementService,
+    private readonly certificates: CertificatesService,
   ) {}
 
   /**
@@ -126,6 +128,23 @@ export class CompletionService {
     await this.engagement.awardActivityCompleted(db, tenantId, enrollment.userId, enrollmentId).catch((error: unknown) => {
       // El reconocimiento nunca puede tumbar el registro formativo, que es el dato legal.
       this.logger.error(`No se pudo registrar el reconocimiento de ${enrollment.userId}`, error as Error);
+    });
+
+    /*
+      LA CONSTANCIA NACE AQUI (Decision #110), no en un boton del panel.
+
+      La alternativa era "generar constancia" a mano por cada persona que termina. Se descarta por
+      lo mismo que el resto del cierre: depender de que alguien se acuerde es no tenerlo. Una
+      constancia que no existe el dia que la pide el auditor vale igual que no haber capacitado.
+
+      FUERA DE LA TRANSACCION del cierre y con `catch`, a proposito. Emitir necesita su propia
+      transaccion —reserva un numero de serie con bloqueo de fila— y sobre todo: si la emision
+      falla, la formacion TIENE que quedar terminada igual. El registro formativo es el dato legal;
+      el papel se puede volver a emitir. Al reves seria perder lo importante por no poder imprimir
+      lo secundario.
+    */
+    await this.certificates.emitirPorEjecucion(tenantId, enrollmentId).catch((error: unknown) => {
+      this.logger.error(`No se pudo emitir la constancia de ${enrollmentId}`, error as Error);
     });
 
     return { status: finalStatus, missing: [], assignmentClosed };

@@ -1,0 +1,13 @@
+-- LA FOTO DE PERFIL (Decision #105).
+--
+-- El avatar eran las INICIALES del nombre sobre un cuadro de color. Funciona como respaldo y no
+-- como destino: en una empresa de seiscientas personas hay decenas de "JG", asi que dos iniciales
+-- no identifican a nadie —y menos a quien comparte turno con otros tres del mismo apellido—. Una
+-- cara si.
+--
+-- Vive en `users` y no en un perfil aparte: es un dato de la persona, del mismo orden que su
+-- nombre, y una tabla mas para una columna solo anade una consulta a cada pantalla que la pinta.
+--
+-- Es NULABLE y lo va a seguir siendo: subir una foto no puede ser obligatorio ni un requisito
+-- previo para hacer la formacion. Sin foto se siguen pintando las iniciales.
+ALTER TABLE "users" ADD COLUMN "avatar_key" TEXT;

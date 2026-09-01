@@ -447,6 +447,38 @@
   }
 }
 
+/*
+  HALO DE MARCA bajo un boton (`<Button glow>`), tomado de una referencia que trajo el cliente.
+
+  Es la unica cosa de esa referencia que se sostiene: la sombra no es gris, es del COLOR del boton
+  y muy difusa, asi que el boton parece encendido en vez de recortado. Lo demas de aquella pantalla
+  —la ilustracion 3D comprada, "Register", "entrar con Google"— no aplica a un producto donde nadie
+  se registra solo.
+
+  Va SOLO en la llamada principal de una tarjeta o de una pantalla: si todos los botones brillan,
+  ninguno destaca, que es justo lo contrario de para lo que sirve. Hereda --brand-primary, asi que
+  cada empresa lo ve en su color sin tocar nada.
+*/
+.btn-glow {
+  /* El color del halo se puede cambiar por pieza (--glow-color); por defecto es el principal. */
+  --glow-color: var(--brand-primary);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 2px 6px color-mix(in srgb, var(--glow-color) 32%, transparent),
+    0 10px 24px -6px color-mix(in srgb, var(--glow-color) 42%, transparent);
+}
+.btn-glow:hover {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 3px 8px color-mix(in srgb, var(--glow-color) 36%, transparent),
+    0 16px 32px -6px color-mix(in srgb, var(--glow-color) 50%, transparent);
+}
+.btn-glow:active {
+  box-shadow:
+    inset 0 2px 4px rgb(16 20 24 / 0.24),
+    0 2px 6px color-mix(in srgb, var(--glow-color) 28%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

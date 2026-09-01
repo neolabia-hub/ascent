@@ -69,15 +69,31 @@ test.describe('Alcance del analista', () => {
     // decision, y la prueba comprueba justo que se puede deshacer.
     await page.locator('#u-scope-areas').click();
     await page.getByRole('listbox').getByRole('option', { name: /^Logistica/ }).click();
-    await page.locator('#u-scope-areas').click();
+    // Un clic NEUTRO cierra el desplegable. Tiene que ser ARRIBA del control: la lista se abre
+    // hacia abajo y tapa todo lo que hay debajo, incluida la etiqueta del siguiente campo.
+    await page.getByText('Areas completas').click();
     await expect(page.getByRole('listbox')).toHaveCount(0);
 
     await page.locator('#u-scope-processes').click();
-    await page.getByRole('option', { name: SUYO, exact: true }).click();
-    // Se cierra el desplegable y se ESPERA a que desaparezca: mientras la lista se pliega, el
-    // cajon cambia de alto y el boton de abajo se mueve, asi que el clic no agarra.
-    await page.locator('#u-scope-processes').click();
+    await page.getByRole('listbox').getByRole('option', { name: SUYO, exact: true }).click();
+    /*
+      SE CIERRA CON UN CLIC NEUTRO, ni volviendo a pulsar el control ni con Escape.
+
+      Con una sola opcion marcada, el chip ocupa el ancho del control y su aspa de quitar cae
+      JUSTO en el centro — que es donde Playwright pulsa—. El resultado era que el clic para
+      cerrar quitaba la seleccion y dejaba la lista abierta: la prueba fallaba con el desplegable
+      abierto y sin nada marcado, que parecia que el clic en la opcion no habia funcionado.
+
+      Y ESCAPE TAMPOCO: lo escucha tambien el cajon, asi que cierra el formulario entero y la
+      prueba se quedaba esperando un control que ya no existia. Un clic en un rotulo inerte de
+      dentro del cajon es un clic FUERA del desplegable, que es lo que lo cierra sin tocar nada.
+
+      La trampa del aspa existe tambien para una persona y esta anotada como pendiente.
+    */
+    await page.getByText('Areas completas').click();
     await expect(page.getByRole('listbox')).toHaveCount(0);
+    // Y la seleccion SIGUE puesta: es lo que la prueba vino a comprobar.
+    await expect(page.locator('#u-scope-processes')).toContainText(SUYO);
 
     await page.getByRole('button', { name: 'Crear persona' }).click();
 

@@ -114,13 +114,18 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     // 5. Sus pendientes. La pildora esta ahi y se puede empezar sin que nadie lo inscriba.
     await page.goto('/hoy');
     /*
-      La biblioteca es de CARATULAS (Decision #89): la tarjeta entera es el boton y no hay un
-      "Empezar" dentro de ella. Antes esto era un <article> con su boton; ahora se pulsa la
-      caratula, que es el mismo gesto que hace la gente en el telefono.
+      LA TARJETA VOLVIO A TENER SU BOTON (Decision #102).
+
+      Estuvo un tiempo siendo un boton ENTERO —la caratula era el area pulsable— y se cambio porque
+      en el telefono no habia nada con forma de boton: no se sabia donde tocar ni si habia pasado
+      algo. Ahora la tarjeta es un <article> con un "Empezar" de verdad dentro.
+
+      Se busca la tarjeta por su titulo y DENTRO de ella el boton, en vez de un boton suelto con ese
+      texto: en la biblioteca hay varias tarjetas y todas tienen un boton que dice lo mismo.
     */
-    const card = page.getByRole('button').filter({ hasText: pillName }).first();
+    const card = page.locator('article').filter({ hasText: pillName }).first();
     await expect(card).toBeVisible({ timeout: 20_000 });
-    await card.click();
+    await card.getByRole('button', { name: /Empezar|Continuar/ }).click();
     await page.waitForURL('**/aprender/**', { timeout: 20_000 });
     await expect(page.getByText(pillName)).toBeVisible();
 

@@ -357,6 +357,14 @@ model Area {
   code          String
   parentId      String? @map("parent_id") @db.Uuid
   parent        Area?   @relation("AreaTree", fields: [parentId], references: [id])
+
+  /// QUIEN DIRIGE EL AREA (Decision #115). Es quien responde la encuesta de EFICACIA sobre su
+  /// gente: el unico que puede decir si lo aprendido se aplica en el puesto.
+  ///
+  /// Nulo es un estado normal y tiene consecuencia visible: esa gente no recibe encuesta de
+  /// eficacia. Es mejor que inventar un evaluador que no ha visto trabajar a nadie.
+  responsibleUserId String? @map("responsible_user_id") @db.Uuid
+  responsible       User?   @relation("AreasQueDirige", fields: [responsibleUserId], references: [id])
   children      Area[]  @relation("AreaTree")
   managerUserId String? @map("manager_user_id") @db.Uuid
   active        Boolean @default(true)
@@ -498,6 +506,8 @@ model User {
   phone          String?
   email          String
   emailKind      EmailKind    @default(PERSONAL) @map("email_kind")
+  /// Foto de perfil, subida por la propia persona. Nulable siempre: sin ella van las iniciales.
+  avatarKey      String?      @map("avatar_key")
 
   passwordHash        String    @map("password_hash")
   mustChangePassword  Boolean   @default(true) @map("must_change_password")
@@ -513,6 +523,8 @@ model User {
   jobTitle   JobTitle  @relation(fields: [jobTitleId], references: [id])
   areaId     String    @map("area_id") @db.Uuid
   area       Area      @relation(fields: [areaId], references: [id])
+  /// Las areas que DIRIGE (distinto de la suya): a quien evalua en las encuestas de eficacia.
+  areasQueDirige Area[]   @relation("AreasQueDirige")
   regionalId String?   @map("regional_id") @db.Uuid
   // Linea de servicio a la que pertenece (almacenamiento, masivo, paqueteo). OPCIONAL: hay
   // empresas que no organizan asi a su gente, y exigirlo bloquearia su carga masiva entera.
@@ -715,6 +727,31 @@ model Activity {
   /// bloquear la publicacion de una capacitacion obligatoria por una foto seria absurdo.
   coverKey          String?      @map("cover_key")
 
+  /// ¿ESTA FORMACION ENTREGA CONSTANCIA? (Decision #110). Editable aqui y CONGELADO al publicar en
+  /// `ActivityVersion.issuesCertificate`: desmarcarlo manana no puede dejar sin explicacion las
+  /// constancias ya emitidas.
+  ///
+  /// TRES ESTADOS (Decision #111): `null` HEREDA del tipo —el caso normal—, `true` fuerza que si y
+  /// `false` fuerza que no. La pregunta es por CLASE de formacion, no por formacion: una pildora
+  /// no acredita y una induccion si, y eso no cambia entre las doscientas de una empresa. Lo que
+  /// hay que marcar doscientas veces se olvida.
+  issuesCertificate Boolean?     @map("issues_certificate")
+
+  /// Horas que acredita el papel. Es el numero que el auditor SUMA por persona y por tema, asi que
+  /// no es lo mismo que `estimatedMinutes` —lo que se tarda en cursarla— y por eso es un campo
+  /// aparte: una capacitacion presencial de 8 horas puede tener 20 minutos de contenido virtual.
+  certificateHours  Int?         @map("certificate_hours")
+
+  /// ¿SE MIDE LA EFICACIA de esta formacion? (Decision #118)
+  ///
+  /// Tres estados como la constancia: `null` hereda del tipo, `true`/`false` deciden.
+  ///
+  /// A diferencia de la satisfaccion —que se quiere de TODO lo que se dicte, y por eso va por
+  /// tipo— la eficacia depende de la naturaleza de la formacion concreta: en alturas importa si
+  /// usa el arnes como le ensenaron; en una actualizacion documental, preguntarle al jefe a los 30
+  /// dias si "aplica" no significa nada. Dentro de un mismo tipo conviven las dos.
+  requiresEfficacy  Boolean?     @map("requires_efficacy")
+
   versions   ActivityVersion[]  @relation("ActivityVersions")
   norms      ActivityNorm[]
   services   ActivityService[]
@@ -801,6 +838,13 @@ model ActivityVersion {
   retryWaitHours     Int?            @map("retry_wait_hours")
   completionCriteria Json            @default("{}") @map("completion_criteria")
   syllabusSnapshot   Json            @default("{}") @map("syllabus_snapshot") // temario para constancias
+  /// Copiado de la actividad AL PUBLICAR. Es lo que decide si esta ejecucion emite constancia, y
+  /// vive aqui porque rige el intento (Decision #27).
+  issuesCertificate  Boolean         @default(false) @map("issues_certificate")
+  certificateHours   Int?            @map("certificate_hours")
+  /// Copiado al publicar. Si viviera solo en la actividad, desmarcarla manana dejaria sin
+  /// explicacion las encuestas de eficacia ya programadas y respondidas.
+  requiresEfficacy   Boolean         @default(false) @map("requires_efficacy")
   migrationPolicy    MigrationPolicy @default(MOVE_NOT_STARTED) @map("migration_policy")
   estimatedMinutes   Int?            @map("estimated_minutes")
 
@@ -1612,8 +1656,15 @@ model CertificateTemplate {
   tenantId      String  @map("tenant_id") @db.Uuid
   name          String
   versionNumber Int     @default(1) @map("version_number")
-  htmlTemplate  String  @map("html_template")
-  signers       Json    @default("[]") // [{name, title, imageKey}]
+  /// EL ARTE que subio el cliente. Nulo mientras no lo suba; sin el no se puede activar.
+  backgroundKey String? @map("background_key")
+  /// Casi todas las constancias son horizontales, pero no todas.
+  landscape     Boolean @default(true)
+  /// DONDE VA CADA CAMPO, en PORCENTAJE de la hoja y con origen arriba-izquierda (Decision #112).
+  /// Ver `certificate-layout.ts`. En porcentaje porque el arte puede venir a cualquier resolucion.
+  fields        Json    @default("{}")
+  /// Las firmas: [{name, title, imageKey}]. PNG con fondo transparente.
+  signers       Json    @default("[]")
   active        Boolean @default(true)
 
   certificates Certificate[]
@@ -1646,7 +1697,11 @@ model Certificate {
   revokedReason    String?             @map("revoked_reason")
 
   @@unique([tenantId, serialNumber])
-    @@index([tenantId, userId, issuedAt])
+  @@index([tenantId, userId, issuedAt])
+  /// UNA POR EJECUCION: `UNIQUE(tenant_id, enrollment_id) WHERE enrollment_id IS NOT NULL`. Es un
+  /// indice PARCIAL —hay constancias sin inscripcion, las que nacen de una certificacion otorgada—
+  /// y Prisma no sabe expresarlos, asi que vive en la migracion `20260901220000_certificados`.
+  /// No quitarlo: sin el, dos evaluaciones de completado a la vez emiten dos constancias.
   @@map("certificates")
 }
 
@@ -1834,4 +1889,66 @@ model RetentionPolicy {
 
   @@unique([tenantId, recordClass])
   @@map("retention_policies")
+}
+
+// ─────────────────────────── CAPA DE PLATAFORMA (Decision #100) ───────────────────────────
+//
+// Quien OPERA el producto, no quien lo usa. Ninguna de estas tres tablas tiene `tenantId` ni
+// politica de aislamiento: no pertenecen a ninguna empresa, asi que no hay nada de un cliente que
+// proteger de otro. Lo que las protege es que solo se llega con un token de plataforma, emitido
+// en su propio ingreso (`/v1/platform/auth/login`), que no es el mismo que el de los tenants.
+
+/// Cuenta del proveedor. Vive FUERA de los tenants a proposito: si viviera dentro de uno, el dia
+/// que ese cliente se desactive se perderia el acceso a la administracion de todos los demas.
+model PlatformUser {
+  id                  String    @id @default(uuid()) @db.Uuid
+  email               String    @unique
+  fullName            String    @map("full_name")
+  passwordHash        String    @map("password_hash")
+  active              Boolean   @default(true)
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastLoginAt         DateTime? @map("last_login_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  sessions PlatformSession[]
+
+  @@map("platform_users")
+}
+
+/// Misma mecanica que `UserSession` (Decision #91): varias sesiones a la vez, token rotado y
+/// ventana de gracia para que dos pestanas que refrescan a la vez no se tumben entre si.
+model PlatformSession {
+  id             String       @id @default(uuid()) @db.Uuid
+  platformUserId String       @map("platform_user_id") @db.Uuid
+  platformUser   PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
+
+  tokenHash          String    @map("token_hash")
+  previousHash       String?   @map("previous_hash")
+  previousValidUntil DateTime? @map("previous_valid_until")
+
+  userAgent  String?  @map("user_agent")
+  ipAddress  String?  @map("ip_address")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+
+  @@index([platformUserId, expiresAt])
+  @@index([tokenHash])
+  @@map("platform_sessions")
+}
+
+/// UNA SOLA FILA (`id` fijo en 1, con CHECK en la base de datos). De este dato solo puede haber
+/// uno: con dos filas habria dos verdades sobre el contacto del proveedor y la lectura decidiria
+/// cual gana por orden de insercion.
+model PlatformSettings {
+  id           Int      @id @default(1)
+  supportName  String   @default("") @map("support_name")
+  supportEmail String   @default("") @map("support_email")
+  supportPhone String   @default("") @map("support_phone")
+  supportNote  String   @default("") @map("support_note")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }

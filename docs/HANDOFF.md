@@ -20,6 +20,175 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-02 — Sprint 5: constancias, encuestas, seguimiento y la capa de plataforma
+
+Sesión larga y con muchas idas y venidas del cliente. Lo que sigue está ordenado por tema, no por
+orden cronológico.
+
+### El patrón que apareció cinco veces
+
+**Configuración sembrada en el Sprint 1 que la interfaz prometía y el motor ignoraba.** Ya había
+pasado con `requiresAssessment`; en esta sesión aparecieron cuatro más:
+
+| Campo | Dónde estaba | Qué pasaba |
+|---|---|---|
+| `issuesCertificate` | `activity_types.config` | Nadie lo leía. Ninguna formación emitía constancia |
+| `requiresSurvey` | `activity_types.config` | Se leía y **bloqueaba publicar**, sin forma de crear una encuesta |
+| `requiresEfficacy` | `activity_types.config` | Sembrado, sin leer y sin interruptor |
+| `assessments.reviewPolicy` | Tabla, desde Sprint 2 | Bien diseñado y **sin pantalla**: valores por defecto para siempre |
+
+**Regla para la próxima sesión:** antes de dar por buena una casilla de configuración, comprobar que
+alguien la lee *y* que alguien la puede cambiar. Sembrar sin leer es deuda silenciosa.
+
+---
+
+### Certificación (#110 – #113)
+
+- Cascada **tipo → actividad → snapshot en la versión**. Una píldora no acredita; una inducción sí.
+  El seed ya traía los valores correctos.
+- **Vigencia desde la recurrencia**, no de un campo aparte: si hay que repetirla cada 12 meses, el
+  papel vale 12 meses. Pedirlo por separado garantizaría que algún día no coincidan.
+- **Contradicción del plan resuelta:** el esquema decía `html_template` (el cliente diseñaría en
+  HTML). Se cambió a **arte de fondo + campos encima**, dibujado con `pdf-lib`. Sin Chromium
+  (300 MB en 1 vCPU) y sin ejecutar HTML ajeno en el servidor.
+- **Migración retroactiva:** las 1.630 versiones ya publicadas quedaron en `false` porque la columna
+  nació después. No era una decisión congelada sino un hueco, así que se rellenó con la cascada. Sin
+  eso, toda la formación existente se quedaba sin constancia en silencio.
+- Verificación pública sin sesión, código de 20 caracteres no enumerable, revocación con motivo.
+
+Ver `docs/modulos/certificacion.md`.
+
+### Encuestas (#114 – #121)
+
+- **Una encuesta de satisfacción por empresa**, elegida en el tipo, **enganchada sola** al crear la
+  formación y otra vez al publicar como red.
+- **No es obligatoria**: si lo fuera, quien no opina se queda sin terminar y **sin constancia**.
+- Tipos de pregunta con escalas en **caras / estrellas / números** (mismo dato guardado).
+- **El binario manda sobre el promedio** al calificar; el corte está en 3 sobre 5, no en 2,5.
+- **La eficacia la responde el jefe del área**, no el dueño del proceso. Obligó a añadir
+  `areas.responsible_user_id` (10 filas frente a 600).
+- **La eficacia se decide por FORMACIÓN**, no por tipo: dentro de «Capacitación del plan» conviven
+  alturas (sí) y una actualización documental (no).
+- **Hoy está apagada en todo** por decisión del cliente. El interruptor existe para que la función
+  quede cerrada.
+
+Ver `docs/modulos/encuestas.md`.
+
+### Seguimiento (#117, #122, #123)
+
+- `/reportes` dejó de ser un «llega en Sprint 6».
+- **Seis estados**, y el orden en que se preguntan es la decisión. `ESPERANDO` gana al vencimiento:
+  no se reclama un retraso a quien nunca pudo empezar.
+- **Barra apilada en vez de un porcentaje**: 62% con el resto atrasado y 62% con el resto esperando
+  convocatoria piden acciones opuestas.
+- Pestaña **«Cómo va»** en el plan, con enlace al detalle de cada formación.
+- **Optimización:** la vista del plan llamaba al cálculo por formación dentro de un bucle (150
+  consultas para 30 renglones). Ahora hay un camino por lote de **3 consultas fijas**. La regla de
+  estados sigue en un solo sitio.
+
+Ver `docs/modulos/seguimiento.md`.
+
+### Capa de plataforma (#100)
+
+Cuenta del proveedor **fuera de los tenants**, con su propio ingreso en `/plataforma`. Los dos tokens
+no se cruzan y eso está probado en las dos direcciones.
+
+Ver `docs/modulos/plataforma.md`.
+
+### Login y contacto (#97)
+
+«No puedo entrar» ahora trae el contacto de la empresa (parametrizable) y un botón que deja
+constancia en la bandeja de quien puede restablecer. Responde lo mismo exista la cuenta o no.
+
+### UI del aprendiz y del panel (#98, #101 – #109)
+
+Barra superior sin fondo en las dos superficies, logo del tenant en las barras laterales, avatar con
+foto subible, `/hoy` como biblioteca con filtros por tipo, sin rojo para lo vencido, y el fallo de
+fondo: **«Venció hace 3 días» junto a «todavía no está abierta»** — un retraso reclamado a quien
+nunca pudo empezar. Resuelto en el servidor para que ningún cliente pueda volver a contradecirse.
+
+---
+
+## Estado al cerrar
+
+| | |
+|---|---|
+| Pruebas unitarias | **309** en verde |
+| e2e | **21 / 21** |
+| Lint, typecheck, build | En verde |
+| Git | **Nada confirmado.** Todo el trabajo está sin commit |
+
+Entorno de pruebas: `.\scripts\mirar.ps1` → http://localhost:3200/login?tenant=transprensa
+
+---
+
+## PENDIENTE, por orden de urgencia
+
+### Lo que el cliente pidió al final de la sesión y quedó sin hacer
+
+1. **No se puede eliminar el tipo «Prueba de encuesta W6PWX»** y da error sin explicar por qué. La
+   causa es correcta —tiene formaciones que lo referencian, y `countReferences` lo impide— pero el
+   mensaje no lo dice. **Arreglar el mensaje**, no la regla: debe decir cuántas formaciones lo usan
+   y ofrecer desactivarlo. (El tipo lo creó `demo:encuesta`; se puede borrar a mano en la base junto
+   con su formación de prueba.)
+
+2. **Decidir qué número va en la tarjeta de Seguimiento con un filtro puesto.** Hoy, al filtrar por
+   «Atrasadas», el número grande pasa a ser *cuántas atrasadas* en vez del avance. Está sin resolver
+   si es mejor eso o mantener siempre el avance. **Mi recomendación:** mantener siempre el % como
+   ancla estable y poner el conteo filtrado al lado, más pequeño — cambiar el significado del número
+   grande según el filtro obliga a releer la tarjeta cada vez.
+
+3. **El enlace del plan no filtra al llegar.** Lleva a `/reportes?formacion=<id>` y la pantalla
+   ignora el parámetro: hay que buscar la formación a mano. Falta leerlo y abrir el detalle directo.
+
+4. **«Reportes» debería llamarse «Seguimiento»** en la barra lateral. El cliente tiene razón: lo que
+   hay ahí no son reportes —son el estado de la ejecución—, y los reportes de verdad (exportables,
+   agregados) llegan en Sprint 6. Cambiar el rótulo del ítem de navegación.
+
+5. **Valorar un filtro de seguimiento dentro del plan**, en vez de saltar a otra pantalla. Queda
+   como pregunta abierta del cliente.
+
+### Sprint 5, lo que falta para cerrarlo del todo
+
+6. **Asistencia presencial y QR.** El cliente dijo que no es urgente, pero **bloquea que las
+   formaciones presenciales emitan constancia**: una jornada de 8 horas acredita, y ahí no hay
+   reproductor que marque completado sino asistencia marcada.
+7. **Exportar a Excel / PDF** el seguimiento. Es lo que se lleva el auditor.
+8. **Pantalla del jefe** para responder la eficacia, y el programador que crea la cita a los N días.
+9. **Emisión manual de constancia** para lo completado antes de activar la plantilla. El permiso
+   `certificates:issue` existe y no lo usa ningún endpoint de alta manual.
+
+### Deuda conocida
+
+10. **`MultiSelect`: el aspa de quitar un chip vive DENTRO del botón que abre y cierra.** Con una
+    sola opción marcada y etiqueta larga, el clic para cerrar puede borrar la selección. Documentado
+    en el componente; arreglarlo exige rehacer su estructura.
+11. **La suite e2e deja basura**: cada corrida crea una audiencia «Toda la empresa <n>» con su regla,
+    y al acumularse 80+ el alta de personas se pasa de tiempo. Paliativo:
+    `pnpm --filter @neo-pulse/api dev:limpiar-reglas`. **La solución real es limpiar en el teardown
+    de la suite.**
+12. **`X-Forwarded-For`** sigue sin leerse. Es lo primero de la lista de endurecimiento desde que
+    existe «No puedo entrar» (3 avisos cada 5 min por IP: detrás de un proxy, el tercero del día
+    dejaría a toda la empresa sin poder pedir ayuda).
+
+### Idea del cliente que vale la pena
+
+13. **El módulo de evaluación de desempeño anual** (Sprint 6, aparte de las encuestas: distinto
+    ciclo, distinta confidencialidad, se firma) **debería alimentar las necesidades de formación del
+    plan del año siguiente**. Y sin esperar a ese módulo, el plan ya podría alimentarse de lo que hoy
+    se sabe: quién reprobó, quién tiene eficacia negativa, a quién le vence la certificación.
+
+---
+
+## Para arrancar la próxima sesión
+
+1. Levantar: `.\scripts\mirar.ps1`
+2. Si el e2e falla en el alta de personas: `pnpm --filter @neo-pulse/api dev:limpiar-reglas`
+3. Leer `docs/README.md` → los cuatro módulos nuevos están ahí.
+4. **Confirmar en git antes de seguir.** Hay una sesión entera sin commit.
+
+---
+
 ## 2026-08-31 (tarde) — Las evaluaciones dejan de tener dos escaleras, y "Hoy" deja de ser una lista
 
 ### Por donde empezo: "esto esta mal, no me gusta"

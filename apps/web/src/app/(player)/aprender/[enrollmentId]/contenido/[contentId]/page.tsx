@@ -3,6 +3,12 @@
 import { ChevronRight } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  answerSurvey,
+  getSurveyToAnswer,
+  type SurveyParaResponder,
+} from '@/lib/surveys-api';
+import { SurveyRunner, loQueFaltaEnCliente, type Respuestas } from '@/components/modules/learner/survey-runner';
 import { useMediaUrl } from '@/lib/use-media-url';
 import { ApiError } from '@/lib/api';
 import {
@@ -288,6 +294,35 @@ export default function ContentPlayerPage() {
                 : null
             }
           />
+        </div>
+      ) : detail.content.type === 'SURVEY' && detail.content.surveyTemplateId ? (
+        /*
+          LA ENCUESTA, dentro del reproductor como una pieza mas (Decision #119).
+
+          No es una pantalla aparte a la que se mande por correo: se responde donde se acaba de
+          cursar, con el contexto delante. Una encuesta que llega tres dias despues por correo la
+          contesta el 10% y ademas ya nadie se acuerda de que opinaba.
+        */
+        /*
+          CON SU PROPIO CONTENEDOR QUE SE DESPLAZA, como las diapositivas.
+
+          El armazon del reproductor es `h-screen overflow-hidden` a proposito —solo se desplaza el
+          escenario, para que la barra y el indice no se vayan al bajar— asi que una pieza que no
+          traiga su propio scroll se CORTA. Con cinco preguntas, el boton de enviar quedaba fuera
+          de la pantalla y no habia forma de llegar a el: se podia responder y no entregar.
+        */
+        <div className="scroll-hidden min-h-0 flex-1 overflow-y-auto px-5 py-6">
+        <SurveyGate
+          enrollmentId={params.enrollmentId}
+          templateId={detail.content.surveyTemplateId}
+          nextLabel={nextLabel}
+          onDone={async () => {
+            // Se marca completa aunque se haya saltado: la pieza es opcional y dejarla en rojo
+            // haria que la formacion se viera sin terminar por una encuesta que no obliga.
+            await push(100, index);
+            goAfterFinishing();
+          }}
+        />
         </div>
       ) : detail.content.type === 'ASSESSMENT' ? (
         <AssessmentGate
@@ -879,6 +914,115 @@ function GateFact({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 font-display text-lg font-semibold tabular-nums" style={{ color: 'var(--reading-ink)' }}>
         {value}
       </dd>
+    </div>
+  );
+}
+
+/**
+ * LA ENCUESTA DENTRO DEL REPRODUCTOR (Decision #119).
+ *
+ * ─── SE RESPONDE UNA VEZ, Y SI YA ESTA SE DICE ───
+ *
+ * Volver a mostrarla en blanco invitaria a responderla otra vez, y una segunda respuesta contaria
+ * doble en el indicador. Si ya se respondio, se agradece y se deja pasar.
+ *
+ * ─── NO BLOQUEA ───
+ *
+ * La pieza es `isRequired: false` (ver el enganche al publicar), asi que se puede saltar. Es
+ * deliberado: si bloqueara, quien no opina se queda sin terminar la formacion y SIN CONSTANCIA —se
+ * le negaria la evidencia de una capacitacion que si hizo por no haber dado su opinion—. Se pide y
+ * se agradece; no se cobra.
+ */
+function SurveyGate({
+  enrollmentId,
+  templateId,
+  nextLabel,
+  onDone,
+}: {
+  enrollmentId: string;
+  templateId: string;
+  nextLabel: string;
+  onDone: () => Promise<void>;
+}) {
+  const [encuesta, setEncuesta] = useState<SurveyParaResponder | null>(null);
+  const [respuestas, setRespuestas] = useState<Respuestas>({});
+  const [faltan, setFaltan] = useState<string[]>([]);
+  const [enviando, setEnviando] = useState(false);
+  const [listo, setListo] = useState(false);
+
+  useEffect(() => {
+    void getSurveyToAnswer(enrollmentId, templateId)
+      .then((valor) => {
+        setEncuesta(valor);
+        if (valor.answered) setListo(true);
+      })
+      .catch(() => setEncuesta(null));
+  }, [enrollmentId, templateId]);
+
+  if (!encuesta) return <Skeleton className="mx-auto h-64 w-full max-w-[560px] rounded-2xl" />;
+
+  if (listo) {
+    return (
+      <div className="mx-auto max-w-[480px] text-center">
+        <p className="font-display text-xl font-bold text-ink-900">Gracias</p>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-500">
+          Tu respuesta ya quedo registrada. Sirve para mejorar la proxima formacion.
+        </p>
+        <Button size="lg" glow className="mt-6 w-full" onClick={() => void onDone()}>
+          {nextLabel}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mx-auto mb-5 max-w-[560px] text-center">
+        <p className="font-display text-xl font-bold text-ink-900">{encuesta.name}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
+          Son treinta segundos y es anonima para quien dicta la formacion.
+        </p>
+      </div>
+
+      <SurveyRunner
+        questions={encuesta.questions}
+        value={respuestas}
+        onChange={(valor) => {
+          setRespuestas(valor);
+          // El aviso se limpia al tocar algo: dejarlo puesto mientras se corrige regana dos veces.
+          if (faltan.length > 0) setFaltan([]);
+        }}
+        faltan={faltan}
+        submitting={enviando}
+        onSubmit={async () => {
+          const pendientes = loQueFaltaEnCliente(encuesta.questions, respuestas);
+          if (pendientes.length > 0) {
+            setFaltan(pendientes);
+            return;
+          }
+          setEnviando(true);
+          try {
+            await answerSurvey(enrollmentId, templateId, respuestas);
+            setListo(true);
+          } finally {
+            setEnviando(false);
+          }
+        }}
+      />
+
+      {/*
+        SALTARLA ES UNA OPCION VISIBLE, no un truco. Esconderla obligaria a quien no quiere opinar a
+        cerrar el navegador, y entonces la formacion se queda a medias por una encuesta opcional.
+      */}
+      <div className="mx-auto mt-4 max-w-[560px] text-center">
+        <button
+          type="button"
+          onClick={() => void onDone()}
+          className="focus-ring text-sm text-ink-500 underline-offset-2 hover:text-ink-900 hover:underline"
+        >
+          Prefiero no responder
+        </button>
+      </div>
     </div>
   );
 }

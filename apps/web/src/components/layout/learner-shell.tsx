@@ -14,8 +14,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { getMyProgress, type MyProgress } from '@/lib/learner-api';
-import { useTenant } from '@/components/providers/tenant-provider';
+import { saludoDe } from '@/lib/greeting';
 import { cn } from '@/components/ui/cn';
+import { TenantMark } from '@/components/layout/tenant-mark';
 import { CommandPalette } from './command-palette';
 import { LearnerTopbar } from './learner-topbar';
 
@@ -42,16 +43,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/perfil', label: 'Perfil', icon: CircleUser },
 ];
 
-function greeting(now: Date): string {
-  const hour = now.getHours();
-  if (hour < 12) return 'Buenos dias';
-  if (hour < 19) return 'Buenas tardes';
-  return 'Buenas noches';
-}
-
 
 export function LearnerShell({ children }: { children: ReactNode }) {
-  const tenant = useTenant();
   const pathname = usePathname();
   /*
     "HOY" VA A SANGRE (Decision #89). El resto del modo aprendiz vive en una columna centrada de
@@ -101,14 +94,8 @@ export function LearnerShell({ children }: { children: ReactNode }) {
       */}
       <aside className="hidden shrink-0 p-3 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[264px] lg:flex-col">
         <div className="flex min-h-0 flex-1 flex-col rounded-3xl border border-line bg-surface shadow-card">
-        <div className="flex items-center gap-2.5 px-5 py-5">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-display text-sm font-bold text-white"
-            style={{ backgroundColor: 'var(--brand-primary)' }}
-          >
-            {tenant.name.charAt(0).toUpperCase()}
-          </div>
-          <span className="truncate font-display text-sm font-semibold text-ink-900">{tenant.name}</span>
+        <div className="px-5 py-5">
+          <TenantMark />
         </div>
 
         {/*
@@ -199,7 +186,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
           en el flujo y el heroe empieza debajo: a sangre de lado a lado, pero sin robarle sitio a
           nada.
         */}
-        <LearnerTopbar greeting={greeting(new Date())} onSearch={() => setPaletteOpen(true)} wide={cine} />
+        <LearnerTopbar greeting={saludoDe()} onSearch={() => setPaletteOpen(true)} wide={cine} />
 
         <main className="flex-1 pb-24 lg:pb-10">
           {cine ? (

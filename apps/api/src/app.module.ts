@@ -23,6 +23,10 @@ import { PlansModule } from './plans/plans.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { CertificatesModule } from './certificates/certificates.module.js';
+import { ReportsModule } from './reports/reports.module.js';
+import { SurveysModule } from './surveys/surveys.module.js';
+import { PlatformModule } from './platform/platform.module.js';
 import { PublicTenantsController } from './tenants/public-tenants.controller.js';
 import { TenantSettingsController } from './tenants/tenant-settings.controller.js';
 import { UsersModule } from './users/users.module.js';
@@ -86,6 +90,14 @@ import { WorkersModule } from './workers/workers.module.js';
     WorkersModule,
     // Experiencia del colaborador: reproductor, examenes y repaso espaciado (Sprint 4).
     LearningModule,
+    // Constancias: la evidencia que se lleva el auditor (Sprint 5).
+    CertificatesModule,
+    // Encuestas de satisfaccion y de eficacia (Sprint 5).
+    SurveysModule,
+    // Seguimiento de la ejecucion: quien la hizo y quien no (Sprint 5).
+    ReportsModule,
+    // La capa del PROVEEDOR, por encima de todos los clientes (Decision #100).
+    PlatformModule,
   ],
   controllers: [AppController, PublicTenantsController, TenantSettingsController],
   providers: [

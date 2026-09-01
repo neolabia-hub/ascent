@@ -166,7 +166,11 @@ instancia, sin balanceador—, pero las cuatro lo serian en produccion:
 
 1. **Leer la IP real del proxy** (`X-Forwarded-For` + `trust proxy`). Sin eso, detras de un
    balanceador todas las peticiones parecen venir del proxy y el limite se aplicaria a todo el
-   mundo junto.
+   mundo junto. **Es lo primero de esta lista** desde que existe "No puedo entrar" (3.06): su
+   limite es de 3 cada 5 minutos, asi que detras de un proxy sin esto, el tercer aviso del dia
+   dejaria a toda la empresa sin poder pedir ayuda. El freno por CUENTA (uno cada 6 h) sigue
+   protegiendo la bandeja aunque el de IP se relaje, que es lo que permite vivir con ello hasta
+   entonces.
 2. **Almacen compartido para el limite.** El contador vive en la memoria del proceso: con varias
    instancias, cada una lleva el suyo y el limite efectivo se multiplica. Redis ya esta en el
    compose.
@@ -184,16 +188,120 @@ mecanismo de "recuperala tu mismo" es una forma de que quien conozca una cedula 
 y la cedula es semipublica dentro de la empresa. Las preguntas de seguridad son peores: sus
 respuestas —el nombre de la madre, la ciudad de nacimiento— las sabe media oficina.
 
-El camino previsto (Sprint 6) es **"No puedo entrar" → contacto del administrador de SU empresa**,
-parametrizable por tenant, con tres condiciones:
+#### "No puedo entrar" (Decision #97) — construido
 
-1. **Sin enumeracion.** La pantalla responde lo mismo exista o no la cedula. Decir "esa cedula no
-   existe" regalaria la lista de empleados a cualquiera.
-2. **Con traza.** Queda auditado quien pidio y quien restablecio.
-3. **La entrega es por canal interno**, nunca por la propia aplicacion.
+En su lugar hay **dos caminos, para dos personas distintas**. Quien tiene al jefe de SST a diez
+metros solo necesitaba su extension; quien entra a las cinco de la manana desde una bodega no va a
+llamar a nadie y lo unico que quiere es dejar constancia. Con uno solo de los dos, la mitad de la
+operacion se queda fuera.
+
+**1. El contacto de SU empresa**, escrito en Configuracion → Preferencias y marca
+(`settings.support`: area, correo, telefono, nota). Dos niveles y el orden importa:
+
+| Sale | Cuando | Donde vive | Quien lo edita |
+|---|---|---|---|
+| El de la empresa | Tiene al menos uno de los tres campos | `tenants.settings.support` | El cliente, en Configuracion |
+| El de la plataforma | La empresa no ha puesto ninguno | `platform_settings` (fila unica) | El proveedor, en `/plataforma` |
+
+Basta **un** campo para considerarlo configurado: exigir los tres haria que una empresa que solo
+publica una extension cayera al respaldo sin enterarse y viera salir un contacto ajeno en su propia
+pantalla de ingreso. El de la plataforma NO lo puede tocar un administrador del cliente — a quien
+se escala no es decision suya— y por eso vive en la capa de plataforma (§3.07) y no en `settings`. La pantalla dice de quien es el contacto ANTES de darlo: si sale el
+nuestro sin avisar, la persona llama a un numero que no conoce creyendo que es de su empresa.
+
+**Se publica sin sesion**, porque esa es exactamente la situacion de quien lo necesita: pedirle que
+inicie sesion para saber a quien pedir ayuda seria un circulo. Consecuencia: lo lee cualquiera que
+conozca la direccion, asi que lo que va ahi es un contacto **institucional** —un area, un correo
+corporativo, una extension—, nunca el movil personal de nadie. La pantalla de configuracion lo
+advierte ARRIBA, antes de los campos, porque es lo que cambia lo que la persona escribe.
+Solo salen esos cuatro campos; el resto de `settings` son reglas de negocio y no se exponen.
+
+**2. `POST /v1/auth/help-request`** — deja el aviso en la bandeja de quien tenga `users:manage`,
+con el nombre, la cedula y la IP de origen. No manda ninguna contrasena y no recupera nada: la
+decision de restablecer sigue siendo de una persona, que es lo unico defendible mientras no haya un
+correo verificado con el que comprobar quien pide.
+
+- **Responde 202 y el mismo texto siempre**, exista la cuenta o no. Cualquier otra cosa convierte
+  una pantalla abierta a internet en un comprobador de quien trabaja en la empresa.
+- **Solo crea el aviso si la cuenta existe**, asi que con cedulas inventadas no se ensucia nada.
+- **Una cada 6 h por cuenta** y **3 cada 5 min por IP** (frente a 60/min del login: aquel se usa
+  cien veces al dia, esto una vez cada varios meses, y cada acierto deja un aviso). Sin el tope por
+  cuenta, quien conozca una cedula de verdad —y dentro de la empresa se conocen— podria enterrar la
+  bandeja repitiendo el envio.
+- Queda auditado como `PASSWORD_HELP_REQUESTED`.
 
 Cuando exista correo verificado, se anade el enlace con token de un solo uso y vida corta, y esto
 pasa a ser el respaldo para quien no tenga correo — que en operacion es mucha gente.
+
+### 3.07 La capa de PLATAFORMA (Decision #100)
+
+Hasta aqui el producto solo conocia UNA clase de persona: alguien que pertenece a una empresa. Eso
+cubre todo lo que pasa DENTRO de un cliente y se queda corto para lo que esta POR ENCIMA de todos:
+hoy los datos de contacto del proveedor, manana listar, dar de alta y suspender clientes.
+
+**Tres tablas SIN `tenant_id` y SIN RLS**, a proposito: no pertenecen a ninguna empresa, asi que no
+hay nada de un cliente que proteger de otro. Lo que las protege es el token.
+
+| Tabla | Que guarda |
+|---|---|
+| `platform_users` | Las cuentas del proveedor (argon2, bloqueo por cuenta igual que en los tenants) |
+| `platform_sessions` | Sus sesiones. Misma mecanica que `user_sessions`: varias a la vez, token rotado, ventana de gracia |
+| `platform_settings` | **Una sola fila** (`id = 1`, con CHECK en la base de datos) |
+
+El CHECK no es celo: de este dato solo puede haber uno, y con dos filas habria dos verdades sobre
+el contacto del proveedor decidiendose por orden de insercion.
+
+#### Por que una cuenta aparte y no una bandera en un usuario de un tenant
+
+Se considero marcar la cuenta que ya existe dentro de TRANSPRENSA. Era mas rapido y deja al
+proveedor **viviendo dentro de un cliente**: el dia que ese tenant se desactive —o que ese cliente
+se vaya— el acceso a la administracion de todos los demas se iria con el. Y un administrador de
+cliente con permiso sobre roles no puede tener ni la posibilidad teorica de concederse esto.
+
+#### Las dos clases de token no se cruzan
+
+Se firman con **las mismas claves** —no hay un segundo par que rotar— y lo que las separa es el
+CONTENIDO. Las dos mitades hacen falta:
+
+| | Lleva | En la otra capa |
+|---|---|---|
+| Token de tenant | `tenantId`, sin `scope` | `PlatformGuard` exige `scope: 'platform'` → rechazado |
+| Token de plataforma | `scope: 'platform'`, sin `tenantId` | `JwtStrategy` exige `tenantId` → rechazado |
+
+La segunda fila es la que de verdad importa: sin ella, una cuenta de proveedor podria hablar con
+los endpoints de un cliente **sin que RLS supiera a que empresa acotar**, que es exactamente el
+agujero que la politica de aislamiento existe para tapar. Cubierto en `platform.guard.spec.ts`,
+incluida la prueba de que un token de tenant bien firmado no entra.
+
+Las rutas de plataforma van marcadas `@Public()`: eso no las abre, las **saca de la cadena de
+guards de tenants** para que las vigile la suya.
+
+**Cookie y `path` propios** (`np_platform_refresh`, `path=/v1/platform`). Si compartieran nombre
+con la de los tenants, entrar como proveedor cerraria la sesion de cliente en el mismo navegador y
+al reves — y dar soporte es tener las dos abiertas a la vez. El token de acceso tambien vive en su
+propia variable en memoria (`platform-api.ts`), por el mismo motivo.
+
+#### El alta es un script, no una pantalla
+
+```
+pnpm --filter @neo-pulse/api cuenta:plataforma <correo> "<Nombre Apellido>"
+```
+
+Crear una cuenta que administra a todos los clientes exige acceso al servidor y a la base de
+datos — que es el mismo nivel de privilegio que la cuenta concede. La contrasena se genera dentro
+y se imprime una vez; no se acepta por parametro porque acabaria en el historial del terminal.
+El script tambien **reactiva y repone**, asi que es el camino de vuelta si la unica cuenta se
+bloquea; al reponerla cierra las sesiones abiertas, porque si sobrevivieran, quien estuviera dentro
+seguiria dentro siete dias mas pese al cambio.
+
+`/plataforma/login` no tiene "No puedo entrar": aqui no hay nadie por encima a quien acudir, y
+anunciar el script seria contar por donde se rehace la cuenta que manda sobre todo.
+
+#### Lo que viene encima de esto
+
+El modulo de administracion de clientes (listar, dar de alta, suspender, ver consumo). Se hizo
+primero la cuenta, el ingreso y el token porque anadir pantallas encima es barato, y migrar
+sesiones vivas a otra clase de cuenta no lo es.
 
 ### Permisos, nunca nombres de rol
 Los guards evaluan **codigos de permiso** (`catalog:publish`, `users:manage`). En el codigo no

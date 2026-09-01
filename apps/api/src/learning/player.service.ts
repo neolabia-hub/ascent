@@ -44,6 +44,7 @@ export class PlayerService {
           config: true,
           lessonId: true,
           assessmentId: true,
+          surveyTemplateId: true,
           // Lo justo para que el indice diga de que tamano es cada parte ANTES de abrirla:
           // "8 tarjetas", "11 diapositivas". Un indice que solo lista titulos obliga a entrar
           // para saber en que se esta metiendo uno.
@@ -93,6 +94,7 @@ export class PlayerService {
           config: content.config,
           hasLesson: content.lessonId !== null,
           assessmentId: content.assessmentId,
+          surveyTemplateId: content.surveyTemplateId,
           /**
            * EL TAMANO DE LA PIEZA, en la unidad de cada tipo.
            *
@@ -143,6 +145,8 @@ export class PlayerService {
         lessonId: true,
         contentPackageId: true,
         assessmentId: true,
+        // La encuesta se responde DENTRO del reproductor, como una pieza mas (Decision #116).
+        surveyTemplateId: true,
         activityVersionId: true,
       },
     });

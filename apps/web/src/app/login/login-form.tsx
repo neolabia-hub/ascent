@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, HelpCircle, IdCard, Lock } from 'lucide-react';
+import { Eye, EyeOff, HelpCircle, IdCard, Lock, Mail, Phone } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveTenantSlug } from '@/lib/tenant';
@@ -11,7 +11,9 @@ import {
   me,
   mediaUrlFromPath,
   setAccessToken,
+  solicitarAyudaDeIngreso,
   type TenantBranding,
+  type TenantSupport,
 } from '@/lib/api';
 import { ADMIN_HOME, landingFor } from '@/lib/landing';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,13 @@ import { Input } from '@/components/ui/input';
  */
 type BrandingState =
   | { status: 'loading' }
-  | { status: 'ready'; tenantSlug: string; branding: TenantBranding; logoUrl: string | null }
+  | {
+      status: 'ready';
+      tenantSlug: string;
+      branding: TenantBranding;
+      logoUrl: string | null;
+      support: TenantSupport | null;
+    }
   | { status: 'not_found' }
   | { status: 'unreachable' };
 
@@ -59,6 +67,7 @@ export function LoginForm() {
           tenantSlug,
           branding: tenant.branding,
           logoUrl: mediaUrlFromPath(tenant.logoUrl),
+          support: tenant.support,
         });
       })
       .catch((error: unknown) => {
@@ -147,7 +156,7 @@ export function LoginForm() {
     );
   }
 
-  const { branding, logoUrl } = brandingState;
+  const { branding, logoUrl, support, tenantSlug } = brandingState;
 
   return (
     /*
@@ -184,11 +193,6 @@ export function LoginForm() {
           style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 30%, white)' }}
         />
         {/*
-          UNA RETICULA FINISIMA sobre el color. Es lo que separa "un fondo de color" de "una
-          superficie": sin ella el degradado se ve plano, y con ella el ojo encuentra donde
-          apoyarse. Al 4% no se ve; se nota.
-        */}
-        {/*
           EL PULSO: la firma de la marca, en grande (skill pulse-ui, "Firma 1 — anillo de pulso").
 
           Aqui iban tres filas de icono y frase, y el cliente las rechazo con razon: es el recurso
@@ -219,16 +223,6 @@ export function LoginForm() {
             />
           ))}
         </span>
-
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
-            backgroundSize: '56px 56px',
-          }}
-        />
 
         <div className="relative flex items-center gap-3.5">
           <LogoEmpresa logoUrl={logoUrl} nombre={branding.companyDisplayName} />
@@ -342,32 +336,12 @@ export function LoginForm() {
               </p>
             ) : null}
 
-            <Button type="submit" loading={submitting} size="lg" className="w-full rounded-xl">
+            <Button type="submit" loading={submitting} size="lg" glow className="w-full rounded-xl">
               {submitting ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>
 
-          {/*
-            "NO PUEDO ENTRAR" dice la verdad y nada mas. Sin correo verificado, cualquier
-            auto-recuperacion es una forma de que quien conozca una cedula se lleve la cuenta —la
-            cedula es semipublica dentro de la empresa—. Aqui no se promete un enlace que no existe.
-          */}
-          <details className="mt-6">
-            <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900">
-              <HelpCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-              No puedo entrar
-            </summary>
-            <div className="animate-card-in mt-3 rounded-xl bg-paper p-4">
-              <p className="text-sm leading-relaxed text-ink-700">
-                Todavia no se puede recuperar la contraseña por correo. Pideselo a quien administra la
-                plataforma en tu empresa: puede generarte una nueva.
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-ink-500">
-                Si te equivocaste cinco veces, la cuenta se bloquea quince minutos y despues vuelve a
-                funcionar sola.
-              </p>
-            </div>
-          </details>
+          <NoPuedoEntrar tenantSlug={tenantSlug} identifier={identifier} support={support} />
         </div>
       </div>
     </div>
@@ -477,5 +451,127 @@ function LogoEmpresa({ logoUrl, nombre }: { logoUrl: string | null; nombre: stri
     >
       {nombre.charAt(0).toUpperCase()}
     </span>
+  );
+}
+
+/**
+ * "NO PUEDO ENTRAR" (Decision #97).
+ *
+ * Antes decia la verdad y nada mas: "pideselo a quien administra en tu empresa". Correcto e
+ * inutil — no decia a QUIEN, que es justo lo unico que la persona necesita. Ahora trae el
+ * contacto de esa empresa, y si esa empresa todavia no lo ha puesto, el nuestro.
+ *
+ * DOS COSAS Y NADA MAS: el contacto de esa empresa y un boton que deja constancia. Son para dos
+ * personas distintas —la que tiene al jefe de SST a diez metros y solo necesitaba su extension, y
+ * la que entra a las cinco de la manana desde una bodega y no va a llamar a nadie— y por eso estan
+ * las dos. El boton no manda ninguna contrasena: pone un aviso en la bandeja de quien SI puede
+ * restablecerla.
+ *
+ * DICE LO MISMO PASE LO QUE PASE. Ni "listo, te avisamos" ni "esa cedula no existe": esta pantalla
+ * esta abierta a internet, y una respuesta que cambie segun exista la cuenta la convierte en un
+ * comprobador de quien trabaja en la empresa. Se responde a ciegas a proposito.
+ */
+function NoPuedoEntrar({
+  tenantSlug,
+  identifier,
+  support,
+}: {
+  tenantSlug: string;
+  identifier: string;
+  support: TenantSupport | null;
+}) {
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+
+  // Sin cedula no hay a quien avisar. Se pide la de arriba en vez de poner un segundo campo: son
+  // el mismo dato, y dos campos pidiendo lo mismo en la misma tarjeta se contestan mal.
+  const puedeAvisar = identifier.trim().length >= 3;
+
+  async function avisar() {
+    setEnviando(true);
+    await solicitarAyudaDeIngreso(tenantSlug, identifier.trim());
+    setEnviando(false);
+    setEnviado(true);
+  }
+
+  return (
+    <details className="mt-6">
+      <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900">
+        <HelpCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+        No puedo entrar
+      </summary>
+
+      <div className="animate-card-in mt-3 space-y-3 rounded-xl bg-paper p-4">
+        {/*
+          CASI TODO EL TEXTO SE FUE (Decision #99). Habia cinco parrafos: como se recupera, de quien
+          es el contacto, que pasa si la empresa no lo ha puesto, que el boton no manda contrasenas
+          y que a los cinco fallos se bloquea la cuenta. Todo cierto y todo de mas.
+
+          Quien abre esto tiene un problema y busca UNA cosa: a quien acudir. Cinco parrafos
+          explicando el mecanismo no se leen —se saltan—, y al saltarlos se salta tambien el
+          telefono, que era lo unico que servia. Queda el contacto y el boton; lo demas se aprende
+          usandolo o no hacia falta.
+        */}
+        {support ? (
+          <div className="rounded-lg border border-line bg-surface p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+              {support.scope === 'tenant' ? 'En tu empresa' : 'Soporte de la plataforma'}
+            </p>
+            {support.contactName ? (
+              <p className="mt-1 font-display text-sm font-semibold text-ink-900">{support.contactName}</p>
+            ) : null}
+
+            <div className="mt-2 space-y-1.5">
+              {support.contactEmail ? (
+                <a
+                  href={`mailto:${support.contactEmail}`}
+                  className="focus-ring flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <Mail className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                  <span className="truncate">{support.contactEmail}</span>
+                </a>
+              ) : null}
+              {support.contactPhone ? (
+                <a
+                  href={`tel:${support.contactPhone.replace(/[^+\d]/g, '')}`}
+                  className="focus-ring flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <Phone className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                  <span className="truncate">{support.contactPhone}</span>
+                </a>
+              ) : null}
+            </div>
+
+            {support.note ? <p className="mt-2 text-xs text-ink-500">{support.note}</p> : null}
+          </div>
+        ) : (
+          // Sin contacto configurado no se deja el hueco mudo: sigue estando el boton, pero hay que
+          // decir a que lleva, porque aqui no hay nadie a quien llamar.
+          <p className="text-sm leading-relaxed text-ink-700">
+            Quien administra en tu empresa puede darte una contraseña nueva.
+          </p>
+        )}
+
+        {enviado ? (
+          <p className="rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm text-ink-700">
+            Listo. Quien administra ya tiene tu aviso.
+          </p>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={!puedeAvisar}
+            loading={enviando}
+            onClick={() => void avisar()}
+            // Sin cedula arriba no hay a quien avisar, y un boton apagado sin decir por que es de
+            // lo que mas desespera. Se dice en el propio boton, que es donde se mira.
+            title={puedeAvisar ? undefined : 'Escribe arriba tu cedula o tu correo'}
+          >
+            {puedeAvisar ? 'Avisar a quien administra' : 'Escribe tu cedula arriba'}
+          </Button>
+        )}
+      </div>
+    </details>
   );
 }

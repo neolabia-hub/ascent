@@ -1318,6 +1318,20 @@ function ComoSeCalifica({
   disabled: boolean;
   onChange: (cambio: Partial<AssessmentDetail>) => void;
 }) {
+  /*
+    LOS MISMOS VALORES POR DEFECTO QUE APLICA EL SERVIDOR (`reviewPolicySchema`).
+
+    Se repiten aqui porque una evaluacion vieja tiene `{}` guardado, y pintar todas las casillas
+    apagadas diria que no se ensena nada — cuando en realidad si se ensena la nota y la
+    explicacion. Una pantalla que miente sobre lo que esta pasando es peor que no tenerla.
+  */
+  const revision = {
+    showScore: assessment.reviewPolicy?.showScore ?? true,
+    showCorrectAnswers: assessment.reviewPolicy?.showCorrectAnswers ?? false,
+    showExplanations: assessment.reviewPolicy?.showExplanations ?? true,
+    onlyAfterLastAttempt: assessment.reviewPolicy?.onlyAfterLastAttempt ?? true,
+  };
+
   return (
     <div className="mx-auto w-full max-w-lg">
       <h2 className="font-display text-xl font-semibold text-ink-900">Como se califica</h2>
@@ -1406,6 +1420,55 @@ function ComoSeCalifica({
             onChange={(shuffleOptions) => onChange({ shuffleOptions })}
             titulo="Barajar las opciones"
             pista='"La respuesta es la C" deja de servir.'
+          />
+        </div>
+
+        {/*
+          QUE VE LA PERSONA DESPUES DE ENTREGAR (Decision #120).
+
+          La politica existia en la base de datos desde el Sprint 2 y **no habia forma de tocarla**:
+          se quedaba con sus valores por defecto para siempre. Lo destapo el cliente al ver que su
+          examen le devolvia el detalle: *"no debe mostrar respuestas si le quedan intentos, y este
+          cliente no quiere mostrarlas en ningun caso"*.
+
+          Las dos cosas ya se podian expresar; lo que faltaba eran estas cuatro casillas.
+
+          ES CRITICO CON UN BANCO REUTILIZADO: ensenar las correctas a todo el mundo equivale a
+          publicar el examen. Por eso "mostrar las correctas" nace APAGADA y las otras tres no.
+        */}
+        <div className="space-y-2 border-t border-line pt-5">
+          <p className="text-sm font-medium text-ink-900">Al terminar, la persona ve</p>
+          <p className="pb-1 text-xs leading-relaxed text-ink-500">
+            Con un banco de preguntas que se reutiliza, ensenar las correctas a todo el mundo equivale a publicar
+            el examen.
+          </p>
+          <Casilla
+            checked={revision.showScore}
+            disabled={disabled}
+            onChange={(showScore) => onChange({ reviewPolicy: { ...revision, showScore } })}
+            titulo="Su calificacion"
+            pista="El porcentaje que saco. Apagalo si prefieres que solo sepa si aprobo."
+          />
+          <Casilla
+            checked={revision.onlyAfterLastAttempt}
+            disabled={disabled}
+            onChange={(onlyAfterLastAttempt) => onChange({ reviewPolicy: { ...revision, onlyAfterLastAttempt } })}
+            titulo="El detalle solo cuando ya no le queden intentos"
+            pista="Con esto apagado ve en que fallo aunque pueda repetir, y el segundo intento deja de medir nada."
+          />
+          <Casilla
+            checked={revision.showExplanations}
+            disabled={disabled}
+            onChange={(showExplanations) => onChange({ reviewPolicy: { ...revision, showExplanations } })}
+            titulo="La explicacion de cada pregunta"
+            pista="Lo que escribiste como retroalimentacion. Ensena sin regalar cual era la correcta."
+          />
+          <Casilla
+            checked={revision.showCorrectAnswers}
+            disabled={disabled}
+            onChange={(showCorrectAnswers) => onChange({ reviewPolicy: { ...revision, showCorrectAnswers } })}
+            titulo="Cual era la respuesta correcta"
+            pista="Solo si esta evaluacion no reutiliza preguntas de otras. Es lo que mas rapido filtra un examen."
           />
         </div>
       </div>

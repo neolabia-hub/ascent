@@ -44,6 +44,30 @@ export const tenantSettingsSchema = z
       })
       .default({}),
 
+    /**
+     * A QUIEN ACUDE alguien de esta empresa que no puede entrar (Decision #97).
+     *
+     * Mientras no haya recuperacion por correo, la pantalla de ingreso no puede prometer un enlace
+     * que no existe: lo unico honesto es decir a quien pedirselo. Y eso cambia por empresa —en una
+     * lo lleva SST, en otra el area de sistemas—, asi que no puede estar escrito en el codigo.
+     *
+     * SE PUBLICA SIN SESION, porque la pantalla de ingreso no la tiene. Por eso lo que va aqui es
+     * un contacto INSTITUCIONAL —un area, un correo corporativo, una extension—, nunca el movil
+     * personal de nadie: cualquiera que sepa el subdominio lo puede leer. La UI lo advierte donde
+     * se escribe.
+     *
+     * Vacio es un estado legitimo y frecuente el primer dia: entonces la pantalla ensena el
+     * contacto de la plataforma, que se configura por variable de entorno y no lo toca el cliente.
+     */
+    support: z
+      .object({
+        contactName: z.string().max(120).default(''),
+        contactEmail: z.string().max(160).default(''),
+        contactPhone: z.string().max(60).default(''),
+        note: z.string().max(300).default(''),
+      })
+      .default({}),
+
     // Flags de modulos.
     features: z
       .object({

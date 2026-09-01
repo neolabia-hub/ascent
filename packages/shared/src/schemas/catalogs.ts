@@ -82,6 +82,16 @@ export const activityTypeConfigSchema = z
       .default(null),
     participatesInPlan: z.boolean().default(false),
     isMicro: z.boolean().default(false),
+    /**
+     * CUAL encuesta usa este tipo (Decision #116). Se engancha sola al final de cada formacion.
+     *
+     * Faltaba declararla aqui, y este esquema es `.strict()`: elegirla en la pantalla devolvia un
+     * 422 seco, sin mas explicacion que "Unprocessable Entity". Es el precio de `.strict()` —que
+     * es la opcion correcta: sin el, una clave mal escrita se guardaria en silencio y no
+     * gobernaria nada— y por eso **cada campo nuevo del config hay que declararlo aqui ademas de
+     * leerlo donde se use**.
+     */
+    surveyTemplateId: z.string().max(60).nullable().default(null),
   })
   .strict();
 

@@ -29,15 +29,19 @@ import { ADMIN_HOME, LEARNER_HOME } from '@/lib/landing';
  * diagnostico era correcto, aunque la solucion literal —poner "Mi formacion" en un control que
  * lleva a Administracion— seria peor: un rotulo que nombra un sitio y te lleva a otro.
  *
- * El fallo de fondo era que UN rotulo intentaba decir dos cosas: donde estas y a donde irias. Asi
- * que ahora son dos, y el control se abre para ensenarlas:
+ * El fallo de fondo era que UN rotulo intentaba decir dos cosas: donde estas y a donde irias.
  *
- *   PLEGADO     dos iconos, nada mas. Ocupa lo que una campana.
- *   DESPLEGADO  al pasar por encima o al enfocarlo con el teclado se abre a lo ancho: el espacio
- *               actual sale marcado y SIN enlace, y el otro como el sitio al que ir.
+ * Se probo partiendolo en dos celdas —el espacio actual marcado y el destino al lado como enlace—
+ * y salio un control de dos rotulos para una accion sola: mas ancho, mas ruido y dos sitios donde
+ * mirar. Asi que ahora es un CONMUTADOR de verdad (Decision #106), como el de claro/oscuro:
  *
- * Asi nadie deduce nada: se ve donde esta, se ve que hay otro sitio, y lo unico que se puede
- * pulsar es lo unico que hace algo.
+ *   PLEGADO     el icono de DONDE ESTAS. Ocupa lo que una campana.
+ *   DESPLEGADO  al pasar o al enfocarlo se abre a lo ancho y lo dice con todas las letras.
+ *   AL PULSAR   cambia al otro espacio.
+ *
+ * Lo que se VE es el estado y lo que se OYE es la accion: el nombre accesible del enlace dice "ir
+ * a mi formacion", que es lo que pasa al pulsarlo. Un solo rotulo visible no puede decir las dos
+ * cosas, asi que la que se ve orienta y la que se oye actua.
  *
  * EL CONTADOR ES DE PENDIENTES, NO DE AVISOS, y esa diferencia es el motivo de que exista. Un
  * aviso se apaga al leerlo; una formacion pendiente sigue ahi aunque leas el correo diez veces. Si
@@ -71,9 +75,7 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
 
   // `to` es el DESTINO, asi que el espacio actual es el otro.
   const IconoActual = to === 'learner' ? LayoutGrid : GraduationCap;
-  const IconoDestino = to === 'learner' ? GraduationCap : LayoutGrid;
   const nombreActual = to === 'learner' ? 'Administracion' : 'Mi formacion';
-  const nombreDestino = to === 'learner' ? 'Mi formacion' : 'Administracion';
   const href = to === 'learner' ? LEARNER_HOME : ADMIN_HOME;
 
   const total = pending?.total ?? 0;
@@ -99,18 +101,35 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
 
   return (
     /*
-      SE ABRE A LO ANCHO al pasar por encima o al enfocar con el teclado. La animacion es de
-      `grid-template-columns` de 0fr a 1fr, que es lo unico que deja animar la aparicion de un
-      texto de ancho DESCONOCIDO: con `width` habria que fijar un numero y un rotulo mas largo
-      —o traducido— se cortaria.
+      UN SOLO BLOQUE, y lo que dice es DONDE ESTAS (Decision #106).
+
+      Antes eran dos: el espacio actual marcado y, al lado, el destino como enlace. Se hizo asi
+      para que nadie tuviera que deducir nada, y salio un control de dos celdas y dos rotulos para
+      una accion sola — mas ancho, mas ruido y dos sitios donde mirar.
+
+      Ahora es un CONMUTADOR de verdad, como el de claro/oscuro: ensena el estado en el que esta y
+      al pulsarlo pasa al otro. Plegado es un icono, y al pasar por encima o al enfocarlo con el
+      teclado se abre a lo ancho para decir donde estas con todas las letras.
+
+      EL NOMBRE ACCESIBLE DICE LA ACCION, no el estado: quien navega escuchando oye "ir a mi
+      formacion" —que es lo que pasa al pulsar— mientras la pantalla ensena "Administracion", que
+      es donde esta. Un solo rotulo visible no puede decir las dos cosas, asi que la que se ve es
+      la que orienta y la que se oye es la que actua. El tooltip las junta para quien use raton.
+
+      La animacion es de `grid-template-columns` de 0fr a 1fr, que es lo unico que deja animar la
+      aparicion de un texto de ancho DESCONOCIDO: con `width` habria que fijar un numero y un
+      rotulo mas largo —o traducido— se cortaria.
     */
-    <div
-      className="group/sw flex h-10 items-center rounded-full border border-line bg-surface p-1 shadow-card transition-all duration-200 ease-pulse focus-within:-translate-y-px focus-within:border-line-strong hover:-translate-y-px hover:border-line-strong hover:shadow-card-hover"
+    <Link
+      href={href}
+      aria-label={accesible}
       title={descripcion}
+      className="group/sw focus-ring flex h-10 items-center rounded-full border border-line p-1 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:shadow-card-hover focus-visible:-translate-y-px"
+      // Mismo tono de reposo que la campana y la cuenta: los tres son una familia (Decision #108).
+      style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
     >
-      {/* DONDE ESTAS: marcado y sin enlace, porque no lleva a ninguna parte. */}
       <span
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2"
+        className="relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2"
         style={{ backgroundColor: 'var(--primary-soft)' }}
       >
         <IconoActual
@@ -119,42 +138,38 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
           style={{ color: 'var(--brand-primary)' }}
           aria-hidden="true"
         />
-        <span className="grid grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-within/sw:grid-cols-[1fr] group-hover/sw:grid-cols-[1fr]">
+        <span className="grid grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-visible/sw:grid-cols-[1fr] group-hover/sw:grid-cols-[1fr]">
           <span className="min-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold text-ink-900">
             {nombreActual}
           </span>
         </span>
-      </span>
-
-      {/* A DONDE PUEDES IR: lo unico pulsable. */}
-      <Link
-        href={href}
-        aria-label={accesible}
-        title={descripcion}
-        className="focus-ring relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
-      >
-        <IconoDestino className="h-[17px] w-[17px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
-        <span className="grid grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-within/sw:grid-cols-[1fr] group-hover/sw:grid-cols-[1fr]">
-          <span className="min-w-0 overflow-hidden whitespace-nowrap text-xs font-medium">{nombreDestino}</span>
-        </span>
 
         {/*
-          UN NUMERO SOLO CUANDO HAY ALGO VENCIDO, y un punto cuando solo hay pendientes. Tener
-          formacion pendiente es lo normal; tenerla vencida es lo que hay que mirar hoy, y solo
+          UN NUMERO SOLO CUANDO HAY ALGO ATRASADO, y un punto cuando solo hay pendientes. Tener
+          formacion pendiente es lo normal; tenerla atrasada es lo que hay que mirar hoy, y solo
           eso merece una cifra.
+
+          Va sobre el icono del espacio ACTUAL porque ya no hay otro sitio donde ponerlo, y sigue
+          contando lo del ESPACIO DEL APRENDIZ —que es lo que este control ofrece cuando se esta
+          en el panel—.
         */}
         {to === 'learner' && urgente ? (
-          <span className="animate-card-in absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold tabular-nums text-white">
+          <span
+            className="animate-card-in absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums text-white"
+            // Ambar y no rojo (Decision #102): el rojo del sistema significa destructivo, y a una
+            // formacion pasada de fecha se la hace y ya.
+            style={{ backgroundColor: 'var(--warn)' }}
+          >
             {overdue > 9 ? '9+' : overdue}
           </span>
         ) : to === 'learner' && total > 0 ? (
           <span
-            className="animate-card-in absolute right-0.5 top-1 h-1.5 w-1.5 rounded-full"
+            className="animate-card-in absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full"
             style={{ backgroundColor: 'var(--brand-primary)' }}
             aria-hidden="true"
           />
         ) : null}
-      </Link>
-    </div>
+      </span>
+    </Link>
   );
 }

@@ -8,11 +8,12 @@ import { getInbox, logout, markAllNotificationsRead, markNotificationRead, type 
 import { getMyProgress } from '@/lib/learner-api';
 import { useLearnerProfile } from './learner-session';
 import { clearOfflineData } from '@/components/providers/service-worker-bridge';
-import { cn } from '@/components/ui/cn';
-import { StreakPill } from '@/components/ui/streak-pill';
 import { managesAnything } from '@/lib/landing';
-import { KIND_LABEL, notificationHref, notificationKind } from '@/lib/notification-kind';
+import { Avatar } from '@/components/ui/avatar';
+import { cn } from '@/components/ui/cn';
 import { SpaceSwitcher } from './space-switcher';
+import { StreakPill } from '@/components/ui/streak-pill';
+import { KIND_LABEL, notificationHref, notificationKind } from '@/lib/notification-kind';
 
 /**
  * Barra superior del aprendiz: buscar, avisos y quien soy.
@@ -94,10 +95,10 @@ function Notifications() {
         */
         className={cn(
           'focus-ring group/bell relative flex h-10 w-10 items-center justify-center rounded-full border shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
-          open
-            ? 'border-line-strong bg-paper text-ink-900'
-            : 'border-line bg-surface text-ink-500 hover:border-line-strong hover:text-ink-900',
+          open ? 'border-transparent text-ink-900' : 'border-line text-ink-500 hover:border-line-strong hover:text-ink-900',
         )}
+        // Ver la nota del tono en `barras`: 5% de marca en reposo, --primary-soft al abrir.
+        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
         {/* Se inclina al pasar. Es lo que hace una campana, y basta para que se sienta viva. */}
         <Bell
@@ -212,18 +213,20 @@ function Notifications() {
   );
 }
 
-function UserMenu({ fullName, email, jobTitle }: { fullName: string; email: string; jobTitle: string | null }) {
+function UserMenu({
+  fullName,
+  email,
+  jobTitle,
+  avatarKey,
+}: {
+  fullName: string;
+  email: string;
+  jobTitle: string | null;
+  avatarKey: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const ref = useOutsideClick(() => setOpen(false));
-
-  const initials = fullName
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .toUpperCase();
 
   return (
     <div ref={ref} className="relative">
@@ -233,30 +236,41 @@ function UserMenu({ fullName, email, jobTitle }: { fullName: string; email: stri
         aria-label={`Tu cuenta: ${fullName}${jobTitle ? `, ${jobTitle}` : ''}`}
         title={`${fullName}${jobTitle ? ` · ${jobTitle}` : ''}`}
         className={cn(
-          'focus-ring flex h-10 items-center gap-2 rounded-full border p-1 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
-          open ? 'border-line-strong bg-paper' : 'border-line bg-surface hover:border-line-strong',
+          'group/av focus-ring flex h-10 items-center gap-2 rounded-full border p-1 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
+          open ? 'border-transparent' : 'border-line hover:border-line-strong',
         )}
+        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
-        <span
-          aria-hidden="true"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-          style={{ backgroundColor: 'var(--brand-primary)' }}
-        >
-          {initials || <UserRound className="h-4 w-4" strokeWidth={1.75} />}
-        </span>
+        <Avatar avatarKey={avatarKey} fullName={fullName} size={32} />
         {/*
-          EL NOMBRE Y EL CARGO, no solo las iniciales (Decision #92). En una empresa de 600
-          personas, "AN" no identifica a nadie; y el CARGO es ademas lo que explica por que a esta
-          persona le tocan justo esas formaciones. Se ocultan en pantallas estrechas, donde el
-          espacio vale mas que el dato.
+          SOLO LA CARA, y el nombre APARECE AL PASAR (Decision #108).
+
+          El nombre y el cargo estaban siempre puestos y ocupaban 140 px fijos de la barra para un
+          dato que nadie necesita consultar: cada uno sabe como se llama. Servian para reconocer
+          "esta es mi cuenta", y para eso basta la foto.
+
+          Se despliega igual que el conmutador, con `grid-template-columns` de 0fr a 1fr: es lo
+          unico que deja animar la aparicion de un texto de ancho DESCONOCIDO —con `width` habria
+          que fijar un numero y un nombre largo se cortaria—. Sigue estando entero en el nombre
+          accesible y en el tooltip, asi que quien navega escuchando no pierde nada; solo deja de
+          ocupar sitio para quien no lo esta mirando.
+
+          En TELEFONO no se abre nunca: ahi no hay "pasar por encima" y el ancho es lo que mas
+          escasea. Queda la foto, que es justo el caso para el que la foto existe.
+
+          `\s+` lleva barra invertida. Estuvo escrito `/s+/` y partia el nombre por la LETRA "s":
+          "Jose Sanchez" salia "Jo e ". Falla callado — no revienta nada, solo escribe mal el
+          nombre de quien acaba de entrar.
         */}
-        <span className="hidden min-w-0 pr-1 text-left lg:block">
-          <span className="block max-w-[140px] truncate text-xs font-semibold leading-tight text-ink-900">
-            {fullName.split(/s+/).slice(0, 2).join(' ')}
+        <span className="hidden grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-visible/av:grid-cols-[1fr] group-hover/av:grid-cols-[1fr] lg:grid">
+          <span className="min-w-0 overflow-hidden pl-0.5 pr-1 text-left">
+            <span className="block whitespace-nowrap text-xs font-semibold leading-tight text-ink-900">
+              {fullName.trim().split(/\s+/).slice(0, 2).join(' ')}
+            </span>
+            {jobTitle ? (
+              <span className="block whitespace-nowrap text-[11px] leading-tight text-ink-500">{jobTitle}</span>
+            ) : null}
           </span>
-          {jobTitle ? (
-            <span className="block max-w-[140px] truncate text-[11px] leading-tight text-ink-500">{jobTitle}</span>
-          ) : null}
         </span>
         <ChevronDown className="mr-1 h-4 w-4 shrink-0 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
       </button>
@@ -397,10 +411,20 @@ export function LearnerTopbar({
           como parte de nada. Con el buscador en medio, cada cosa tiene su sitio y la barra se
           reparte sola a cualquier ancho.
         */}
+        {/*
+          EL BORDE SE ENCIENDE con los dos colores de la empresa al pasar y al enfocar
+          (`.aurora-focus`, Decision #104). Es la misma pieza que ya usan los campos del ingreso, y
+          va justamente aqui porque el buscador es el unico control de esta barra que ACEPTA algo
+          escrito: el resto son botones. Un borde vivo dice "aqui se escribe" sin ninguna palabra.
+
+          Se insinua al pasar y se enciende al enfocar, no late solo: una animacion permanente en
+          la barra de arriba es un parpadeo en el rabillo del ojo durante toda la jornada, y esto lo
+          mira gente que esta leyendo otra cosa.
+        */}
         <button
           type="button"
           onClick={onSearch}
-          className="focus-ring hidden h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-line-strong hover:text-ink-700 lg:flex"
+          className="aurora-focus focus-ring hidden h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-transparent hover:text-ink-700 lg:flex"
         >
           <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
           <span className="flex-1 truncate text-left">Buscar una formacion</span>
@@ -431,7 +455,12 @@ export function LearnerTopbar({
         {managesAnything(profile.permissions) ? <SpaceSwitcher to="admin" /> : null}
 
         <Notifications />
-        <UserMenu fullName={profile.fullName} email={profile.email} jobTitle={profile.jobTitle} />
+        <UserMenu
+          fullName={profile.fullName}
+          email={profile.email}
+          jobTitle={profile.jobTitle}
+          avatarKey={profile.avatarKey}
+        />
         {trailing}
       </div>
     </header>

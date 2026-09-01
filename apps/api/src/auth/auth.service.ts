@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { AuditService } from '../common/audit.service.js';
 import type { JwtPayload } from '../common/types.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export interface AuthUserView {
@@ -38,6 +39,9 @@ const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Ventana en la que el token ANTERIOR sigue valiendo tras rotar. Ver `rotarSesion`. */
 const GRACE_MS = 30_000;
 
+/** Una sola solicitud de ayuda por cuenta cada seis horas. Ver solicitarAyudaDeIngreso. */
+const SOLICITUD_AYUDA_MS = 6 * 60 * 60 * 1000;
+
 // Versiones vigentes de las politicas aceptadas en la activacion (quedan registradas por usuario).
 const HABEAS_DATA_POLICY_VERSION = process.env.HABEAS_DATA_POLICY_VERSION ?? '1.0';
 const ESIGN_AGREEMENT_VERSION = process.env.ESIGN_AGREEMENT_VERSION ?? '1.0';
@@ -56,6 +60,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -252,7 +257,7 @@ export class AuthService {
   async me(
     userId: string,
     tenantId: string,
-  ): Promise<AuthUserView & { permissions: string[]; jobTitle: string | null }> {
+  ): Promise<AuthUserView & { permissions: string[]; jobTitle: string | null; avatarKey: string | null }> {
     const user = await this.prisma.forTenant(tenantId).user.findUniqueOrThrow({
       where: { id: userId },
       include: {
@@ -267,7 +272,23 @@ export class AuthService {
       ...this.toView(user),
       permissions: user.role.permissions.map((rp) => rp.permission.code),
       jobTitle: user.jobTitle?.name ?? null,
+      // La clave, no la URL firmada: la firma caduca y este perfil se cachea en el cliente.
+      avatarKey: user.avatarKey,
     };
+  }
+
+  /**
+   * Guarda (o quita) la foto de perfil de la propia persona.
+   *
+   * No borra el fichero anterior del almacen: los medios se limpian por barrido, y borrar aqui
+   * significaria que un fallo al escribir la fila deja una foto huerfana referenciada por nadie —o
+   * peor, una fila apuntando a un fichero que ya no existe—.
+   */
+  async setAvatar(userId: string, tenantId: string, avatarKey: string | null): Promise<{ avatarKey: string | null }> {
+    const user = await this.prisma
+      .forTenant(tenantId)
+      .user.update({ where: { id: userId }, data: { avatarKey }, select: { avatarKey: true } });
+    return { avatarKey: user.avatarKey };
   }
 
   private async registerFailedAttempt(user: ThrottledUser, identifier: string, ctx: AuthContext): Promise<void> {
@@ -393,4 +414,80 @@ export class AuthService {
   private hashRefresh(token: string): string {
     return createHash('sha256').update(this.pepper(token)).digest('hex');
   }
+
+  /**
+   * "NO PUEDO ENTRAR": avisar a quien administra, sin contar nada a quien pregunta (Decision #97).
+   *
+   * Es la mitad activa de la pantalla de olvido. La otra mitad —el telefono y el correo de quien
+   * administra— sirve para la persona que tiene a mano a esa persona; esta sirve para la que no:
+   * el conductor a las cinco de la manana, que no va a llamar a nadie y lo unico que quiere es
+   * dejar constancia de que necesita una contrasena nueva.
+   *
+   * NO ES una recuperacion automatica y no manda ninguna contrasena. Deja una notificacion en la
+   * bandeja de quien puede restablecerla, con la cedula tal cual se escribio, y ahi para: la
+   * decision de restablecer sigue siendo de una persona, que es lo unico defendible mientras no
+   * haya un correo verificado con el que comprobar quien pide.
+   *
+   * TRES REGLAS, y las tres importan:
+   *
+   * 1. RESPONDE SIEMPRE LO MISMO, exista la cedula o no. Si dijera "esa cedula no existe", esta
+   *    pantalla —abierta, sin sesion— seria un comprobador de quien trabaja en la empresa: se le
+   *    tiran las seiscientas cedulas y se obtiene la nomina.
+   * 2. SOLO AVISA SI LA CUENTA EXISTE. Con cedulas inventadas no se crea nada, asi que no se puede
+   *    llenar la bandeja de quien administra con ruido desde fuera.
+   * 3. UNA CADA SEIS HORAS por cuenta. Sin esto, quien conozca una cedula de verdad —y dentro de
+   *    la empresa se conocen— puede repetir el envio hasta enterrar la bandeja. Y no hace falta
+   *    mas: la respuesta a esto es una llamada, no un segundo aviso.
+   */
+  async solicitarAyudaDeIngreso(tenantSlug: string, identifier: string, ctx: AuthContext = {}): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+    if (!tenant || !tenant.active) return;
+
+    const scoped = this.prisma.forTenant(tenant.id);
+    const isEmail = identifier.includes('@');
+    const user = isEmail
+      ? await scoped.user.findUnique({
+          where: { tenantId_email: { tenantId: tenant.id, email: identifier.toLowerCase() } },
+        })
+      : await scoped.user.findUnique({
+          where: { tenantId_documentNumber: { tenantId: tenant.id, documentNumber: identifier } },
+        });
+    if (!user || !user.active || user.deletedAt) return;
+
+    const desde = new Date(Date.now() - SOLICITUD_AYUDA_MS);
+    const yaHay = await scoped.notification.findFirst({
+      where: {
+        eventType: 'PASSWORD_HELP_REQUESTED',
+        referenceType: 'user',
+        referenceId: user.id,
+        createdAt: { gte: desde },
+      },
+      select: { id: true },
+    });
+    if (yaHay) return;
+
+    const quien = user.fullName.trim() || user.documentNumber;
+    await this.notifications.notifyByPermission(tenant.id, 'users:manage', {
+      eventType: 'PASSWORD_HELP_REQUESTED',
+      channels: ['IN_APP'],
+      subject: 'Alguien no puede entrar',
+      // Dice QUIEN y DESDE DONDE, porque es lo que permite reconocer un aviso raro: una solicitud
+      // a nombre de alguien del turno de la manana llegando de madrugada desde otra IP.
+      body: `${quien} (${user.documentNumber}) pidio ayuda para entrar. Si lo reconoces, restablece su contrasena desde Usuarios. Origen: ${ctx.ipAddress ?? 'IP desconocida'}.`,
+      referenceType: 'user',
+      referenceId: user.id,
+    });
+
+    await this.audit.record({
+      tenantId: tenant.id,
+      userId: user.id,
+      action: 'PASSWORD_HELP_REQUESTED',
+      resourceType: 'auth',
+      resourceId: user.id,
+      newValues: { identifier },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+  }
+
 }

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
-import { activationSchema, changePasswordSchema, loginSchema } from '@neo-pulse/shared';
+import { Body, Controller, Get, HttpCode, Post, Put, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { activationSchema, avatarSchema, changePasswordSchema, helpRequestSchema, loginSchema } from '@neo-pulse/shared';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public } from '../common/decorators.js';
@@ -71,6 +71,30 @@ export class AuthController {
   }
 
   @Public()
+  /*
+    UNA SOLICITUD DE AYUDA CADA CINCO MINUTOS POR IP, mucho mas estrecho que el login.
+
+    El login se usa cien veces al dia y por eso su limite es alto; esto se usa una vez cada varios
+    meses y cada acierto deja un aviso en la bandeja de quien administra. Un limite generoso aqui
+    seria una forma comoda de enterrar esa bandeja desde fuera.
+  */
+  @Throttle({ default: { ttl: 300_000, limit: 3 } })
+  @Post('help-request')
+  @HttpCode(202)
+  async helpRequest(@Body() body: unknown, @Req() req: Request) {
+    const input = helpRequestSchema.parse(body);
+    await this.auth.solicitarAyudaDeIngreso(input.tenantSlug, input.identifier, requestContext(req));
+    /*
+      SIEMPRE 202 Y SIEMPRE EL MISMO TEXTO, exista la cuenta o no.
+
+      Es la unica respuesta que no convierte esta pantalla —abierta, sin sesion— en un comprobador
+      de quien trabaja en la empresa. Por eso tampoco dice "te avisamos cuando la restablezcan":
+      no lo sabemos, y prometerlo haria que la persona se quedara esperando en vez de llamar.
+    */
+    return { ok: true };
+  }
+
+  @Public()
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -125,6 +149,24 @@ export class AuthController {
   async me(@CurrentUser() user: AuthUser) {
     const profile = await this.auth.me(user.id, user.tenantId);
     return { ...profile, scopeProcessIds: user.scopeProcessIds };
+  }
+
+  /**
+   * LA FOTO DE PERFIL, que cambia SOLO su dueno (Decision #105).
+   *
+   * No pide ningun permiso y no recibe un id de usuario: opera sobre `user.id`, el de la sesion.
+   * Es lo que impide que esto sea una via para ponerle una foto a otra persona — con un id en la
+   * ruta, cualquiera con `users:manage` podria, y la foto de la cara de alguien no es un dato que
+   * deba poder cambiar su jefe.
+   *
+   * Recibe la clave de un fichero YA SUBIDO por `/media/upload`, que es donde vive la validacion
+   * de tipo real (magic bytes) y de tamano. Aqui solo se guarda a quien pertenece.
+   */
+  @Put('me/avatar')
+  @HttpCode(200)
+  async setAvatar(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const input = avatarSchema.parse(body);
+    return this.auth.setAvatar(user.id, user.tenantId, input.avatarKey);
   }
 
   /** Extrae el tenantId del payload del access recien emitido (evita otra consulta). */

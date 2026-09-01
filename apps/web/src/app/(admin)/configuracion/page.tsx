@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Award, ClipboardCheck, Layers, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { CatalogManager, type CatalogManagerProps } from '@/components/config/catalog-manager';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -72,13 +72,19 @@ const SECTIONS: Section[] = [
     description: 'Normas a las que tributa la formacion (BASC, BPM, PESV, ISO...).',
     extraFields: [{ key: 'annualHoursRequired', label: 'Horas/ano exigidas', kind: 'number', hint: 'Ej.: BPM exige 10 horas anuales por manipulador. Vacio si no aplica.' }],
   },
-  {
-    catalogKey: 'activity-types',
-    label: 'Tipos de actividad',
-    singular: 'tipo de actividad',
-    description: 'Los caminos de formacion (induccion, plan, extraordinaria, pildora). Los del sistema no se eliminan.',
-    extraFields: [{ key: 'colorHex', label: 'Color', kind: 'color', hint: 'Identifica el tipo en listas y reportes.' }],
-  },
+  /*
+    "TIPOS DE ACTIVIDAD" SALIO DE AQUI (Decision #116).
+
+    Estaba como un catalogo mas —crear, renombrar, borrar— y ademas existia "Tipos de formacion"
+    en la barra de arriba, que es la MISMA tabla vista de otra manera. Dos entradas para lo mismo,
+    con dos nombres distintos para la misma cosa, y ninguna de las dos completa: en el catalogo se
+    podia renombrar pero no decir que exige el tipo; en la otra se podia decir que exige pero no
+    renombrarlo.
+
+    Ahora hay una sola pantalla, `/configuracion/tipos-de-formacion`, que hace las dos cosas. Y se
+    llama "formacion" y no "actividad" porque es la palabra que usa el cliente y la que aparece en
+    el resto del producto.
+  */
 ];
 
 export default function ConfiguracionPage() {
@@ -103,6 +109,29 @@ export default function ConfiguracionPage() {
             <Button variant="outline">
               <SlidersHorizontal size={16} />
               Preferencias y marca
+            </Button>
+          </Link>
+          {/*
+            LOS DOS DE LA CONSTANCIA VAN JUNTOS y en este orden: primero se decide QUE formaciones
+            acreditan y despues COMO se ve el papel. Al reves, alguien disena una constancia
+            preciosa y descubre semanas mas tarde que su tipo de formacion no la emite.
+          */}
+          <Link href="/configuracion/tipos-de-formacion">
+            <Button variant="outline">
+              <Layers size={16} />
+              Tipos de formacion
+            </Button>
+          </Link>
+          <Link href="/configuracion/constancias">
+            <Button variant="outline">
+              <Award size={16} />
+              Constancias
+            </Button>
+          </Link>
+          <Link href="/configuracion/encuestas">
+            <Button variant="outline">
+              <ClipboardCheck size={16} />
+              Encuestas
             </Button>
           </Link>
         </div>

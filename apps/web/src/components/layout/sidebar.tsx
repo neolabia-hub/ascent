@@ -5,11 +5,9 @@ import {
   CalendarDays,
   ChartColumn,
   CheckSquare,
-  ChevronsLeft,
-  ChevronsRight,
+  ChevronLeft,
   ClipboardList,
   House,
-  LogOut,
   Settings,
   Target,
   Users,
@@ -18,11 +16,10 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { logout } from '@/lib/api';
-import { useTenant } from '@/components/providers/tenant-provider';
 import { listPlans, type PlanRow } from '@/lib/delivery-api';
 import { cn } from '@/components/ui/cn';
 import { ProgressRing } from '@/components/ui/progress-ring';
+import { TenantMark } from '@/components/layout/tenant-mark';
 
 const SIDEBAR_COLLAPSED_KEY = 'pulso.sidebar.collapsed';
 
@@ -52,22 +49,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/configuracion', label: 'Configuracion', icon: Settings },
 ];
 
-function getInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? '';
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : '';
-  return `${first}${last}`.toUpperCase() || '?';
-}
-
-export interface SidebarProps {
-  userFullName: string;
-}
-
-export function Sidebar({ userFullName }: SidebarProps) {
+// Sin props: el nombre y la salida de la persona viven en la barra de arriba (Decision #104).
+export function Sidebar() {
   const pathname = usePathname();
-  const tenant = useTenant();
   const [collapsed, setCollapsed] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
@@ -82,15 +67,6 @@ export function Sidebar({ userFullName }: SidebarProps) {
       window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
       return next;
     });
-  }
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      window.location.assign('/login');
-    }
   }
 
   return (
@@ -108,16 +84,8 @@ export function Sidebar({ userFullName }: SidebarProps) {
       )}
     >
       <div className="flex min-h-0 flex-1 flex-col rounded-3xl border border-line bg-surface shadow-card">
-      <div className={cn('flex items-center gap-2 px-4 py-4', collapsed && 'justify-center px-0')}>
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-display text-sm font-bold text-white"
-          style={{ backgroundColor: 'var(--brand-primary)' }}
-        >
-          {tenant.name.charAt(0).toUpperCase()}
-        </div>
-        {!collapsed ? (
-          <span className="truncate font-display text-sm font-semibold text-ink-900">{tenant.name}</span>
-        ) : null}
+      <div className={cn('px-4 py-4', collapsed && 'px-2')}>
+        <TenantMark collapsed={collapsed} />
       </div>
 
       <nav className="mt-2 flex-1 space-y-0.5 overflow-y-auto px-2">
@@ -149,24 +117,6 @@ export function Sidebar({ userFullName }: SidebarProps) {
         })}
       </nav>
 
-      <button
-        type="button"
-        onClick={toggleCollapsed}
-        aria-label={collapsed ? 'Expandir menu' : 'Contraer menu'}
-        className={cn(
-          'focus-ring mx-2 mb-2 flex items-center justify-center gap-2 rounded-md py-2 text-xs text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900',
-        )}
-      >
-        {collapsed ? (
-          <ChevronsRight className="h-4 w-4" strokeWidth={1.75} />
-        ) : (
-          <>
-            <ChevronsLeft className="h-4 w-4" strokeWidth={1.75} />
-            <span>Contraer</span>
-          </>
-        )}
-      </button>
-
       {/*
         EL PULSO DEL PLAN (Decision #92), que es el equivalente administrador de la racha del
         aprendiz: el numero del que esta persona responde.
@@ -178,28 +128,51 @@ export function Sidebar({ userFullName }: SidebarProps) {
         Y va con su META al lado, porque un 62% suelto no dice si eso esta bien —que es justo lo
         que hay que poder contestar de un vistazo—.
       */}
-      {!collapsed ? <PulsoDelPlan /> : null}
+      <PulsoDelPlan collapsed={collapsed} />
 
-      <div className={cn('flex items-center gap-2.5 border-t border-line px-3 py-3', collapsed && 'justify-center px-0')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-ink-900">
-          {getInitials(userFullName)}
-        </div>
-        {!collapsed ? (
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-ink-900">{userFullName}</p>
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          aria-label="Cerrar sesion"
-          title="Cerrar sesion"
-          className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900 disabled:opacity-50"
-        >
-          <LogOut className="h-4 w-4" strokeWidth={1.75} />
-        </button>
-      </div>
+      {/*
+        CONTRAER, DEBAJO DEL PLAN Y SOLO ICONO (Decision #109).
+
+        Estaba ENCIMA del plan y llevaba la palabra "Contraer" al lado. Las dos cosas estaban mal:
+        el rotulo gastaba un renglon entero de barra en una accion que se usa una vez y se
+        recuerda, y encima del plan partia el bloque de abajo en dos —el numero del que responde
+        quien administra quedaba flotando entre un boton y el borde—. Ahora el plan cierra la barra
+        y el control de la barra va al final, que es donde va un control de la barra.
+
+        UNA SOLA FLECHA que gira 180 grados, no dos iconos que se intercambian: es lo que de verdad
+        esta pasando, el mismo objeto mirando al otro lado.
+
+        CON CONTRASTE, no un icono gris sobre blanco: fondo tenido de marca y el icono en el color
+        de la empresa, como los tres controles de la barra de arriba. Antes era invisible.
+      */}
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        aria-label={collapsed ? 'Expandir menu' : 'Contraer menu'}
+        title={collapsed ? 'Expandir menu' : 'Contraer menu'}
+        className={cn(
+          'focus-ring mx-3 mb-3 flex h-9 items-center justify-center gap-2 rounded-xl border border-line text-ink-700 transition-all duration-150 hover:-translate-y-px hover:border-line-strong',
+          collapsed && 'mx-2',
+        )}
+        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+      >
+        <ChevronLeft
+          className={cn('h-4 w-4 shrink-0 transition-transform duration-300 ease-pulse', collapsed && 'rotate-180')}
+          strokeWidth={2.25}
+          style={{ color: 'var(--brand-primary)' }}
+          aria-hidden="true"
+        />
+      </button>
+
+      {/*
+        EL BLOQUE DE USUARIO SE FUE DE AQUI (Decision #104).
+
+        Estaba DOS VECES en la misma pantalla: su nombre abajo en la barra y su menu de cuenta
+        arriba a la derecha. Duplicar no es solo feo — obliga a decidir cual de los dos se toca
+        para salir. Se queda el de arriba, que es donde lo busca todo el mundo.
+
+        El conmutador NO baja aqui: vive en la barra de arriba, en las dos superficies.
+      */}
       </div>
     </aside>
   );
@@ -211,7 +184,7 @@ export function Sidebar({ userFullName }: SidebarProps) {
  * Si no hay plan o falla la peticion no se pinta nada: es un indicador que orienta, no un dato
  * sin el cual no se pueda trabajar. Un bloque de error aqui seria mas ruido que ausencia.
  */
-function PulsoDelPlan() {
+function PulsoDelPlan({ collapsed }: { collapsed: boolean }) {
   const [plan, setPlan] = useState<PlanRow | null>(null);
   const pathname = usePathname();
 
@@ -234,11 +207,37 @@ function PulsoDelPlan() {
   const meta = plan.goalPct;
   const faltan = meta === null ? null : Math.max(0, meta - cumplimiento);
 
+  const titulo = `Plan ${plan.year}: ${cumplimiento}% de cumplimiento${meta === null ? '' : `, meta ${meta}%`}`;
+
+  /*
+    PLEGADA, EL PORCENTAJE NO DESAPARECE (Decision #109).
+
+    Antes el bloque entero se ocultaba al contraer la barra, asi que el numero del que responde
+    quien administra —el que le pregunta el auditor— se perdia justo en el modo que mas se usa
+    cuando se trabaja con tablas anchas. Y era evitable: en 64 px cabe perfectamente un anillo con
+    su cifra dentro.
+
+    El anillo SOLO, sin el rotulo "Plan 2026" ni la meta: ahi no caben y el tooltip ya los lleva.
+    Lo que no se puede perder es la cifra.
+  */
+  if (collapsed) {
+    return (
+      <Link
+        href={`/plan/${plan.id}`}
+        className="focus-ring mx-2 mb-1 mt-auto flex items-center justify-center rounded-2xl py-3 transition-colors duration-150 hover:bg-primary-soft"
+        title={titulo}
+        aria-label={titulo}
+      >
+        <ProgressRing value={cumplimiento} size={46} showLabel />
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={`/plan/${plan.id}`}
-      className="focus-ring m-3 mt-auto flex items-center gap-3 rounded-2xl bg-paper p-3 transition-colors duration-150 hover:bg-primary-soft"
-      title={`Plan ${plan.year}: ${cumplimiento}% de cumplimiento${meta === null ? '' : `, meta ${meta}%`}`}
+      className="focus-ring m-3 mb-1 mt-auto flex items-center gap-3 rounded-2xl bg-paper p-3 transition-colors duration-150 hover:bg-primary-soft"
+      title={titulo}
     >
       <ProgressRing value={cumplimiento} size={44} showLabel={false} />
       <div className="min-w-0">

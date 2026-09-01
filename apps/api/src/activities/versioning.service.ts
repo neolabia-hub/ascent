@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AssignmentsService } from '../assignments/assignments.service.js';
 import { OfferingsService } from '../offerings/offerings.service.js';
 import { loQueExigeElTipo } from './type-requirements.js';
+import { decidirConstancia, decidirEficacia } from '../certificates/certificate-policy.js';
 
 /**
  * MOTOR DE VERSIONADO (Decision #6 — la regla de oro 4 del modelo).
@@ -88,7 +89,7 @@ export class VersioningService {
    */
   async createInitialDraft(tx: Prisma.TransactionClient, tenantId: string, activityId: string) {
     const defaults = await this.tenantDefaults(tx, tenantId);
-    return tx.activityVersion.create({
+    const version = await tx.activityVersion.create({
       data: {
         tenantId,
         activityId,
@@ -97,6 +98,70 @@ export class VersioningService {
         passingScore: defaults.passingScore,
         maxAttempts: defaults.maxAttempts,
         retryWaitHours: defaults.retryWaitHours,
+      },
+    });
+
+    await this.sembrarEncuestaDelTipo(tx, tenantId, activityId, version.id);
+    return version;
+  }
+
+  /**
+   * SI EL TIPO PIDE ENCUESTA, LA PONE EN EL CONTENIDO DESDE EL PRIMER DIA (Decision #121).
+   *
+   * ─── POR QUE AL CREAR Y NO SOLO AL PUBLICAR ───
+   *
+   * Se engancha tambien al publicar, y con eso bastaba para que funcionara. Pero era INVISIBLE
+   * hasta ese momento: quien armaba una formacion de un tipo que pide encuesta veia su lista de
+   * contenido sin ella y no tenia forma de saber que iba a aparecer. Lo dijo el cliente: *"cuando
+   * se cree una de ese tipo se debe crear en contenido la encuesta como paso, para que sea
+   * evidente que esta ahi"*. Tiene razon — una pieza que se anade sola sin avisar es una sorpresa,
+   * aunque sea una sorpresa correcta.
+   *
+   * Ahora se ve en la lista, se puede mover de sitio y se puede quitar si esta formacion es la
+   * excepcion. **El enganche al publicar se queda como red**: cubre los borradores creados antes
+   * de que existiera esto y aquellos a los que alguien la quito por error.
+   *
+   * ─── LA EVALUACION NO SE SIEMBRA, Y ES DELIBERADO ───
+   *
+   * Se penso hacer lo mismo con `requiresAssessment` y es peor: una encuesta es UN instrumento de
+   * la empresa, identico en todas partes, asi que sembrarla es poner algo terminado. Una evaluacion
+   * tiene sus propias preguntas en cada formacion, asi que sembrarla dejaria un cascaron vacio que
+   * alguien tiene que rellenar — y una evaluacion vacia publicada es peor que no tener ninguna. La
+   * regla de publicacion ya avisa de que falta.
+   */
+  private async sembrarEncuestaDelTipo(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    activityId: string,
+    versionId: string,
+  ): Promise<void> {
+    const actividad = await tx.activity.findUnique({
+      where: { id: activityId },
+      select: { activityType: { select: { config: true } } },
+    });
+    const config = (actividad?.activityType?.config ?? {}) as Record<string, unknown>;
+    if (config.requiresSurvey !== true || typeof config.surveyTemplateId !== 'string') return;
+
+    // Se comprueba que siga viva: el tipo puede apuntar a una encuesta que despues desactivaron.
+    const encuesta = await tx.surveyTemplate.findFirst({
+      where: { id: config.surveyTemplateId, active: true },
+      select: { id: true, name: true },
+    });
+    if (!encuesta) return;
+
+    await tx.activityContent.create({
+      data: {
+        tenantId,
+        activityVersionId: versionId,
+        type: 'SURVEY',
+        title: encuesta.name,
+        // La ultima, siempre: se responde despues de haber visto todo. Con `0` aqui y el resto del
+        // contenido anadiendose despues, quedaria la primera — preguntando por algo que aun no pasa.
+        displayOrder: 999,
+        // NO requerida: si lo fuera, quien no opina se queda sin terminar la formacion y sin
+        // constancia. Se pide y se agradece; no se cobra.
+        isRequired: false,
+        surveyTemplateId: encuesta.id,
       },
     });
   }
@@ -136,7 +201,9 @@ export class VersioningService {
     const tenantId = this.prisma.currentTenantId;
     const draft = await this.assertDraft(versionId);
 
-    const contents = await this.prisma.scoped.activityContent.findMany({
+    // `let` y no `const`: al publicar puede engancharse la encuesta del tipo, y el temario y el
+    // congelado de mas abajo tienen que verla (Decision #116).
+    let contents = await this.prisma.scoped.activityContent.findMany({
       where: { activityVersionId: draft.id },
       orderBy: { displayOrder: 'asc' },
     });
@@ -180,9 +247,56 @@ export class VersioningService {
       where: { id: draft.id },
       select: { activity: { select: { activityType: { select: { config: true } } } } },
     });
-    const avisosDelTipo = loQueExigeElTipo(conTipo.activity.activityType.config, contents);
+    const configDelTipo = (conTipo.activity.activityType.config ?? {}) as Record<string, unknown>;
+    const avisosDelTipo = loQueExigeElTipo(configDelTipo, contents);
+
+    /*
+      LA ENCUESTA SE ENGANCHA SOLA (Decision #116).
+
+      Si el tipo pide encuesta, tiene una elegida y esta version todavia no la lleva, se anade como
+      ULTIMA pieza. Al final porque se responde despues de haber visto todo: una encuesta de
+      satisfaccion en mitad del contenido pregunta por algo que aun no ha pasado.
+
+      NO ES REQUERIDA (`isRequired: false`) y esa decision importa: si lo fuera, quien no la
+      responde se queda con la formacion sin terminar y **sin constancia**. Se le estaria negando la
+      evidencia de una capacitacion que si hizo por no haber opinado sobre ella. La encuesta se pide
+      y se agradece; no se cobra.
+    */
+    const encuestaDelTipo = typeof configDelTipo.surveyTemplateId === 'string' ? configDelTipo.surveyTemplateId : null;
+    const pideEncuesta = configDelTipo.requiresSurvey === true;
+    const yaLaTiene = contents.some((content) => content.type === 'SURVEY');
 
     const published = await this.prisma.tx(async (tx) => {
+      if (pideEncuesta && encuestaDelTipo && !yaLaTiene) {
+        // Se comprueba que siga existiendo y activa: el tipo puede apuntar a una que borraron.
+        const viva = await tx.surveyTemplate.findFirst({
+          where: { id: encuestaDelTipo, active: true },
+          select: { id: true, name: true },
+        });
+        if (viva) {
+          const ultima = await tx.activityContent.aggregate({
+            where: { activityVersionId: draft.id },
+            _max: { displayOrder: true },
+          });
+          await tx.activityContent.create({
+            data: {
+              tenantId,
+              activityVersionId: draft.id,
+              type: 'SURVEY',
+              title: viva.name,
+              displayOrder: (ultima._max.displayOrder ?? 0) + 1,
+              isRequired: false,
+              surveyTemplateId: viva.id,
+            },
+          });
+          // Se relee: el temario y el congelado de abajo tienen que incluirla.
+          contents = await tx.activityContent.findMany({
+            where: { activityVersionId: draft.id },
+            orderBy: { displayOrder: 'asc' },
+          });
+        }
+      }
+
       // 1. Congelar el contenido editable: la version publicada apunta a copias inmutables.
       for (const content of contents) {
         if (content.type === 'LESSON' && content.lessonId) {
@@ -251,7 +365,32 @@ export class VersioningService {
       //    entonces, y cambiar el responsable manana no puede reescribir lo que ya se dicto.
       const owner = await tx.activity.findUnique({
         where: { id: draft.activityId },
-        select: { responsibleUserId: true },
+        select: {
+          responsibleUserId: true,
+          issuesCertificate: true,
+          certificateHours: true,
+          requiresEfficacy: true,
+          activityType: { select: { config: true } },
+        },
+      });
+
+      /*
+        5. LA CONSTANCIA, RESUELTA Y CONGELADA (Decision #111).
+
+        La cascada TIPO -> ACTIVIDAD se resuelve AQUI, una sola vez, y lo que se guarda en la
+        version es el RESULTADO. Resolverla al emitir seria leerla meses despues, cuando el tipo o
+        la actividad ya pueden decir otra cosa — y entonces dos personas que cursaron la misma
+        version podrian acabar una con papel y otra sin el.
+
+        Es la misma regla que gobierna la nota minima y quien responde: la version publicada
+        congela lo que regia el intento (Decision #27).
+      */
+      const constancia = decidirConstancia(owner?.activityType ?? null, {
+        issuesCertificate: owner?.issuesCertificate ?? null,
+        // La vigencia sale de la recurrencia del requisito, no de un campo aparte. Todavia no se
+        // resuelve aqui —vive en las reglas de asignacion— y por eso va null: sin recurrencia, la
+        // constancia no vence, que es la respuesta correcta para una induccion de una sola vez.
+        recurrenceMonths: null,
       });
       const result = await tx.activityVersion.update({
         where: { id: draft.id },
@@ -262,6 +401,12 @@ export class VersioningService {
           migrationPolicy: input.migrationPolicy,
           syllabusSnapshot: syllabus,
           responsibleUserId: owner?.responsibleUserId ?? null,
+          issuesCertificate: constancia.emite,
+          certificateHours: owner?.certificateHours ?? null,
+          // Misma cascada que la constancia, congelada por el mismo motivo (Decision #118).
+          requiresEfficacy: decidirEficacia(owner?.activityType ?? null, {
+            requiresEfficacy: owner?.requiresEfficacy ?? null,
+          }),
         },
       });
       await tx.activity.update({ where: { id: draft.activityId }, data: { currentVersionId: result.id } });

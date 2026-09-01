@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { POINTS, type SelfEnrollInput } from '@neo-pulse/shared';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { resolvePendingState } from './pending-state.js';
 
 /** Obligaciones que todavia pesan sobre la persona. */
 const OPEN_ASSIGNMENT: Prisma.EnumAssignmentStatusFilter = { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] };
@@ -54,7 +55,22 @@ export class LearnerService {
       }),
       this.prisma.scoped.enrollment.findMany({
         where: { userId: actor.id, status: { in: ['ENROLLED', 'IN_PROGRESS'] } },
-        select: { id: true, status: true, activityVersion: { select: { activityId: true } } },
+        select: {
+          id: true,
+          status: true,
+          activityVersion: {
+            select: {
+              activityId: true,
+              // CUANTAS PIEZAS TIENE la version que esta cursando, para el denominador. Se cuenta
+              // aqui y no en la actividad: la version publicada es la que rige el intento, y una
+              // version nueva puede tener mas piezas que la que esta persona empezo.
+              _count: { select: { contents: true } },
+            },
+          },
+          // Solo las TERMINADAS. El avance a medias de una pieza suelta no cuenta como progreso de
+          // la formacion: para quien la esta haciendo, una leccion o esta hecha o no lo esta.
+          progress: { where: { status: 'COMPLETED' }, select: { id: true } },
+        },
       }),
       // Autoservicio: convocatoria permanente o mixta, publicada y dentro de su ventana.
       this.prisma.scoped.offering.findMany({
@@ -85,6 +101,7 @@ export class LearnerService {
       items: assignments.map((assignment) => {
         const activity = activityById.get(assignment.targetId);
         const enrollment = enrollmentByActivity.get(assignment.targetId);
+        const selfServiceOfferingId = enrollment ? null : (offeringByActivity.get(assignment.targetId) ?? null);
         return {
           assignmentId: assignment.id,
           activityId: assignment.targetId,
@@ -106,8 +123,37 @@ export class LearnerService {
           source: assignment.source,
           enrollmentId: enrollment?.id ?? null,
           started: enrollment?.status === 'IN_PROGRESS',
+          /*
+            CUANTO LLEVA HECHO, en porcentaje (Decision #107).
+
+            Sale del SERVIDOR y no de una estimacion de la pantalla: "vas por la mitad" es una
+            afirmacion sobre el expediente de alguien, y en un producto donde ese expediente lo
+            mira un auditor no puede depender de lo que un navegador crea recordar.
+
+            `null` cuando no hay inscripcion o no tiene piezas: es distinto de 0 —que significa
+            "empezada y sin nada hecho"— y la pantalla los pinta distinto.
+          */
+          progressPct: porcentajeDe(enrollment),
           /** Convocatoria de autoservicio donde puede empezarla por su cuenta. */
-          selfServiceOfferingId: enrollment ? null : (offeringByActivity.get(assignment.targetId) ?? null),
+          selfServiceOfferingId,
+          /*
+            EL ESTADO YA RESUELTO (Decision #101). La pantalla no reconcilia banderas: recibe UNO.
+
+            Mandando las banderas sueltas (overdue, enrollmentId, selfServiceOfferingId), la web llego a
+            decir "Vencio hace 3 dias" y "todavia no esta abierta, deben convocarte" en la misma
+            tarjeta: un retraso reclamado a quien no podia empezar. Basta que un cliente se
+            despiste para que vuelva, asi que se decide aqui y viaja decidido.
+          */
+          ...resolvePendingState(
+            {
+              overdue: assignment.status === 'OVERDUE',
+              dueAt: assignment.dueAt,
+              enrollmentId: enrollment?.id ?? null,
+              started: enrollment?.status === 'IN_PROGRESS',
+              selfServiceOfferingId,
+            },
+            today,
+          ),
         };
       }),
     };
@@ -259,4 +305,25 @@ export class LearnerService {
     }
     return true;
   }
+}
+
+/**
+ * QUE PARTE DE LA FORMACION LLEVA HECHA, de 0 a 100.
+ *
+ * Cuenta PIEZAS TERMINADAS sobre piezas de la version, no minutos ni tiempo dentro: el tiempo
+ * dice cuanto estuvo la pantalla abierta, y eso no es lo mismo que haber avanzado. Piezas hechas
+ * sobre piezas totales es lo unico que significa lo que la barra promete.
+ *
+ * Devuelve `null` —y no 0— si no hay inscripcion o la version no tiene piezas. Cero significa
+ * "esta empezada y no lleva nada", que es una informacion util y distinta de "no aplica".
+ */
+function porcentajeDe(
+  enrollment: { activityVersion: { _count: { contents: number } }; progress: { id: string }[] } | undefined,
+): number | null {
+  if (!enrollment) return null;
+  const total = enrollment.activityVersion._count.contents;
+  if (total === 0) return null;
+  // Se acota a 100: si alguna vez hubiera mas filas de progreso que piezas —una pieza retirada de
+  // la version despues de hacerla— la barra no puede salirse de su carril.
+  return Math.min(100, Math.round((enrollment.progress.length / total) * 100));
 }

@@ -3,7 +3,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarRange, CalendarX2, CheckCircle2, ClipboardList, Layers, Link2, Pencil, Plus, Rows3, RotateCcw, Search, ShieldCheck, Sparkles, Trash2, Unlink } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  CalendarRange,
+  CalendarX2,
+  CheckCircle2,
+  ClipboardList,
+  Layers,
+  Link2,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Rows3,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Unlink,
+} from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
   activatePlan,
@@ -42,6 +60,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Combo } from '@/components/ui/combo';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
+import { getEjecucionDelPlan, type FilaPlan } from '@/lib/reports-api';
+import { BarraEjecucion } from '@/components/modules/admin/barra-ejecucion';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 
@@ -99,7 +119,7 @@ const ITEM_STATUS: Record<PlanItemStatus, { kind: StatusPillKind; label: string 
  * dos nombres para lo mismo es justo lo que ese documento existe para evitar: quien lee "sistema de
  * gestion" en una pestana y "Proceso" en un campo, se pregunta si son cosas distintas.
  */
-type PlanView = 'capacitacion' | 'mes' | 'proceso' | 'tabla';
+type PlanView = 'capacitacion' | 'mes' | 'proceso' | 'tabla' | 'ejecucion';
 
 /** Una capacitacion del plan con todas sus jornadas. */
 interface ActivityGroup {
@@ -778,6 +798,12 @@ export default function PlanDetallePage() {
           <ViewTab active={view} id="mes" onSelect={setView} icon={CalendarRange} label="Cronograma" />
           <ViewTab active={view} id="proceso" onSelect={setView} icon={ShieldCheck} label="Por proceso" />
           <ViewTab active={view} id="tabla" onSelect={setView} icon={Rows3} label="Tabla" />
+          {/*
+            COMO VA, y no como se planeo (Decision #122). Las otras cuatro vistas responden "¿que
+            hay en el plan?"; esta responde "¿se esta cumpliendo?", que es la pregunta que hace el
+            auditor y la unica que no se podia contestar sin abrir el indicador a mano.
+          */}
+          <ViewTab active={view} id="ejecucion" onSelect={setView} icon={Activity} label="Como va" />
         </div>
         <span className="text-sm text-ink-500">
           {groups.length} {groups.length === 1 ? 'capacitacion' : 'capacitaciones'} · {filtered.length}{' '}
@@ -884,6 +910,8 @@ export default function PlanDetallePage() {
         <MonthGrid groups={groups} canReschedule={plan.status !== 'CLOSED'} onReschedule={reschedule} />
       ) : view === 'tabla' ? (
         <FlatTable items={filtered} canRemove={isDraft} busy={busy} onRemove={removeItem} onCancel={openCancel} onAdjust={openAdjust} />
+      ) : view === 'ejecucion' ? (
+        <EjecucionDelPlan planId={params.id} />
       ) : (
         <ProcessTable plan={plan} />
       )}
@@ -1923,3 +1951,123 @@ function ProjectedCell({ item, onAdjust }: { item: PlanItemRow; onAdjust: (item:
     </button>
   );
 }
+
+/**
+ * COMO VA EL PLAN, renglon por renglon (Decision #122).
+ *
+ * El plan tenia un porcentaje arriba y no habia forma de saber **que renglon lo esta hundiendo**.
+ * Aqui cada uno lleva su barra: se ve de un vistazo cual va bien, cual esta atrasado y —lo mas
+ * util— cual no ha empezado porque nadie convoco la jornada.
+ *
+ * Se ordenan por mes, como el resto del plan: aqui la pregunta es "¿vamos al dia con el
+ * calendario?", y para eso el orden del calendario es el que sirve.
+ */
+function EjecucionDelPlan({ planId }: { planId: string }) {
+  const [filas, setFilas] = useState<FilaPlan[] | null>(null);
+
+  useEffect(() => {
+    void getEjecucionDelPlan(planId)
+      .then((valor) => setFilas(valor.items))
+      .catch(() => setFilas([]));
+  }, [planId]);
+
+  if (!filas) return <Skeleton className="h-64 w-full rounded-xl" />;
+
+  if (filas.length === 0) {
+    return (
+      <p className="card p-8 text-center text-sm text-ink-500">
+        Este plan todavia no tiene renglones que seguir.
+      </p>
+    );
+  }
+
+  const total = filas.reduce((suma, fila) => suma + fila.resumen.total, 0);
+  const hechas = filas.reduce((suma, fila) => suma + fila.resumen.terminadas, 0);
+
+  return (
+    <div>
+      <section className="card mb-4 flex flex-wrap items-end justify-between gap-4 p-5">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Avance del plan</p>
+          <p className="mt-1 font-display text-[32px] font-bold leading-none tabular-nums text-ink-900">
+            {total === 0 ? 0 : Math.round((hechas / total) * 100)}%
+          </p>
+        </div>
+        <p className="text-sm text-ink-500">
+          {hechas} de {total} obligaciones cumplidas en {filas.length} {filas.length === 1 ? 'renglon' : 'renglones'}
+        </p>
+      </section>
+
+      <div className="space-y-2">
+        {/*
+          CADA RENGLON LLEVA A SUS PERSONAS. "Reprobadas: 1" sin poder abrirlo obliga a salir del
+          plan, ir a Seguimiento y buscar la formacion a mano — y entonces no se mira. El enlace
+          lleva directo al detalle de esa formacion, donde los chips filtran por estado.
+        */}
+        {filas.map((fila) => (
+          <Link
+            key={fila.planItemId}
+            href={`/reportes?formacion=${fila.activityId}`}
+            className="focus-ring block rounded-xl transition-transform duration-150 hover:-translate-y-px"
+          >
+          <div className="card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: fila.typeColor ?? 'var(--brand-primary)' }}
+                  />
+                  <p className="truncate font-display text-[15px] font-semibold text-ink-900">{fila.activityName}</p>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-ink-500">
+                  {MESES[fila.plannedMonth - 1] ?? ''}
+                  {fila.typeName ? ` · ${fila.typeName}` : ''}
+                  {/*
+                    LOS PROYECTADOS del plan al lado de los reales: si se pactaron 40 y hay 25
+                    asignados, el renglon puede estar al 100% y aun asi no cubrir lo prometido. Es
+                    la clase de hueco que solo se ve poniendo los dos numeros juntos.
+                  */}
+                  {fila.projected !== null && fila.projected !== fila.resumen.total
+                    ? ` · se proyectaron ${fila.projected}`
+                    : ''}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="font-display text-lg font-bold leading-none tabular-nums text-ink-900">
+                  {fila.resumen.avancePct}%
+                </p>
+                <p className="mt-0.5 text-xs text-ink-500">
+                  {fila.resumen.terminadas}/{fila.resumen.total}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <BarraEjecucion resumen={fila.resumen} />
+            </div>
+          </div>
+          </Link>
+        ))}
+      </div>
+
+      <p className="mt-4 text-center text-xs text-ink-500">Abre un renglon para ver persona por persona.</p>
+    </div>
+  );
+}
+
+/** Los meses en el idioma del plan. Se escriben aqui y no con `toLocaleDateString`: no hay fecha. */
+const MESES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];

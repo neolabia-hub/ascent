@@ -19,6 +19,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    * persona mira es el que no puede pulsar. Sin definir, es un boton normal.
    */
   meterPct?: number;
+  /**
+   * HALO DEL COLOR DE LA EMPRESA bajo el boton, en vez de la sombra gris.
+   *
+   * Para la llamada PRINCIPAL de una tarjeta o de una pantalla —"Empezar", "Continuar",
+   * "Ingresar"—, donde hay que ver de un vistazo cual de los botones es el que importa. Si
+   * brillan todos no destaca ninguno, asi que uno por vista.
+   */
+  glow?: boolean;
 }
 
 /**
@@ -47,7 +55,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { className, variant = 'primary', size = 'md', loading = false, meterPct, disabled, children, ...props },
+  { className, variant = 'primary', size = 'md', loading = false, meterPct, glow = false, disabled, children, ...props },
   ref,
 ) {
   const metering = typeof meterPct === 'number';
@@ -77,6 +85,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         'focus-ring relative isolate inline-flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md font-medium transition-[transform,box-shadow,filter,background-color,border-color] duration-150 ease-pulse disabled:cursor-not-allowed',
         opening && 'animate-unlock',
         variantClasses[variant],
+        // Va despues de la variante para que twMerge le quite su sombra gris de hover y de pulsado;
+        // el halo de color las repone en .btn-glow.
+        glow && !locked && 'btn-glow hover:shadow-none active:shadow-none',
         sizeClasses[size],
         // DESPUES de la variante a proposito: `twMerge` deja ganar a la ultima, y estas anulan
         // el relleno y el texto blanco del boton normal.

@@ -337,6 +337,13 @@ export interface TenantSettings {
   efficacyDaysDefault: number;
   labels: Record<string, string>;
   features: Record<string, boolean>;
+  /** A quien acude quien no puede entrar. Se publica SIN sesion (Decision #97). */
+  support: {
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string;
+    note: string;
+  };
 }
 
 export interface TenantBrandingSettings {

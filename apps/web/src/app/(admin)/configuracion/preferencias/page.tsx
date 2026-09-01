@@ -180,6 +180,102 @@ export default function PreferenciasPage() {
         </div>
       </section>
 
+      {/*
+        A QUIEN ACUDE QUIEN NO PUEDE ENTRAR (Decision #97).
+
+        Va aqui y no en el codigo porque cambia por empresa: en una lo lleva SST, en otra sistemas,
+        en otra la persona que hace nomina. Lo que se escriba sale tal cual en la pantalla de
+        ingreso, debajo de "No puedo entrar".
+
+        Si se deja vacio no queda un hueco: sale nuestro contacto de plataforma. Funciona, pero es
+        el camino largo —nosotros no podemos restablecer la contrasena de alguien de esta empresa
+        sin pedirsela antes a esta empresa—, y por eso conviene llenarlo.
+      */}
+      <section className="card mt-6 p-6">
+        <h2 className="font-display text-lg font-semibold">Ayuda para entrar</h2>
+        <p className="mb-4 mt-1 text-sm text-ink-500">
+          Lo que ve alguien de la empresa que abre &quot;No puedo entrar&quot; en la pantalla de ingreso.
+        </p>
+
+        {/*
+          LA ADVERTENCIA VA ARRIBA, antes de los campos, no debajo en letra pequena: es lo que
+          cambia lo que la persona escribe. La pantalla de ingreso esta abierta a internet —no
+          puede pedir sesion a quien todavia no ha entrado—, asi que esto lo lee cualquiera que
+          conozca la direccion. Un area y una extension es informacion de la empresa; el movil
+          personal de alguien no lo es.
+        */}
+        <p className="mb-5 rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-3 text-sm leading-relaxed text-ink-700">
+          Esto se ve <strong>sin haber iniciado sesion</strong>. Pon un contacto del area (un correo
+          corporativo, una extension), nunca el numero personal de nadie.
+        </p>
+
+        {!settings ? (
+          <Skeleton className="h-40 w-full" />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              htmlFor="sup-name"
+              label="Area o cargo que atiende"
+              hint="Un cargo, no un nombre propio: la persona cambia, el cargo se queda."
+            >
+              <Input
+                id="sup-name"
+                maxLength={120}
+                placeholder="Coordinacion de SST"
+                value={settings.support.contactName}
+                onChange={(e) => setSettings({ ...settings, support: { ...settings.support, contactName: e.target.value } })}
+              />
+            </Field>
+
+            <Field htmlFor="sup-email" label="Correo de contacto">
+              <Input
+                id="sup-email"
+                type="email"
+                maxLength={160}
+                placeholder="sst@empresa.com"
+                value={settings.support.contactEmail}
+                onChange={(e) => setSettings({ ...settings, support: { ...settings.support, contactEmail: e.target.value } })}
+              />
+            </Field>
+
+            <Field htmlFor="sup-phone" label="Telefono o extension">
+              <Input
+                id="sup-phone"
+                maxLength={60}
+                placeholder="(604) 000 0000 ext. 120"
+                value={settings.support.contactPhone}
+                onChange={(e) => setSettings({ ...settings, support: { ...settings.support, contactPhone: e.target.value } })}
+              />
+            </Field>
+
+            <Field
+              htmlFor="sup-note"
+              label="Nota (opcional)"
+              hint="Horario de atencion, por ejemplo. Sale debajo del contacto."
+            >
+              <Input
+                id="sup-note"
+                maxLength={300}
+                placeholder="Lunes a viernes, 7:00 a 17:00"
+                value={settings.support.note}
+                onChange={(e) => setSettings({ ...settings, support: { ...settings.support, note: e.target.value } })}
+              />
+            </Field>
+          </div>
+        )}
+
+        <p className="mt-4 text-sm leading-relaxed text-ink-500">
+          Quien tenga el permiso de gestionar usuarios recibe ademas un aviso en su bandeja cada vez
+          que alguien pulsa &quot;Avisar a quien administra&quot; en esa pantalla.
+        </p>
+
+        <div className="mt-5 flex justify-end">
+          <Button onClick={saveSettings} loading={savingSettings} disabled={!settings}>
+            Guardar contacto
+          </Button>
+        </div>
+      </section>
+
       <section className="card mt-6 p-6">
         <h2 className="font-display text-lg font-semibold">Marca</h2>
         <p className="mb-4 mt-1 text-sm text-ink-500">
