@@ -103,6 +103,13 @@ export interface OfferingDetail extends Omit<OfferingListItem, '_count'> {
   instructor: { id: string; fullName: string; email: string; jobTitle: { name: string } } | null;
   obligedCount: number;
   derivedProjected: ProjectedAudience;
+  /**
+   * ¿Esta formacion se acredita con el papel de un tercero? Viene RESUELTO por el servidor —sale de
+   * la formacion con su tipo de respaldo— para que la cascada se interprete en un solo sitio.
+   */
+  registraCertificadoExterno: boolean;
+  /** Quien dicta la jornada ("ARL Sura", "PROPIOS"): es el emisor por defecto del certificado. */
+  quienLaDicto: string;
   planItems: Array<{ id: string; plannedMonth: number; status: string; plan: { id: string; name: string; year: number; status: string } }>;
   /** La TAJADA: a que parte de los obligados atiende esta jornada (Decision #68). */
   audience: { id: string; name: string; rule: AudienceRule } | null;
@@ -246,7 +253,8 @@ export type AsistenciaEstado = 'PRESENT' | 'ABSENT' | 'JUSTIFIED';
 
 /** El papel de un tercero, cuando el tipo de formacion lo lleva (Decision #157). */
 export interface CertificadoExterno {
-  issuer: string;
+  /** Opcional: por defecto lo pone el servidor desde quien dicta la jornada. */
+  issuer?: string;
   number: string;
   issuedAt?: string;
   /** Lo que dice el papel. MANDA sobre la vigencia que calcularia la recurrencia. */

@@ -209,7 +209,7 @@ comprobar(convocarTestigo.ok, 'y hay alguien convocado en ella', `convocar testi
 const lista2 = (await admin.get(`/offerings/${jornada2.cuerpo?.id}/roster`)).cuerpo?.items ?? [];
 comprobar(lista2.length === 1, 'la lista de la testigo trae a esa persona', `trae ${lista2.length}`);
 const rechazo = await admin.post(`/offerings/${jornada2.cuerpo?.id}/attendance`, {
-  items: [{ enrollmentId: lista2[0]?.id, estado: 'PRESENT', certificate: { issuer: 'ARL Sura', number: 'X-1' } }],
+  items: [{ enrollmentId: lista2[0]?.id, estado: 'PRESENT', certificate: { number: 'X-1' } }],
 });
 comprobar(
   rechazo.estado === 409 && rechazo.cuerpo?.code === 'TYPE_DOES_NOT_TRACK_EXTERNAL_CERT',
@@ -264,7 +264,7 @@ const asistencia = await admin.post(`/offerings/${creado.offeringId}/attendance`
     {
       enrollmentId: inscVa.id,
       estado: 'PRESENT',
-      certificate: { issuer: 'ARL Sura', number: `MC-${marca}`, issuedAt: fecha, validUntil: venceElPapel },
+      certificate: { number: `MC-${marca}`, issuedAt: fecha, validUntil: venceElPapel },
     },
     { enrollmentId: inscFalta.id, estado: 'ABSENT' },
   ],
@@ -287,9 +287,9 @@ const listaTras = (await admin.get(`/offerings/${creado.offeringId}/roster`)).cu
 const filaVa = listaTras.find((f) => f.user.id === elQueVa.id);
 comprobar(filaVa?.attendanceStatus === 'PRESENT', 'y consta COMO consta: por asistencia, no por la plataforma', 'no quedo la marca de asistencia');
 comprobar(
-  filaVa?.extCertNumber === `MC-${marca}` && (filaVa?.extCertIssuer ?? '').length > 0,
-  `el papel queda registrado: ${filaVa?.extCertIssuer} · ${filaVa?.extCertNumber}`,
-  'no se guardaron los datos del certificado del tercero',
+  filaVa?.extCertNumber === `MC-${marca}` && filaVa?.extCertIssuer === 'ARL Sura',
+  `el papel queda registrado, y el emisor lo puso la JORNADA sin teclearlo: ${filaVa?.extCertIssuer} · ${filaVa?.extCertNumber}`,
+  `emisor=${filaVa?.extCertIssuer} numero=${filaVa?.extCertNumber}; la jornada la dicta "ARL Sura"`,
 );
 
 paso(9, 'Y QUIEN NO VINO LA SIGUE DEBIENDO: eso es lo que hace util tomar asistencia');
@@ -465,7 +465,127 @@ comprobar(
   `cerradas=${colarse.cuerpo?.cerradas} ignoradas=${(colarse.cuerpo?.ignoradas ?? []).length}`,
 );
 
-await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 15 });
+paso(15, 'LOS ESTADOS DE LA JORNADA: ni en BORRADOR ni CANCELADA');
+/*
+  Lo cazo el cliente mirando la pantalla: salia "Tomar asistencia" en una convocatoria CANCELADA.
+  El servidor ya lo rechazaba, pero un boton que solo falla al pulsarlo no es una compuerta.
+  Se comprueban los dos extremos, porque son estados distintos y por motivos distintos: en BORRADOR
+  todavia no se ha citado a nadie, y CANCELADA es una jornada que NO se dicto — dar por cumplida a
+  alguien ahi seria escribir que asistio a algo que no ocurrio.
+*/
+const borrador = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+  scheduledDate: fecha, startTime: '18:00', endTime: '19:00', location: `Borrador ${SUFIJO}`, capacity: 5,
+});
+comprobar(borrador.ok, 'jornada en BORRADOR creada', `borrador: ${borrador.estado}`);
+const enBorrador = await admin.post(`/offerings/${borrador.cuerpo?.id}/attendance`, {
+  items: [{ enrollmentId: lista3[0]?.id, estado: 'PRESENT' }],
+});
+comprobar(
+  enBorrador.estado === 409 && enBorrador.cuerpo?.code === 'OFFERING_NOT_ATTENDABLE',
+  'una jornada en BORRADOR rechaza la lista: todavia no se ha citado a nadie',
+  `esperaba 409 OFFERING_NOT_ATTENDABLE y vino ${enBorrador.estado} ${JSON.stringify(enBorrador.cuerpo).slice(0, 200)}`,
+);
+
+const cancelable = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+  scheduledDate: fecha, startTime: '19:00', endTime: '20:00', location: `Cancelada ${SUFIJO}`, capacity: 5,
+});
+await admin.post(`/offerings/${cancelable.cuerpo?.id}/publish`, { confirm: true });
+const cancelar = await admin.post(`/offerings/${cancelable.cuerpo?.id}/cancel`, {
+  cancelledReason: 'Recorrido automatico: se cancela para comprobar que no admite asistencia.',
+});
+comprobar(cancelar.ok, `jornada CANCELADA (${cancelar.estado})`, `cancelar: ${cancelar.estado} ${JSON.stringify(cancelar.cuerpo).slice(0, 220)}`);
+const enCancelada = await admin.post(`/offerings/${cancelable.cuerpo?.id}/attendance`, {
+  items: [{ enrollmentId: lista3[0]?.id, estado: 'PRESENT' }],
+});
+comprobar(
+  enCancelada.estado === 409 && enCancelada.cuerpo?.code === 'OFFERING_NOT_ATTENDABLE',
+  'y una CANCELADA tambien: no se puede escribir que alguien asistio a algo que no se dicto',
+  `esperaba 409 OFFERING_NOT_ATTENDABLE y vino ${enCancelada.estado} ${JSON.stringify(enCancelada.cuerpo).slice(0, 200)}`,
+);
+
+paso(16, 'EL EMISOR SALE DE LA JORNADA, no se teclea por persona');
+/*
+  Lo pidio el cliente: "si fuera ejecutada por una ARL o externo, debe salir automatico; llenarlo
+  cada uno por persona seria mucho trabajo". Quien dicta la jornada ya esta EN la jornada
+  (`executedByOther`), asi que se manda solo el numero y el servidor pone el emisor.
+*/
+const jornada4 = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+  scheduledDate: fecha, startTime: '07:00', endTime: '09:00', location: `Patio 3 ${SUFIJO}`,
+  executedBy: 'ARL', executedByOther: 'ARL Colmena', capacity: 10,
+  intensityTheoryHours: 1, intensityPracticeHours: 1,
+});
+comprobar(jornada4.ok, 'jornada dictada por "ARL Colmena"', `jornada 4: ${jornada4.estado} ${JSON.stringify(jornada4.cuerpo).slice(0, 220)}`);
+await admin.post(`/offerings/${jornada4.cuerpo?.id}/publish`, { confirm: true });
+const cuarta = await alta(4);
+creado.personas.push(cuarta.id);
+await admin.post(`/offerings/${jornada4.cuerpo?.id}/enroll`, { userIds: [cuarta.id] });
+const lista4 = (await admin.get(`/offerings/${jornada4.cuerpo?.id}/roster`)).cuerpo?.items ?? [];
+comprobar(lista4.length === 1, 'con una persona convocada', `trae ${lista4.length}`);
+
+const detalle4 = (await admin.get(`/offerings/${jornada4.cuerpo?.id}`)).cuerpo;
+comprobar(
+  detalle4?.quienLaDicto === 'ARL Colmena',
+  `la jornada dice quien la dicta, y la pantalla lo usa de emisor: "${detalle4?.quienLaDicto}"`,
+  `quienLaDicto=${detalle4?.quienLaDicto}`,
+);
+comprobar(
+  detalle4?.registraCertificadoExterno === true,
+  'y trae RESUELTO si lleva papel de tercero: la cascada se interpreta en un solo sitio',
+  `registraCertificadoExterno=${detalle4?.registraCertificadoExterno}`,
+);
+
+// Se manda SOLO el numero. Sin `issuer`.
+const soloNumero = await admin.post(`/offerings/${jornada4.cuerpo?.id}/attendance`, {
+  heldOn: fecha,
+  items: [{ enrollmentId: lista4[0]?.id, estado: 'PRESENT', certificate: { number: `SIN-EMISOR-${marca}` } }],
+});
+comprobar(soloNumero.ok && soloNumero.cuerpo?.cerradas === 1, 'se manda solo el numero y cierra', `${soloNumero.estado} ${JSON.stringify(soloNumero.cuerpo).slice(0, 200)}`);
+const lista4Tras = (await admin.get(`/offerings/${jornada4.cuerpo?.id}/roster`)).cuerpo?.items ?? [];
+comprobar(
+  lista4Tras[0]?.extCertIssuer === 'ARL Colmena',
+  `el emisor lo pone el servidor desde la jornada: "${lista4Tras[0]?.extCertIssuer}"`,
+  `emisor guardado: ${lista4Tras[0]?.extCertIssuer}, y la jornada la dicta "ARL Colmena"`,
+);
+
+paso(17, 'Y LA CASCADA POR FORMACION: el tipo es el punto de partida, la ficha manda');
+/*
+  Lo cazo el cliente: "configurar si una formacion acredita o no certificado oficial no deberia ser
+  en la formacion y no en el tipo... el plan puede que haya capacitaciones de ARL o externo que
+  emitan o no certificados oficiales". Tiene razon, y es la misma cascada que ya gobiernan la
+  constancia y la eficacia. Se comprueba en los dos sentidos.
+*/
+const apagarEnLaFicha = await admin.patch(`/activities/${creado.activityId}`, { tracksExternalCertificate: false });
+comprobar(apagarEnLaFicha.ok, 'la ficha se desvia de su tipo y dice que NO', `patch: ${apagarEnLaFicha.estado} ${JSON.stringify(apagarEnLaFicha.cuerpo).slice(0, 200)}`);
+const detalleApagado = (await admin.get(`/offerings/${jornada4.cuerpo?.id}`)).cuerpo;
+comprobar(
+  detalleApagado?.registraCertificadoExterno === false,
+  'y aunque su TIPO lo lleve, la formacion manda: ya no pide papel',
+  `registraCertificadoExterno=${detalleApagado?.registraCertificadoExterno} y el tipo lo tiene en true`,
+);
+
+const encenderEnLaFicha = await admin.patch(`/activities/${conTipoSinPapel.cuerpo?.id}`, { tracksExternalCertificate: true });
+comprobar(encenderEnLaFicha.ok, 'y al reves: una formacion de un tipo que NO lo lleva se enciende en su ficha', `patch: ${encenderEnLaFicha.estado}`);
+const detalleEncendido = (await admin.get(`/offerings/${jornada2.cuerpo?.id}`)).cuerpo;
+comprobar(
+  detalleEncendido?.registraCertificadoExterno === true,
+  'ahora si pide papel, con el mismo tipo de antes: es la ficha la que decide',
+  `registraCertificadoExterno=${detalleEncendido?.registraCertificadoExterno}`,
+);
+
+// Se devuelve la ficha a "lo que diga su tipo", que es como estaba.
+await admin.patch(`/activities/${creado.activityId}`, { tracksExternalCertificate: null });
+await admin.patch(`/activities/${conTipoSinPapel.cuerpo?.id}`, { tracksExternalCertificate: null });
+const detalleVuelto = (await admin.get(`/offerings/${jornada4.cuerpo?.id}`)).cuerpo;
+comprobar(
+  detalleVuelto?.registraCertificadoExterno === true,
+  'y en blanco vuelve a heredar de su tipo, que es el caso normal',
+  `registraCertificadoExterno=${detalleVuelto?.registraCertificadoExterno}`,
+);
+
+await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 18 });
 
 console.log(`\nCREADO PARA LIMPIAR: actividades=${creado.activityId},${conTipoSinPapel.cuerpo?.id} personas=${creado.personas.join(',')} sufijo=${SUFIJO}`);
 process.exit(resumen() === 0 ? 0 : 1);

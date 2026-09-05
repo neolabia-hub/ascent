@@ -20,6 +20,76 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-06 — Cuatro cosas que cazo el cliente mirando la pantalla, y una matriz que se corrigio a si misma
+
+Sesion de revision de la asistencia. El encargo fue *"pruebas completas y complejas de inicio a fin,
+marcado de asistencia, como llega todo a seguimiento, acotamiento, todas las posibles situaciones"*,
+con cuatro observaciones sobre la pantalla que resultaron ser tres fallos y una mejora.
+
+### Lo que cazo el cliente
+
+**1. Salia "Tomar asistencia" en una convocatoria CANCELADA.** El servidor ya lo rechazaba con 409,
+pero un boton que solo falla al pulsarlo no es una compuerta: es una trampa. Ahora solo sale en
+PUBLICADA / EN CURSO / CERRADA. En BORRADOR tampoco: no se ha citado a nadie.
+
+**2. La entidad del certificado se tecleaba persona a persona.** Quien dicta la jornada **ya esta en
+la jornada**, asi que escribirlo cuarenta veces es copiar a mano un dato que el sistema tiene — y
+garantizar que la fila 23 diga "ARL sura". Ahora lo pone el servidor; lo unico propio de cada persona
+es su NUMERO.
+
+**3. Lo de acreditar con papel de un tercero vivia solo en el TIPO, y no basta.** Dentro de
+*Capacitacion del plan* conviven la charla de seguridad vial que dicta la ARL y no certifica nada, y
+el curso de alturas que dicta la ARL y si. Se bajo a la FORMACION con la misma cascada que ya
+gobiernan la constancia y la eficacia: el tipo pone el punto de partida, la ficha puede desviarse.
+
+**4. La guia no dejaba claro que no todas las formaciones se repiten.** Corregido.
+
+Y lo que pidio para ahorrar clics: la fecha viene con la de la **jornada** en vez de hoy, y hay
+**Todos asistieron / Nadie asistio**. Una jornada que fue como debia se cierra sin tocar una fila.
+
+### La matriz, y las dos aserciones mias que pasaban sin comprobar nada
+
+`asistencia-matriz.mjs`, en tres partes: **A** los siete tipos con la modalidad rotando PRESENCIAL /
+VIRTUAL / HIBRIDA y los tres estados de la lista, todo derivado de `activity_types.config`; **B** el
+acotamiento; **C** corregir una lista ya tomada.
+
+**Y lo que hubo que corregir del primer intento, que es la parte que importa.** La parte B preguntaba
+por cada faceta y comprobaba que "resolvia". Regional y servicio devolvian **cero personas** —el
+tenant de desarrollo no tiene a nadie con esos campos— y el Seguimiento de esa parte salia con **0
+obligaciones y 0 filas**, porque la formacion no tenia requisito. *"El avance cuadra: 0/0 = 0%"* es un
+comentario con sintaxis de codigo.
+
+Reescrita: la prueba **crea la gente que necesita** con cuatro combinaciones y mide el DELTA de cada
+faceta —cargo +4, area +4, regional +2, servicio +2, y **regional x servicio +1**, que es la prueba de
+que se cruzan y no se suman—, y el requisito se crea **antes** que las personas con "solo a quien entre
+desde ahora". Con eso las dos jornadas complementarias se miden de verdad: **4 obligaciones, 3
+terminadas, 75%**.
+
+**La leccion, que este directorio ya tenia escrita:** una asercion que pasa siempre no es una
+asercion. Si la prueba necesita datos, que los cree — medir sobre lo que hay devuelve cero, y cero
+pasa cualquier comparacion perezosa.
+
+### El barrido
+
+```
+14 recorridos           TODO BIEN     (los 13 de antes + asistencia-matriz)
+390 pruebas unitarias   pasan
+21 e2e                  pasan
+build - lint - types    limpios       (1 aviso de lint, ninguno nuevo)
+```
+
+### Lo que sigue abierto
+
+1. **El archivo no se sube todavia**: el PDF del certificado y el acta escaneada. Columnas listas,
+   API preparada, falta la pantalla.
+2. **Los mecanismos 2 y 3 de la asistencia**: QR de sesion y firma en pantalla con acta PDF.
+3. **La segunda puerta** para el papel que llega tarde, desde la ficha de la persona.
+4. **El informe de Vencimientos**: fuente vacia (`certification_grants`) y **eje equivocado**.
+5. **Repaso / volver a verlo**: sigue esperando las preguntas del cliente.
+6. **El aviso**: notificacion INTERNA al jefe o a SST, no correo.
+
+---
+
 ## 2026-09-05 (noche) — Una tabla que ya existia, un informe que inflaba el cumplimiento, y un manual
 
 Sesion de revision sobre lo de la tarde. El encargo del cliente fue *"asegurate que pase pruebas en

@@ -51,6 +51,13 @@ export interface CatalogRef {
 
 export interface ActivityDetail extends Omit<ActivityListItem, 'versions'> {
   description: string | null;
+  /**
+   * ¿La acredita un tercero? `null` = lo que diga su tipo, que es el caso normal.
+   *
+   * Vive en la formacion ademas de en el tipo porque dentro de una misma clase conviven las dos
+   * cosas: la charla de la ARL que no certifica nada y el curso de alturas que si.
+   */
+  tracksExternalCertificate: boolean | null;
   /** Portada subida. `null` = se pinta la generada, que es un estado normal (Decision #88). */
   coverKey: string | null;
   responsibleUserId: string | null;

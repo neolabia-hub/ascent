@@ -193,13 +193,21 @@ export type EnrollOfferingInput = z.infer<typeof enrollOfferingSchema>;
  * al ano seria inventar un incumplimiento sobre alguien con su habilitacion vigente y el papel para
  * probarlo. Por eso se copia a la obligacion (`valid_until_override`) y no se queda solo aqui.
  *
- * Todo es opcional salvo el numero: una jornada presencial que NO certifica nada —la charla de
- * seguridad vial que trae la ARL— se cierra por asistencia y no tiene papel ninguno.
+ * ─── EL EMISOR NO SE TECLEA POR PERSONA (2026-09-06) ───
+ *
+ * Lo cazo el cliente: *"si fuera ejecutada por una ARL o externo, el que sea, debe salir automatico;
+ * llenarlo cada uno por persona seria mucho trabajo"*. Y es cierto: **quien dicta la jornada ya esta
+ * en la jornada** (`executedBy` / `executedByOther`), asi que escribirlo cuarenta veces es copiar a
+ * mano un dato que el sistema ya tiene — y garantizar que en la fila 23 alguien escriba "ARL sura".
+ *
+ * Lo unico que de verdad cambia por persona es **el numero** de su certificado, y su vencimiento si
+ * no es el mismo para todos. `issuer` queda opcional: si no viene, lo pone el servidor desde la
+ * jornada. Se deja mandarlo para el dia que exista el caso de quien llega con un papel de OTRA
+ * entidad, sacado en otro empleo.
  */
 export const certificadoExternoSchema = z.object({
-  /** Quien lo expide: "ARL Sura", "Centro de Entrenamiento X". Texto libre a proposito: la lista
-   *  de organismos acreditados cambia y no es del sistema mantenerla. */
-  issuer: z.string().trim().min(2).max(160),
+  /** Quien lo expide. Opcional: por defecto, quien dicto la jornada. */
+  issuer: z.string().trim().min(2).max(160).optional(),
   number: z.string().trim().min(1).max(80),
   issuedAt: z.string().date().optional(),
   /** Lo que dice el papel. Si viene, MANDA sobre lo que calcula la recurrencia. */

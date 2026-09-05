@@ -77,6 +77,15 @@ export function ActivityInfoTab({
     responsibleUserId: activity.responsibleUserId ?? '',
     modality: activity.modality,
     normIds: activity.norms.map((row) => row.id),
+    /**
+     * '' = lo que diga su tipo, que es el caso normal y por eso es el valor de arranque. Se guarda
+     * como texto y no como `boolean | null` porque es lo que devuelve un `<select>`, y convertir
+     * en un solo sitio —al guardar— evita tener dos representaciones del mismo estado.
+     */
+    tracksExternalCertificate:
+      activity.tracksExternalCertificate === null || activity.tracksExternalCertificate === undefined
+        ? ''
+        : String(activity.tracksExternalCertificate),
   });
 
   useEffect(() => {
@@ -109,6 +118,8 @@ export function ActivityInfoTab({
         responsibleUserId: form.responsibleUserId || null,
         modality: form.modality,
         normIds: form.normIds,
+        tracksExternalCertificate:
+          form.tracksExternalCertificate === '' ? null : form.tracksExternalCertificate === 'true',
       });
       await onSaved();
       showToast({ kind: 'success', title: 'Ficha guardada' });
@@ -216,6 +227,37 @@ export function ActivityInfoTab({
                   <option value="VIRTUAL">Virtual</option>
                   <option value="PRESENCIAL">Presencial</option>
                   <option value="HIBRIDA">Hibrida</option>
+                </Select>
+              </Field>
+
+              {/*
+                ¿LA ACREDITA UN TERCERO? POR FORMACION, NO SOLO POR TIPO (2026-09-06).
+
+                Empezo viviendo solo en el tipo y el cliente lo cazo: dentro de "capacitacion del
+                plan" conviven la charla de seguridad vial que dicta la ARL y no certifica nada, y
+                el curso de alturas que dicta la ARL y si. Preguntarlo solo por clase de formacion
+                obliga a elegir mal en la mitad de los casos, y lo que se elige mal se rellena a
+                mano o se salta.
+
+                Misma cascada que la constancia y la eficacia (#111, #118): el tipo pone el punto de
+                partida y la formacion puede desviarse. Por eso el valor por defecto es "lo que diga
+                su tipo" y no un si/no — que obligaria a decidir doscientas veces lo que casi
+                siempre ya esta decidido.
+              */}
+              <Field
+                htmlFor="i-cert-externo"
+                label="La acredita un tercero"
+                hint="Si la dicta la ARL o un centro acreditado y emite su propio certificado, la lista de asistencia pedira su numero y su vencimiento — y esa fecha manda."
+              >
+                <Select
+                  id="i-cert-externo"
+                  disabled={!canEdit}
+                  value={form.tracksExternalCertificate}
+                  onChange={(event) => setForm({ ...form, tracksExternalCertificate: event.target.value })}
+                >
+                  <option value="">Lo que diga su tipo</option>
+                  <option value="true">Si, la acredita un tercero</option>
+                  <option value="false">No</option>
                 </Select>
               </Field>
             </div>

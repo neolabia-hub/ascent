@@ -25,6 +25,7 @@ node scripts/recorridos/recertificacion.mjs         # aniversario por persona, y
 node scripts/recorridos/tajadas.mjs                 # jornadas acotadas: 6 tipos x 7 facetas, y 2 reglas
 node scripts/recorridos/proyectados-ajuste.mjs      # congelar, que cambie la plantilla, ajustar con motivo
 node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia, "el papel manda", 2 reglas y acotamiento
+node scripts/recorridos/asistencia-matriz.mjs       # la asistencia en TODOS los tipos y modalidades, las 5 facetas y el Seguimiento
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```
@@ -239,10 +240,10 @@ SG-SST la mayor parte del plan anual se dicta en salon.
 obligaciones y asistir cierra UNA), el **acotamiento** por facetas (se cruzan: cargo 100 · area 240
 · las dos, 9) y que una lista **no alcanza fuera de su jornada**.
 
-**Y sobre hacer un recorrido por tipo:** no. Cerrar por asistencia no depende del tipo sino del
-`kind` de la jornada, asi que siete archivos serian siete copias del mismo camino desincronizandose
-una a una. Lo propio de cada tipo —constancia, examen, plan— ya lo deriva `estandar.mjs` de su
-configuracion. Es la misma decision que ya tomo `tajadas.mjs`.
+**Y sobre hacer un recorrido por tipo:** no en archivos separados —siete copias del mismo camino se
+desincronizan una a una— pero **si por tipo dentro de uno solo**, que es lo que hace
+`asistencia-matriz.mjs`: recorre todos los tipos que existan, con la modalidad rotando, y DERIVA de
+`activity_types.config` lo que cada uno promete. Misma decision que ya tomo `tajadas.mjs`.
 
 **Como se mide "el papel manda" sin tocar el reloj:** un certificado que vence dentro de **30 dias**
 sobre una formacion con recurrencia de **12 meses**. Es el mismo truco de comprimir — la ventana esta
@@ -254,6 +255,25 @@ fecha del papel.**
 guarda al fin del dia en Bogota, que en UTC es el DIA SIGUIENTE a las 04:59. Comparar el
 `slice(0, 10)` del ISO contra la fecha que se mando da un dia de diferencia y parece un fallo del
 sistema cuando esta en la asercion.
+
+### Y de LA MATRIZ DE ASISTENCIA (2026-09-06)
+
+`asistencia-matriz.mjs`, tres partes:
+
+| | |
+|---|---|
+| **A. Por tipo** | una jornada por cada tipo, con la modalidad rotando PRESENCIAL / VIRTUAL / HIBRIDA, tres personas en los tres estados, y el Seguimiento detras de cada una. Todo DERIVADO de `config` |
+| **B. Acotamiento** | las cinco facetas medidas por DELTA sobre gente que crea la prueba, y dos jornadas complementarias: **4 obligaciones, 3 terminadas, 75%** |
+| **C. Corregir** | re-marcar pisa la fila (no duplica), y marcar ausente despues **no reabre** lo cumplido |
+
+**Lo que corrigio de si misma, y es la leccion:** la primera version comprobaba que cada faceta
+"resolvia". Regional y servicio devolvian **cero** —el tenant no tiene a nadie con esos campos— y el
+Seguimiento de la parte B salia con **0 obligaciones**, porque la formacion no tenia requisito. Las
+dos aserciones pasaban **sin comprobar nada**. Ahora la prueba CREA la gente que necesita y mide
+deltas, y el requisito se crea antes que las personas con "solo a quien entre desde ahora".
+
+**La regla:** una asercion que pasa siempre no es una asercion. Si la prueba necesita datos, que los
+cree — medir sobre lo que hay devuelve cero, y cero pasa cualquier comparacion perezosa.
 
 ## La suite ESTANDAR, y como convive con estos
 

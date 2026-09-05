@@ -760,6 +760,19 @@ model Activity {
   /// usa el arnes como le ensenaron; en una actualizacion documental, preguntarle al jefe a los 30
   /// dias si "aplica" no significa nada. Dentro de un mismo tipo conviven las dos.
   requiresEfficacy Boolean? @map("requires_efficacy")
+  /// ¿LA ACREDITA UN TERCERO? `null` = lo que diga su tipo (Decision #157, ampliada el 2026-09-06).
+  ///
+  /// Empezo viviendo solo en el tipo y el cliente lo cazo: *"el plan puede que haya capacitaciones
+  /// de ARL o externo que emitan o no certificados oficiales, o extraordinaria"*. Dentro de la MISMA
+  /// clase de formacion conviven las dos cosas —una charla de seguridad vial que dicta la ARL y no
+  /// certifica nada, y un curso de alturas que dicta la ARL y si— asi que preguntarlo solo por tipo
+  /// obliga a elegir mal en la mitad de los casos.
+  ///
+  /// Misma cascada que la constancia y la eficacia (#111, #118) y por la misma razon de forma. NO se
+  /// congela en la version, al reves que `issuesCertificate`: aquello queda estampado en un papel
+  /// que hay que poder explicar dentro de dos anos, y esto solo decide que campos pide la lista de
+  /// asistencia el dia de la jornada.
+  tracksExternalCertificate Boolean? @map("tracks_external_certificate")
 
   versions    ActivityVersion[]       @relation("ActivityVersions")
   norms       ActivityNorm[]

@@ -198,6 +198,18 @@ export class ActivitiesService {
           modality: input.modality,
           tags: input.tags,
           active: input.active,
+          /*
+            ¿LA ACREDITA UN TERCERO? (Decision #157, ampliada el 2026-09-06)
+
+            `undefined` = no viene en el PATCH y Prisma no toca la columna; `null` = "lo que diga su
+            tipo", que es un valor con significado y hay que poder volver a el. Por eso viaja
+            `nullable` en el zod y no se colapsa a booleano.
+
+            NO se congela en la version, al reves que `issuesCertificate`: aquello queda estampado en
+            un papel que hay que poder explicar dentro de dos anos, y esto solo decide que campos
+            pide la lista de asistencia el dia de la jornada.
+          */
+          tracksExternalCertificate: input.tracksExternalCertificate,
           // La PORTADA no se congela con la version (Decision #88): una foto no es evidencia, asi
           // que cambiarla no puede costar publicar la formacion de nuevo.
           coverKey: input.coverKey,

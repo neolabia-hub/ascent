@@ -22,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ruleReachesEveryone } from '../assignments/audience-rule.js';
 import { AudiencesService } from '../assignments/audiences.service.js';
+import { decidirCertificadoExterno } from '../certificates/certificate-policy.js';
 import { CompletionService } from '../learning/completion.service.js';
 import { ProjectedAudienceService } from './projected-audience.service.js';
 import { planVersionMigration, type MigrationPolicy } from './version-migration.js';
@@ -124,7 +125,8 @@ export class OfferingsService {
 
     const tenantId = this.prisma.currentTenantId;
     const conCertificado = input.items.filter((fila) => fila.certificate);
-    if (conCertificado.length > 0 && !(await this.tipoRegistraCertificadoExterno(offeringId))) {
+    const { registraCertificado, quienLaDicto } = await this.contextoDeLaJornada(offeringId);
+    if (conCertificado.length > 0 && !registraCertificado) {
       /*
         LA COMPUERTA VIVE EN EL SERVIDOR, no solo en la pantalla.
 
@@ -135,7 +137,7 @@ export class OfferingsService {
       throw new ConflictException({
         code: 'TYPE_DOES_NOT_TRACK_EXTERNAL_CERT',
         message:
-          'Este tipo de formacion no lleva certificado de un tercero. Se cambia en Configuracion → Tipos de formacion.',
+          'Esta formacion no lleva certificado de un tercero. Se cambia en su ficha, o en Configuracion → Tipos de formacion para toda su clase.',
       });
     }
 
@@ -217,7 +219,9 @@ export class OfferingsService {
         attendedAt: heldOn,
         certificado: fila.certificate
           ? {
-              issuer: fila.certificate.issuer,
+              // EL EMISOR SALE DE LA JORNADA si no lo mandan: quien la dicto ya esta ahi, y
+              // teclearlo por cabeza es copiar cuarenta veces un dato que el sistema tiene.
+              issuer: fila.certificate.issuer ?? quienLaDicto,
               number: fila.certificate.number,
               issuedAt: fila.certificate.issuedAt ? new Date(`${fila.certificate.issuedAt}T12:00:00-05:00`) : null,
               // FIN DEL DIA en Bogota, como todo vencimiento del sistema: "vence el 31" quiere decir
@@ -260,26 +264,42 @@ export class OfferingsService {
   }
 
   /**
-   * ¿ESTA CLASE DE FORMACION SE ACREDITA CON EL PAPEL DE UN TERCERO?
+   * LO QUE LA LISTA NECESITA SABER DE LA JORNADA, en una consulta.
    *
-   * Lo decide la empresa en el TIPO, no el codigo: una recertificacion de montacargas si, una
-   * capacitacion del plan normalmente no, y otro cliente puede pensarlo distinto. Vive donde ya
-   * viven todas las decisiones por clase de formacion (`activity_types.config`) y se cambia desde
-   * Configuracion → Tipos de formacion, igual que la fecha de campana o la gracia por ingreso
-   * reciente.
+   * **¿Se acredita con el papel de un tercero?** Lo decide la FORMACION, y su tipo es el punto de
+   * partida (`decidirCertificadoExterno`, la misma cascada que la constancia y la eficacia). Empezo
+   * viviendo solo en el tipo y el cliente lo cazo: dentro de "capacitacion del plan" conviven la
+   * charla de seguridad vial que no certifica nada y el curso de alturas que si.
+   *
+   * **¿Quien la dicto?** Para no teclear el emisor cuarenta veces. `executedByOther` es el nombre
+   * escrito ("ARL Sura") y `executedBy` la clase (ARL, EPS, TEMPORALES...); se prefiere el primero
+   * porque es lo que va a leer quien audite, y el segundo es el respaldo.
    */
-  private async tipoRegistraCertificadoExterno(offeringId: string): Promise<boolean> {
+  private async contextoDeLaJornada(
+    offeringId: string,
+  ): Promise<{ registraCertificado: boolean; quienLaDicto: string }> {
     const fila = await this.prisma.scoped.offering.findUnique({
       where: { id: offeringId },
       select: {
+        executedBy: true,
+        executedByOther: true,
         activityVersion: {
-          select: { activity: { select: { activityType: { select: { config: true } } } } },
+          select: {
+            activity: {
+              select: { tracksExternalCertificate: true, activityType: { select: { config: true } } },
+            },
+          },
         },
       },
     });
-    const config = fila?.activityVersion.activity.activityType?.config;
-    if (!config || typeof config !== 'object') return false;
-    return (config as Record<string, unknown>).tracksExternalCertificate === true;
+    const actividad = fila?.activityVersion.activity ?? null;
+    const tipo = actividad?.activityType ?? null;
+    return {
+      registraCertificado: actividad
+        ? decidirCertificadoExterno(tipo, { tracksExternalCertificate: actividad.tracksExternalCertificate })
+        : false,
+      quienLaDicto: (fila?.executedByOther ?? '').trim() || (fila?.executedBy ?? 'PROPIOS'),
+    };
   }
 
   async list(actor: AuthUser, query: ListOfferingsQuery) {
@@ -380,11 +400,26 @@ export class OfferingsService {
       this.projected.derive(offering.activityVersion.activity.id, { audienceId: offering.audienceId, regionalId: offering.regionalId }),
     ]);
 
+    /*
+      LA CASCADA SE RESUELVE AQUI, no en la pantalla.
+
+      "¿Esta formacion se acredita con el papel de un tercero?" sale de la FORMACION con su tipo de
+      respaldo (`decidirCertificadoExterno`). Devolver los dos datos crudos y que la pantalla los
+      combine seria una segunda implementacion de la misma regla, y dos implementaciones acaban
+      discrepando — es lo mismo que ya decidio `lib/activity-type.ts` para el resto del config.
+
+      `quienLaDicto` viaja al lado porque es lo que la lista de asistencia va a poner como emisor sin
+      que nadie lo teclee cuarenta veces.
+    */
+    const contexto = await this.contextoDeLaJornada(offering.id);
+
     return {
       ...offering,
       instructor,
       obligedCount: obliged,
       derivedProjected: derived,
+      registraCertificadoExterno: contexto.registraCertificado,
+      quienLaDicto: contexto.quienLaDicto,
       versionUpgrade: await this.versionUpgrade(offering.id),
     };
   }

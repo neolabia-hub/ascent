@@ -2,8 +2,9 @@
 
 *Cómo consta que una persona cumplió. Documento común a todos los tipos, como `00-el-motor.md`.*
 
-Verificado de punta a punta por `scripts/recorridos/asistencia.mjs` (15 pasos, seguimiento
-incluido). Decisión #157, del 2026-09-05.
+Verificado de punta a punta por dos recorridos: `asistencia.mjs` (18 pasos, seguimiento incluido)
+y `asistencia-matriz.mjs` (los siete tipos × tres modalidades, las cinco facetas del acotamiento y
+la corrección de una lista ya tomada). Decisión #157, del 2026-09-05, ampliada el 2026-09-06.
 
 ---
 
@@ -174,15 +175,57 @@ comprimir que usa `reinduccion-ciclos.mjs` — la ventana está fijada en 60 dí
 30 la tiene abierta hoy. Resultado: nace la ronda 2 venciendo **el día que dice el papel**, no
 dentro de doce meses. Con la recurrencia mandando, no habría nacido ninguna.
 
-## 8. Lo que decide la empresa, y lo que falta
+## 8. Lo que decide la empresa: por formación, con el tipo de respaldo
 
-**`activity_types.config.tracksExternalCertificate`** es el único ajuste, y vive donde viven todas
-las decisiones por clase de formación: Configuración → Tipos de formación. Nace encendido **solo en
-Recertificación**; los otros seis, apagados. Pedir un número de certificado en una charla de quince
-minutos llena el expediente de campos vacíos y enseña a saltárselos.
+**«¿La acredita un tercero?»** es el único ajuste, y desde el 2026-09-06 vive en **dos niveles**, la
+misma cascada que ya gobiernan la constancia y la eficacia (#111, #118):
+
+| Nivel | Dónde | Qué dice |
+|---|---|---|
+| **Tipo** | `activity_types.config.tracksExternalCertificate` | el punto de partida de toda su clase |
+| **Formación** | `activities.tracks_external_certificate` | puede desviarse. `null` = lo que diga su tipo |
+
+**Por qué no basta el tipo**, que es como nació: dentro de *Capacitación del plan* conviven la charla
+de seguridad vial que dicta la ARL y no certifica nada, y el curso de alturas que dicta la ARL y sí.
+Lo mismo en *Extraordinaria*. Preguntarlo solo por clase de formación obliga a elegir mal en la mitad
+de los casos — y lo que se elige mal se rellena a mano o se salta.
+
+**Por qué no se congela en la versión**, al revés que `issuesCertificate`: aquello queda estampado en
+un papel que hay que poder explicar dentro de dos años; esto solo decide qué campos pide la lista de
+asistencia el día de la jornada.
+
+El tipo **Recertificación** nace encendido; los otros seis, apagados. Pedir un número de certificado
+en una charla de quince minutos llena el expediente de campos vacíos y enseña a saltárselos.
 
 La compuerta la aplica el **servidor** (409 `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`), no solo la
 pantalla: un control que solo vive en el navegador no es un control.
+
+### Y el emisor no se teclea
+
+Lo que cambia por persona es **el número** de su certificado, y su vencimiento. La **entidad sale de
+la jornada** (`executedByOther` / `executedBy`): quien la dicta ya está en la convocatoria, así que
+escribirlo cuarenta veces es copiar a mano un dato que el sistema tiene, y garantizar que la fila 23
+diga «ARL sura». `issuer` sigue admitiéndose en la API para el día que exista el caso de quien llega
+con un papel de otra entidad, sacado en otro empleo.
+
+### Dónde NO aparece la lista
+
+En jornadas en **BORRADOR** —todavía no se ha citado a nadie— y en **CANCELADAS**, donde dar por
+cumplida a alguien sería escribir que asistió a algo que no ocurrió. El servidor lo rechaza con 409
+`OFFERING_NOT_ATTENDABLE` y la pantalla ya no enseña el botón: un botón que solo falla al pulsarlo
+no es una compuerta, es una trampa.
+
+## 8 bis. Lo que ahorra clics, que también es diseño
+
+Lo pidió el cliente —*«por si son muchos… cómo se puede ayudar a ser más automático»*— y son cuatro
+decisiones sobre lo mismo: **que una jornada normal se cierre sin tocar la lista**.
+
+| | |
+|---|---|
+| Todos empiezan **PRESENT** | lo normal es que quien fue convocado asista: en una lista de cuarenta se cambian tres, no se marcan treinta y siete |
+| La fecha viene de la **jornada**, no de hoy | se toma asistencia al día siguiente más veces de las que se toma en el salón, y fechar el cumplimiento el día que se teclea es fecharlo mal |
+| **Todos asistieron / Nadie asistió** | para la jornada que fue como debía, y para la que de hecho no se dictó |
+| El **emisor** no se teclea | sale de quien dicta la jornada |
 
 ## 9. Lo que se midió con varias reglas y con acotamiento
 

@@ -29,6 +29,15 @@ export const createActivitySchema = z.object({
   regionalIds: z.array(z.string().uuid()).max(50).default([]),
   jobTitleIds: z.array(z.string().uuid()).max(200).default([]),
   tags: z.array(z.string().min(1).max(40)).max(20).default([]),
+  /**
+   * ¿LA ACREDITA UN TERCERO? `null` = lo que diga su tipo, que es el caso normal.
+   *
+   * Cuando es que si, la lista de asistencia de la jornada pide el numero del certificado y su
+   * vencimiento — y esa fecha manda sobre la que calcularia la recurrencia. Vive aqui ademas de en
+   * el tipo porque dentro de una misma clase de formacion conviven las dos cosas: la charla de la
+   * ARL que no certifica nada y el curso de alturas que si.
+   */
+  tracksExternalCertificate: z.boolean().nullable().optional(),
 });
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 

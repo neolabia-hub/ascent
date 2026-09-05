@@ -1,0 +1,16 @@
+-- LO DE ACREDITAR CON EL PAPEL DE UN TERCERO SE DECIDE POR FORMACION, NO SOLO POR TIPO.
+--
+-- Lo cazo el cliente y tiene razon: "el plan puede que haya capacitaciones de ARL o externo que
+-- emitan o no certificados oficiales, o extraordinaria". Dentro de la MISMA clase de formacion
+-- conviven las dos cosas — una charla de seguridad vial que dicta la ARL y no certifica nada, y un
+-- curso de alturas que dicta la ARL y si—, asi que preguntarlo solo por tipo obliga a elegir mal en
+-- la mitad de los casos.
+--
+-- Es la MISMA cascada que ya gobierna la constancia y la eficacia (Decisiones #111 y #118):
+--
+--     TIPO (punto de partida)  ->  ACTIVIDAD (puede desviarse; NULL = hereda)
+--
+-- `NULL` es lo normal y significa "lo que diga mi tipo". No se congela en la version, al reves que
+-- `issues_certificate`: aquello queda estampado en un papel que hay que poder explicar dentro de dos
+-- anos, y esto solo decide que campos pide la lista de asistencia el dia de la jornada.
+ALTER TABLE "activities" ADD COLUMN IF NOT EXISTS "tracks_external_certificate" BOOLEAN;

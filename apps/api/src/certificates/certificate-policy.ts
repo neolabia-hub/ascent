@@ -112,3 +112,30 @@ export function decidirEficacia(
   const cfg = (tipo?.config ?? {}) as Record<string, unknown>;
   return actividad.requiresEfficacy ?? cfg.requiresEfficacy === true;
 }
+
+/**
+ * ¿LA ACREDITA UN TERCERO? (Decision #157, ampliada el 2026-09-06)
+ *
+ * Cuando es que si, la lista de asistencia de la jornada pide ademas el numero del certificado y su
+ * fecha de vencimiento — y esa fecha MANDA sobre la vigencia que calcularia la recurrencia.
+ *
+ * ─── POR QUE NO BASTA CON EL TIPO ───
+ *
+ * Empezo viviendo solo en `activity_types.config` y el cliente lo cazo: *"el plan puede que haya
+ * capacitaciones de ARL o externo que emitan o no certificados oficiales, o extraordinaria"*. Dentro
+ * de la MISMA clase de formacion conviven las dos cosas: una charla de seguridad vial que dicta la
+ * ARL y no certifica nada, y un curso de alturas que dicta la ARL y si. Preguntarlo solo por tipo
+ * obliga a elegir mal en la mitad de los casos, y lo que se elige mal se rellena a mano o se salta.
+ *
+ * Es la MISMA cascada que la constancia y la eficacia, y vive junto a ellas por lo mismo: tres
+ * archivos con la misma logica y distinto nombre se separan el dia que alguien corrige uno.
+ *
+ * `null` en la actividad = lo que diga su tipo, que es el caso normal.
+ */
+export function decidirCertificadoExterno(
+  tipo: TipoDeFormacion | null,
+  actividad: { tracksExternalCertificate: boolean | null },
+): boolean {
+  const cfg = (tipo?.config ?? {}) as Record<string, unknown>;
+  return actividad.tracksExternalCertificate ?? cfg.tracksExternalCertificate === true;
+}

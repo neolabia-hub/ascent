@@ -2972,3 +2972,85 @@ Lo que si hacia falta era cubrir las combinaciones dentro de UN recorrido, y es 
 `asistencia.mjs` con 15 pasos: dos tipos distintos —uno que lleva papel de tercero y otro que no—,
 dos reglas sobre la misma persona, dos jornadas, las tres formas de marcar, el acotamiento y el
 Seguimiento cruzado al final.
+
+### 2026-09-06 — Cuatro cosas que cazo el cliente mirando la pantalla
+
+Todas ciertas, y tres son fallos de la version de ayer.
+
+**1. Salia "Tomar asistencia" en una convocatoria CANCELADA.** El servidor ya lo rechazaba con 409,
+pero un boton que solo falla al pulsarlo no es una compuerta: es una trampa. La pantalla ahora solo
+lo enseña en PUBLICADA / EN CURSO / CERRADA. En BORRADOR tampoco: todavia no se ha citado a nadie.
+
+**2. La entidad del certificado se tecleaba persona a persona.** *"Si fuera ejecutada por una ARL o
+externo, debe salir automatico; llenarlo cada uno por persona seria mucho trabajo."* Y quien dicta la
+jornada **ya esta en la jornada** (`executedByOther`), asi que escribirlo cuarenta veces es copiar a
+mano un dato que el sistema tiene — y garantizar que la fila 23 diga "ARL sura". Ahora `issuer` es
+opcional y lo pone el servidor; lo unico propio de cada persona es su NUMERO.
+
+**3. Lo de acreditar con papel de un tercero vivia solo en el TIPO.** *"El plan puede que haya
+capacitaciones de ARL o externo que emitan o no certificados oficiales, o extraordinaria."* Exacto:
+dentro de la misma clase de formacion conviven la charla de seguridad vial que dicta la ARL y no
+certifica nada, y el curso de alturas que dicta la ARL y si. Preguntarlo solo por tipo obliga a
+elegir mal en la mitad de los casos, y lo que se elige mal se rellena a mano o se salta.
+
+Se bajo a la formacion con la MISMA cascada que ya gobiernan la constancia y la eficacia (#111,
+#118): **el tipo pone el punto de partida y la ficha puede desviarse**, `null` = "lo que diga mi
+tipo". `decidirCertificadoExterno` vive junto a sus dos hermanas en `certificate-policy.ts` por lo
+mismo de siempre: tres archivos con la misma logica y distinto nombre se separan el dia que alguien
+corrige uno. **No se congela en la version**, al reves que `issuesCertificate`: aquello queda
+estampado en un papel que hay que poder explicar dentro de dos anos, y esto solo decide que campos
+pide la lista el dia de la jornada.
+
+**4. La guia decia "la siguiente ronda se cuenta desde esta fecha"** sin dejar claro que **no todas
+las formaciones se repiten** — una capacitacion del plan no vuelve. Corregido en la frase.
+
+**Y de paso, lo que pidio para ahorrar clics:** la fecha viene con la de la JORNADA en vez de hoy
+—tomar asistencia al dia siguiente es lo normal, y fecharlo el dia que se teclea es fecharlo mal— y
+hay **Todos asistieron / Nadie asistio**. Una jornada que fue como debia se cierra sin tocar ninguna
+fila.
+
+### 2026-09-06 — La matriz de asistencia, y dos aserciones mias que pasaban sin comprobar nada
+
+El encargo fue *"pruebas completas y complejas de inicio a fin... todas las posibles situaciones"*.
+Salio `asistencia-matriz.mjs`, y lo interesante es lo que hubo que corregir del primer intento.
+
+**Parte A — todos los tipos, todas las modalidades.** Una jornada por cada tipo que exista en el
+tenant, con la modalidad **rotando** PRESENCIAL / VIRTUAL / HIBRIDA, tres personas marcadas
+PRESENT / ABSENT / JUSTIFIED, y el Seguimiento cruzado detras de cada una. Las expectativas se
+DERIVAN de `activity_types.config` como en `estandar.mjs`: ni una escrita a mano, asi que un tipo
+que cree el cliente queda cubierto el mismo dia. Comprobado en los siete: el que exige examen se
+cierra igual sin que nadie lo responda, el que lleva papel de tercero no emite constancia propia, el
+que no lo lleva rechaza el certificado con 409, y la pildora no emite nada.
+
+**LA MODALIDAD ROTA A PROPOSITO.** "La asistencia va con el `kind` y no con la modalidad" es una
+afirmacion, y las afirmaciones se miden: si alguien la ata a PRESENCIAL algun dia, el webinar en vivo
+de la ARL deja de poder cerrarse y nadie se entera hasta que lo reporta un cliente.
+
+**Parte B, y aqui esta la leccion.** La primera version preguntaba por cada faceta del acotamiento y
+comprobaba que "resolvia". **Regional y servicio devolvian CERO personas** —el tenant de desarrollo
+no tiene a nadie con esos campos puestos— asi que la asercion pasaba sin comprobar nada. Y el
+Seguimiento de esa parte salia con **0 obligaciones y 0 filas**, porque la formacion no tenia
+requisito: "el avance cuadra: 0/0 = 0%" es un comentario con sintaxis de codigo.
+
+Reescrita: la prueba **crea la gente que necesita** con cuatro combinaciones elegidas y mide el
+DELTA de cada faceta, que es robusto contra lo que ya hubiera en la base:
+
+```
+persona 1  regional R  servicio S     delta cargo +4 · area +4
+persona 2  regional R  —              delta regional +2 · servicio +2
+persona 3  —           servicio S     delta cargo x regional +2
+persona 4  —           —              delta regional x servicio +1  <- se CRUZAN, no se suman
+```
+
+Y el requisito se crea **antes que la gente**, con "solo a quien entre desde ahora": si se creara
+despues, exigirla al cargo le crearia la obligacion a las 129 personas que ya lo tienen. Con eso las
+dos jornadas complementarias se pueden medir de verdad: **4 obligaciones, 3 terminadas, avance 75%**.
+
+**Parte C — corregir una lista ya tomada.** Se marca mal, se corrige, y se comprueba que la fila se
+PISA en vez de duplicarse (`upsert` sobre jornada+persona). Y una que importa: volver a marcar
+ausente a alguien ya cerrado **no reabre lo cumplido**. La ejecucion ocurrio; una casilla no la borra.
+
+**La leccion, que este directorio ya tenia escrita y volvio a morder:** una asercion que pasa
+siempre no es una asercion. Cuando una prueba mide sobre datos que no controla —facetas vacias,
+formaciones sin requisito— lo que devuelve es cero, y cero pasa cualquier comparacion perezosa. Si la
+prueba necesita datos, **que los cree**.

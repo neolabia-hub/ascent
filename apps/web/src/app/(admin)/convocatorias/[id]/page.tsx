@@ -627,11 +627,19 @@ export default function ConvocatoriaDetallePage() {
         Una PERMANENTE no: ahi la persona entra sola y la evidencia es lo que registro el sistema.
         Atarlo a PRESENCIAL dejaria fuera el webinar de la ARL.
       */}
-      {!esAutoservicio ? (
+      {/*
+        Y NO EN UNA JORNADA QUE NO SE DICTO (2026-09-06). Lo cazo el cliente: aparecia "Tomar
+        asistencia" en una convocatoria **CANCELADA**. El servidor ya lo rechazaba con 409, pero un
+        boton que solo falla al pulsarlo no es una compuerta: es una trampa. En BORRADOR tampoco —
+        todavia no se ha citado a nadie.
+      */}
+      {!esAutoservicio && (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED') ? (
         <ListaDeAsistencia
           offeringId={offering.id}
           roster={roster}
-          pideCertificado={activity.activityType.config?.tracksExternalCertificate === true}
+          pideCertificado={offering.registraCertificadoExterno}
+          quienLaDicto={offering.quienLaDicto}
+          fechaDeLaJornada={offering.scheduledDate ?? null}
           onHecho={() => void load()}
         />
       ) : null}

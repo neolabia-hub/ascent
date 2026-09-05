@@ -36,39 +36,55 @@ import { useToast } from '@/components/ui/toast';
  * ─── LOS TRES ESTADOS, Y EL CUARTO QUE ES NO HABER MIRADO ───
  *
  * PRESENT / ABSENT / JUSTIFIED son los del diseno (CLAUDE.md 3.7) y se guardan en
- * `attendance_records`, la tabla que ya existia para esto desde el Sprint 5. El cuarto estado es
- * `null`: todavia sin revisar, que NO es lo mismo que ausente — la primera es trabajo pendiente y
- * la segunda es evidencia.
+ * `attendance_records`. El cuarto estado es `null`: todavia sin revisar, que NO es lo mismo que
+ * ausente — la primera es trabajo pendiente y la segunda es evidencia.
  *
  * **JUSTIFIED no exime la formacion**: explica por que no vino a ESA jornada, no que ya no tenga
  * que formarse. La sigue debiendo y va a la siguiente.
  *
- * ─── LO QUE SE DECIDIO EN LA FORMA ───
+ * ─── LO QUE SE DECIDIO PARA QUE NO SEA UN TRABAJO DE CHINOS ───
  *
- * **Todos empiezan como PRESENT.** Lo normal es que quien fue convocado asista, y en una lista de
- * cuarenta obliga a cambiar tres en vez de marcar treinta y siete. La excepcion es la que hay que
- * buscar a proposito.
+ * Lo pidio el cliente —*"por si son muchos... como se puede ayudar a ser mas automatico"*— y son
+ * cuatro cosas, todas sobre lo mismo: **que una jornada normal se cierre sin tocar la lista**.
  *
- * **El papel del tercero solo se pide si el TIPO lo lleva** (`tracksExternalCertificate`). Pedir un
- * numero de certificado en una charla de quince minutos llena el expediente de campos vacios y
- * enseña a saltarselos.
+ *   1. Todos empiezan como PRESENTE. Lo normal es que quien fue convocado asista, asi que en una
+ *      lista de cuarenta hay que cambiar tres, no marcar treinta y siete.
+ *   2. La fecha viene de la JORNADA, no de hoy. Se toma asistencia al dia siguiente mas veces de
+ *      las que se toma en el salon, y poner "hoy" hace que el cumplimiento quede fechado mal.
+ *   3. **Todos asistieron / Nadie asistio**, para el caso raro en que se cancelo de hecho.
+ *   4. El EMISOR del certificado no se teclea: sale de quien dicta la jornada. Escribirlo cuarenta
+ *      veces es copiar un dato que el sistema ya tiene, y garantizar que en la fila 23 alguien
+ *      ponga "ARL sura". Lo unico propio de cada persona es su NUMERO.
+ *
+ * **El papel del tercero solo se pide si la FORMACION lo lleva.** La decision viene resuelta del
+ * servidor (`registraCertificadoExterno`), porque sale de la formacion con su tipo de respaldo y
+ * dos implementaciones de la misma cascada acaban discrepando.
  */
 export function ListaDeAsistencia({
   offeringId,
   roster,
   pideCertificado,
+  quienLaDicto,
+  fechaDeLaJornada,
   onHecho,
 }: {
   offeringId: string;
   roster: RosterRow[];
-  /** `activity_types.config.tracksExternalCertificate`: lo decide la empresa, no esta pantalla. */
+  /** Resuelto por el servidor: la formacion manda y su tipo es el punto de partida. */
   pideCertificado: boolean;
+  /** Quien la dicta ("ARL Sura", "PROPIOS"): el emisor por defecto, para no teclearlo por cabeza. */
+  quienLaDicto: string;
+  fechaDeLaJornada: string | null;
   onHecho: () => void;
 }) {
   const { showToast } = useToast();
   const [abierta, setAbierta] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [heldOn, setHeldOn] = useState(() => new Date().toISOString().slice(0, 10));
+  // La fecha de la JORNADA, no la de hoy: se toma asistencia al dia siguiente mas veces de las que
+  // se toma en el salon, y fechar el cumplimiento en el dia que se teclea es fecharlo mal.
+  const [heldOn, setHeldOn] = useState(
+    () => (fechaDeLaJornada ?? new Date().toISOString()).slice(0, 10),
+  );
 
   /**
    * Quien ya tiene su formacion cerrada no entra en la lista: no hay nada que marcarle, y dejarlo
@@ -82,24 +98,18 @@ export function ListaDeAsistencia({
   const [papeles, setPapeles] = useState<Record<string, CertificadoExterno>>({});
 
   const estadoDe = (id: string): AsistenciaEstado => estados[id] ?? 'PRESENT';
-  const papel = (id: string) => papeles[id] ?? { issuer: '', number: '' };
+  const papel = (id: string) => papeles[id] ?? { number: '' };
   const cuentaPresentes = porRevisar.filter((fila) => estadoDe(fila.id) === 'PRESENT').length;
+
+  /** Marcar la lista entera de una vez: la jornada que fue como debia, o la que no se dicto. */
+  function todos(estado: AsistenciaEstado) {
+    setEstados(Object.fromEntries(porRevisar.map((fila) => [fila.id, estado])));
+  }
 
   /** Una justificacion sin motivo no justifica nada, y es lo que el auditor va a leer. */
   const faltaMotivo = porRevisar.some(
     (fila) => estadoDe(fila.id) === 'JUSTIFIED' && (motivos[fila.id] ?? '').trim().length < 5,
   );
-
-  /**
-   * El papel es OPCIONAL, pero a medias no vale: un numero sin entidad no se puede rastrear y una
-   * entidad sin numero no identifica nada. O los dos, o ninguno.
-   */
-  const papelIncompleto = porRevisar.some((fila) => {
-    if (!pideCertificado || estadoDe(fila.id) !== 'PRESENT') return false;
-    const p = papel(fila.id);
-    const algo = p.issuer.trim() || p.number.trim() || p.validUntil;
-    return Boolean(algo) && !(p.issuer.trim().length >= 2 && p.number.trim().length >= 1);
-  });
 
   async function guardar() {
     setBusy(true);
@@ -109,7 +119,8 @@ export function ListaDeAsistencia({
         items: porRevisar.map((fila) => {
           const estado = estadoDe(fila.id);
           const p = papel(fila.id);
-          const tienePapel = pideCertificado && estado === 'PRESENT' && p.issuer.trim() && p.number.trim();
+          // El emisor lo pone el servidor desde la jornada; aqui solo viaja lo propio de la persona.
+          const tienePapel = pideCertificado && estado === 'PRESENT' && p.number.trim();
           return {
             enrollmentId: fila.id,
             estado,
@@ -117,9 +128,7 @@ export function ListaDeAsistencia({
             ...(tienePapel
               ? {
                   certificate: {
-                    issuer: p.issuer.trim(),
                     number: p.number.trim(),
-                    ...(p.issuedAt ? { issuedAt: p.issuedAt } : {}),
                     ...(p.validUntil ? { validUntil: p.validUntil } : {}),
                   },
                 }
@@ -180,12 +189,34 @@ export function ListaDeAsistencia({
                 onChange={(e) => setHeldOn(e.target.value)}
               />
             </Field>
-            <p className="pb-2 text-sm text-ink-500">
-              <strong className="font-medium text-ink-900">{cuentaPresentes}</strong> de {porRevisar.length} asistieron.
-              Quien no vino <strong className="font-medium text-ink-700">sigue debiendo</strong> la formacion, aunque la
-              falta este justificada.
-            </p>
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              <Button variant="ghost" onClick={() => todos('PRESENT')}>
+                Todos asistieron
+              </Button>
+              <Button variant="ghost" onClick={() => todos('ABSENT')}>
+                Nadie asistio
+              </Button>
+            </div>
           </div>
+
+          <p className="px-5 pb-3 text-sm text-ink-500">
+            <strong className="font-medium text-ink-900">{cuentaPresentes}</strong> de {porRevisar.length} asistieron.
+            Quien no vino <strong className="font-medium text-ink-700">sigue debiendo</strong> la formacion, aunque la
+            falta este justificada.
+          </p>
+
+          {pideCertificado ? (
+            <p className="flex items-start gap-2 border-t border-line px-5 py-3 text-sm text-ink-500">
+              <ClipboardList size={15} className="mt-0.5 shrink-0" strokeWidth={2} />
+              <span>
+                El certificado lo expide <strong className="font-medium text-ink-700">{quienLaDicto}</strong>, que es
+                quien dicta esta jornada — no hay que escribirlo por persona. Solo su{' '}
+                <strong className="font-medium text-ink-700">numero</strong>, y el vencimiento si lo trae:{' '}
+                <strong className="font-medium text-ink-700">esa fecha manda</strong> sobre la que calcularia el sistema.
+                Si el papel todavia no ha llegado, deja el numero en blanco y añadelo despues.
+              </span>
+            </p>
+          ) : null}
 
           <div className="overflow-x-auto">
             <Table>
@@ -194,7 +225,8 @@ export function ListaDeAsistencia({
                   <Th>Persona</Th>
                   <Th>Asistencia</Th>
                   <Th>Motivo</Th>
-                  {pideCertificado ? <Th>Certificado del tercero</Th> : null}
+                  {pideCertificado ? <Th>No. de certificado</Th> : null}
+                  {pideCertificado ? <Th>Vence</Th> : null}
                 </Tr>
               </THead>
               <TBody>
@@ -237,35 +269,32 @@ export function ListaDeAsistencia({
                       {pideCertificado ? (
                         <Td>
                           {estado === 'PRESENT' ? (
-                            <div className="flex flex-wrap gap-2">
-                              <Input
-                                className="max-w-[10rem]"
-                                placeholder="Entidad (ARL...)"
-                                aria-label={`Entidad que certifica a ${fila.user.fullName}`}
-                                value={papel(fila.id).issuer}
-                                onChange={(e) =>
-                                  setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), issuer: e.target.value } })
-                                }
-                              />
-                              <Input
-                                className="max-w-[9rem]"
-                                placeholder="No. certificado"
-                                aria-label={`Numero de certificado de ${fila.user.fullName}`}
-                                value={papel(fila.id).number}
-                                onChange={(e) =>
-                                  setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), number: e.target.value } })
-                                }
-                              />
-                              <Input
-                                type="date"
-                                className="max-w-[9.5rem]"
-                                aria-label={`Vence el certificado de ${fila.user.fullName}`}
-                                value={papel(fila.id).validUntil ?? ''}
-                                onChange={(e) =>
-                                  setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), validUntil: e.target.value } })
-                                }
-                              />
-                            </div>
+                            <Input
+                              className="max-w-[10rem]"
+                              placeholder="Opcional"
+                              aria-label={`Numero de certificado de ${fila.user.fullName}`}
+                              value={papel(fila.id).number}
+                              onChange={(e) =>
+                                setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), number: e.target.value } })
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm text-ink-500">—</span>
+                          )}
+                        </Td>
+                      ) : null}
+                      {pideCertificado ? (
+                        <Td>
+                          {estado === 'PRESENT' ? (
+                            <Input
+                              type="date"
+                              className="max-w-[9.5rem]"
+                              aria-label={`Vence el certificado de ${fila.user.fullName}`}
+                              value={papel(fila.id).validUntil ?? ''}
+                              onChange={(e) =>
+                                setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), validUntil: e.target.value } })
+                              }
+                            />
                           ) : (
                             <span className="text-sm text-ink-500">—</span>
                           )}
@@ -278,28 +307,12 @@ export function ListaDeAsistencia({
             </Table>
           </div>
 
-          {pideCertificado ? (
-            <p className="flex items-start gap-2 border-t border-line px-5 py-3 text-sm text-ink-500">
-              <ClipboardList size={15} className="mt-0.5 shrink-0" strokeWidth={2} />
-              <span>
-                El certificado es <strong className="font-medium text-ink-700">opcional</strong>: si todavia no llego,
-                marca la asistencia y añadelo despues. Cuando lo pongas,{' '}
-                <strong className="font-medium text-ink-700">su fecha de vencimiento manda</strong> sobre la que
-                calcularia el sistema.
-              </span>
-            </p>
-          ) : null}
-
           <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
             <Button variant="ghost" onClick={() => setAbierta(false)}>
               Cancelar
             </Button>
-            <Button onClick={guardar} loading={busy} disabled={papelIncompleto || faltaMotivo}>
-              {faltaMotivo
-                ? 'Falta el motivo de la justificacion'
-                : papelIncompleto
-                  ? 'Falta entidad o numero'
-                  : `Dar por cumplida a ${cuentaPresentes}`}
+            <Button onClick={guardar} loading={busy} disabled={faltaMotivo}>
+              {faltaMotivo ? 'Falta el motivo de la justificacion' : `Dar por cumplida a ${cuentaPresentes}`}
             </Button>
           </div>
         </div>

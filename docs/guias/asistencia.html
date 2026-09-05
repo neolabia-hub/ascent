@@ -187,11 +187,22 @@
   <h3>Dónde está</h3>
   <ol class="pasos">
     <li>Entra a <b>Convocatorias</b> y abre la jornada.</li>
-    <li>Debajo de la ficha aparece <b>Lista de asistencia</b> con el botón <b>Tomar asistencia</b>.</li>
-    <li>Se abre la lista de los convocados. <b>Todos empiezan marcados como que asistieron</b>: lo normal es que quien fue convocado vaya, así que solo tienes que cambiar las excepciones.</li>
-    <li>Comprueba la fecha en <b>Se dictó el</b> — es la que va a quedar como fecha de cumplimiento.</li>
+    <li>Debajo de la ficha aparece <b>Lista de asistencia</b> con el botón <b>Tomar asistencia</b>.
+      Solo sale en jornadas <em>publicadas, en curso o cerradas</em>: en un borrador todavía no se ha
+      citado a nadie, y en una cancelada no hubo jornada que registrar.</li>
+    <li>Se abre la lista. <b>Todos empiezan marcados como que asistieron</b>: lo normal es que quien
+      fue convocado vaya, así que en una lista de cuarenta cambias tres en vez de marcar treinta y siete.</li>
+    <li>La fecha viene puesta con la de la jornada, no con la de hoy — tomar asistencia al día
+      siguiente es lo normal, y fecharlo el día que tecleas sería fecharlo mal. Se puede cambiar.</li>
     <li><b>Dar por cumplida a N</b>, y listo.</li>
   </ol>
+
+  <div class="aviso bien">
+    <span class="etiqueta">Si son muchos</span>
+    <p>Tienes <b>Todos asistieron</b> y <b>Nadie asistió</b> para marcar la lista entera de una vez y
+      corregir solo lo que haga falta. Una jornada que fue como debía se cierra sin tocar ninguna fila:
+      abres, compruebas la fecha y guardas.</p>
+  </div>
 
   <div class="aviso">
     <span class="etiqueta">Solo aparece en las jornadas con fecha</span>
@@ -220,7 +231,7 @@
     <tbody>
       <tr><td>Marcas que asistió</td><td>Su formación queda cumplida <strong>sin que tenga que entrar a la plataforma</strong>, y sin responder el examen: el examen lo puso el instructor en el salón</td></tr>
       <tr><td>El tipo entrega constancia</td><td>Se emite sola, con su número y su código verificable</td></tr>
-      <tr><td>La formación se repite</td><td>La siguiente ronda se cuenta desde esta fecha</td></tr>
+      <tr><td>La formación se repite <em>—y no todas lo hacen: una capacitación del plan no vuelve—</em></td><td>La siguiente ronda se cuenta desde esta fecha</td></tr>
       <tr><td>Vuelves a la jornada al día siguiente</td><td>La lista se abre con lo que ya marcaste. Se puede corregir</td></tr>
       <tr><td>Alguien ya tenía su formación cerrada</td><td>No sale en la lista: no hay nada que marcarle</td></tr>
     </tbody>
@@ -228,7 +239,10 @@
 
   <h3>Cuando el certificado lo emite un tercero</h3>
   <p>Alturas, espacios confinados, montacargas, manipulación de alimentos: la norma exige el papel de un organismo acreditado. NEO PULSE no lo emite —no puede— pero sí <strong>lleva su control</strong>, que es lo que la empresa necesita.</p>
-  <p>Si el tipo de formación lo lleva, la lista pide además <b>entidad</b>, <b>número</b> y <b>fecha de vencimiento</b> de cada persona.</p>
+  <p>Si la formación lo lleva, la lista pide además el <b>número</b> del certificado de cada persona y su
+    <b>fecha de vencimiento</b>. La <b>entidad no se escribe</b>: sale sola de quien dicta la jornada, que ya
+    está en la convocatoria. Teclearla cuarenta veces sería copiar a mano un dato que el sistema ya tiene
+    —y la fila veintitrés acabaría diciendo «ARL sura».</p>
 
   <div class="aviso bien">
     <span class="etiqueta">La fecha del papel manda</span>
@@ -254,6 +268,14 @@
   <div class="aviso">
     <span class="etiqueta">Queda quién lo marcó</span>
     <p>Cerrar una formación por asistencia salta el examen que el tipo exige, así que el sistema guarda quién respondió por ello, con fecha y hora. Es lo que un auditor va a preguntar, y es lo que separa un registro de una puerta trasera.</p>
+  </div>
+  <div class="aviso">
+    <span class="etiqueta">Dónde se dice que una formación la acredita un tercero</span>
+    <p>En <b>su ficha</b>, campo <em>«La acredita un tercero»</em>. Por defecto dice «lo que diga su tipo»,
+      que es lo normal — pero se puede desviar, y hace falta: dentro de <em>Capacitación del plan</em> conviven
+      la charla de seguridad vial que dicta la ARL y no certifica nada, y el curso de alturas que dicta la ARL
+      y sí. Si quieres cambiarlo para toda una clase de formación de golpe, eso está en
+      <b>Configuración → Tipos de formación</b>.</p>
   </div>
   <div class="aviso">
     <span class="etiqueta">Quién puede tomarla</span>
