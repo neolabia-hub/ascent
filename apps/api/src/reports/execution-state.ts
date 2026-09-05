@@ -29,6 +29,55 @@ export type EstadoEjecucion =
 export const ESTADOS_RETIRADOS = ['WITHDRAWN_LEFT_AUDIENCE', 'WITHDRAWN_PLAN_ITEM_CANCELLED'] as const;
 
 /**
+ * QUE EJECUCION DESCRIBE A CADA RONDA (2026-09-05).
+ *
+ * ─── EL FALLO QUE OBLIGA A QUE ESTO EXISTA ───
+ *
+ * Los tres informes cogian la inscripcion MAS RECIENTE de cada persona y la aplicaban a TODAS sus
+ * filas. Con una formacion que no se repite da igual —una ronda, una inscripcion—; en cuanto se
+ * repite es falso, y `resolverEstadoEjecucion` pregunta primero por el resultado, asi que **quien
+ * completo la ronda 1 salia con la ronda 2 tambien como TERMINADA**.
+ *
+ * MEDIDO el 2026-09-05 con `asistencia.mjs`: 5 obligaciones, 3 pendientes de verdad, y el informe
+ * decia 4 terminadas. En produccion es la reinduccion de 796 personas figurando hecha el 2 de enero
+ * de cada ano, y nadie reclama un numero que le favorece.
+ *
+ * Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como "sin empezar"— pero
+ * al reves: aquel inflaba el incumplimiento y este infla el CUMPLIMIENTO.
+ *
+ * ─── POR QUE NO HAY QUE ADIVINAR NADA ───
+ *
+ * El enlace existe en las dos direcciones desde el Sprint 3 (Decision #2: ejecucion y obligacion se
+ * ENLAZAN, no se fusionan): `assignments.completed_enrollment_id` apunta a la que la cerro, y
+ * `enrollments.assignment_id` a la que se venia a satisfacer. Se usan los dos y no se supone nada:
+ * una inscripcion sin obligacion **no colorea ninguna fila**, que es lo correcto — es una ejecucion
+ * que no responde por ese requisito.
+ *
+ * Vive aqui y se exporta por el mismo motivo que `ESTADOS_RETIRADOS`: son TRES informes, y el que
+ * se olvide de aplicarlo dara un numero distinto en su pantalla.
+ */
+export function inscripcionDeCadaRonda<
+  A extends { id: string; completedEnrollmentId?: string | null },
+  E extends { id: string; assignmentId?: string | null },
+>(obligaciones: readonly A[], inscripciones: readonly E[]): Map<string, E> {
+  const porObligacion = new Map<string, E>();
+  const porId = new Map(inscripciones.map((fila) => [fila.id, fila]));
+
+  // Primero la que la CERRO: es la respuesta directa y no depende de que el enlace de ida exista.
+  for (const obligacion of obligaciones) {
+    const cerrada = obligacion.completedEnrollmentId ? porId.get(obligacion.completedEnrollmentId) : undefined;
+    if (cerrada) porObligacion.set(obligacion.id, cerrada);
+  }
+  // Y despues la que se abrio PARA ella, que es la que describe lo que esta en curso.
+  for (const inscripcion of inscripciones) {
+    if (inscripcion.assignmentId && !porObligacion.has(inscripcion.assignmentId)) {
+      porObligacion.set(inscripcion.assignmentId, inscripcion);
+    }
+  }
+  return porObligacion;
+}
+
+/**
  * COMO SE LLAMA CADA ESTADO POR ESCRITO.
  *
  * Vive aqui porque el servidor tambien tiene que nombrarlos: lo que se exporta a Excel se lee sin

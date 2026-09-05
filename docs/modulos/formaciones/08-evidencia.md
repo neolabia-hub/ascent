@@ -2,7 +2,7 @@
 
 *Cómo consta que una persona cumplió. Documento común a todos los tipos, como `00-el-motor.md`.*
 
-Verificado de punta a punta por `scripts/recorridos/asistencia.mjs` (12 pasos, seguimiento
+Verificado de punta a punta por `scripts/recorridos/asistencia.mjs` (15 pasos, seguimiento
 incluido). Decisión #157, del 2026-09-05.
 
 ---
@@ -29,14 +29,14 @@ producto, enseñaba cero de todo lo que de verdad se hizo.**
 |---|---|---|
 | **A. En plataforma** | contenido + examen, la persona entra sola | progreso, nota, constancia propia |
 | **B. Lista de asistencia** | jornada con fecha, la dicte quien la dicte | quién asistió, quién no, y quién lo marcó |
-| **C. Papel de un tercero** | el certificado lo emite un organismo acreditado | entidad, número, expedición, **vencimiento**, escaneo |
+| **C. Papel de un tercero** | el certificado lo emite un organismo acreditado | entidad, número, expedición, **vencimiento** |
 
 Las tres cierran **la misma obligación** y valen lo mismo para el indicador. Y se combinan:
 
 - Inducción general virtual → **A**
 - Capacitación del plan que dicta la ARL y no certifica nada → **B sola**
 - Recertificación de montacargas con la ARL → **B + C**
-- Quien llega con un certificado vigente de otro empleo → **C sola** (todavía no implementado: ver §8)
+- Quien llega con un certificado vigente de otro empleo → **C sola** (todavía no implementado: ver §10)
 
 **No van atadas al tipo de formación.** Es la respuesta a «¿cómo consta que cumplió?», y cada
 empresa la contesta distinto según la formación. Atarlo al tipo habría dejado fuera la mitad de los
@@ -67,21 +67,71 @@ Lo comprueba el recorrido con el caso más duro: la formación es de tipo Recert
 CUMPLIDA.
 
 Y por eso cerrar así **salta la evaluación que el tipo exige**, que es exactamente lo que un auditor
-cuestionaría. Queda `enrollments.attendance_by` —quién respondió por ello— además de la fila de
-auditoría `OFFERING_ATTENDANCE_MARKED`. Sin eso sería una puerta trasera para dar por cumplido lo
+cuestionaría. Queda `attendance_records.marked_by` —quién respondió por ello, con su método y su sello de
+tiempo— además de la fila de auditoría `OFFERING_ATTENDANCE_MARKED`. Sin eso sería una puerta trasera para dar por cumplido lo
 que no se hizo.
 
-## 5. Quien no vino la sigue debiendo
+## 5. Los tres estados, y el cuarto que es no haber mirado
 
-`attended: false` **es un dato, no un hueco**: «convocado y NO vino» es lo que hay que poder
-demostrar, y es distinto de «todavía no lo hemos revisado».
+**PRESENT / ABSENT / JUSTIFIED**, los del diseño (CLAUDE.md §3.7). Y `null` = **todavía sin
+revisar**, que no es lo mismo que ausente: la primera es trabajo pendiente y la segunda es evidencia
+de que se le convocó y no fue. Un dato que se lee por lo que le falta acaba significando dos cosas.
 
-No se cierra nada y **no se retira la obligación**: la sigue debiendo, que es el punto entero de
-tomar asistencia. Medido en los pasos 8 y 9 del recorrido: de dos convocados, uno queda CUMPLIDO y
-el otro sigue PENDIENTE.
+| Se marca | Qué pasa con su formación |
+|---|---|
+| **PRESENT** | queda **cumplida**; si el tipo entrega constancia, se emite sola |
+| **ABSENT** | **la sigue debiendo**, y queda escrito que se le convocó y no fue |
+| **JUSTIFIED** | **también la sigue debiendo**, con el motivo escrito. Irá a la siguiente jornada |
 
-En la pantalla **todos empiezan marcados como presentes**. Lo normal es que quien fue convocado
-asista, y en una lista de cuarenta eso obliga a desmarcar tres en vez de marcar treinta y siete.
+**JUSTIFIED no exime, y es deliberado.** «Estaba incapacitado» explica por qué no vino a *esa*
+jornada, no que ya no tenga que formarse. Eximir es otro acto, con su propio motivo y su propia
+auditoría; mezclarlos convertiría una incapacidad en un permiso permanente para no capacitarse. Y
+por eso la justificación **exige motivo** (422 sin él): una justificación sin explicación no
+justifica nada, y es lo primero que lee quien audita.
+
+Medido en los pasos 9 y 12 del recorrido: de dos convocados uno queda CUMPLIDO y el otro sigue
+PENDIENTE; al justificarle la falta, **sigue igual de pendiente**.
+
+En la pantalla **todos empiezan como PRESENT**. Lo normal es que quien fue convocado asista, y en
+una lista de cuarenta eso obliga a cambiar tres en vez de marcar treinta y siete.
+
+### Dónde vive, y la corrección que costó
+
+En **`attendance_records`**, con `method: INSTRUCTOR`. No es una tabla nueva: **ya estaba en el
+esquema desde el Sprint 0**, con los tres estados, el método, la justificación, la firma y quien
+marcó — vacía, porque nadie la escribía. Al lado, `session_acts` para el acta generada.
+
+La primera versión de esta decisión le puso columnas propias a `enrollments` sin verla. Dos casas
+para el mismo hecho es exactamente el problema que este proyecto ya conoce por el otro lado —el
+informe de Vencimientos leyendo `certification_grants`, que tampoco escribe nadie— así que se
+corrigió el mismo día, con la tabla todavía vacía y no cuando hubiera un año de asistencias
+repartidas entre dos sitios.
+
+**La lección es de método:** antes de añadir una columna, mirar si el modelo ya la tiene. Este
+esquema se diseñó entero al principio y lleva partes esperando.
+
+### Los tres mecanismos, y cuántos hay construidos
+
+El diseño (CLAUDE.md §3.7) prevé tres formas de marcar a alguien, combinables:
+
+| # | Mecanismo | Estado |
+|---|---|---|
+| 1 | **Lista del instructor** — presente / ausente / justificado | **Construido** (`method: INSTRUCTOR`) |
+| 2 | **QR de sesión** rotativo: la persona lo escanea y queda su sello de tiempo | Diseñado. `offerings.session_code` y `method: QR` esperan |
+| 3 | **Firma en pantalla** + acta PDF con hash | Diseñado. `SessionAct` y `method: SIGNATURE` esperan |
+
+Los tres escriben en la **misma tabla** y solo cambian de `method`, que es lo que permite construir
+el segundo y el tercero sin tocar lo que ya funciona.
+
+## 5 bis. Quién puede tomarla
+
+**`attendance:take`**, y no `offerings:manage`, que era lo que parecía natural. El permiso existía
+desde el Sprint 1 sin que nadie lo usara, y existe por una razón que se ve en cuanto se piensa en
+quién hace este trabajo: **el instructor** (CLAUDE.md §1: *«dicta convocatorias: toma asistencia,
+firma actas»*). Quien dicta la jornada tiene que poder decir quién vino **sin poder además programar,
+publicar ni cancelar convocatorias**, que es lo que le daría `offerings:manage`.
+
+ADMIN y ANALISTA lo traen de fábrica, así que no cambia nada de lo que ya funcionaba.
 
 ## 6. Con papel de un tercero no se emite constancia propia
 
@@ -134,16 +184,49 @@ minutos llena el expediente de campos vacíos y enseña a saltárselos.
 La compuerta la aplica el **servidor** (409 `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`), no solo la
 pantalla: un control que solo vive en el navegador no es un control.
 
-### Lo que falta
+## 9. Lo que se midió con varias reglas y con acotamiento
+
+Lo pidió el cliente, y da dos respuestas que conviene tener escritas:
+
+| | |
+|---|---|
+| Una formación exigida por **dos reglas** que alcanzan a la misma persona | le nacen **dos** obligaciones (la deduplicación del motor es por REGLA), y asistir a una jornada cierra **una**. La otra sigue viva |
+| Las **facetas** del alcance | se **cruzan**, no se suman: cargo 100 · área 240 · las dos, **9** |
+| Una lista de asistencia con la inscripción de **otra** jornada | se **ignora**. Una lista no cierra la formación de quien no estuvo en esa sala |
+
+Sobre lo primero: no se cambió. Que asistir a una jornada cerrara las dos obligaciones haría que una
+sola sesión cubriera dos requisitos distintos, y no cerrar ninguna dejaría en rojo a quien sí fue.
+Cerrar una es lo correcto; que existan dos es una decisión anterior (`00-el-motor.md` §9).
+
+### Y lo que se destapó midiéndolo
+
+Al cruzar el Seguimiento con cinco obligaciones —dos cumplidas, tres pendientes— el informe decía
+**cuatro terminadas**. Los tres informes pegaban la inscripción por **(persona, formación)** en vez
+de por ronda, y como `resolverEstadoEjecucion` pregunta primero por el resultado, **quien completó la
+ronda 1 salía con la ronda 2 también como TERMINADA**.
+
+Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como «sin empezar»— pero al
+revés: aquel inflaba el incumplimiento y este infla el **cumplimiento**, que es el que no se
+descubre solo, porque nadie reclama un número que le favorece. En producción es la reinducción de
+796 personas figurando hecha el 2 de enero de cada año.
+
+Arreglado con `inscripcionDeCadaRonda` (`execution-state.ts`), que usa los enlaces que ya existían
+en las dos direcciones desde el Sprint 3 (Decisión #2). **Medido: el mismo escenario pasó de 80% de
+avance a 40%**, que es el real.
+
+## 10. Lo que falta
 
 1. **El archivo escaneado no se sube todavía.** Las columnas están (`ext_cert_file_key`,
-   `offerings.attendance_sheet_key`) y la API los acepta, pero no hay pantalla que suba el PDF ni el
+   `offerings.attendance_sheet_key`) y la API las acepta, pero no hay pantalla que suba el PDF ni el
    acta firmada. Es lo siguiente natural y lo que completa la evidencia.
 2. **La segunda puerta**, para cuando el papel llega después de la jornada — que es lo normal: la
    ARL manda los certificados a los quince días. Hoy hay que volver a la jornada; falta poder
    hacerlo desde la ficha de la persona.
 3. **Quien llega con un certificado de otro empleo** (vía C sola, sin jornada) no tiene por dónde
    registrarse.
-4. **El informe de Vencimientos sigue leyendo `certification_grants`**, una tabla que nadie escribe,
+4. **El QR de sesión y la firma en pantalla**: los mecanismos 2 y 3, diseñados y con su sitio en el
+   modelo. Con ellos llega `attendance:sign`, que CLAUDE.md nombra y `permissions.ts` todavía no
+   tiene.
+5. **El informe de Vencimientos sigue leyendo `certification_grants`**, una tabla que nadie escribe,
    así que su serie de «Certificación» sale en cero. Ahora que existe `valid_until_override` y que
    `certificates.valid_until` ya se escribía, tiene con qué llenarse. Ver `seguimiento.md` §7 quater.

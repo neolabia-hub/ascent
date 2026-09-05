@@ -2879,3 +2879,96 @@ exactamente que se rompio.
 
 **La leccion, que es la misma de siempre en este directorio:** un paso preparatorio sin asercion no
 es preparacion, es una suposicion — y cuando falla, el recorrido acusa al sitio equivocado.
+
+### 2026-09-05 (tarde) — Le puse columnas a una tabla cuando el modelo ya tenia la suya
+
+La primera version de la Decision #157 anadio `attended_at` y `attendance_by` a `enrollments`.
+**`attendance_records` ya estaba en el esquema desde el Sprint 0** —con los tres estados
+(PRESENT/ABSENT/JUSTIFIED), el metodo (INSTRUCTOR/QR/SIGNATURE), la justificacion, la firma y quien
+marco— y vacia porque nadie la escribia. Al lado, `session_acts` para el acta con su hash.
+
+Se descubrio al intentar anadir el estado JUSTIFICADO: `prisma migrate deploy` fallo con *"invalid
+input value for enum AttendanceStatus: PRESENTE"*, y despues `generate` con *"the enum
+AttendanceStatus cannot be defined because a enum with that name already exists"*. El error decia
+exactamente lo que pasaba y aun asi hubo que pararse a leerlo dos veces.
+
+**Se corrigio el mismo dia, con la tabla todavia vacia**, y no cuando hubiera un ano de asistencias
+repartidas entre dos sitios. Es el mismo problema que este proyecto ya conoce por el otro lado: el
+informe de Vencimientos leyendo `certification_grants`, que tampoco escribe nadie — solo que aquel
+lleva meses asi y este se cazo en horas.
+
+**La leccion, que vale mas que el caso:** este esquema se diseno ENTERO al principio y lleva partes
+esperando. Antes de anadir una columna, mirar si el modelo ya la tiene. Buscar `model X` en
+`schema.prisma` cuesta diez segundos; una migracion de vuelta cuesta el dia que alguien descubre que
+hay dos sitios donde mirar.
+
+**Y de paso salio el permiso correcto.** El endpoint iba bajo `offerings:manage`; `attendance:take`
+existe desde el Sprint 1 sin usarse, y existe porque **el INSTRUCTOR** tiene que poder decir quien
+vino sin poder ademas programar, publicar ni cancelar convocatorias.
+
+### 2026-09-05 (tarde) — El informe daba por TERMINADA la ronda que la persona todavia debe
+
+El fallo mas caro del dia, y no era del trabajo nuevo: **lo destapo medirlo**. El cliente pidio
+probar con varias reglas y con acotamiento, y al cruzar el Seguimiento con cinco obligaciones —dos
+cumplidas de verdad y tres pendientes— el informe decia **cuatro terminadas**.
+
+Los tres informes hacian esto:
+
+```
+// La inscripcion MAS RECIENTE de cada persona: una formacion recurrente tiene una por ronda,
+// y la que describe el estado de hoy es la ultima.
+const ultima = new Map();  // clave: userId | activityId
+```
+
+El comentario explica la suposicion y la suposicion es falsa: la inscripcion mas reciente describe
+la RONDA mas reciente, no todas. Y como `resolverEstadoEjecucion` pregunta primero por el resultado
+—correctamente: una formacion aprobada el mes pasado no esta "atrasada"— **quien completo la ronda 1
+salia con la ronda 2 tambien como TERMINADA**.
+
+MEDIDO: el mismo escenario pasaba de **80% de avance a 40%**, que es el real. En produccion es la
+reinduccion de 796 personas figurando hecha el 2 de enero de cada ano.
+
+Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como "sin empezar"— pero al
+reves, y por eso es peor: **aquel inflaba el incumplimiento y este infla el cumplimiento**. Nadie
+reclama un numero que le favorece, asi que este no se descubre solo.
+
+**No hizo falta inventar nada:** el enlace existe en las dos direcciones desde el Sprint 3 (Decision
+#2, *la ejecucion y la obligacion se ENLAZAN, no se fusionan*): `assignments.completed_enrollment_id`
+apunta a la que la cerro y `enrollments.assignment_id` a la que se venia a satisfacer. Se usan los
+dos y no se supone nada — una inscripcion sin obligacion no colorea ninguna fila.
+
+`inscripcionDeCadaRonda` vive en `execution-state.ts` y se exporta por el mismo motivo que
+`ESTADOS_RETIRADOS`: **son tres informes**, y el que se olvide dara un numero distinto en su
+pantalla.
+
+**Por que no lo vio ningun recorrido:** `reinduccion-ciclos.mjs` prueba el camino de quien NO la
+hizo —ronda 1 cerrada como NO REALIZADA y ronda 2 abierta— y ahi no hay inscripcion, asi que no hay
+falso TERMINADA. Hacia falta alguien que hubiera CUMPLIDO la ronda anterior, que es justo lo que
+produce cerrar por asistencia.
+
+### 2026-09-05 (tarde) — Lo que se midio con varias reglas y con acotamiento
+
+Lo pidio el cliente y da tres respuestas que conviene tener escritas:
+
+| | |
+|---|---|
+| Formacion exigida por **dos reglas** que alcanzan a la misma persona | le nacen **DOS** obligaciones (la deduplicacion es por REGLA) y asistir a una jornada cierra **UNA** |
+| Las **facetas** del alcance | se **cruzan**: cargo 100 · area 240 · las dos, **9** |
+| Lista con la inscripcion de **otra** jornada | se **ignora**: una lista no cierra la formacion de quien no estuvo en esa sala |
+
+Lo primero **no se cambio**, y merece decirse por que: cerrar las dos haria que una sola sesion
+cubriera dos requisitos distintos, y no cerrar ninguna dejaria en rojo a quien si fue. Cerrar una es
+lo correcto. Que existan dos es una decision anterior, y sigue anotada en `00-el-motor.md` §9.
+
+### 2026-09-05 (tarde) — Y sobre hacer un recorrido por tipo
+
+El cliente pregunto si convenia uno por tipo. **No**, y por lo mismo que ya decidio `tajadas.mjs`
+—que recorre los siete tipos dentro de un solo archivo—: cerrar por asistencia **no depende del
+tipo**. Depende del `kind` de la jornada. Siete archivos serian siete copias del mismo camino que
+se desincronizan una a una, y lo especifico de cada tipo (que emita constancia, que exija examen,
+que entre al plan) ya lo deriva `estandar.mjs` de su propia configuracion.
+
+Lo que si hacia falta era cubrir las combinaciones dentro de UN recorrido, y es lo que hace ahora
+`asistencia.mjs` con 15 pasos: dos tipos distintos —uno que lleva papel de tercero y otro que no—,
+dos reglas sobre la misma persona, dos jornadas, las tres formas de marcar, el acotamiento y el
+Seguimiento cruzado al final.

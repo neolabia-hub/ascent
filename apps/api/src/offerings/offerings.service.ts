@@ -98,10 +98,16 @@ export class OfferingsService {
    * evidencia es justamente lo que la plataforma registro. Atarlo a `PRESENCIAL` dejaria fuera el
    * webinar de la ARL, que es cada vez mas comun.
    *
-   * ─── `attended: false` ES UN DATO, NO UN HUECO ───
+   * ─── LOS TRES ESTADOS, Y EL CUARTO QUE ES NO MANDAR LA FILA ───
    *
-   * "Convocado y NO vino" es exactamente lo que hay que poder demostrar, y es distinto de "todavia
-   * no lo hemos revisado". Por eso se manda la lista entera y no solo los presentes.
+   * PRESENTE / AUSENTE / JUSTIFICADO (CLAUDE.md 3.7), y `null` = todavia sin revisar. "Convocado y
+   * NO vino" es exactamente lo que hay que poder demostrar, y es distinto de "todavia no lo hemos
+   * mirado": por eso el estado es explicito y no se deduce de un campo vacio.
+   *
+   * **JUSTIFICADO no exime la formacion.** Explica por que no vino a ESA jornada, no que ya no
+   * tenga que formarse: la sigue debiendo y va a la siguiente. Eximir es otro acto, deliberado, con
+   * su propio motivo y su propia auditoria — mezclarlos convertiria "estaba incapacitado" en "ya no
+   * tiene que hacerlo".
    */
   async marcarAsistencia(actor: AuthUser, offeringId: string, input: MarcarAsistenciaInput) {
     const offering = await this.requireOffering(offeringId);
@@ -135,39 +141,80 @@ export class OfferingsService {
 
     // Solo las inscripciones de ESTA jornada: mandar el id de otra cerraria la formacion de alguien
     // que no estuvo aqui.
-    const validas = new Set(
+    // A QUIEN se puede marcar, y de paso su `userId`: la evidencia se guarda por PERSONA y jornada
+    // (`attendance_records` tiene `UNIQUE(offering_id, user_id)`), no por inscripcion. Mandar el id
+    // de una inscripcion de otra jornada cerraria la formacion de alguien que no estuvo aqui.
+    const validas = new Map(
       (
         await this.prisma.scoped.enrollment.findMany({
           where: { offeringId, id: { in: input.items.map((fila) => fila.enrollmentId) } },
-          select: { id: true },
+          select: { id: true, userId: true },
         })
-      ).map((fila) => fila.id),
+      ).map((fila) => [fila.id, fila.userId]),
     );
 
     const heldOn = input.heldOn ? new Date(`${input.heldOn}T12:00:00-05:00`) : new Date();
     let cerradas = 0;
     let ausentes = 0;
+    let justificados = 0;
     const ignoradas: string[] = [];
 
     for (const fila of input.items) {
-      if (!validas.has(fila.enrollmentId)) {
+      const userId = validas.get(fila.enrollmentId);
+      if (!userId) {
         ignoradas.push(fila.enrollmentId);
         continue;
       }
-      if (!fila.attended) {
+
+      /*
+        LA EVIDENCIA VA A `attendance_records`, QUE YA EXISTIA (corregido el 2026-09-05).
+
+        La primera version de la Decision #157 le puso columnas propias a `enrollments` sin ver que
+        esta tabla estaba en el esquema desde el Sprint 5 —con los tres estados, el metodo, la
+        justificacion, la firma y quien marco— y vacia porque nadie la escribia. Dos casas para el
+        mismo hecho es el problema que este proyecto ya conoce por el otro lado: el informe de
+        Vencimientos leyendo `certification_grants`, que tampoco escribe nadie.
+
+        `method: INSTRUCTOR` es el primero de los tres que preve el diseno (CLAUDE.md 3.7). El QR de
+        sesion y la firma en pantalla escriben en esta MISMA tabla cuando se construyan, cambiando
+        solo el metodo — por eso la columna existe desde el principio.
+
+        Se re-marca sin miedo: `upsert` sobre la clave (jornada, persona). Corregir a alguien que se
+        apunto mal no puede exigir borrar una fila a mano.
+      */
+      await this.prisma.scoped.attendanceRecord.upsert({
+        where: { offeringId_userId: { offeringId, userId } },
+        create: {
+          tenantId,
+          offeringId,
+          userId,
+          status: fila.estado,
+          justification: fila.motivo ?? null,
+          method: 'INSTRUCTOR',
+          checkedAt: heldOn,
+          markedBy: actor.id,
+        },
+        update: {
+          status: fila.estado,
+          justification: fila.motivo ?? null,
+          method: 'INSTRUCTOR',
+          checkedAt: heldOn,
+          markedBy: actor.id,
+        },
+      });
+
+      if (fila.estado !== 'PRESENT') {
         // NO se cierra nada y NO se retira la obligacion: quien no vino la SIGUE debiendo, que es
-        // el punto entero de tomar asistencia. Queda escrito que se le convoco y no asistio.
-        await this.prisma.scoped.enrollment.update({
-          where: { id: fila.enrollmentId },
-          data: { attendedAt: null, attendanceBy: actor.id },
-        });
+        // el punto entero de tomar asistencia. Una falta JUSTIFICADA explica por que no vino a esta
+        // jornada, no que ya no tenga que formarse: ira a la siguiente.
         ausentes += 1;
+        if (fila.estado === 'JUSTIFIED') justificados += 1;
         continue;
       }
+
       const resultado = await this.completion.cerrarPorAsistencia(this.prisma.scoped, tenantId, {
         enrollmentId: fila.enrollmentId,
         attendedAt: heldOn,
-        attendanceBy: actor.id,
         certificado: fila.certificate
           ? {
               issuer: fila.certificate.issuer,
@@ -203,12 +250,13 @@ export class OfferingsService {
         revisadas: input.items.length,
         cerradas,
         ausentes,
+        justificados,
         conCertificadoExterno: conCertificado.length,
         acta: Boolean(input.attendanceSheetKey),
       },
     });
 
-    return { revisadas: input.items.length, cerradas, ausentes, ignoradas };
+    return { revisadas: input.items.length, cerradas, ausentes, justificados, ignoradas };
   }
 
   /**
@@ -1216,7 +1264,6 @@ export class OfferingsService {
         // LA ASISTENCIA Y EL PAPEL (Decision #157). La lista tiene que abrirse con lo que ya se
         // marco: volver a la jornada al dia siguiente y encontrarla en blanco haria que alguien la
         // tomara dos veces.
-        attendedAt: true,
         extCertIssuer: true,
         extCertNumber: true,
         extCertIssuedAt: true,
@@ -1232,7 +1279,38 @@ export class OfferingsService {
         },
       },
     });
-    return { total: enrollments.length, items: enrollments };
+
+    /*
+      LA ASISTENCIA SE PEGA APARTE, y de una sola consulta.
+
+      `attendance_records` cuelga de la JORNADA y la PERSONA, no de la inscripcion, asi que Prisma no
+      la puede traer anidada en el mismo select. Se piden todas las de esta jornada de un viaje y se
+      cruzan en memoria: son las de una sesion, no las del tenant.
+
+      `null` es un estado con significado —**todavia no se ha revisado**— y no es lo mismo que
+      AUSENTE. La primera es trabajo pendiente; la segunda es evidencia de que se le convoco y no
+      vino. Un dato que se lee por lo que le falta acaba significando dos cosas.
+    */
+    const asistencia = new Map(
+      (
+        await this.prisma.scoped.attendanceRecord.findMany({
+          where: { offeringId: id },
+          select: { userId: true, status: true, justification: true, method: true, checkedAt: true },
+        })
+      ).map((fila) => [fila.userId, fila]),
+    );
+
+    const items = enrollments.map((fila) => {
+      const marca = asistencia.get(fila.user.id) ?? null;
+      return {
+        ...fila,
+        attendanceStatus: marca?.status ?? null,
+        attendanceNote: marca?.justification ?? null,
+        attendanceMethod: marca?.method ?? null,
+        attendedAt: marca?.status === 'PRESENT' ? marca.checkedAt : null,
+      };
+    });
+    return { total: items.length, items };
   }
 
   /**

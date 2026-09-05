@@ -163,8 +163,10 @@ export class CompletionService {
    * ─── LO QUE ESO OBLIGA A REGISTRAR ───
    *
    * Cerrar asi **salta la evaluacion que exige el tipo**, y eso es exactamente lo que un auditor
-   * cuestionaria. Por eso queda `attendanceBy` —quien respondio por ello— ademas de la fila de
-   * auditoria: sin eso seria una puerta trasera para dar por cumplido lo que no se hizo.
+   * cuestionaria. Quien respondio por ello queda en el `AttendanceRecord` (`marked_by`, con su
+   * metodo y su sello de tiempo) ademas de en la fila de auditoria: sin eso seria una puerta
+   * trasera para dar por cumplido lo que no se hizo. Esta funcion solo CIERRA; la evidencia de la
+   * asistencia la escribe quien toma la lista.
    *
    * ─── Y LA CONSTANCIA, QUE ES LA PARTE QUE SE PIENSA MAL ───
    *
@@ -180,7 +182,6 @@ export class CompletionService {
     input: {
       enrollmentId: string;
       attendedAt: Date;
-      attendanceBy: string;
       certificado?: {
         issuer: string;
         number: string;
@@ -212,8 +213,6 @@ export class CompletionService {
         // PASSED diria que aprobo una evaluacion de la plataforma, y no la hubo. COMPLETED es lo
         // que de verdad consta: estuvo y la jornada se dicto.
         ...(yaCerrada ? {} : { status: 'COMPLETED', completedAt: input.attendedAt }),
-        attendedAt: input.attendedAt,
-        attendanceBy: input.attendanceBy,
         ...(cert
           ? {
               extCertIssuer: cert.issuer,

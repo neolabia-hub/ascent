@@ -190,12 +190,17 @@ export class OfferingsController {
   /**
    * LA LISTA DE ASISTENCIA (Decision #157): la segunda via de dar por cumplida una formacion.
    *
-   * Va bajo `offerings:manage` —el mismo permiso con el que se convoca— y no bajo uno nuevo: quien
-   * cita a la gente a una jornada es quien despues dice quien vino. Partirlo en dos permisos
-   * obligaria a configurar dos roles para un solo trabajo.
+   * Va bajo **`attendance:take`** y no bajo `offerings:manage`, que es lo que parecia natural.
+   * El permiso ya existia desde el Sprint 1 sin que nadie lo usara, y existe por una razon que se
+   * ve en cuanto se piensa en quien hace este trabajo: **el INSTRUCTOR** (CLAUDE.md 1: *"dicta
+   * convocatorias: toma asistencia, firma actas"*). Quien dicta la jornada tiene que poder decir
+   * quien vino sin poder ademas programar, publicar ni cancelar convocatorias — que es lo que le
+   * daria `offerings:manage`.
+   *
+   * ADMIN y ANALISTA lo tienen de fabrica, asi que no cambia nada de lo que ya funcionaba.
    */
   @Post(':id/attendance')
-  @RequirePermissions('offerings:manage')
+  @RequirePermissions('attendance:take')
   attendance(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.offerings.marcarAsistencia(actor, id, marcarAsistenciaSchema.parse(body));
   }

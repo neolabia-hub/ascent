@@ -222,9 +222,21 @@ export type CertificadoExternoInput = z.infer<typeof certificadoExternoSchema>;
  * grupo —se lee la hoja firmada de arriba abajo— y mandar uno por uno dejaria a medias la jornada
  * si el navegador se cae en el decimoquinto.
  *
- * `attended: false` es informacion, no ausencia de dato: "convocado y NO vino" es justo lo que hay
- * que poder demostrar, y es distinto de "no lo hemos revisado todavia".
+ * LOS TRES ESTADOS, y el cuarto que es no mandar la fila. "Convocado y NO vino" es justo lo que
+ * hay que poder demostrar, y es distinto de "no lo hemos revisado todavia" — por eso el estado es
+ * explicito y no se deduce de un campo vacio.
+ *
+ * **JUSTIFIED no exime la formacion**, y es deliberado: explica por que no vino a ESA jornada, no
+ * que ya no tenga que formarse. La sigue debiendo y va a la siguiente. Eximir es otro acto, con su
+ * propio motivo y su propia auditoria.
+ *
+ * Lo que se escribe es un `AttendanceRecord` —la tabla que ya estaba en el esquema desde el Sprint
+ * 5— con `method: INSTRUCTOR`. Los otros dos metodos que preve el diseno (QR de sesion y firma en
+ * pantalla) comparten esa misma tabla cuando se construyan.
  */
+export const asistenciaEstadoSchema = z.enum(['PRESENT', 'ABSENT', 'JUSTIFIED']);
+export type AsistenciaEstado = z.infer<typeof asistenciaEstadoSchema>;
+
 export const marcarAsistenciaSchema = z.object({
   /** El dia en que se dicto. Por defecto, hoy. */
   heldOn: z.string().date().optional(),
@@ -232,11 +244,27 @@ export const marcarAsistenciaSchema = z.object({
   attendanceSheetKey: z.string().max(500).optional(),
   items: z
     .array(
-      z.object({
-        enrollmentId: z.string().uuid(),
-        attended: z.boolean(),
-        certificate: certificadoExternoSchema.optional(),
-      }),
+      z
+        .object({
+          enrollmentId: z.string().uuid(),
+          estado: asistenciaEstadoSchema,
+          /** Por que se justifico. Obligatorio en JUSTIFIED: una justificacion sin motivo no
+           *  justifica nada, y es lo que el auditor va a leer. */
+          motivo: z.string().trim().max(500).optional(),
+          certificate: certificadoExternoSchema.optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (value.estado === 'JUSTIFIED' && (value.motivo ?? '').length < 5) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['motivo'], message: 'Escribe por que se justifica.' });
+          }
+          if (value.estado !== 'PRESENT' && value.certificate) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['certificate'],
+              message: 'Solo se registra el certificado de quien asistio.',
+            });
+          }
+        }),
     )
     .min(1)
     .max(500),

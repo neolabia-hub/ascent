@@ -16,7 +16,7 @@ dentro de un ano) entienda que hay construido sin leer el codigo:
 | [02](02-catalogo-formativo.md) | Catalogo formativo: versionado, lecciones, evaluaciones | Terminado |
 | [03](03-convocatorias-asignaciones-plan.md) | Convocatorias, audiencias, asignaciones y plan anual | Terminado |
 | [04](04-experiencia-aprendiz.md) | Experiencia del aprendiz: PWA, reproductor de tarjetas, examenes, repaso y racha | Terminado |
-| [05](05-cumplimiento.md) | Certificados, encuestas, seguimiento de la ejecucion y capa de plataforma | Terminado salvo asistencia presencial |
+| [05](05-cumplimiento.md) | Certificados, encuestas, seguimiento de la ejecucion y capa de plataforma | Terminado. La asistencia, que quedo fuera, llego el 2026-09-05 (Decision #157): el mecanismo 1 de 3 —la lista del instructor—; el QR y la firma siguen disenados sin construir |
 | 06 | Reportes, IA, auditoria y salida a produccion | Pendiente |
 
 ## Esto es historia, no referencia

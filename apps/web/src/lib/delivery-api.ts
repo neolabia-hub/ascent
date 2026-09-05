@@ -223,14 +223,26 @@ export interface RosterRow {
   completedAt: string | null;
   finalScore: string | number | null;
   assignmentId: string | null;
-  /** Cuando se marco que ASISTIO. `null` con la jornada ya revisada significa que no vino. */
+  /** Cuando se marco que ASISTIO. */
   attendedAt: string | null;
+  /**
+   * PRESENT / ABSENT / JUSTIFIED, o `null` = **todavia sin revisar**, que no es lo mismo que
+   * ausente: la primera es trabajo pendiente y la segunda es evidencia de que se le convoco y no
+   * vino. Sale de `attendance_records`, no de la inscripcion.
+   */
+  attendanceStatus: AsistenciaEstado | null;
+  attendanceNote: string | null;
+  /** Como se marco: INSTRUCTOR hoy; QR y SIGNATURE cuando se construyan (CLAUDE.md 3.7). */
+  attendanceMethod: 'INSTRUCTOR' | 'QR' | 'SIGNATURE' | null;
   extCertIssuer: string | null;
   extCertNumber: string | null;
   extCertIssuedAt: string | null;
   extCertValidUntil: string | null;
   user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string }; area: { name: string } };
 }
+
+/** Los tres estados de la lista de asistencia (CLAUDE.md 3.7). */
+export type AsistenciaEstado = 'PRESENT' | 'ABSENT' | 'JUSTIFIED';
 
 /** El papel de un tercero, cuando el tipo de formacion lo lleva (Decision #157). */
 export interface CertificadoExterno {
@@ -252,9 +264,15 @@ export function marcarAsistencia(
   id: string,
   body: {
     heldOn?: string;
-    items: { enrollmentId: string; attended: boolean; certificate?: CertificadoExterno }[];
+    items: {
+      enrollmentId: string;
+      estado: AsistenciaEstado;
+      /** Obligatorio en JUSTIFIED: una justificacion sin motivo no justifica nada. */
+      motivo?: string;
+      certificate?: CertificadoExterno;
+    }[];
   },
-): Promise<{ revisadas: number; cerradas: number; ausentes: number; ignoradas: string[] }> {
+): Promise<{ revisadas: number; cerradas: number; ausentes: number; justificados: number; ignoradas: string[] }> {
   return apiFetch(`/offerings/${id}/attendance`, { method: 'POST', body });
 }
 

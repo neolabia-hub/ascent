@@ -24,7 +24,7 @@ node scripts/recorridos/extraordinaria.mjs          # crea un plan tapadera y lo
 node scripts/recorridos/recertificacion.mjs         # aniversario por persona, y jornada dictada por un tercero
 node scripts/recorridos/tajadas.mjs                 # jornadas acotadas: 6 tipos x 7 facetas, y 2 reglas
 node scripts/recorridos/proyectados-ajuste.mjs      # congelar, que cambie la plantilla, ajustar con motivo
-node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia, y "el papel manda"
+node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia, "el papel manda", 2 reglas y acotamiento
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```
@@ -233,6 +233,16 @@ SG-SST la mayor parte del plan anual se dicta en salon.
 | Sin papel | **si** se emite: una charla presencial que no certifica nada deja a la persona sin nada mas |
 | **EL PAPEL MANDA** | su fecha se copia a `assignments.valid_until_override` y es la que decide cuando vuelve |
 | La compuerta del tipo | `tracksExternalCertificate`, comprobada contra el SERVIDOR (409) y no solo en la pantalla |
+
+**Y lo que se anadio el mismo dia, que pidio el cliente:** la falta JUSTIFICADA (que explica pero
+**no exime** — la formacion se sigue debiendo), **dos reglas** sobre la misma persona (le nacen dos
+obligaciones y asistir cierra UNA), el **acotamiento** por facetas (se cruzan: cargo 100 · area 240
+· las dos, 9) y que una lista **no alcanza fuera de su jornada**.
+
+**Y sobre hacer un recorrido por tipo:** no. Cerrar por asistencia no depende del tipo sino del
+`kind` de la jornada, asi que siete archivos serian siete copias del mismo camino desincronizandose
+una a una. Lo propio de cada tipo —constancia, examen, plan— ya lo deriva `estandar.mjs` de su
+configuracion. Es la misma decision que ya tomo `tajadas.mjs`.
 
 **Como se mide "el papel manda" sin tocar el reloj:** un certificado que vence dentro de **30 dias**
 sobre una formacion con recurrencia de **12 meses**. Es el mismo truco de comprimir — la ventana esta

@@ -987,9 +987,12 @@ model Offering {
   instructorCredentialKey String?    @map("instructor_credential_key") // idoneidad adjuntable
   executedBy              ExecutedBy @default(PROPIOS) @map("executed_by")
   executedByOther         String?    @map("executed_by_other")
-  /// EL ACTA firmada de la jornada: UN documento para todos los que asistieron, no uno por
+  /// EL ACTA ESCANEADA de la jornada: UN documento para todos los que asistieron, no uno por
   /// persona. Es como se hace de verdad —una hoja que circula y se firma— y pedirla por cabeza
   /// obligaria a subir veinte veces el mismo escaneo.
+  ///
+  /// No se confunde con `SessionAct`, que es el acta que GENERA el sistema (PDF inmutable con su
+  /// hash, a partir de las firmas en pantalla). Esta es la de papel, la que se sube escaneada.
   attendanceSheetKey      String?    @map("attendance_sheet_key")
 
   location   String?
@@ -1063,19 +1066,11 @@ model Enrollment {
   blockedReason String?   @map("blocked_reason")
   unblockedBy   String?   @map("unblocked_by") @db.Uuid
 
-  /// ─────────── LA SEGUNDA VIA DE EVIDENCIA: LA ASISTENCIA (Decision #157) ───────────
-  ///
-  /// Hasta aqui una ejecucion solo se cerraba de UNA forma: la persona entrando a la plataforma
-  /// y completando el contenido. En una empresa bajo SG-SST la mayor parte del plan anual se
-  /// dicta en salon —charlas de seguridad vial, brigadas, lo que trae la ARL—, y de eso no queda
-  /// contenido que completar: queda una LISTA DE ASISTENCIA firmada, que es la evidencia que el
-  /// auditor pide. Sin esto, todo lo dictado presencialmente contaba como incumplido.
-  attendedAt   DateTime? @map("attended_at")
-  /// Quien la marco. Cerrar por asistencia SALTA la evaluacion que exige el tipo —el examen lo
-  /// puso el instructor en el salon— asi que tiene que constar quien respondio por ello.
-  attendanceBy String?   @map("attendance_by") @db.Uuid
-
-  /// ─────────── LA TERCERA: EL PAPEL DE UN TERCERO (Decision #157) ───────────
+  /// LA SEGUNDA VIA DE EVIDENCIA —la asistencia— NO vive aqui: vive en `AttendanceRecord`, que
+  /// ya estaba en el esquema desde el Sprint 5 con los tres estados, el metodo, la justificacion y
+  /// la firma. La primera version de la Decision #157 le puso columnas propias a `enrollments` sin
+  /// verla, y eso son dos casas para el mismo hecho. Corregido el 2026-09-05.
+  /// ─────────── LA TERCERA VIA: EL PAPEL DE UN TERCERO (Decision #157) ───────────
   ///
   /// Alturas, espacios confinados, montacargas, manipulacion de alimentos: la norma exige el
   /// certificado de un organismo acreditado, y ahi la empresa es RECEPTORA, no emisora. El

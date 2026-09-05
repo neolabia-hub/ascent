@@ -150,6 +150,7 @@ export {
   previewProjectedSchema,
   certificadoExternoSchema,
   marcarAsistenciaSchema,
+  asistenciaEstadoSchema,
 } from './schemas/offerings.js';
 export type {
   CreateOfferingInput,
@@ -163,6 +164,7 @@ export type {
   PreviewProjectedInput,
   CertificadoExternoInput,
   MarcarAsistenciaInput,
+  AsistenciaEstado,
 } from './schemas/offerings.js';
 
 export {

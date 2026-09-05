@@ -15,6 +15,11 @@ Cerrar el ciclo de cumplimiento: que una capacitación terminada **produzca evid
 - **Asistencia presencial y QR.** El cliente dijo explícitamente que no era urgente. Tiene una
   consecuencia que hay que recordar: **las formaciones presenciales no emiten constancia**, porque
   ahí no hay reproductor que marque completado sino asistencia marcada.
+
+  > **Costó más de lo que parecía en su momento** (nota del 2026-09-05). No era que lo presencial no
+  > emitiera constancia: es que **no se podía cerrar de ninguna forma**, y por tanto contaba como
+  > incumplido en todos los indicadores. Encima de esa capa está construido el plan entero. Se
+  > resolvió con la Decisión #157 — el mecanismo 1 de los 3, la lista del instructor.
 - **Reportes agregados y exportables.** Van a Sprint 6. Lo que se construyó es el *seguimiento de la
   ejecución*, que es otra cosa: el estado persona a persona, no el indicador consolidado.
 - **Evaluación de desempeño anual.** Se analizó y se decidió que es un módulo aparte: distinto ciclo,
@@ -125,7 +130,7 @@ resolución del evaluador de eficacia, los seis estados de ejecución, y el guar
 
 | Pendiente | Criticidad | Nota |
 |---|---|---|
-| **Asistencia presencial y QR** | **Alta** | Bloquea que lo presencial emita constancia |
+| ~~Asistencia presencial y QR~~ | — | **La lista del instructor, hecha el 2026-09-05** (Decisión #157). No bloqueaba solo la constancia: bloqueaba que lo presencial se pudiera dar por cumplido. El QR y la firma en pantalla siguen diseñados sin construir |
 | ~~Exportar el seguimiento a Excel~~ | — | **Hecho el 2026-09-01** (Decision #124). El PDF se descarto: 600 filas en PDF no se ordenan ni se filtran. Ver `docs/modulos/seguimiento.md` |
 | El enlace del plan no filtra al llegar a Seguimiento | Media | Falta leer `?formacion=` |
 | Renombrar «Reportes» a «Seguimiento» en la navegación | Media | Los reportes de verdad llegan en Sprint 6 |

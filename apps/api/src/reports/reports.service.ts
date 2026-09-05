@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   ESTADOS_RETIRADOS,
+  inscripcionDeCadaRonda,
   resolverEstadoEjecucion,
   resumirEjecucion,
   type EstadoEjecucion,
@@ -51,6 +52,10 @@ export class ReportsService {
         dueAt: true,
         status: true,
         cycleNumber: true,
+        // EL ENLACE A LA EJECUCION QUE LA SATISFIZO (Decision #2: se enlazan, no se fusionan).
+        // Sin esto el informe tenia que adivinar que inscripcion describe a que ronda, y adivinaba
+        // mal — ver la nota de `inscripcionDeCadaRonda`.
+        completedEnrollmentId: true,
         user: {
           select: {
             id: true,
@@ -89,6 +94,9 @@ export class ReportsService {
         userId: true,
         status: true,
         completedAt: true,
+        // A QUE OBLIGACION pertenece. Nace enlazada al inscribir (Decision #2), tanto si la
+        // inscribe quien convoca como si la persona entra sola.
+        assignmentId: true,
         activityVersion: { select: { versionNumber: true } },
       },
     });
@@ -122,10 +130,28 @@ export class ReportsService {
       }),
     ]);
 
-    // La inscripcion MAS RECIENTE de cada persona: una formacion recurrente tiene una por ronda, y
-    // la que describe el estado de hoy es la ultima.
-    const inscripcionPorUsuario = new Map<string, (typeof inscripciones)[number]>();
-    for (const fila of inscripciones) if (!inscripcionPorUsuario.has(fila.userId)) inscripcionPorUsuario.set(fila.userId, fila);
+    /*
+      LA INSCRIPCION SE PEGA A SU RONDA, NO A LA PERSONA (2026-09-05).
+
+      Aqui se cogia la inscripcion MAS RECIENTE de cada persona y se aplicaba a TODAS sus filas.
+      Con una formacion que no se repite da igual —hay una ronda y una inscripcion— y en cuanto se
+      repite es falso: `resolverEstadoEjecucion` pregunta primero por el resultado, asi que **quien
+      completo la ronda 1 salia con la ronda 2 tambien como TERMINADA**.
+
+      MEDIDO el 2026-09-05 con el recorrido de asistencia: 5 obligaciones, 3 pendientes de verdad,
+      y el informe decia 4 terminadas. En produccion es la reinduccion de 796 personas figurando
+      hecha el 2 de enero de cada ano.
+
+      Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como "sin empezar"—
+      pero al reves: aquel inflaba el incumplimiento y este infla el CUMPLIMIENTO, que es el que no
+      se descubre solo porque nadie reclama un numero que le favorece.
+
+      No hacia falta inventar nada: el enlace existe en las dos direcciones desde el Sprint 3
+      (`assignments.completed_enrollment_id` y `enrollments.assignment_id`, Decision #2). Se usa el
+      enlace y NO se adivina: una inscripcion sin obligacion no colorea ninguna fila, que es lo
+      correcto — es una ejecucion que no responde por ese requisito.
+    */
+    const inscripcionPorObligacion = inscripcionDeCadaRonda(vivas, inscripciones);
 
     const mejorNota = new Map<string, number>();
     const cuantosIntentos = new Map<string, number>();
@@ -144,7 +170,7 @@ export class ReportsService {
     const certificadoPorUsuario = new Map(certificados.map((fila) => [fila.userId, fila]));
 
     const items = vivas.map((fila) => {
-      const inscripcion = inscripcionPorUsuario.get(fila.userId) ?? null;
+      const inscripcion = inscripcionPorObligacion.get(fila.id) ?? null;
       const estado: EstadoEjecucion = resolverEstadoEjecucion({
         overdue: fila.status === 'OVERDUE',
         assignmentStatus: fila.status,
@@ -216,7 +242,9 @@ export class ReportsService {
         // Y lo mismo con la obligacion RETIRADA, por el mismo motivo (ver `ESTADOS_RETIRADOS`).
         status: { notIn: [...ESTADOS_RETIRADOS] },
       },
-      select: { userId: true, targetId: true, status: true },
+      // `id` y `completedEnrollmentId`: la ejecucion se pega a la RONDA, no a la persona
+      // (`inscripcionDeCadaRonda`). Sin ellos, quien completo la ronda 1 salia con la 2 terminada.
+      select: { id: true, userId: true, targetId: true, status: true, completedEnrollmentId: true },
     });
     if (asignaciones.length === 0) return null;
 
@@ -226,7 +254,13 @@ export class ReportsService {
       this.prisma.scoped.enrollment.findMany({
         where: { activityVersion: { activityId: { in: ids } } },
         orderBy: { enrolledAt: 'desc' },
-        select: { userId: true, status: true, activityVersion: { select: { activityId: true } } },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          assignmentId: true,
+          activityVersion: { select: { activityId: true } },
+        },
       }),
       this.prisma.scoped.offering.findMany({
         where: {
@@ -238,13 +272,9 @@ export class ReportsService {
       }),
     ]);
 
-    // La MAS RECIENTE por persona y formacion: una recurrente tiene una inscripcion por ronda, y la
-    // que describe el estado de hoy es la ultima.
-    const ultima = new Map<string, (typeof inscripciones)[number]>();
-    for (const fila of inscripciones) {
-      const clave = `${fila.userId}|${fila.activityVersion.activityId}`;
-      if (!ultima.has(clave)) ultima.set(clave, fila);
-    }
+    // POR RONDA y no por persona: ver `inscripcionDeCadaRonda`. Coger la mas reciente de cada uno
+    // hacia que quien completo la ronda 1 saliera con la ronda 2 tambien como TERMINADA.
+    const porRonda = inscripcionDeCadaRonda(asignaciones, inscripciones);
 
     const conPuerta = new Set(convocatorias.map((fila) => fila.activityVersion.activityId));
     const porActividad = new Map<string, EstadoEjecucion[]>();
@@ -254,7 +284,7 @@ export class ReportsService {
       const estado = resolverEstadoEjecucion({
         overdue: asignacion.status === 'OVERDUE',
         assignmentStatus: asignacion.status,
-        enrollmentStatus: ultima.get(`${asignacion.userId}|${asignacion.targetId}`)?.status ?? null,
+        enrollmentStatus: porRonda.get(asignacion.id)?.status ?? null,
         puedeAutoinscribirse: conPuerta.has(asignacion.targetId),
       });
       const previos = porActividad.get(asignacion.targetId);
@@ -420,9 +450,13 @@ export class ReportsService {
         ...(planId ? { source: 'PLAN', planItem: { planId } } : {}),
       },
       select: {
+        // `id` y `completedEnrollmentId`: la ejecucion se pega a la RONDA, no a la persona
+        // (`inscripcionDeCadaRonda`). Sin ellos, quien completo la ronda 1 salia con la 2 terminada.
+        id: true,
         userId: true,
         targetId: true,
         status: true,
+        completedEnrollmentId: true,
         user: {
           select: {
             area: { select: { id: true, name: true } },
@@ -441,7 +475,13 @@ export class ReportsService {
       this.prisma.scoped.enrollment.findMany({
         where: { activityVersion: { activityId: { in: ids } } },
         orderBy: { enrolledAt: 'desc' },
-        select: { userId: true, status: true, activityVersion: { select: { activityId: true } } },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          assignmentId: true,
+          activityVersion: { select: { activityId: true } },
+        },
       }),
       this.prisma.scoped.offering.findMany({
         where: {
@@ -462,11 +502,9 @@ export class ReportsService {
       }),
     ]);
 
-    const ultima = new Map<string, (typeof inscripciones)[number]>();
-    for (const fila of inscripciones) {
-      const clave = `${fila.userId}|${fila.activityVersion.activityId}`;
-      if (!ultima.has(clave)) ultima.set(clave, fila);
-    }
+    // POR RONDA y no por persona: ver `inscripcionDeCadaRonda`. Coger la mas reciente de cada uno
+    // hacia que quien completo la ronda 1 saliera con la ronda 2 tambien como TERMINADA.
+    const porRonda = inscripcionDeCadaRonda(asignaciones, inscripciones);
     const conPuerta = new Set(convocatorias.map((fila) => fila.activityVersion.activityId));
     const porActividad = new Map(actividades.map((fila) => [fila.id, fila]));
 
@@ -477,7 +515,7 @@ export class ReportsService {
         estado: resolverEstadoEjecucion({
           overdue: asignacion.status === 'OVERDUE',
           assignmentStatus: asignacion.status,
-          enrollmentStatus: ultima.get(`${asignacion.userId}|${asignacion.targetId}`)?.status ?? null,
+          enrollmentStatus: porRonda.get(asignacion.id)?.status ?? null,
           puedeAutoinscribirse: conPuerta.has(asignacion.targetId),
         }),
         area: asignacion.user.area ?? null,

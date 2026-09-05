@@ -122,7 +122,7 @@ comprobar(publicada.ok, `publicada (${publicada.estado})`, `publicar: ${publicad
   El tipo exige evaluacion; la jornada la dicta la ARL y el examen lo pone el instructor en el
   salon. Si cerrar por asistencia pasara por la misma puerta que el aprendiz, aqui diria "falta el
   examen" para siempre. No es un atajo alrededor de la regla: es que la evidencia es OTRA, y por eso
-  queda escrito QUIEN respondio por ella (`attendanceBy`).
+  queda escrito QUIEN respondio por ella (`attendance_records.marked_by`).
 */
 
 paso(3, 'EXIGIRLA AL CARGO, y dos personas que la deben');
@@ -170,7 +170,7 @@ comprobar(lista.length === 2, 'la lista de la jornada trae a los dos', `trae ${l
 const inscVa = lista.find((f) => f.user.id === elQueVa.id);
 const inscFalta = lista.find((f) => f.user.id === elQueFalta.id);
 comprobar(
-  inscVa?.attendedAt === null && inscVa?.extCertNumber === null,
+  inscVa?.attendanceStatus === null && inscVa?.extCertNumber === null,
   'y abre en blanco: nadie ha marcado asistencia todavia',
   'la lista viene con asistencia ya marcada, y no deberia',
 );
@@ -209,7 +209,7 @@ comprobar(convocarTestigo.ok, 'y hay alguien convocado en ella', `convocar testi
 const lista2 = (await admin.get(`/offerings/${jornada2.cuerpo?.id}/roster`)).cuerpo?.items ?? [];
 comprobar(lista2.length === 1, 'la lista de la testigo trae a esa persona', `trae ${lista2.length}`);
 const rechazo = await admin.post(`/offerings/${jornada2.cuerpo?.id}/attendance`, {
-  items: [{ enrollmentId: lista2[0]?.id, attended: true, certificate: { issuer: 'ARL Sura', number: 'X-1' } }],
+  items: [{ enrollmentId: lista2[0]?.id, estado: 'PRESENT', certificate: { issuer: 'ARL Sura', number: 'X-1' } }],
 });
 comprobar(
   rechazo.estado === 409 && rechazo.cuerpo?.code === 'TYPE_DOES_NOT_TRACK_EXTERNAL_CERT',
@@ -218,7 +218,7 @@ comprobar(
 );
 // Y sin certificado, la MISMA jornada si cierra: la charla generica se acredita por asistencia sola.
 const soloAsistencia = await admin.post(`/offerings/${jornada2.cuerpo?.id}/attendance`, {
-  items: [{ enrollmentId: lista2[0]?.id, attended: true }],
+  items: [{ enrollmentId: lista2[0]?.id, estado: 'PRESENT' }],
 });
 comprobar(
   soloAsistencia.ok && soloAsistencia.cuerpo?.cerradas === 1,
@@ -237,7 +237,7 @@ if (permanentes.length === 0) {
   ok('no hay ninguna convocatoria permanente viva ahora mismo: nada que comprobar aqui');
 } else {
   const noVa = await admin.post(`/offerings/${permanentes[0].id}/attendance`, {
-    items: [{ enrollmentId: '00000000-0000-4000-8000-000000000000', attended: true }],
+    items: [{ enrollmentId: '00000000-0000-4000-8000-000000000000', estado: 'PRESENT' }],
   });
   comprobar(
     noVa.estado === 409 && noVa.cuerpo?.code === 'OFFERING_NOT_ATTENDABLE',
@@ -263,10 +263,10 @@ const asistencia = await admin.post(`/offerings/${creado.offeringId}/attendance`
   items: [
     {
       enrollmentId: inscVa.id,
-      attended: true,
+      estado: 'PRESENT',
       certificate: { issuer: 'ARL Sura', number: `MC-${marca}`, issuedAt: fecha, validUntil: venceElPapel },
     },
-    { enrollmentId: inscFalta.id, attended: false },
+    { enrollmentId: inscFalta.id, estado: 'ABSENT' },
   ],
 });
 comprobar(asistencia.ok, `asistencia guardada (${asistencia.estado})`, `asistencia: ${asistencia.estado} ${JSON.stringify(asistencia.cuerpo).slice(0, 250)}`);
@@ -285,7 +285,7 @@ comprobar(
 );
 const listaTras = (await admin.get(`/offerings/${creado.offeringId}/roster`)).cuerpo?.items ?? [];
 const filaVa = listaTras.find((f) => f.user.id === elQueVa.id);
-comprobar(!!filaVa?.attendedAt, 'y consta COMO consta: por asistencia, no por la plataforma', 'no quedo la marca de asistencia');
+comprobar(filaVa?.attendanceStatus === 'PRESENT', 'y consta COMO consta: por asistencia, no por la plataforma', 'no quedo la marca de asistencia');
 comprobar(
   filaVa?.extCertNumber === `MC-${marca}` && (filaVa?.extCertIssuer ?? '').length > 0,
   `el papel queda registrado: ${filaVa?.extCertIssuer} · ${filaVa?.extCertNumber}`,
@@ -298,7 +298,7 @@ const viva = trasFaltar.filter((a) => ['PENDING', 'IN_PROGRESS', 'OVERDUE'].incl
 console.log(`   ... tiene ${trasFaltar.length}: ${trasFaltar.map((a) => a.status).join(', ')}`);
 comprobar(viva.length === 1, 'sigue con su obligacion viva: no se cerro y no se retiro', `tiene ${viva.length} vivas`);
 const filaFalta = listaTras.find((f) => f.user.id === elQueFalta.id);
-comprobar(!filaFalta?.attendedAt, 'y en la lista consta que se le convoco y no asistio', 'quedo marcado como asistente');
+comprobar(filaFalta?.attendanceStatus === 'ABSENT', 'y en la lista consta que se le convoco y no asistio', 'quedo marcado como asistente');
 
 paso(10, 'CON PAPEL DE UN TERCERO NO SE EMITE CONSTANCIA PROPIA');
 /*
@@ -343,7 +343,129 @@ comprobar(
   `la ronda 2 vence ${enBogota(ronda2?.dueAt)} y el papel dice ${venceElPapel}`,
 );
 
-await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 12 });
+paso(12, 'LA FALTA JUSTIFICADA: se explica, pero NO exime');
+/*
+  El tercer estado del diseno (CLAUDE.md 3.7), y el que mas facil se malinterpreta. "Estaba
+  incapacitado" explica por que no vino a ESTA jornada; no dice que ya no tenga que formarse. La
+  obligacion sigue viva y esa persona ira a la siguiente. Eximir es otro acto, deliberado, con su
+  propio motivo y su propia auditoria — confundirlos convertiria una incapacidad en un permiso
+  permanente para no capacitarse.
+*/
+const justificar = await admin.post(`/offerings/${creado.offeringId}/attendance`, {
+  heldOn: fecha,
+  items: [{ enrollmentId: inscFalta.id, estado: 'JUSTIFIED', motivo: 'Incapacidad medica del 3 al 8.' }],
+});
+comprobar(justificar.ok && justificar.cuerpo?.justificados === 1, `falta justificada registrada (${justificar.estado})`, `justificar: ${justificar.estado} ${JSON.stringify(justificar.cuerpo).slice(0, 220)}`);
+
+const sinMotivo = await admin.post(`/offerings/${creado.offeringId}/attendance`, {
+  items: [{ enrollmentId: inscFalta.id, estado: 'JUSTIFIED' }],
+});
+comprobar(
+  sinMotivo.estado === 422,
+  'y una justificacion SIN motivo se rechaza: no justifica nada, y es lo que lee el auditor',
+  `esperaba 422 y vino ${sinMotivo.estado}`,
+);
+
+const listaJust = (await admin.get(`/offerings/${creado.offeringId}/roster`)).cuerpo?.items ?? [];
+const filaJust = listaJust.find((f) => f.user.id === elQueFalta.id);
+comprobar(
+  filaJust?.attendanceStatus === 'JUSTIFIED' && (filaJust?.attendanceNote ?? '').length > 0,
+  `queda el estado y el motivo: "${filaJust?.attendanceNote}"`,
+  `estado=${filaJust?.attendanceStatus} motivo=${filaJust?.attendanceNote}`,
+);
+comprobar(
+  filaJust?.attendanceMethod === 'INSTRUCTOR',
+  'y COMO se marco: lista del instructor, el primero de los tres metodos que preve el diseno',
+  `metodo=${filaJust?.attendanceMethod}`,
+);
+const trasJustificar = (await suyas(elQueFalta.id)).filter((a) => ['PENDING', 'IN_PROGRESS', 'OVERDUE'].includes(a.status));
+comprobar(
+  trasJustificar.length === 1,
+  'y la formacion SIGUE debiendose: justificar la falta no exime, ira a la jornada siguiente',
+  `una falta justificada le quito la obligacion (${trasJustificar.length} vivas)`,
+);
+
+paso(13, 'DOS REGLAS SOBRE LA MISMA PERSONA: la asistencia cierra UNA obligacion');
+/*
+  El caso que aparece en cuanto una formacion se exige por dos caminos que alcanzan a la misma
+  gente —por cargo Y por area—. Hoy le nacen DOS obligaciones, porque la deduplicacion del motor es
+  POR REGLA, y asistir a UNA jornada cierra UNA. Se mide en vez de suponerlo, porque de aqui sale
+  el numero del auditor: si asistir cerrara las dos, una jornada cubriria dos requisitos distintos;
+  si no cerrara ninguna, quien fue seguiria en rojo.
+*/
+const reglaPorArea = await admin.post(`/activities/${creado.activityId}/requirements`, {
+  scope: { match: 'ALL', areaIds: [area.id] },
+  trigger: 'ON_JOIN', dueDaysAfterTrigger: 30, everyMonths: 12, soloNuevos: true,
+});
+comprobar(reglaPorArea.ok, `segunda regla, ahora por area "${area.name}" (${reglaPorArea.estado})`, `regla por area: ${reglaPorArea.estado} ${JSON.stringify(reglaPorArea.cuerpo).slice(0, 220)}`);
+const dosReglas = (await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? [];
+comprobar(dosReglas.length === 2, 'la formacion tiene DOS requisitos vivos', `tiene ${dosReglas.length}`);
+
+const doblePersona = await alta(3);
+creado.personas.push(doblePersona.id);
+const dobles = await suyas(doblePersona.id);
+console.log(`   ... a quien cumple las dos reglas le nacen ${dobles.length}: ${dobles.map((a) => a.status).join(', ')}`);
+comprobar(
+  dobles.length === 2,
+  'a quien cumple las dos le nacen DOS obligaciones — la deduplicacion del motor es por REGLA',
+  `le nacieron ${dobles.length}, y con dos reglas que la alcanzan deberian ser 2`,
+);
+
+const jornada3 = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+  scheduledDate: fecha, startTime: '14:00', endTime: '16:00', location: `Patio 2 ${SUFIJO}`,
+  executedBy: 'ARL', capacity: 10, intensityTheoryHours: 1, intensityPracticeHours: 1,
+});
+comprobar(jornada3.ok, 'segunda jornada programada', `jornada 3: ${jornada3.estado} ${JSON.stringify(jornada3.cuerpo).slice(0, 220)}`);
+const pub3 = await admin.post(`/offerings/${jornada3.cuerpo?.id}/publish`, { confirm: true });
+comprobar(pub3.ok, 'y publicada', `publicar jornada 3: ${pub3.estado} ${JSON.stringify(pub3.cuerpo).slice(0, 220)}`);
+const conv3 = await admin.post(`/offerings/${jornada3.cuerpo?.id}/enroll`, { userIds: [doblePersona.id] });
+comprobar(conv3.ok, 'se le convoca a ella', `convocar 3: ${conv3.estado} ${JSON.stringify(conv3.cuerpo).slice(0, 220)}`);
+const lista3 = (await admin.get(`/offerings/${jornada3.cuerpo?.id}/roster`)).cuerpo?.items ?? [];
+comprobar(lista3.length === 1, 'la lista de la segunda jornada la trae', `trae ${lista3.length}`);
+const cierraUna = await admin.post(`/offerings/${jornada3.cuerpo?.id}/attendance`, {
+  heldOn: fecha,
+  items: [{ enrollmentId: lista3[0]?.id, estado: 'PRESENT' }],
+});
+comprobar(cierraUna.ok && cierraUna.cuerpo?.cerradas === 1, 'asiste, y se cierra UNA obligacion', `cerradas=${cierraUna.cuerpo?.cerradas} ${JSON.stringify(cierraUna.cuerpo).slice(0, 200)}`);
+const trasLaJornada = await suyas(doblePersona.id);
+const vivasDoble = trasLaJornada.filter((a) => ['PENDING', 'IN_PROGRESS', 'OVERDUE'].includes(a.status));
+console.log(`   ... ahora tiene ${trasLaJornada.length}: ${trasLaJornada.map((a) => a.status).join(', ')}`);
+comprobar(
+  trasLaJornada.filter((a) => a.status === 'COMPLETED').length === 1 && vivasDoble.length === 1,
+  'una queda CUMPLIDA y la otra sigue viva: una jornada no cierra dos requisitos distintos',
+  `cumplidas=${trasLaJornada.filter((a) => a.status === 'COMPLETED').length} vivas=${vivasDoble.length}`,
+);
+
+paso(14, 'ACOTAMIENTO: las facetas se CRUZAN, y una lista no alcanza fuera de su jornada');
+/*
+  Que las facetas se cruzan y no se suman lo mide `tajadas.mjs` para los siete tipos. Aqui se
+  comprueba lo de al lado, que es lo propio de la asistencia: **una lista no puede cerrar la
+  formacion de quien no estuvo en esa sala**. Se intenta a proposito colar la inscripcion de otra
+  jornada; si eso funcionara, tomar una lista daria por cumplida a gente que nunca fue.
+*/
+const facetas = {
+  cargo: (await admin.post('/audiences/preview', { match: 'ALL', jobTitleIds: [cargo.id] })).cuerpo?.count ?? 0,
+  area: (await admin.post('/audiences/preview', { match: 'ALL', areaIds: [area.id] })).cuerpo?.count ?? 0,
+  cruzada: (await admin.post('/audiences/preview', { match: 'ALL', jobTitleIds: [cargo.id], areaIds: [area.id] })).cuerpo?.count ?? 0,
+};
+console.log(`   ... cargo ${facetas.cargo} · area ${facetas.area} · las dos cruzadas ${facetas.cruzada}`);
+comprobar(
+  facetas.cruzada <= Math.min(facetas.cargo, facetas.area),
+  'cruzar dos facetas nunca alcanza a mas que la menor de las dos: se cruza, no se suma',
+  `cruzada=${facetas.cruzada} cargo=${facetas.cargo} area=${facetas.area}`,
+);
+const colarse = await admin.post(`/offerings/${jornada3.cuerpo?.id}/attendance`, {
+  heldOn: fecha,
+  items: [{ enrollmentId: inscFalta.id, estado: 'PRESENT' }],
+});
+comprobar(
+  colarse.ok && colarse.cuerpo?.cerradas === 0 && (colarse.cuerpo?.ignoradas ?? []).length === 1,
+  'y la inscripcion de OTRA jornada se ignora: una lista no cierra la formacion de quien no estuvo',
+  `cerradas=${colarse.cuerpo?.cerradas} ignoradas=${(colarse.cuerpo?.ignoradas ?? []).length}`,
+);
+
+await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 15 });
 
 console.log(`\nCREADO PARA LIMPIAR: actividades=${creado.activityId},${conTipoSinPapel.cuerpo?.id} personas=${creado.personas.join(',')} sufijo=${SUFIJO}`);
 process.exit(resumen() === 0 ? 0 : 1);

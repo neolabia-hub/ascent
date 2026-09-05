@@ -20,6 +20,98 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-05 (noche) — Una tabla que ya existia, un informe que inflaba el cumplimiento, y un manual
+
+Sesion de revision sobre lo de la tarde. El encargo del cliente fue *"asegurate que pase pruebas en
+diferentes situaciones: varias reglas, sin acotamiento y con acotamiento de todas las facetas, y
+como se ve en seguimiento"*, y de ahi salieron tres cosas, dos de ellas incomodas.
+
+### 1. La asistencia ya tenia su tabla, y le habia puesto columnas a otra
+
+`attendance_records` **estaba en el esquema desde el Sprint 0** —los tres estados
+(PRESENT/ABSENT/JUSTIFIED), el metodo (INSTRUCTOR/QR/SIGNATURE), la justificacion, la firma y quien
+marco— vacia porque nadie la escribia. Y al lado `session_acts`, para el acta con su hash. La
+version de la tarde le habia puesto `attended_at` y `attendance_by` a `enrollments`.
+
+Se corrigio el mismo dia, con la tabla todavia vacia. Es el mismo problema que ya arrastra el
+informe de Vencimientos leyendo `certification_grants` —otra tabla que nadie escribe— solo que aquel
+lleva meses y este se cazo en horas.
+
+**La leccion:** este esquema se diseno entero al principio y lleva partes esperando. Antes de anadir
+una columna, buscar `model X` en `schema.prisma`.
+
+De paso salio el permiso correcto: **`attendance:take`**, que existia desde el Sprint 1 sin usarse,
+porque el INSTRUCTOR tiene que poder decir quien vino sin poder ademas programar ni cancelar
+convocatorias.
+
+### 2. Y esto es lo gordo: el informe daba por TERMINADA la ronda que la persona todavia debe
+
+Lo destapo medirlo. Cinco obligaciones —dos cumplidas y tres pendientes— y el informe decia **cuatro
+terminadas**. Los tres informes pegaban la inscripcion por `(persona, formacion)` y la aplicaban a
+todas sus filas; como `resolverEstadoEjecucion` pregunta primero por el resultado, **quien completo
+la ronda 1 salia con la ronda 2 tambien como TERMINADA**.
+
+**MEDIDO: el mismo escenario pasaba de 80% de avance a 40%.** En produccion es la reinduccion de 796
+personas figurando hecha el 2 de enero de cada ano.
+
+Es el hermano del fallo del 2026-09-04 pero al reves, y por eso es peor: aquel inflaba el
+incumplimiento y este infla el **cumplimiento** — nadie reclama un numero que le favorece.
+
+Arreglado con `inscripcionDeCadaRonda`, usando los enlaces que ya existian en las dos direcciones
+desde el Sprint 3 (Decision #2). Vive en `execution-state.ts` y se exporta por lo mismo que
+`ESTADOS_RETIRADOS`: son TRES informes.
+
+### 3. Lo que se midio, y por que NO hay un recorrido por tipo
+
+`asistencia.mjs` pasa de 12 a **15 pasos**: falta justificada (explica pero **no exime**), dos reglas
+sobre la misma persona (le nacen dos obligaciones y asistir cierra UNA), acotamiento por facetas
+(cargo 100 · area 240 · las dos, **9**), y que una lista no alcanza fuera de su jornada.
+
+Sobre lo del recorrido por tipo, que pregunto el cliente: **no**. Cerrar por asistencia no depende
+del tipo sino del `kind` de la jornada; siete archivos serian siete copias del mismo camino. Lo
+propio de cada tipo ya lo deriva `estandar.mjs` de su configuracion. Misma decision que `tajadas.mjs`.
+
+### 4. El manual, que tambien lo pidio
+
+`docs/guias/asistencia.html` —una guia propia, porque la asistencia es identica en los siete tipos y
+copiarla siete veces es lo que se desincroniza— **mas un puntero** en las cinco guias de tipos que si
+se dictan en jornada. En la pildora no: es microlearning de tres minutos y nadie convoca un salon
+para eso; un aviso que no aplica ensena a saltarse los avisos. Y su seccion en el indice.
+
+### Contradicciones revisadas, que tambien lo pidio
+
+- **CLAUDE.md 3.7** decia "asistencia PRESENCIAL". Corregido: va con el `kind`, no con la modalidad,
+  y se anota cuales de los tres mecanismos estan construidos (1 de 3).
+- **`attendance:sign`** lo nombra CLAUDE.md y no existe en `permissions.ts`. Anotado: llega con la
+  firma en pantalla.
+- **`sprints/README`** decia "Terminado salvo asistencia presencial" y **`05-cumplimiento`** la tenia
+  como pendiente Alta que "bloquea que lo presencial emita constancia" — que se quedaba corto: no
+  bloqueaba la constancia, bloqueaba **cerrarla de ninguna forma**. Los dos actualizados.
+- Los sprints 03 y 04 tambien la mencionan y **NO se tocan**: son historia, no referencia.
+
+### El barrido
+
+```
+13 recorridos           TODO BIEN     (asistencia.mjs con 15 pasos)
+390 pruebas unitarias   pasan         (385 + 5 del enlace por ronda)
+21 e2e                  pasan         (4,0 min)
+build - lint - types    limpios       (1 aviso de lint, ninguno nuevo)
+```
+
+### Lo que sigue abierto
+
+1. **El archivo no se sube todavia**: el PDF del certificado y el acta escaneada. Las columnas estan
+   y la API las acepta; falta la pantalla.
+2. **Los mecanismos 2 y 3 de la asistencia**: QR de sesion y firma en pantalla con acta PDF. Los dos
+   diseñados, con su sitio en el modelo y su valor en el enum.
+3. **La segunda puerta** para el papel que llega tarde, desde la ficha de la persona.
+4. **El informe de Vencimientos**: sigue leyendo `certification_grants` (vacia) y **su eje esta mal**
+   —separa por origen del dato en vez de por "¿ya la tuvo o nunca?"—.
+5. **Repaso / volver a verlo**: sigue esperando las preguntas del cliente.
+6. **El aviso**: aplazado, y sera notificacion INTERNA al jefe o a SST, no correo.
+
+---
+
 ## 2026-09-05 (tarde) — No se podia registrar NINGUNA formacion presencial
 
 Empezo como una pregunta sobre certificados externos y acabo destapando el agujero mas grande que
