@@ -148,6 +148,8 @@ export {
   enrollOfferingSchema,
   migrateOfferingVersionSchema,
   previewProjectedSchema,
+  certificadoExternoSchema,
+  marcarAsistenciaSchema,
 } from './schemas/offerings.js';
 export type {
   CreateOfferingInput,
@@ -159,6 +161,8 @@ export type {
   EnrollOfferingInput,
   MigrateOfferingVersionInput,
   PreviewProjectedInput,
+  CertificadoExternoInput,
+  MarcarAsistenciaInput,
 } from './schemas/offerings.js';
 
 export {

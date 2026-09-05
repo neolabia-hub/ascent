@@ -151,6 +151,111 @@ export class CompletionService {
   }
 
   /**
+   * CERRAR POR ASISTENCIA (Decision #157). La segunda via de evidencia.
+   *
+   * ─── POR QUE NO PASA POR `evaluate` ───
+   *
+   * `evaluate` recalcula desde los hechos guardados en la plataforma: contenidos vistos y examenes
+   * aprobados. Para una jornada de salon esos hechos no existen ni van a existir —el temario lo dio
+   * un instructor y el examen, si lo hubo, lo puso en papel— asi que llamarla siempre devolveria
+   * "faltan contenidos". No es un atajo alrededor de la regla: es que la evidencia es OTRA.
+   *
+   * ─── LO QUE ESO OBLIGA A REGISTRAR ───
+   *
+   * Cerrar asi **salta la evaluacion que exige el tipo**, y eso es exactamente lo que un auditor
+   * cuestionaria. Por eso queda `attendanceBy` —quien respondio por ello— ademas de la fila de
+   * auditoria: sin eso seria una puerta trasera para dar por cumplido lo que no se hizo.
+   *
+   * ─── Y LA CONSTANCIA, QUE ES LA PARTE QUE SE PIENSA MAL ───
+   *
+   * Si hay papel de un TERCERO, no se emite constancia propia: el documento que vale es el suyo, y
+   * emitir otro encima produce dos papeles con dos numeros para un mismo hecho — que en una
+   * auditoria es peor que no tener ninguno. Si no lo hay (la charla de seguridad vial que dicta la
+   * ARL y que no certifica nada), la constancia propia SI se emite: es la unica evidencia que le
+   * queda a la persona.
+   */
+  async cerrarPorAsistencia(
+    db: TenantPrisma,
+    tenantId: string,
+    input: {
+      enrollmentId: string;
+      attendedAt: Date;
+      attendanceBy: string;
+      certificado?: {
+        issuer: string;
+        number: string;
+        issuedAt?: Date | null;
+        validUntil?: Date | null;
+        fileKey?: string | null;
+      } | null;
+    },
+  ): Promise<{ closed: boolean; assignmentClosed: boolean }> {
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: input.enrollmentId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        assignmentId: true,
+        activityVersionId: true,
+        activityVersion: { select: { activityId: true } },
+      },
+    });
+    if (!enrollment) return { closed: false, assignmentClosed: false };
+
+    const cert = input.certificado ?? null;
+    const yaCerrada = enrollment.status === 'COMPLETED' || enrollment.status === 'PASSED';
+
+    await db.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        // PASSED diria que aprobo una evaluacion de la plataforma, y no la hubo. COMPLETED es lo
+        // que de verdad consta: estuvo y la jornada se dicto.
+        ...(yaCerrada ? {} : { status: 'COMPLETED', completedAt: input.attendedAt }),
+        attendedAt: input.attendedAt,
+        attendanceBy: input.attendanceBy,
+        ...(cert
+          ? {
+              extCertIssuer: cert.issuer,
+              extCertNumber: cert.number,
+              extCertIssuedAt: cert.issuedAt ?? null,
+              extCertValidUntil: cert.validUntil ?? null,
+              extCertFileKey: cert.fileKey ?? null,
+            }
+          : {}),
+      },
+    });
+
+    const assignmentClosed = yaCerrada
+      ? false
+      : await this.closeAssignment(db, enrollment, input.attendedAt, cert?.validUntil ?? null);
+
+    if (!yaCerrada) {
+      await db.learningEvent.create({
+        data: {
+          tenantId,
+          userId: enrollment.userId,
+          enrollmentId: enrollment.id,
+          verb: 'COMPLETED',
+          objectType: 'activity_versions',
+          objectId: enrollment.activityVersionId,
+          result: { via: 'ATTENDANCE', closedAssignment: assignmentClosed } as Prisma.InputJsonValue,
+        },
+      });
+    }
+
+    // Sin papel de un tercero, la constancia propia es la unica evidencia que le queda a la
+    // persona. Con papel, emitirla seria duplicar el mismo hecho con dos numeros distintos.
+    if (!yaCerrada && !cert) {
+      await this.certificates.emitirPorEjecucion(tenantId, enrollment.id).catch((error: unknown) => {
+        this.logger.error(`No se pudo emitir la constancia de ${enrollment.id}`, error as Error);
+      });
+    }
+
+    return { closed: !yaCerrada, assignmentClosed };
+  }
+
+  /**
    * Cierra la obligacion que esta ejecucion satisface. Si la persona lo hizo por su cuenta (sin
    * venir de una asignacion), igual se busca una obligacion viva de esa misma actividad: haberlo
    * hecho por iniciativa propia tambien cumple.
@@ -159,6 +264,12 @@ export class CompletionService {
     db: TenantPrisma,
     enrollment: { id: string; userId: string; assignmentId: string | null; activityVersion: { activityId: string } },
     completedAt: Date,
+    /**
+     * Lo que dice el PAPEL de un tercero, cuando lo hay (Decision #157). Se copia AQUI y no se
+     * deja solo en la inscripcion porque es el motor quien lo necesita: `proximoVencimiento` lo
+     * lee para saber cuando vuelve a deberse, y la obligacion es la fila que el auditor rastrea.
+     */
+    validUntilOverride: Date | null = null,
   ): Promise<boolean> {
     const assignment = enrollment.assignmentId
       ? await db.assignment.findUnique({ where: { id: enrollment.assignmentId } })
@@ -175,7 +286,12 @@ export class CompletionService {
 
     await db.assignment.update({
       where: { id: assignment.id },
-      data: { status: 'COMPLETED', completedAt, completedEnrollmentId: enrollment.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt,
+        completedEnrollmentId: enrollment.id,
+        ...(validUntilOverride ? { validUntilOverride } : {}),
+      },
     });
 
     // EL AVISO QUE YA NO PIDE NADA SE APAGA. "Tienes esta formacion asignada" deja de tener

@@ -826,6 +826,10 @@ export class AssignmentsService {
           status: true,
           assignedAt: true,
           completedAt: true,
+          // HASTA CUANDO VALE DE VERDAD, cuando lo dice el papel de un tercero (Decision #157).
+          // Sin esto la pantalla enseñaria el vencimiento que calcula la recurrencia sobre alguien
+          // cuyo certificado dice otra fecha — y es la fecha del papel la que manda.
+          validUntilOverride: true,
           waivedReason: true,
           user: {
             select: {

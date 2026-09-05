@@ -223,7 +223,39 @@ export interface RosterRow {
   completedAt: string | null;
   finalScore: string | number | null;
   assignmentId: string | null;
+  /** Cuando se marco que ASISTIO. `null` con la jornada ya revisada significa que no vino. */
+  attendedAt: string | null;
+  extCertIssuer: string | null;
+  extCertNumber: string | null;
+  extCertIssuedAt: string | null;
+  extCertValidUntil: string | null;
   user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string }; area: { name: string } };
+}
+
+/** El papel de un tercero, cuando el tipo de formacion lo lleva (Decision #157). */
+export interface CertificadoExterno {
+  issuer: string;
+  number: string;
+  issuedAt?: string;
+  /** Lo que dice el papel. MANDA sobre la vigencia que calcularia la recurrencia. */
+  validUntil?: string;
+}
+
+/**
+ * LA LISTA DE ASISTENCIA de una jornada (Decision #157).
+ *
+ * Se manda entera y no persona a persona: marcar asistencia es un acto sobre el GRUPO —se lee la
+ * hoja firmada de arriba abajo— y enviarla de una en una dejaria la jornada a medias si el
+ * navegador se cae en el decimoquinto.
+ */
+export function marcarAsistencia(
+  id: string,
+  body: {
+    heldOn?: string;
+    items: { enrollmentId: string; attended: boolean; certificate?: CertificadoExterno }[];
+  },
+): Promise<{ revisadas: number; cerradas: number; ausentes: number; ignoradas: string[] }> {
+  return apiFetch(`/offerings/${id}/attendance`, { method: 'POST', body });
 }
 
 export function getRoster(id: string): Promise<{ total: number; items: RosterRow[] }> {

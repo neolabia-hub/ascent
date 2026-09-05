@@ -247,6 +247,35 @@ export function computeNextCycleDueAt(recurrence: Recurrence, anchorInstant: Dat
   return endOfDay(nextFixedDate(recurrence.fixedDate as string, addDays(anchor, 1)));
 }
 
+/** Lo que se sabe de la ronda que la persona ya cumplio, y que decide cuando vuelve. */
+export interface RondaCumplida {
+  completedAt?: Date | null;
+  dueAt?: Date | null;
+  /** Lo que dice el PAPEL de un tercero, si lo hay. Ver `proximoVencimiento`. */
+  validUntilOverride?: Date | null;
+}
+
+/**
+ * CUANDO VUELVE A DEBERSE, contando ya con el papel de un tercero (Decision #157).
+ *
+ * La regla general (Decision #111) es que la vigencia sale de la RECURRENCIA: si hay que repetirla
+ * cada 12 meses, la constancia vale 12 meses, y pedir la vigencia aparte seria pedir el mismo dato
+ * dos veces y garantizar que algun dia no coincidan.
+ *
+ * La excepcion es el certificado de un TERCERO, y no es una preferencia: **la fecha no la pone la
+ * empresa**. Si la ARL certifica en alturas por tres anos y el tipo dice doce meses, reclamarla al
+ * ano es inventar un incumplimiento sobre alguien que tiene su habilitacion vigente y el papel
+ * para probarlo. En las externas manda el papel.
+ *
+ * Ojo a la forma: `validUntilOverride` **no es un ancla** a la que sumarle meses — es el
+ * vencimiento mismo. Tratarlo como ancla daria "tres anos despues de que caduque", que es justo
+ * al reves de lo que dice el documento.
+ */
+export function proximoVencimiento(recurrence: Recurrence, ronda: RondaCumplida, fallback: Date): Date {
+  if (ronda.validUntilOverride) return ronda.validUntilOverride;
+  return computeNextCycleDueAt(recurrence, cycleAnchor(recurrence, ronda, fallback));
+}
+
 /**
  * Cuando aparece la ronda siguiente en los pendientes de la persona: `windowDays` antes de
  * vencer. Sin ventana, la reinduccion anual aparecerria el mismo dia en que ya esta vencida.

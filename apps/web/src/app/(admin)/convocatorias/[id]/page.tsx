@@ -22,6 +22,7 @@ import {
   type RosterRow,
 } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
+import { ListaDeAsistencia } from '@/components/modules/delivery/lista-de-asistencia';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -617,6 +618,24 @@ export default function ConvocatoriaDetallePage() {
         </div>
       </div>
 
+      {/*
+        LA LISTA DE ASISTENCIA, SOLO EN LAS JORNADAS CON FECHA (Decision #157).
+
+        Va con el `kind` y no con la modalidad, y no es un detalle: una jornada EVENT se cierra por
+        asistencia la dicte como la dicte —presencial en un salon o virtual en vivo—, porque en las
+        dos hay una lista de quien estuvo y en ninguna queda contenido completado en la plataforma.
+        Una PERMANENTE no: ahi la persona entra sola y la evidencia es lo que registro el sistema.
+        Atarlo a PRESENCIAL dejaria fuera el webinar de la ARL.
+      */}
+      {!esAutoservicio ? (
+        <ListaDeAsistencia
+          offeringId={offering.id}
+          roster={roster}
+          pideCertificado={activity.activityType.config?.tracksExternalCertificate === true}
+          onHecho={() => void load()}
+        />
+      ) : null}
+
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4">
           <h2 className="font-display text-base font-semibold text-ink-900">Inscritos</h2>
@@ -655,7 +674,16 @@ export default function ConvocatoriaDetallePage() {
                     <Td className="text-ink-500">{row.user.area.name}</Td>
                     <Td className="text-ink-500">{row.assignmentId ? 'Obligacion' : 'Inscripcion directa'}</Td>
                     <Td>
-                      <StatusPill kind={row.completedAt ? 'ok' : 'neutral'} label={row.completedAt ? 'COMPLETADA' : 'INSCRITO'} />
+                      {/*
+                        COMO CONSTA, no solo si consta (Decision #157). Una formacion cerrada por
+                        ASISTENCIA y una cerrada por la plataforma valen lo mismo para el indicador
+                        y NO son la misma evidencia: la primera la respalda una hoja firmada y la
+                        segunda el registro del sistema. Quien audita pregunta por cual de las dos.
+                      */}
+                      <StatusPill
+                        kind={row.completedAt ? 'ok' : 'neutral'}
+                        label={row.completedAt ? (row.attendedAt ? 'ASISTIO' : 'COMPLETADA') : 'INSCRITO'}
+                      />
                     </Td>
                   </Tr>
                 ))}

@@ -7,6 +7,7 @@ import type {
   CreateOfferingInput,
   EnrollOfferingInput,
   ListOfferingsQuery,
+  MarcarAsistenciaInput,
   MigrateOfferingVersionInput,
   PreviewProjectedInput,
   PublishOfferingInput,
@@ -21,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ruleReachesEveryone } from '../assignments/audience-rule.js';
 import { AudiencesService } from '../assignments/audiences.service.js';
+import { CompletionService } from '../learning/completion.service.js';
 import { ProjectedAudienceService } from './projected-audience.service.js';
 import { planVersionMigration, type MigrationPolicy } from './version-migration.js';
 
@@ -79,7 +81,158 @@ export class OfferingsService {
     // La TAJADA de la jornada se declara con los mismos criterios que Quienes, asi que la
     // audiencia la resuelve la misma pieza: dos implementaciones crearian grupos gemelos.
     private readonly audiences: AudiencesService,
+    // Cerrar por ASISTENCIA usa la MISMA pieza que cierra por contenido (Decision #157): dos
+    // caminos para dar por cumplida una obligacion acabarian cerrandola de dos formas distintas.
+    private readonly completion: CompletionService,
   ) {}
+
+  /**
+   * MARCAR LA ASISTENCIA DE UNA JORNADA (Decision #157).
+   *
+   * ─── LA ASISTENCIA VA CON EL `kind`, NO CON LA MODALIDAD ───
+   *
+   * Es la pregunta que parece obvia y no lo es. Una jornada `EVENT` —tiene fecha, cupo y alguien
+   * que convoca— se cierra por asistencia LA DICTE COMO LA DICTE: presencial en un salon o virtual
+   * en vivo por videollamada. En las dos hay una lista de quien estuvo y en ninguna queda contenido
+   * completado en la plataforma. Una `PERMANENT` no: ahi la persona entra sola cuando puede y la
+   * evidencia es justamente lo que la plataforma registro. Atarlo a `PRESENCIAL` dejaria fuera el
+   * webinar de la ARL, que es cada vez mas comun.
+   *
+   * ─── `attended: false` ES UN DATO, NO UN HUECO ───
+   *
+   * "Convocado y NO vino" es exactamente lo que hay que poder demostrar, y es distinto de "todavia
+   * no lo hemos revisado". Por eso se manda la lista entera y no solo los presentes.
+   */
+  async marcarAsistencia(actor: AuthUser, offeringId: string, input: MarcarAsistenciaInput) {
+    const offering = await this.requireOffering(offeringId);
+    if (offering.kind === 'PERMANENT') {
+      throw new ConflictException({
+        code: 'OFFERING_NOT_ATTENDABLE',
+        message:
+          'Esta convocatoria es de autoservicio: se acredita completando el contenido, no con una lista de asistencia.',
+      });
+    }
+    if (offering.status === 'DRAFT' || offering.status === 'CANCELLED') {
+      throw new ConflictException({ code: 'OFFERING_NOT_ATTENDABLE', status: offering.status });
+    }
+
+    const tenantId = this.prisma.currentTenantId;
+    const conCertificado = input.items.filter((fila) => fila.certificate);
+    if (conCertificado.length > 0 && !(await this.tipoRegistraCertificadoExterno(offeringId))) {
+      /*
+        LA COMPUERTA VIVE EN EL SERVIDOR, no solo en la pantalla.
+
+        Que una clase de formacion se acredite con el papel de un tercero lo decide la empresa en
+        `activity_types.config.tracksExternalCertificate` —una recertificacion si, una charla de
+        quince minutos no—. Un control que solo existe en el navegador no es un control.
+      */
+      throw new ConflictException({
+        code: 'TYPE_DOES_NOT_TRACK_EXTERNAL_CERT',
+        message:
+          'Este tipo de formacion no lleva certificado de un tercero. Se cambia en Configuracion → Tipos de formacion.',
+      });
+    }
+
+    // Solo las inscripciones de ESTA jornada: mandar el id de otra cerraria la formacion de alguien
+    // que no estuvo aqui.
+    const validas = new Set(
+      (
+        await this.prisma.scoped.enrollment.findMany({
+          where: { offeringId, id: { in: input.items.map((fila) => fila.enrollmentId) } },
+          select: { id: true },
+        })
+      ).map((fila) => fila.id),
+    );
+
+    const heldOn = input.heldOn ? new Date(`${input.heldOn}T12:00:00-05:00`) : new Date();
+    let cerradas = 0;
+    let ausentes = 0;
+    const ignoradas: string[] = [];
+
+    for (const fila of input.items) {
+      if (!validas.has(fila.enrollmentId)) {
+        ignoradas.push(fila.enrollmentId);
+        continue;
+      }
+      if (!fila.attended) {
+        // NO se cierra nada y NO se retira la obligacion: quien no vino la SIGUE debiendo, que es
+        // el punto entero de tomar asistencia. Queda escrito que se le convoco y no asistio.
+        await this.prisma.scoped.enrollment.update({
+          where: { id: fila.enrollmentId },
+          data: { attendedAt: null, attendanceBy: actor.id },
+        });
+        ausentes += 1;
+        continue;
+      }
+      const resultado = await this.completion.cerrarPorAsistencia(this.prisma.scoped, tenantId, {
+        enrollmentId: fila.enrollmentId,
+        attendedAt: heldOn,
+        attendanceBy: actor.id,
+        certificado: fila.certificate
+          ? {
+              issuer: fila.certificate.issuer,
+              number: fila.certificate.number,
+              issuedAt: fila.certificate.issuedAt ? new Date(`${fila.certificate.issuedAt}T12:00:00-05:00`) : null,
+              // FIN DEL DIA en Bogota, como todo vencimiento del sistema: "vence el 31" quiere decir
+              // que a las once de la noche del 31 todavia acredita.
+              validUntil: fila.certificate.validUntil
+                ? new Date(`${fila.certificate.validUntil}T23:59:59-05:00`)
+                : null,
+              fileKey: fila.certificate.fileKey ?? null,
+            }
+          : null,
+      });
+      if (resultado.closed) cerradas += 1;
+    }
+
+    if (input.attendanceSheetKey) {
+      await this.prisma.scoped.offering.update({
+        where: { id: offeringId },
+        data: { attendanceSheetKey: input.attendanceSheetKey },
+      });
+    }
+
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'OFFERING_ATTENDANCE_MARKED',
+      resourceType: 'offerings',
+      resourceId: offeringId,
+      newValues: {
+        heldOn: heldOn.toISOString(),
+        revisadas: input.items.length,
+        cerradas,
+        ausentes,
+        conCertificadoExterno: conCertificado.length,
+        acta: Boolean(input.attendanceSheetKey),
+      },
+    });
+
+    return { revisadas: input.items.length, cerradas, ausentes, ignoradas };
+  }
+
+  /**
+   * ¿ESTA CLASE DE FORMACION SE ACREDITA CON EL PAPEL DE UN TERCERO?
+   *
+   * Lo decide la empresa en el TIPO, no el codigo: una recertificacion de montacargas si, una
+   * capacitacion del plan normalmente no, y otro cliente puede pensarlo distinto. Vive donde ya
+   * viven todas las decisiones por clase de formacion (`activity_types.config`) y se cambia desde
+   * Configuracion → Tipos de formacion, igual que la fecha de campana o la gracia por ingreso
+   * reciente.
+   */
+  private async tipoRegistraCertificadoExterno(offeringId: string): Promise<boolean> {
+    const fila = await this.prisma.scoped.offering.findUnique({
+      where: { id: offeringId },
+      select: {
+        activityVersion: {
+          select: { activity: { select: { activityType: { select: { config: true } } } } },
+        },
+      },
+    });
+    const config = fila?.activityVersion.activity.activityType?.config;
+    if (!config || typeof config !== 'object') return false;
+    return (config as Record<string, unknown>).tracksExternalCertificate === true;
+  }
 
   async list(actor: AuthUser, query: ListOfferingsQuery) {
     // Una sola clausula sobre la actividad: si se escribieran por separado, la ultima pisaria a
@@ -1060,6 +1213,14 @@ export class OfferingsService {
         completedAt: true,
         finalScore: true,
         assignmentId: true,
+        // LA ASISTENCIA Y EL PAPEL (Decision #157). La lista tiene que abrirse con lo que ya se
+        // marco: volver a la jornada al dia siguiente y encontrarla en blanco haria que alguien la
+        // tomara dos veces.
+        attendedAt: true,
+        extCertIssuer: true,
+        extCertNumber: true,
+        extCertIssuedAt: true,
+        extCertValidUntil: true,
         user: {
           select: {
             id: true,

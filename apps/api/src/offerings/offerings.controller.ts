@@ -5,6 +5,7 @@ import {
   createOfferingSchema,
   enrollOfferingSchema,
   listOfferingsQuerySchema,
+  marcarAsistenciaSchema,
   migrateOfferingVersionSchema,
   previewProjectedSchema,
   publishOfferingSchema,
@@ -184,5 +185,18 @@ export class OfferingsController {
   @RequirePermissions('offerings:manage')
   enroll(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.offerings.enroll(actor, id, enrollOfferingSchema.parse(body));
+  }
+
+  /**
+   * LA LISTA DE ASISTENCIA (Decision #157): la segunda via de dar por cumplida una formacion.
+   *
+   * Va bajo `offerings:manage` —el mismo permiso con el que se convoca— y no bajo uno nuevo: quien
+   * cita a la gente a una jornada es quien despues dice quien vino. Partirlo en dos permisos
+   * obligaria a configurar dos roles para un solo trabajo.
+   */
+  @Post(':id/attendance')
+  @RequirePermissions('offerings:manage')
+  attendance(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.offerings.marcarAsistencia(actor, id, marcarAsistenciaSchema.parse(body));
   }
 }

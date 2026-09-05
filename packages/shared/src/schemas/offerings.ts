@@ -182,6 +182,68 @@ export const enrollOfferingSchema = z
 export type EnrollOfferingInput = z.infer<typeof enrollOfferingSchema>;
 
 /**
+ * EL PAPEL DE UN TERCERO (Decision #157).
+ *
+ * Alturas, espacios confinados, montacargas, manipulacion de alimentos: la norma exige el
+ * certificado de un organismo acreditado, y ahi la empresa es RECEPTORA, no emisora. NEO PULSE no
+ * emite ese papel — lo REGISTRA, porque quien necesita saber cuando vence es la empresa.
+ *
+ * `validUntil` es el unico campo con consecuencias sobre el motor: **manda sobre la vigencia que
+ * calcula la recurrencia**. Si la ARL certifica por tres anos y el tipo dice doce meses, reclamarla
+ * al ano seria inventar un incumplimiento sobre alguien con su habilitacion vigente y el papel para
+ * probarlo. Por eso se copia a la obligacion (`valid_until_override`) y no se queda solo aqui.
+ *
+ * Todo es opcional salvo el numero: una jornada presencial que NO certifica nada —la charla de
+ * seguridad vial que trae la ARL— se cierra por asistencia y no tiene papel ninguno.
+ */
+export const certificadoExternoSchema = z.object({
+  /** Quien lo expide: "ARL Sura", "Centro de Entrenamiento X". Texto libre a proposito: la lista
+   *  de organismos acreditados cambia y no es del sistema mantenerla. */
+  issuer: z.string().trim().min(2).max(160),
+  number: z.string().trim().min(1).max(80),
+  issuedAt: z.string().date().optional(),
+  /** Lo que dice el papel. Si viene, MANDA sobre lo que calcula la recurrencia. */
+  validUntil: z.string().date().optional(),
+  /** El escaneo, ya subido a almacenamiento. */
+  fileKey: z.string().max(500).optional(),
+});
+export type CertificadoExternoInput = z.infer<typeof certificadoExternoSchema>;
+
+/**
+ * CERRAR UNA JORNADA POR ASISTENCIA (Decision #157).
+ *
+ * La segunda de las tres vias de evidencia. Hasta aqui una ejecucion solo se cerraba de UNA forma
+ * —la persona entrando a la plataforma y completando el contenido— y en una empresa bajo SG-SST la
+ * mayor parte del plan anual se dicta en salon: charlas de seguridad vial, brigadas, lo que trae la
+ * ARL. De eso no queda contenido que completar; queda una LISTA DE ASISTENCIA firmada, que es la
+ * evidencia que pide el auditor. Sin esto, todo lo dictado presencialmente contaba como incumplido.
+ *
+ * Se manda la lista ENTERA de la jornada, no una persona: marcar asistencia es un acto sobre el
+ * grupo —se lee la hoja firmada de arriba abajo— y mandar uno por uno dejaria a medias la jornada
+ * si el navegador se cae en el decimoquinto.
+ *
+ * `attended: false` es informacion, no ausencia de dato: "convocado y NO vino" es justo lo que hay
+ * que poder demostrar, y es distinto de "no lo hemos revisado todavia".
+ */
+export const marcarAsistenciaSchema = z.object({
+  /** El dia en que se dicto. Por defecto, hoy. */
+  heldOn: z.string().date().optional(),
+  /** El acta firmada: UNA por jornada, no una por persona. */
+  attendanceSheetKey: z.string().max(500).optional(),
+  items: z
+    .array(
+      z.object({
+        enrollmentId: z.string().uuid(),
+        attended: z.boolean(),
+        certificate: certificadoExternoSchema.optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+export type MarcarAsistenciaInput = z.infer<typeof marcarAsistenciaSchema>;
+
+/**
  * APUNTAR LA CONVOCATORIA A OTRA VERSION.
  *
  * Publicar la v2 de una formacion NO tocaba a nadie: la convocatoria seguia colgada de la v1

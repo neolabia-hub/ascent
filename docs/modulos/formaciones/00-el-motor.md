@@ -64,6 +64,10 @@ no deberia tener que leer las otras seis:
 | Pildora | `06-pildora.md` | Recorrido en verde |
 | Recertificacion | `07-recertificacion.md` | Recorrido en verde (mas la suite estandar) |
 
+Y uno mas que no es un tipo sino algo comun a todos: **`08-evidencia.md`** — las tres vias por las
+que una formacion se puede dar por cumplida (la plataforma, la lista de asistencia y el papel de un
+tercero). Verificado por `asistencia.mjs`.
+
 ---
 
 ## 4. Cuándo nace una obligación
@@ -122,7 +126,12 @@ La recurrencia tiene dos formas y **solo una a la vez**:
   caiga.
 - **Cada año en una fecha fija**: la campaña. Todos vencen el mismo día.
 
-Y **el ancla no es la misma en las dos** (`cycleAnchor`, 2026-09-05). Una campaña se satisface por
+Y antes que nada manda **el papel de un tercero**, si lo hay (Decision #157): un certificado de
+la ARL trae su propia fecha de vencimiento y la empresa no la pone. Se guarda en
+`assignments.valid_until_override` y `proximoVencimiento` la lee primero. Detalle en
+`08-evidencia.md`.
+
+Cuando no lo hay, **el ancla no es la misma en las dos formas de repetir** (`cycleAnchor`, 2026-09-05). Una campaña se satisface por
 **periodo**: quien hace la reinducción el 20 de marzo la hace para el periodo que vence el 31, así
 que la siguiente se cuenta desde el 31 de marzo, no desde el 20. Un aniversario se satisface por
 **fecha de cumplimiento**: quien se certifica el 20 de marzo vence el 20 de marzo del año que viene,

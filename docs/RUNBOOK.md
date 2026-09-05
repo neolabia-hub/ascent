@@ -2789,3 +2789,93 @@ una cobertura de punta a punta que no hay.
 **La leccion, que ya tiene tres marcas:** el truco de comprimir la recurrencia solo prueba lo que
 puede comprimirse. Todo lo que dependa de una FECHA DEL CALENDARIO —campana anual, ultimo dia del
 mes del plan— se queda fuera y hay que probarlo en la logica pura.
+
+### 2026-09-05 — No habia forma de registrar una formacion presencial, y nadie lo habia notado
+
+Salio de una pregunta del cliente sobre certificados externos y acabo destapando algo mucho mayor.
+**`CompletionService.evaluate` —lo unico que cierra una obligacion— solo lo llaman `player.service`
+y `attempts.service`, las dos del lado del APRENDIZ.** `POST /offerings/:id/complete` cierra la
+jornada y marca el renglon del plan como EJECUTADO, pero no toca a ninguna persona. Y el roster era
+de solo lectura.
+
+Traducido: **la unica manera de que a alguien se le cerrara una formacion era que entrara a la
+plataforma y completara el contenido.** Una capacitacion de la ARL, presencial, de dos horas, con
+veinte personas: no habia como darla por cumplida.
+
+En una empresa bajo SG-SST la mayor parte del plan anual se dicta en salon. Y encima de esa capa
+esta construido todo lo demas —los siete tipos, el plan con proyectados y tajadas, la cobertura, las
+constancias, el Seguimiento—, asi que el indicador de cumplimiento enseñaba **cero de todo lo que de
+verdad se hizo**.
+
+Por eso los recorridos decian *"ASISTENCIA: solo aplica a lo presencial"* y acto seguido *"la
+formacion es VIRTUAL: se acredita completando el contenido"* — el caso presencial nunca se probo
+porque no se podia hacer.
+
+**LAS TRES VIAS DE EVIDENCIA (Decision #157).** Se generalizo en vez de anadir un campo:
+
+|  | Cuando | Que queda |
+|---|---|---|
+| A. En plataforma | contenido + examen | progreso, nota, constancia propia — ya existia |
+| B. Lista de asistencia | jornada con fecha, la dicte quien la dicte | quien vino, quien no, y quien lo marco |
+| C. Papel de un tercero | lo emite un organismo acreditado | entidad, numero, expedicion, vencimiento, escaneo |
+
+**LA ASISTENCIA VA CON EL `kind`, NO CON LA MODALIDAD**, y es la decision que mas se piensa mal. Una
+jornada `EVENT` se cierra por lista la dicte como la dicte —presencial en un salon o virtual en
+vivo—: en las dos hay quien estuvo y en ninguna queda contenido completado. Una `PERMANENT` no.
+Atarlo a `PRESENCIAL` habria dejado fuera el webinar de la ARL.
+
+**CERRAR POR ASISTENCIA NO PASA POR `evaluate`, y eso hay que registrarlo.** `evaluate` recalcula
+desde contenidos vistos y examenes aprobados; para una jornada de salon esos hechos no existen ni
+van a existir. No es un atajo alrededor de la regla: la evidencia es OTRA. Pero salta la evaluacion
+que exige el tipo, que es lo que un auditor cuestionaria, asi que queda `attendance_by` ademas de la
+auditoria. El recorrido lo mide con el caso mas duro: tipo RECERTIFICACION, que exige examen, y
+nadie lo responde en la plataforma.
+
+**QUIEN NO VINO LA SIGUE DEBIENDO.** `attended: false` es un DATO, no un hueco: "convocado y no
+vino" es lo que hay que poder demostrar. No se cierra ni se retira nada.
+
+**Y CON PAPEL DE TERCERO NO SE EMITE CONSTANCIA PROPIA:** dos papeles con dos numeros para un mismo
+hecho es peor, en auditoria, que ninguno. Sin papel si se emite — la charla presencial que no
+certifica nada deja a la persona sin nada mas.
+
+### 2026-09-05 — "El papel manda", y como se mide sin tocar el reloj
+
+Lo decidio el cliente: *"el papel siempre debe mandar, en caso de externas"*. Contradice a proposito
+la Decision #111 —*"la vigencia sale de la recurrencia y pedirla aparte seria pedir el mismo dato dos
+veces"*— y con razon: **la fecha del certificado de un tercero no la pone la empresa**. Si la ARL
+certifica por tres anos y el tipo dice doce meses, reclamarla al ano es inventar un incumplimiento
+sobre alguien con su habilitacion vigente y el papel para probarlo.
+
+`proximoVencimiento` (`due-date.ts`) resuelve las tres en orden: **papel → campana → aniversario**.
+La fecha se copia a `assignments.valid_until_override` y no se queda solo en la inscripcion, porque
+es el MOTOR quien la lee y la obligacion es la fila que el auditor rastrea.
+
+**Ojo a la forma:** `validUntilOverride` **no es un ancla** a la que sumarle meses — es el
+vencimiento mismo. Tratarlo como ancla daria "tres anos despues de que caduque".
+
+**Y como se prueba de punta a punta sin manipular fechas:** un certificado que vence dentro de **30
+dias** sobre una formacion con recurrencia de **12 meses**. Es el mismo truco de comprimir que usa
+`reinduccion-ciclos.mjs` —la ventana esta fijada en 60 dias, asi que un papel a 30 la tiene abierta
+hoy—. Si manda el papel, nace la ronda 2 venciendo el dia del papel; si mandara la recurrencia, no
+naceria ninguna. **Medido: nace, y con la fecha del papel.**
+
+**La trampa que volvio a morder:** el vencimiento se guarda al FIN DEL DIA en Bogota, que en UTC cae
+el dia siguiente a las 04:59. La primera corrida dio dos fallos —`2026-10-06` contra `2026-10-05`—
+que no eran del sistema sino de la asercion. Ya le habia pasado al recorrido del plan.
+
+### 2026-09-05 — Un testigo de prueba tiene que cumplir DOS condiciones, no una
+
+Al escribir `asistencia.mjs` hacia falta una formacion cuyo tipo NO llevara certificado externo,
+para comprobar que el servidor lo rechaza. Se eligio "el primer tipo sin `tracksExternalCertificate`"
+y salio **Induccion general** — que exige evaluacion. La compuerta de la Decision #74 rechazo
+publicarla sin examen, y de ahi cayeron en cascada cuatro pasos: sin publicar no hay jornada, sin
+jornada no hay convocados, y sin convocados el `enrollmentId` iba `undefined` y el 409 esperado
+llegaba como **422 de validacion**.
+
+El diagnostico costo una corrida entera porque los pasos intermedios **no comprobaban nada**: se
+llamaba a publicar y a convocar sin mirar el resultado, asi que el primer `comprobar` que fallaba
+estaba cinco operaciones despues de la causa. Ahora cada eslabon tiene el suyo y el mensaje dice
+exactamente que se rompio.
+
+**La leccion, que es la misma de siempre en este directorio:** un paso preparatorio sin asercion no
+es preparacion, es una suposicion — y cuando falla, el recorrido acusa al sitio equivocado.

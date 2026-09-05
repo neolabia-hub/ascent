@@ -260,6 +260,19 @@ series de la misma barra y nunca un solo número.
   ronda siguiente, y esa obligación todavía no existe. Incluir las cerradas llenaría el calendario
   de trabajo ya hecho, que es la forma más rápida de que nadie vuelva a mirarlo.
 
+**La serie de «Certificación» sale hoy en CERO, y no porque no haya datos** (2026-09-05). Lee
+`certification_grants`, una tabla que se consulta en tres sitios y que **no escribe nadie**: no hay
+módulo `certifications` en la API ni nada en la semilla. Mientras tanto la fecha de caducidad de
+cada persona sí existe en otras dos columnas —`certificates.valid_until`, escrita en cada constancia
+desde la Decisión #111, y `assignments.valid_until_override`, con lo que dice el papel de un tercero
+(#157)—. La serie no está vacía por falta de dato: está leyendo la tabla equivocada.
+
+Y eso importa más de lo que parece, porque **la serie de Obligación solo ve lo que ya existe**: la
+ronda siguiente de algo que se repite nace 60 días antes de vencer, no antes. Con el horizonte por
+defecto en 12 meses, los meses 3 al 12 del calendario salen estructuralmente vacíos para todo lo
+recurrente — que es justo lo contrario de «nadie recuerda en octubre que en marzo caducan cuarenta
+certificados».
+
 **El color de las dos series no es decorativo.** Son categorías, no estados, así que no reutilizan
 el ámbar de «atrasado» ni el rojo de «reprobado» —prestarlos los vaciaría de significado—. Los dos
 tonos (`--serie-1`, `--serie-2`) pasan los seis chequeos de color: banda de luminosidad, croma,

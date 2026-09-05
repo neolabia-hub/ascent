@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  ArrowLeft, Award, ClipboardCheck, Eye, EyeOff, FileCheck2, Lock, Pencil, Plus,
+  ArrowLeft, Award, BadgeCheck, ClipboardCheck, Eye, EyeOff, FileCheck2, Lock, Pencil, Plus,
   SlidersHorizontal, Target, Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -52,6 +52,8 @@ interface TipoConfig {
   requiresAssessment?: boolean;
   requiresSurvey?: boolean;
   issuesCertificate?: boolean;
+  /** La acredita un tercero: la jornada pide entidad, numero y vencimiento (Decision #157). */
+  tracksExternalCertificate?: boolean;
   /** Punto de partida de la eficacia. Cada formacion puede desviarse (Decision #118). */
   requiresEfficacy?: boolean;
   /** CUAL encuesta usa este tipo. Se engancha sola al final al publicar (Decision #116). */
@@ -125,6 +127,23 @@ const REGLAS = [
     */
     detalle:
       'A los 30 dias, el jefe del area responde si la persona aplica lo aprendido. Es el punto de partida: cada formacion puede desviarse desde su ficha.',
+  },
+  {
+    clave: 'tracksExternalCertificate' as const,
+    icono: BadgeCheck,
+    titulo: 'La acredita un tercero',
+    /*
+      APAGADO EN SEIS DE LOS SIETE, y encendido solo en Recertificacion (Decision #157).
+
+      Es la clase de formacion donde el papel NO lo emite la empresa: alturas, espacios confinados,
+      montacargas, manipulacion de alimentos. La norma exige el certificado de un organismo
+      acreditado y la empresa es RECEPTORA — lo que necesita saber es cuando vence.
+
+      Se explica la consecuencia y no la regla, como los otros cuatro: lo que le importa a quien
+      lee es que la fecha del papel gana, porque es la que va a mover su indicador.
+    */
+    detalle:
+      'La lista de asistencia pedira entidad, numero y vencimiento del certificado. Esa fecha manda sobre la que calcula la recurrencia.',
   },
 ];
 

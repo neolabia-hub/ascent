@@ -7,9 +7,9 @@ import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import { AudiencesService } from './audiences.service.js';
 import {
   computeFirstDueAt,
-  computeNextCycleDueAt,
-  cycleAnchor,
   cycleOpensAt,
+  proximoVencimiento,
+  type RondaCumplida,
   type Trigger,
 } from './due-date.js';
 import { decidirPrimeraRonda, decidirRondaSiguiente } from './next-cycle.js';
@@ -222,7 +222,14 @@ export class RequirementEngineService {
 
     const existing = await db.assignment.findMany({
       where: { ruleId: rule.id, userId: { in: members.map((m) => m.userId) } },
-      select: { userId: true, cycleNumber: true, status: true, dueAt: true, completedAt: true },
+      select: {
+        userId: true,
+        cycleNumber: true,
+        status: true,
+        dueAt: true,
+        completedAt: true,
+        validUntilOverride: true,
+      },
       orderBy: { cycleNumber: 'asc' },
     });
     const byUser = new Map<string, typeof existing>();
@@ -336,12 +343,11 @@ export class RequirementEngineService {
                    ese periodo, a diferencia de retirada o eximida— y la siguiente nace para todos.
                    Es como funciona el cumplimiento por calendario: cada campana es su periodo.
       */
-      // El ancla NO es la misma en las dos formas de repetir: una campana se satisface por
-      // PERIODO y un aniversario por fecha de cumplimiento. Ver `cycleAnchor` — anclar las dos en
-      // `completedAt` le abria a quien cumplia antes del 31 de marzo una ronda 2 con ese mismo
-      // 31 de marzo, once dias despues de haberla hecho.
-      const anchor = cycleAnchor(recurrence, last, now);
-      const nextDueAt = computeNextCycleDueAt(recurrence, anchor);
+      // TRES COSAS EN UNA LINEA, y ninguna es intercambiable (`proximoVencimiento`):
+      //   - si hay PAPEL de un tercero, manda el papel;
+      //   - si no, una CAMPANA se cuenta desde el vencimiento del periodo que se cumplio;
+      //   - y un ANIVERSARIO desde la fecha en que cada quien la completo.
+      const nextDueAt = proximoVencimiento(recurrence, last, now);
       const decision = decidirRondaSiguiente({
         estadoAnterior: last.status,
         politica: recurrence.onExpiry ?? 'ESPERA',
@@ -391,7 +397,7 @@ export class RequirementEngineService {
     db: TenantPrisma,
     rule: AssignmentRule,
     userIds: string[],
-  ): Promise<Map<string, { completedAt: Date | null; dueAt: Date | null }>> {
+  ): Promise<Map<string, RondaCumplida>> {
     if (userIds.length === 0) return new Map();
     const filas = await db.assignment.findMany({
       where: {
@@ -401,12 +407,18 @@ export class RequirementEngineService {
         status: 'COMPLETED',
         completedAt: { not: null },
       },
-      select: { userId: true, completedAt: true, dueAt: true },
+      select: { userId: true, completedAt: true, dueAt: true, validUntilOverride: true },
       orderBy: { completedAt: 'desc' },
     });
-    const ultima = new Map<string, { completedAt: Date | null; dueAt: Date | null }>();
+    const ultima = new Map<string, RondaCumplida>();
     for (const fila of filas) {
-      if (!ultima.has(fila.userId)) ultima.set(fila.userId, { completedAt: fila.completedAt, dueAt: fila.dueAt });
+      if (!ultima.has(fila.userId)) {
+        ultima.set(fila.userId, {
+          completedAt: fila.completedAt,
+          dueAt: fila.dueAt,
+          validUntilOverride: fila.validUntilOverride,
+        });
+      }
     }
     return ultima;
   }

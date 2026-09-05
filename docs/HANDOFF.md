@@ -20,6 +20,90 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-05 (tarde) — No se podia registrar NINGUNA formacion presencial
+
+Empezo como una pregunta sobre certificados externos y acabo destapando el agujero mas grande que
+quedaba en el producto.
+
+### Lo que se encontro
+
+`CompletionService.evaluate` —lo unico que cierra una obligacion— **solo lo llaman el reproductor y
+los intentos de examen, los dos del lado del aprendiz**. `POST /offerings/:id/complete` cierra la
+jornada y marca el renglon del plan como EJECUTADO, pero no toca a ninguna persona. Y el roster era
+de solo lectura.
+
+Traducido: **la unica manera de cerrarle una formacion a alguien era que entrara a la plataforma y
+completara el contenido.** Una capacitacion de la ARL, presencial, dos horas, veinte personas: no
+habia como darla por cumplida.
+
+En una empresa bajo SG-SST la mayor parte del plan anual se dicta en salon, y encima de esa capa
+esta TODO lo demas —los siete tipos, el plan, la cobertura, las constancias, el Seguimiento—. **El
+indicador de cumplimiento enseñaba cero de todo lo que de verdad se hizo.**
+
+### Las tres vias de evidencia (Decision #157)
+
+Se generalizo a "¿como consta que cumplio?" en vez de anadir un campo a un tipo, porque la respuesta
+cambia POR FORMACION y no por clase de formacion:
+
+|  | Cuando | Que queda |
+|---|---|---|
+| **A. En plataforma** | contenido + examen | progreso, nota, constancia propia — ya existia |
+| **B. Lista de asistencia** | jornada con fecha, la dicte quien la dicte | quien vino, quien no, y quien lo marco |
+| **C. Papel de un tercero** | lo emite un organismo acreditado | entidad, numero, expedicion, vencimiento |
+
+Las decisiones que importan, todas medidas en `asistencia.mjs` (12 pasos, seguimiento incluido):
+
+- **La asistencia va con el `kind`, no con la modalidad.** `EVENT` se cierra por lista —presencial o
+  virtual en vivo—; `PERMANENT` la rechaza con 409. Atarlo a PRESENCIAL dejaba fuera el webinar de
+  la ARL.
+- **No pasa por `evaluate`.** Para una jornada de salon los contenidos vistos no existen. No es un
+  atajo: la evidencia es otra. Pero salta la evaluacion que exige el tipo, asi que queda escrito
+  **quien** respondio por ella. Probado con el caso mas duro: tipo Recertificacion, que exige
+  examen, y nadie lo responde.
+- **Quien no vino la SIGUE debiendo.** No se cierra ni se retira nada.
+- **Con papel de tercero NO se emite constancia propia**; sin papel, SI.
+- **El papel manda** (lo decidio el cliente): su fecha va a `assignments.valid_until_override` y
+  `proximoVencimiento` la lee antes que la campana y que el aniversario.
+
+**Como se midio "el papel manda" sin tocar el reloj:** un certificado a **30 dias** sobre una
+recurrencia de **12 meses**. La ventana esta fijada en 60, asi que el papel la tiene abierta hoy. Si
+manda el papel nace la ronda 2 con su fecha; si mandara la recurrencia, no naceria ninguna. **Nace,
+y con la fecha del papel.**
+
+### Lo que se toco
+
+Migracion `20260905120000_asistencia_y_certificado_externo`, `proximoVencimiento` en `due-date.ts`,
+`cerrarPorAsistencia` en `CompletionService`, `POST /offerings/:id/attendance`,
+`tracksExternalCertificate` en el config del tipo (con su interruptor en Configuracion), el
+componente `lista-de-asistencia.tsx` en la jornada, y `docs/modulos/formaciones/08-evidencia.md`.
+
+### El barrido
+
+```
+13 recorridos           TODO BIEN     (los 7 tipos + ciclos, convocatorias, tajadas,
+                                       proyectados-ajuste, estandar y ASISTENCIA)
+385 pruebas unitarias   pasan
+build - lint - types    limpios       (1 aviso de lint, ninguno nuevo)
+```
+
+### Lo que sigue abierto
+
+1. **El archivo no se sube todavia.** Las columnas estan (`ext_cert_file_key`,
+   `offerings.attendance_sheet_key`) y la API las acepta, pero no hay pantalla que suba el PDF del
+   certificado ni el acta firmada. Es lo siguiente y lo que completa la evidencia.
+2. **La segunda puerta**: cuando el papel llega despues de la jornada —lo normal, la ARL los manda a
+   los quince dias— hay que volver a la jornada. Falta poder hacerlo desde la ficha de la persona.
+3. **El informe de Vencimientos sigue leyendo `certification_grants`**, que no escribe nadie, asi
+   que su serie de "Certificacion" sale en cero. Ya tiene con que llenarse.
+4. **Y su EJE esta mal**, no solo su fuente: separa por "de donde sale el dato" y deberia separar
+   por "¿ya la tuvo o nunca?" — por hacer (perseguir) frente a por renovar (reprogramar). Con el eje
+   de hoy, quien esta en su ventana de 60 dias sale en las DOS series.
+5. **Repaso / volver a verlo**: dejado a proposito, el cliente tiene preguntas.
+6. **El aviso por correo**: aplazado. Cuando toque, sera notificacion INTERNA al jefe o a los
+   encargados de SST, no correo.
+
+---
+
 ## 2026-09-05 — Lo que ya hizo no se le vuelve a pedir, y una campana que acusaba al que cumplia
 
 El encargo era cerrar el ultimo pendiente de la induccion especifica —*"pense que la 1 ya estaba

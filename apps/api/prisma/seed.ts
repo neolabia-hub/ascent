@@ -479,6 +479,18 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
         defaultRecurrenceMonths: 12,
         // Quien entra tiene que certificarse ya: no hay meses de gracia en una habilitacion.
         exemptRecentHiresMonths: 0,
+        /*
+          EL UNICO TIPO QUE NACE CON ESTO ENCENDIDO (Decision #157).
+
+          Es la clase de formacion donde el papel lo emite un TERCERO acreditado —la ARL, un centro
+          de entrenamiento— y la empresa es receptora: lo que necesita saber es cuando vence. Con
+          esto encendido, la lista de asistencia de la jornada pide entidad, numero y vencimiento, y
+          esa fecha MANDA sobre la que calcularia la recurrencia: si la ARL certifica por tres anos
+          y aqui dice doce meses, reclamarla al ano seria inventar un incumplimiento.
+
+          Los otros seis nacen apagados y cada empresa lo enciende donde le aplique.
+        */
+        tracksExternalCertificate: true,
       },
     },
     {

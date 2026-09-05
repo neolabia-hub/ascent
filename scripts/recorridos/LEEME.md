@@ -24,6 +24,7 @@ node scripts/recorridos/extraordinaria.mjs          # crea un plan tapadera y lo
 node scripts/recorridos/recertificacion.mjs         # aniversario por persona, y jornada dictada por un tercero
 node scripts/recorridos/tajadas.mjs                 # jornadas acotadas: 6 tipos x 7 facetas, y 2 reglas
 node scripts/recorridos/proyectados-ajuste.mjs      # congelar, que cambie la plantilla, ajustar con motivo
+node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia, y "el papel manda"
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```
@@ -216,6 +217,33 @@ diferencia: las dos vencian el mismo dia, con razon. La asercion **pasaba sin co
 decia**. Se reescribio para comprobar la CAUSA (`everyMonths` sin `fixedDate`, y
 `computeNextCycleDueAt` anclando en `completedAt`) en vez de simular ocho meses. Una asercion que
 pasa siempre es un comentario con sintaxis de codigo.
+
+### Y de LAS TRES VIAS DE EVIDENCIA (2026-09-05)
+
+`asistencia.mjs`. Lo que cierra el agujero mas grande que quedaba: hasta hoy una formacion solo se
+podia dar por cumplida de UNA forma —la persona entrando a la plataforma— y en una empresa bajo
+SG-SST la mayor parte del plan anual se dicta en salon.
+
+| | |
+|---|---|
+| La asistencia va con el `kind` | `EVENT` se cierra por lista, la dicte como la dicte —presencial o virtual en vivo—; una `PERMANENT` la rechaza con 409. Atarlo a PRESENCIAL dejaria fuera el webinar de la ARL |
+| Quien asistio | queda CUMPLIDO **sin tocar el contenido**, y el examen que exige el tipo no lo responde nadie: la evidencia es OTRA, no es un atajo |
+| Quien NO vino | **la sigue debiendo**. No se cierra ni se retira nada — es el punto entero de tomar asistencia |
+| Con papel de un tercero | **no** se emite constancia propia: dos papeles con dos numeros para un hecho es peor que ninguno |
+| Sin papel | **si** se emite: una charla presencial que no certifica nada deja a la persona sin nada mas |
+| **EL PAPEL MANDA** | su fecha se copia a `assignments.valid_until_override` y es la que decide cuando vuelve |
+| La compuerta del tipo | `tracksExternalCertificate`, comprobada contra el SERVIDOR (409) y no solo en la pantalla |
+
+**Como se mide "el papel manda" sin tocar el reloj:** un certificado que vence dentro de **30 dias**
+sobre una formacion con recurrencia de **12 meses**. Es el mismo truco de comprimir — la ventana esta
+fijada en 60 dias, asi que un papel a 30 la tiene abierta hoy. Si el papel manda, nace la ronda 2
+venciendo el dia del papel; si mandara la recurrencia, no naceria ninguna. **Medido: nace, y con la
+fecha del papel.**
+
+**Y una trampa que ya habia mordido al recorrido del plan y volvio a morder aqui:** el vencimiento se
+guarda al fin del dia en Bogota, que en UTC es el DIA SIGUIENTE a las 04:59. Comparar el
+`slice(0, 10)` del ISO contra la fecha que se mando da un dia de diferencia y parece un fallo del
+sistema cuando esta en la asercion.
 
 ## La suite ESTANDAR, y como convive con estos
 

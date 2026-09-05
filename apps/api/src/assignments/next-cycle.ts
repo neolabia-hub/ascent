@@ -1,5 +1,5 @@
 import type { OnExpiry, Recurrence } from '@neo-pulse/shared';
-import { computeNextCycleDueAt, cycleAnchor, cycleOpensAt } from './due-date.js';
+import { cycleOpensAt, proximoVencimiento, type RondaCumplida } from './due-date.js';
 
 /** Lo que hay que hacer con la ronda anterior y con la siguiente. */
 export interface NextCycleDecision {
@@ -101,7 +101,7 @@ export function decidirPrimeraRonda(input: {
    * (`cycleAnchor`): quien hizo la reinduccion de 2026 la hizo para el periodo de 2026, y su
    * siguiente es la de 2027 aunque haya cambiado de cargo en septiembre.
    */
-  cumplida: { completedAt: Date | null; dueAt: Date | null } | null;
+  cumplida: RondaCumplida | null;
   /** La recurrencia de la regla NUEVA: es ella la que dice cada cuanto hay que renovarla. */
   recurrencia: Recurrence | null;
   ahora: Date;
@@ -110,8 +110,7 @@ export function decidirPrimeraRonda(input: {
   if (!input.cumplida?.completedAt) return DE_SIEMPRE;
   if (!input.recurrencia) return { abrir: false, venceEl: null };
 
-  const ancla = cycleAnchor(input.recurrencia, input.cumplida, input.cumplida.completedAt);
-  const vence = computeNextCycleDueAt(input.recurrencia, ancla);
+  const vence = proximoVencimiento(input.recurrencia, input.cumplida, input.cumplida.completedAt);
   if (vence <= input.ahora) return DE_SIEMPRE;
   if (input.ahora < cycleOpensAt(vence, input.recurrencia)) return { abrir: false, venceEl: null };
   return { abrir: true, venceEl: vence };

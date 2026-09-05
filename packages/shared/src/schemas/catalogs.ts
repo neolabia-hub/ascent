@@ -125,6 +125,22 @@ export const activityTypeConfigSchema = z
      * leerlo donde se use**.
      */
     surveyTemplateId: z.string().max(60).nullable().default(null),
+    /**
+     * ¿ESTA CLASE DE FORMACION SE ACREDITA CON EL PAPEL DE UN TERCERO? (Decision #157)
+     *
+     * Alturas, espacios confinados, montacargas, manipulacion de alimentos: la norma exige el
+     * certificado de un organismo acreditado, y ahi la empresa es RECEPTORA, no emisora. Cuando
+     * esto esta encendido, la lista de asistencia de la jornada pide ademas entidad, numero, fecha
+     * y el escaneo — y la fecha del papel MANDA sobre la vigencia que calcula la recurrencia.
+     *
+     * Vive en el TIPO y no en cada formacion por lo mismo que `issuesCertificate` (Decision #111):
+     * la pregunta es por CLASE de formacion y no cambia entre las doscientas de una empresa. Lo que
+     * hay que marcar doscientas veces se olvida, y el olvido se descubre el dia de la auditoria.
+     *
+     * `false` por defecto a proposito: pedir un numero de certificado en una charla de quince
+     * minutos llena el expediente de campos vacios y ensena a saltarselos.
+     */
+    tracksExternalCertificate: z.boolean().default(false),
   })
   .strict();
 
