@@ -16,6 +16,7 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * LA CONSOLA DEL PROVEEDOR (Decision #100).
@@ -62,8 +63,8 @@ export default function PlataformaPage() {
       const { settings: guardados } = await putPlatformSettings(settings);
       setSettings(guardados);
       showToast({ kind: 'success', title: 'Datos de contacto guardados' });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudieron guardar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudieron guardar', description: motivoDelError(error) });
     } finally {
       setGuardando(false);
     }

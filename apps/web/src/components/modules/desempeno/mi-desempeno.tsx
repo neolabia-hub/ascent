@@ -6,6 +6,7 @@ import { ESCALAS, firmarEvaluacion, sobreMi, type Evaluacion } from '@/lib/perfo
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * MI EVALUACION DE DESEMPENO (Decision #134), arriba de "Desempeno" (Decision #140).
@@ -170,8 +171,8 @@ function Detalle({
     try {
       await firmarEvaluacion(evaluacion.id);
       onFirmada();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo firmar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo firmar', description: motivoDelError(error) });
     } finally {
       setFirmando(false);
     }

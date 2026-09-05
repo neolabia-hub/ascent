@@ -3,7 +3,7 @@
 import { ArrowLeft, BadgeCheck, Eye, Plus, Power, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { uploadMedia } from '@/lib/catalog-api';
 import {
   abrirVistaPrevia,
@@ -629,8 +629,8 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
                 try {
                   const subido = await uploadMedia(file, 'certificate');
                   setFondo(subido.storageKey);
-                } catch {
-                  showToast({ kind: 'danger', title: 'No se pudo subir el diseno' });
+                } catch (error) {
+                  showToast({ kind: 'danger', title: 'No se pudo subir el diseno', description: motivoDelError(error) });
                 }
               }}
             />
@@ -817,8 +817,8 @@ function Firmas({ firmas, onChange }: { firmas: FirmanteConstancia[]; onChange: 
                     try {
                       const subido = await uploadMedia(file, 'signature');
                       actualizar(indice, { imageKey: subido.storageKey });
-                    } catch {
-                      showToast({ kind: 'danger', title: 'No se pudo subir la rubrica' });
+                    } catch (error) {
+                      showToast({ kind: 'danger', title: 'No se pudo subir la rubrica', description: motivoDelError(error) });
                     }
                   }}
                 />

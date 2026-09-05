@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * SESION DE REPASO DEL DIA (Decision #22). Trae de vuelta lo que se fallo, en escalones
@@ -92,8 +93,8 @@ export default function ReviewPage() {
         .map((item) => ({ questionVersionId: item.questionVersionId, answer: answers[item.questionVersionId] }))
         .filter((item): item is { questionVersionId: string; answer: AnswerInput } => hasAnswer(item.answer ?? null));
       setResult(await answerReview(payload));
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar el repaso. Intenta de nuevo.' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar el repaso. Intenta de nuevo.', description: motivoDelError(error) });
       setSending(false);
     }
   }

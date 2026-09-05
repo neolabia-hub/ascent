@@ -21,7 +21,7 @@ import {
   Smartphone,
   Trash2,
 } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createQuestion,
   createQuestionCategory,
@@ -329,8 +329,8 @@ export default function EvaluacionEditorPage() {
     setPresentation(siguiente);
     try {
       await updateAssessmentPresentation(assessmentId, siguiente);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar el diseno' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar el diseno', description: motivoDelError(error) });
     }
   };
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, Copy, Download, KeyRound, Pencil, Plus, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createUser,
   downloadImportTemplate,
@@ -122,8 +122,8 @@ export default function UsuariosPage() {
     try {
       const result = await listUsers({ q: q || undefined, areaId: areaFilter || undefined, page, pageSize: PAGE_SIZE });
       setData(result);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar el listado de personas' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar el listado de personas', description: motivoDelError(error) });
     }
   }, [q, areaFilter, page, showToast]);
 

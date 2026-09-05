@@ -20,6 +20,79 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-06 (tarde) — Cuatro observaciones del cliente sobre la pantalla, y dos fallos detras
+
+Sesion corta de revision que acabo destapando dos cosas que no eran de la pantalla.
+
+### 1. Un 409 que la pantalla se tragaba, y otros 54 iguales
+
+Publicar una convocatoria devolvia **409 en la consola** y el aviso decia "No se pudo publicar". La
+API si explicaba —*"Publica primero el contenido de la formacion"*— y el `catch` la tiraba. Eran
+**55 sitios** con la misma forma.
+
+`motivoDelError(error)` en `lib/api.ts` y un codemod para los 52 con la forma exacta. Lee
+`ApiError.message`, que es donde el filtro global pone la frase del 409.
+
+**Y el 409 concreto era correcto:** esa formacion no tenia contenido —solo la encuesta automatica—
+y publicar la convocatoria habria citado gente a algo vacio.
+
+### 2. Convocar creaba una SEGUNDA inscripcion viva de la misma formacion
+
+Salio de una pregunta que parecia de concepto: *"¿que pasa con las inducciones que pueden ser
+presenciales, como las especificas?"*. Ese tipo abre su convocatoria PERMANENTE sola al publicar, y
+despues alguien programa la jornada y convoca. Medido:
+
+```
+PERMANENT | PUBLISHED | ENROLLED   <- viva para siempre
+EVENT     | PUBLISHED | COMPLETED  <- cerrada por asistencia
+```
+
+Es el mismo fallo que `varias-convocatorias.mjs` arreglo el 2026-09-04 en el AUTOSERVICIO; el
+camino del ADMINISTRADOR se quedo igual, y la asistencia lo volvio alcanzable. Ahora convocar
+**retira** la viva de la otra convocatoria (`WITHDRAWN`, con auditoria; lo cumplido no se toca).
+`permanente-y-jornada.mjs`.
+
+**La leccion, segunda vez esta semana:** un fallo arreglado en un camino no esta arreglado.
+Inscribirse tiene dos puertas y la correccion de septiembre solo paso por una.
+
+### 3. Donde vive cada cosa del certificado, que estaba bien y mal explicado
+
+La pregunta era *"«La acredita un tercero» esta en la ficha pero «ejecutado por» en la
+convocatoria: ¿donde debe estar que cosa?"*. Estan bien donde estan, y lo que las separa es cada
+cuanto cambia la respuesta: si la formacion se acredita con papel de fuera no cambia de una jornada
+a otra (ficha); QUIEN la dicto si (convocatoria).
+
+Lo que estaba mal era el TEXTO del interruptor del tipo, que prometia configurar algo mas. Ahora
+dice **"Normalmente la acredita un tercero"** y explica que es el punto de partida de sus
+formaciones y que quien lo expide sale de la convocatoria. No se quito del tipo: una
+recertificacion siempre la acredita alguien de fuera, y encenderlo formacion por formacion es lo
+que se olvida.
+
+### 4. Ejemplos para poder mirar la pantalla
+
+`scripts/demo-asistencia.mjs` deja tres jornadas publicadas con gente convocada: una PROPIA, una de
+un TERCERO (pide numero y vencimiento, con la entidad puesta sola) y una QUE CERTIFICA. No es una
+prueba: no comprueba ni limpia nada, existe para poder pulsar el boton.
+
+### El barrido
+
+```
+15 recorridos           TODO BIEN     (+ permanente-y-jornada)
+390 pruebas unitarias   pasan
+21 e2e                  pasan
+build - lint - types    limpios
+```
+
+### Lo que sigue abierto
+
+1. **El archivo no se sube todavia**: PDF del certificado y acta escaneada.
+2. **Los mecanismos 2 y 3 de la asistencia**: QR de sesion y firma en pantalla.
+3. **La segunda puerta** para el papel que llega tarde, desde la ficha de la persona.
+4. **El informe de Vencimientos**: fuente vacia y eje equivocado.
+5. **Repaso / volver a verlo**, y **el aviso interno**.
+
+---
+
 ## 2026-09-06 — Cuatro cosas que cazo el cliente mirando la pantalla, y una matriz que se corrigio a si misma
 
 Sesion de revision de la asistencia. El encargo fue *"pruebas completas y complejas de inicio a fin,

@@ -3,7 +3,7 @@
 import { CalendarDays, CalendarPlus, Info, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { listCatalog, listPickableUsers, type PickableUser } from '@/lib/admin-api';
 import {
   createOffering,
@@ -174,8 +174,8 @@ export function ActivityScheduleTab({
       setEditing(offering);
       setForm(convocatoriaExistente(offering));
       setCreating(true);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo abrir la convocatoria' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo abrir la convocatoria', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -258,8 +258,8 @@ export function ActivityScheduleTab({
           ? 'Quien la tenga exigida puede empezarla cuando quiera.'
           : 'Un administrador debe aprobarla antes de que se abra.',
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo dejar disponible' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo dejar disponible', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }

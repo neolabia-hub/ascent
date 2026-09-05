@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/components/ui/cn';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * QUE INDUCCION ESPECIFICA LE TOCA A CADA CARGO.
@@ -105,8 +106,8 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
           ? `Nacieron ${nacidas} obligaciones para quienes ya tienen el cargo.`
           : 'Todavia no obligan a nadie: nadie tiene ese cargo hoy.',
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -126,8 +127,8 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
         title: 'Retirada de ese cargo',
         description: 'Lo pendiente queda retirado; lo que ya se cumplio no se toca.',
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo retirar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo retirar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }

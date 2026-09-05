@@ -26,7 +26,7 @@ import {
   type Formulario,
 } from '@/lib/performance-api';
 import { listCatalog, type CatalogRow } from '@/lib/admin-api';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { Escala } from '@/components/ui/escala';
 import { useCan } from '@/components/providers/session-provider';
 import { Button } from '@/components/ui/button';
@@ -213,8 +213,8 @@ function Ciclos() {
       await cerrarCiclo(ciclo.id);
       showToast({ kind: 'success', title: 'Ciclo cerrado' });
       cargar();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cerrar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cerrar', description: motivoDelError(error) });
     } finally {
       setOcupado(null);
     }
@@ -728,8 +728,8 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
     setBajando(true);
     try {
       await descargarConsolidadoXlsx(datos.cycle.id, datos.cycle.name);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo generar el Excel' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo generar el Excel', description: motivoDelError(error) });
     } finally {
       setBajando(false);
     }

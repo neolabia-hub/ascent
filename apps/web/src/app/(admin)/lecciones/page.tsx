@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Copy, Layers, Pencil, Plus } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { createLesson, duplicateLesson, listLessons, type LessonListItem } from '@/lib/catalog-api';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
@@ -37,8 +37,8 @@ export default function LeccionesPage() {
     try {
       const result = await listLessons();
       setLessons(result);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar el listado de lecciones' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar el listado de lecciones', description: motivoDelError(error) });
     }
   }, [showToast]);
 

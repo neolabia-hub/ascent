@@ -3054,3 +3054,80 @@ ausente a alguien ya cerrado **no reabre lo cumplido**. La ejecucion ocurrio; un
 siempre no es una asercion. Cuando una prueba mide sobre datos que no controla —facetas vacias,
 formaciones sin requisito— lo que devuelve es cero, y cero pasa cualquier comparacion perezosa. Si la
 prueba necesita datos, **que los cree**.
+
+### 2026-09-06 (tarde) — 55 `catch` que tiraban a la basura lo que el servidor explicaba
+
+Lo reporto el cliente: publicar una convocatoria devolvia **409 en la consola** y la pantalla decia
+"No se pudo publicar". La API si explicaba —*"Publica primero el contenido de la formacion. Hasta
+entonces esta convocatoria puede quedar programada, pero no se puede abrir a la gente"*— y el
+`catch` la tiraba.
+
+```js
+} catch {
+  showToast({ kind: 'danger', title: 'No se pudo publicar' });
+}
+```
+
+No era un caso: eran **55 sitios** con la misma forma. Un servidor que se molesta en decir QUE
+hacer y una pantalla que responde "no se pudo" convierte cada regla de negocio en un misterio, y a
+quien la usa en alguien que prueba cosas a ver si alguna pasa.
+
+`motivoDelError(error)` en `lib/api.ts`, y un codemod para los 52 que tenian la forma exacta (los
+otros 3, a mano). Lee `ApiError.message`, que lleva el `title` del cuerpo — que es donde el filtro
+global pone la frase, como ya estaba escrito aqui el 2026-09-04: *"el motivo de un 409 viaja en
+`title`, no en `message`"*. Devuelve `undefined` cuando no hay nada util: un aviso con una linea
+vacia debajo se lee peor que uno sin ella.
+
+**Y el 409 concreto era correcto:** esa formacion no tenia contenido —solo la encuesta automatica,
+sin leccion ni examen— y publicar la convocatoria habria citado gente a algo vacio. La compuerta
+hacia lo que se puso a hacer; lo que fallaba era contarlo.
+
+### 2026-09-06 (tarde) — Convocar creaba una SEGUNDA inscripcion de la misma formacion
+
+Salio de una pregunta del cliente que parecia de concepto: *"¿que pasa con las inducciones que
+pueden ser presenciales, como las especificas?"*. Ese tipo abre su convocatoria **PERMANENTE** sola
+al publicar, y despues alguien programa ademas una jornada y convoca.
+
+El enroll de ADMINISTRADOR deduplicaba solo dentro de la misma jornada (`where: { offeringId: id }`),
+asi que la persona acababa con dos:
+
+```
+PERMANENT | PUBLISHED | ENROLLED   <- viva para siempre
+EVENT     | PUBLISHED | COMPLETED  <- cerrada por asistencia
+```
+
+Es **el mismo fallo** que `varias-convocatorias.mjs` encontro el 2026-09-04 —*"al terminar una, la
+otra se queda viva para siempre"*— pero aquel se arreglo en el AUTOSERVICIO (`learner.service`) y
+este camino se quedo igual. La asistencia lo volvio alcanzable en el flujo normal.
+
+**Lo que hace ahora:** convocar RETIRA la inscripcion viva que hubiera en otra convocatoria de la
+misma formacion. No se reutiliza —la persona no saldria en la lista de esta jornada y no se le
+podria tomar asistencia, que es justo a lo que se le convoca— y no se borra: queda `WITHDRAWN` con
+su fila de auditoria (Decision #11). Lo ya CUMPLIDO no se toca.
+
+`permanente-y-jornada.mjs`. Medido antes y despues.
+
+**La leccion, y es la segunda vez esta semana:** un fallo arreglado en UN camino no esta arreglado.
+Inscribirse tiene dos puertas —la persona y quien convoca— y la correccion de septiembre solo paso
+por una. Cuando un arreglo vive en un servicio, vale la pena preguntarse quien mas hace lo mismo.
+
+### 2026-09-06 (tarde) — Donde vive cada cosa del certificado externo, y por que
+
+Lo pregunto el cliente: *"«La acredita un tercero» esta en la ficha pero «ejecutado por» esta en la
+convocatoria; ¿donde debe estar que cosa?"*. Son dos preguntas que suenan igual y no lo son, y la
+que las separa es **cada cuanto cambia la respuesta**:
+
+| Pregunta | Cambia por | Vive en |
+|---|---|---|
+| ¿Esta formacion se acredita con papel de un tercero? | FORMACION — alturas siempre, la charla vial nunca | la ficha (con el tipo de punto de partida) |
+| ¿Quien dicto ESTA jornada? | JORNADA — la ARL en marzo, un centro en septiembre | la convocatoria |
+
+Esta bien donde esta. Lo que estaba mal era el TEXTO del interruptor del tipo, que prometia
+configurar algo mas —*"solo activa pero no especificas una configuracion"*, dijo el cliente— cuando
+lo unico que hace es poner el valor de partida de sus formaciones. Reescrito para que lo diga:
+**"Normalmente la acredita un tercero"**, y el detalle explica que quien lo expide sale de la
+convocatoria.
+
+La alternativa —quitarlo del tipo— se descarto por lo mismo que la Decision #111: una
+recertificacion SIEMPRE la acredita alguien de fuera, y encenderlo formacion por formacion es lo
+que se olvida y se descubre el dia de la auditoria.

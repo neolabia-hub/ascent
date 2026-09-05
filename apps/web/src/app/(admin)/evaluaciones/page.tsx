@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * EVALUACIONES. Solo evaluaciones (Decision #84).
@@ -70,8 +71,8 @@ export default function EvaluacionesPage() {
       setTitulo('');
       setNuevaOpen(false);
       router.push(`/evaluaciones/${created.id}`);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo crear la evaluacion' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo crear la evaluacion', description: motivoDelError(error) });
     } finally {
       setCreando(false);
     }

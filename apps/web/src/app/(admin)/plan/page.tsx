@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, CalendarRange, ClipboardList, Plus, Target, Trash2 } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { createPlan, deletePlan, listPlans, type PlanRow, type PlanStatus } from '@/lib/delivery-api';
 import { formatDate, monthName } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -94,8 +94,8 @@ export default function PlanPage() {
   const load = useCallback(async () => {
     try {
       setPlans(await listPlans());
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudieron cargar los planes' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudieron cargar los planes', description: motivoDelError(error) });
     }
   }, [showToast]);
 

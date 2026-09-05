@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TablePagination, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string }> = {
   DRAFT: { kind: 'neutral', label: 'BORRADOR' },
@@ -68,8 +69,8 @@ export default function ConvocatoriasPage() {
   const load = useCallback(async () => {
     try {
       setData(await listOfferings({ q: q || undefined, status: status || undefined, page }));
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudieron cargar las convocatorias' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudieron cargar las convocatorias', description: motivoDelError(error) });
     }
   }, [q, status, page, showToast]);
 

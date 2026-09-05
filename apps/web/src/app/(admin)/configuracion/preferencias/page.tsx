@@ -19,6 +19,7 @@ import {
   type TenantBrandingSettings,
   type TenantSettings,
 } from '@/lib/admin-api';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * Preferencias del tenant: reglas academicas (nota minima, intentos) y marca (colores, nombre).
@@ -60,8 +61,8 @@ export default function PreferenciasPage() {
       // Aplica los colores de inmediato: el admin VE su marca sin recargar.
       applyTenantBranding({ ...r.branding, logoKey: r.branding.logoKey });
       showToast({ kind: 'success', title: 'Marca actualizada' });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar la marca' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar la marca', description: motivoDelError(error) });
     } finally {
       setSavingBranding(false);
     }
@@ -419,8 +420,8 @@ function LogoDeLaMarca({
             const subido = await uploadMedia(file, 'logo');
             onChange(subido.storageKey);
             showToast({ kind: 'success', title: 'Logo subido', description: 'Pulsa "Guardar marca" para aplicarlo.' });
-          } catch {
-            showToast({ kind: 'danger', title: 'No se pudo subir el logo' });
+          } catch (error) {
+            showToast({ kind: 'danger', title: 'No se pudo subir el logo', description: motivoDelError(error) });
           } finally {
             setSubiendo(false);
           }

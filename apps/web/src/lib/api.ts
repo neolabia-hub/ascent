@@ -343,3 +343,36 @@ export function markAllNotificationsRead(): Promise<void> {
     method: 'POST',
   });
 }
+
+/**
+ * LO QUE EL SERVIDOR EXPLICO, para ponerlo debajo del titulo del aviso.
+ *
+ * ─── EL FALLO QUE OBLIGA A QUE ESTO EXISTA (2026-09-06) ───
+ *
+ * Lo reporto el cliente: publicar una convocatoria devolvia **409 en la consola** y la pantalla
+ * decia "No se pudo publicar". La API si explicaba —*"Publica primero el contenido de la formacion.
+ * Hasta entonces esta convocatoria puede quedar programada, pero no se puede abrir a la gente"*—
+ * y el `catch` la tiraba a la basura.
+ *
+ * No era un caso: habia **55 `catch` vacios** haciendo lo mismo. Un servidor que se molesta en
+ * decir QUE hacer y una pantalla que responde "no se pudo" convierte cada regla de negocio en un
+ * misterio, y a quien la usa en alguien que prueba cosas a ver si alguna pasa.
+ *
+ * ─── POR QUE `message` Y NO `code` ───
+ *
+ * `ApiError.message` lleva el `title` del cuerpo, que es donde el filtro global de excepciones pone
+ * la frase de la excepcion (ver la nota del RUNBOOK del 2026-09-04: *"el motivo de un 409 viaja en
+ * `title`, no en `message`"*). El `code` sirve para DECIDIR —ramificar, contar, traducir— y no para
+ * escribir: `VERSION_NOT_PUBLISHED` no le dice nada a nadie.
+ *
+ * Devuelve `undefined` cuando no hay nada util que enseñar —un fallo de red, un error sin cuerpo—
+ * porque un aviso con una linea vacia debajo se lee peor que uno sin ella.
+ */
+export function motivoDelError(error: unknown): string | undefined {
+  if (!(error instanceof ApiError)) return undefined;
+  const texto = error.message?.trim();
+  // "Error de la API" es el respaldo del constructor cuando el cuerpo no traia `title`: es ruido,
+  // no explicacion.
+  if (!texto || texto === 'Error de la API') return undefined;
+  return texto;
+}

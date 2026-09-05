@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useSession } from '@/components/providers/session-provider';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * FICHA DE LA FORMACION: todo lo que describe QUE se aprende y A QUIEN va dirigido.
@@ -123,8 +124,8 @@ export function ActivityInfoTab({
       });
       await onSaved();
       showToast({ kind: 'success', title: 'Ficha guardada' });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar la ficha' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar la ficha', description: motivoDelError(error) });
     } finally {
       setSaving(false);
     }
@@ -247,7 +248,7 @@ export function ActivityInfoTab({
               <Field
                 htmlFor="i-cert-externo"
                 label="La acredita un tercero"
-                hint="Si la dicta la ARL o un centro acreditado y emite su propio certificado, la lista de asistencia pedira su numero y su vencimiento — y esa fecha manda."
+                hint="Si emite su propio certificado, la lista de asistencia pedira su numero y su vencimiento, y esa fecha manda. QUIEN lo expide no se dice aqui: sale de cada convocatoria, porque la misma formacion la puede dictar la ARL en marzo y un centro en septiembre."
               >
                 <Select
                   id="i-cert-externo"

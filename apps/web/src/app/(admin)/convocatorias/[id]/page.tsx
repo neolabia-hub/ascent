@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, SlidersHorizontal, UserPlus, Users, XCircle } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   adjustProjected,
   cancelOffering,
@@ -123,8 +123,8 @@ export default function ConvocatoriaDetallePage() {
       setOffering(detail);
       setRoster(rosterResult.items);
       setPendientes(pendingResult);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar la convocatoria' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar la convocatoria', description: motivoDelError(error) });
     }
   }, [id, showToast]);
 
@@ -168,8 +168,8 @@ export default function ConvocatoriaDetallePage() {
       );
       setPublishOpen(false);
       await load();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo publicar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo publicar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -187,8 +187,8 @@ export default function ConvocatoriaDetallePage() {
       setCancelOpen(false);
       setCancelReason('');
       await load();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cancelar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cancelar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -293,8 +293,8 @@ export default function ConvocatoriaDetallePage() {
       await completeOffering(id);
       showToast({ kind: 'success', title: 'Convocatoria cerrada', description: 'Cuenta como ejecutada en el plan anual.' });
       await load();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cerrar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cerrar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }

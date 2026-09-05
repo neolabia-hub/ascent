@@ -23,7 +23,7 @@ import {
   Trash2,
   Unlink,
 } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   activatePlan,
   addPlanItem,
@@ -259,8 +259,8 @@ export default function PlanDetallePage() {
   const load = useCallback(async () => {
     try {
       setPlan(await getPlan(id));
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar el plan' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar el plan', description: motivoDelError(error) });
     }
   }, [id, showToast]);
 
@@ -578,8 +578,8 @@ export default function PlanDetallePage() {
       await (next === 'ACTIVE' ? activatePlan(id) : closePlan(id));
       showToast({ kind: 'success', title: next === 'ACTIVE' ? 'Plan en ejecucion' : 'Plan cerrado' });
       await load();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cambiar el estado' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cambiar el estado', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }

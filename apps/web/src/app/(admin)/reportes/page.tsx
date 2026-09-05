@@ -27,6 +27,7 @@ import { useToast } from '@/components/ui/toast';
 import { useCan } from '@/components/providers/session-provider';
 import { Analitica } from '@/components/modules/admin/analitica';
 import { Vencimientos } from '@/components/modules/admin/vencimientos';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * SEGUIMIENTO DE LA EJECUCION (Decision #122).
@@ -153,8 +154,8 @@ function VistaEjecucion() {
     setBajando(true);
     try {
       await descargarEjecucionGeneralXlsx(filtro);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo generar el archivo' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo generar el archivo', description: motivoDelError(error) });
     } finally {
       setBajando(false);
     }
@@ -386,8 +387,8 @@ function DetalleFormacion({
     setBajando(true);
     try {
       await descargarEjecucionDeActividadXlsx(fila.activityId, fila.activityName, filtro);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo generar el archivo' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo generar el archivo', description: motivoDelError(error) });
     } finally {
       setBajando(false);
     }

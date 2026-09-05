@@ -138,6 +138,10 @@ export class ActivitiesService {
             responsibleUserId,
             modality: input.modality,
             tags: input.tags,
+            // `undefined` = no vino, y entonces la columna queda NULL = "lo que diga su tipo", que
+            // es el caso normal. El esquema lo aceptaba y este `data` lo ignoraba en silencio:
+            // crear una formacion diciendo que la acredita un tercero no guardaba nada.
+            tracksExternalCertificate: input.tracksExternalCertificate,
             createdBy: actor.id,
             updatedBy: actor.id,
           },

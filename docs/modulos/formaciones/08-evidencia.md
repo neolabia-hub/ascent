@@ -45,16 +45,44 @@ casos reales.
 
 ## 3. La asistencia va con el `kind`, no con la modalidad
 
-Es la pregunta que parece obvia y no lo es.
+Es la pregunta que más se piensa mal, y merece las dos definiciones separadas porque suenan
+parecido y no lo son:
+
+| | Qué contesta | Valores |
+|---|---|---|
+| **`kind`** de la convocatoria | **cómo se entra** | `EVENT` (fecha, cupo, alguien convoca) · `PERMANENT` (autoservicio: la persona entra cuando puede) · `HYBRID` |
+| **`modality`** | **cómo se dicta** | `PRESENCIAL` · `VIRTUAL` · `HIBRIDA` |
+
+Son **ortogonales**: existen las cuatro combinaciones, y la que decide cómo se cierra es la
+primera.
 
 | | Se cierra por | Por qué |
 |---|---|---|
-| `EVENT` | **asistencia** | tiene fecha, cupo y alguien que convoca. Hay una lista de quién estuvo, y no queda contenido completado en la plataforma |
-| `PERMANENT` | **la plataforma** | la persona entra sola cuando puede; la evidencia es justamente lo que el sistema registró |
+| `EVENT` | **asistencia** | hay una lista de quién estuvo, y no queda contenido completado en la plataforma |
+| `PERMANENT` | **la plataforma** | la persona entra sola cuando puede; la evidencia es lo que el sistema registró |
 
-Atarlo a `PRESENCIAL` habría dejado fuera el **webinar de la ARL**, que es cada vez más común: una
-jornada virtual en vivo también tiene lista de asistentes y tampoco deja rastro en el reproductor.
+Atarlo a `PRESENCIAL` habría dejado fuera el **webinar en vivo de la ARL**, que es cada vez más
+común: es `VIRTUAL` y tampoco deja rastro en el reproductor. Y al revés, un contenido presencial
+que la gente ve cuando quiere no existe — si es presencial, hay una fecha.
+
 Una convocatoria permanente rechaza la lista con **409 `OFFERING_NOT_ATTENDABLE`**.
+
+### Y entonces, ¿qué pasa con una inducción específica presencial?
+
+Es la pregunta del cliente, y la respuesta tiene dos partes.
+
+**La modalidad de la FICHA es solo el valor por defecto de sus convocatorias.** Marcar una
+inducción como `PRESENCIAL` no decide nada por sí solo: lo decide la convocatoria que se le cree.
+
+**Y ese tipo abre una convocatoria PERMANENTE sola al publicar** (`defaultOfferingKind: PERMANENT`),
+pero eso no impide programarle además una jornada `EVENT` y tomar asistencia. Las dos conviven, y
+es el camino normal: la gente que puede la hace online, y a quien no, se le da en salón.
+
+Lo que sí obliga eso es a que **una persona no acabe con dos ejecuciones vivas de la misma
+formación**. Convocar a una jornada a quien ya estaba en la permanente **retira** aquella
+(`WITHDRAWN`, con su rastro) y crea la de la jornada — porque reutilizarla dejaría a esa persona
+fuera de la lista a la que se le está convocando. Medido en `permanente-y-jornada.mjs`; antes del
+2026-09-06 se quedaban las dos, y la de la permanente viva para siempre.
 
 ## 4. Cerrar por asistencia no pasa por `evaluate`, y eso hay que registrarlo
 

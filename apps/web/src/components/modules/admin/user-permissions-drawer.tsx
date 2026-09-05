@@ -2,7 +2,7 @@
 
 import { Check, Globe, Minus, Plus, RotateCcw } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   getUser,
   listCatalog,
@@ -105,8 +105,8 @@ export function UserPermissionsDrawer({
           detail.overrides.map((override) => [override.permission.code, override.granted ? 'granted' : 'revoked']),
         ),
       );
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudieron cargar los permisos' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudieron cargar los permisos', description: motivoDelError(error) });
     } finally {
       setLoading(false);
     }

@@ -22,7 +22,7 @@ import {
   Video,
   type LucideIcon,
 } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createNextVersion,
   duplicateLesson,
@@ -254,8 +254,8 @@ export default function LessonEditorPage() {
     try {
       const data = await getLesson(lessonId);
       applyLesson(data);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar la leccion' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar la leccion', description: motivoDelError(error) });
       setLesson(null);
     } finally {
       setInitialLoading(false);

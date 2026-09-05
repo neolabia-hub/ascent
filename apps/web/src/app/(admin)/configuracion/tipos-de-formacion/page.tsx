@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { frasearUso, leerEnUso, type EnUso } from '@/lib/catalog-en-uso';
 import { createCatalogRow, deleteCatalogRow, listCatalog, updateCatalogRow, type CatalogRow } from '@/lib/admin-api';
 import { listSurveys, type SurveyTemplate } from '@/lib/surveys-api';
@@ -131,7 +131,7 @@ const REGLAS = [
   {
     clave: 'tracksExternalCertificate' as const,
     icono: BadgeCheck,
-    titulo: 'La acredita un tercero',
+    titulo: 'Normalmente la acredita un tercero',
     /*
       APAGADO EN SEIS DE LOS SIETE, y encendido solo en Recertificacion (Decision #157).
 
@@ -142,8 +142,23 @@ const REGLAS = [
       Se explica la consecuencia y no la regla, como los otros cuatro: lo que le importa a quien
       lee es que la fecha del papel gana, porque es la que va a mover su indicador.
     */
+    /*
+      ─── ES UN PUNTO DE PARTIDA, Y EL TEXTO TIENE QUE DECIRLO (2026-09-06) ───
+
+      Lo cazo el cliente: *"desde el tipo solo activa pero no especificas una configuracion... la
+      guia dice que viene desde el tipo pero no viene nada"*. Tenia razon en la queja y la respuesta
+      no es quitar el interruptor: es que decia mas de lo que hace.
+
+      Aqui NO se configura ningun certificado. Se dice que esta CLASE de formacion normalmente la
+      acredita alguien de fuera, que es el valor con el que nacen sus formaciones — y cada una puede
+      desviarse desde su ficha, que es donde se decide de verdad. Igual que "Entrega constancia".
+
+      Y QUIEN lo expide no se dice ni aqui ni en la ficha: se dice en la CONVOCATORIA, porque cambia
+      de una jornada a otra. La misma habilitacion la puede dictar la ARL en marzo y un centro de
+      entrenamiento en septiembre.
+    */
     detalle:
-      'La lista de asistencia pedira entidad, numero y vencimiento del certificado. Esa fecha manda sobre la que calcula la recurrencia.',
+      'Es el punto de partida de sus formaciones: cada una puede decir otra cosa desde su ficha. Cuando aplica, la lista de asistencia pide el numero del certificado y su vencimiento — y esa fecha manda sobre la que calcula la recurrencia. QUIEN lo expide sale de la convocatoria.',
   },
 ];
 
@@ -182,10 +197,10 @@ export default function TiposDeFormacionPage() {
     setTipos((previos) => previos?.map((t) => (t.id === tipo.id ? ({ ...t, ...cambio } as TipoDeFormacion) : t)) ?? null);
     try {
       await updateCatalogRow('activity-types', tipo.id, cambio as Record<string, unknown>);
-    } catch {
+    } catch (error) {
       // Dejarlo movido seria decir que se guardo algo que no se guardo.
       setTipos((previos) => previos?.map((t) => (t.id === tipo.id ? tipo : t)) ?? null);
-      showToast({ kind: 'danger', title: 'No se pudo guardar' });
+      showToast({ kind: 'danger', title: 'No se pudo guardar', description: motivoDelError(error) });
     }
   }
 

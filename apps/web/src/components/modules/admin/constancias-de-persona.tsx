@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { useToast } from '@/components/ui/toast';
 import { useCan } from '@/components/providers/session-provider';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * LAS CONSTANCIAS DE UNA PERSONA, PARA QUIEN LLEVA EL EXPEDIENTE (Decision #128).
@@ -68,8 +69,8 @@ export function ConstanciasDePersona({
     setBajando(fila.id);
     try {
       await descargarPdf(`/certificates/${fila.id}/pdf`, `${nombre} - ${fila.activityName}.pdf`);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo descargar la constancia' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo descargar la constancia', description: motivoDelError(error) });
     } finally {
       setBajando(null);
     }
@@ -84,8 +85,8 @@ export function ConstanciasDePersona({
       setARevocar(null);
       setMotivo('');
       if (userId) setFilas(await getCertificatesOf(userId));
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo revocar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo revocar', description: motivoDelError(error) });
     } finally {
       setRevocando(false);
     }

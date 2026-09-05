@@ -19,6 +19,7 @@ import { Modal } from '@/components/ui/modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * RESPONDER UNA EVALUACION DE DESEMPENO (Decision #134).
@@ -435,8 +436,8 @@ function Formulario({
         comment: general.trim() || null,
       });
       onEntregada();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo entregar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo entregar', description: motivoDelError(error) });
     } finally {
       setGuardando(false);
       setConfirmando(false);

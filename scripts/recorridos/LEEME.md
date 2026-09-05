@@ -26,6 +26,7 @@ node scripts/recorridos/tajadas.mjs                 # jornadas acotadas: 6 tipos
 node scripts/recorridos/proyectados-ajuste.mjs      # congelar, que cambie la plantilla, ajustar con motivo
 node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia, "el papel manda", 2 reglas y acotamiento
 node scripts/recorridos/asistencia-matriz.mjs       # la asistencia en TODOS los tipos y modalidades, las 5 facetas y el Seguimiento
+node scripts/recorridos/permanente-y-jornada.mjs    # una formacion con convocatoria permanente Y jornada: una sola inscripcion viva
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```

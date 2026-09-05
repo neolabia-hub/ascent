@@ -2,7 +2,7 @@
 
 import { Award, Camera, Download, Flame, LogOut, Shield, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { logout, setMyAvatar } from '@/lib/api';
+import { logout, setMyAvatar, motivoDelError } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { getMyProgress, type MyProgress } from '@/lib/learner-api';
 import { useLearnerProfile } from '@/components/layout/learner-session';
@@ -227,8 +227,8 @@ function MiFoto({
           try {
             const subido = await uploadMedia(file, 'avatar');
             await guardar(subido.storageKey);
-          } catch {
-            showToast({ kind: 'danger', title: 'No se pudo subir la foto' });
+          } catch (error) {
+            showToast({ kind: 'danger', title: 'No se pudo subir la foto', description: motivoDelError(error) });
           } finally {
             setSubiendo(false);
           }
@@ -262,8 +262,8 @@ function MisConstancias() {
     setBajando(fila.id);
     try {
       await descargarPdf(`/me/certificados/${fila.id}/pdf`, `${fila.activityName}.pdf`);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo generar el PDF' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo generar el PDF', description: motivoDelError(error) });
     } finally {
       setBajando(null);
     }

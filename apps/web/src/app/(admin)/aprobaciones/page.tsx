@@ -13,6 +13,7 @@ import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TablePagination, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/components/ui/cn';
+import { motivoDelError } from '@/lib/api';
 
 type Tab = 'PENDING' | 'HISTORY' | 'MINE';
 
@@ -80,8 +81,8 @@ export default function AprobacionesPage() {
       setSelected(null);
       setNote('');
       await load();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo registrar la decision' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo registrar la decision', description: motivoDelError(error) });
     } finally {
       setDeciding(false);
     }

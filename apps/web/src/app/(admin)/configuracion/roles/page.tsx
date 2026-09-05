@@ -3,7 +3,7 @@
 import { Check, Lock, Plus, Save, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createRole,
   listPermissions,
@@ -71,8 +71,8 @@ export default function RolesPage() {
       setRoles(roleRows);
       setPermissions(permissionRows);
       setDraft(Object.fromEntries(roleRows.map((role) => [role.id, new Set(role.permissionCodes)])));
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudieron cargar los roles' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudieron cargar los roles', description: motivoDelError(error) });
       setRoles([]);
     }
   }, [showToast]);

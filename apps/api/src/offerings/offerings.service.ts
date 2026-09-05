@@ -1406,10 +1406,73 @@ export class OfferingsService {
           area: { select: { name: true } },
         },
       }),
-      this.prisma.scoped.enrollment.findMany({ where: { offeringId: id }, select: { userId: true } }),
+      /*
+        LO VIVO DE ESA FORMACION, NO SOLO LO DE ESTA JORNADA (2026-09-06).
+
+        Se miraba `{ offeringId: id }`, asi que convocar a alguien que YA tenia una inscripcion viva
+        de la misma formacion en OTRA convocatoria le creaba una segunda. Es el mismo fallo que
+        `varias-convocatorias.mjs` encontro y arreglo el 2026-09-04 —*"al terminar una, la otra se
+        queda viva para siempre"*— pero aquel se arreglo en el autoservicio (`learner.service`) y
+        este camino, el del administrador, se quedo igual.
+
+        LA ASISTENCIA LO VOLVIO ALCANZABLE en el flujo normal, y lo cazo el cliente preguntando por
+        "las inducciones que pueden ser presenciales, como las especificas": ese tipo abre su
+        convocatoria PERMANENTE sola al publicar, y despues alguien programa la jornada y convoca.
+
+        MEDIDO antes del arreglo: la misma persona con `PERMANENT/ENROLLED` y `EVENT/COMPLETED`. Al
+        cerrar la jornada por asistencia, la permanente se quedaba viva para siempre — contando como
+        inscrita en los numeros de esa convocatoria y apareciendole a ella en sus pendientes.
+      */
+      this.prisma.scoped.enrollment.findMany({
+        where: {
+          userId: { in: input.allAssigned ? undefined : input.userIds },
+          OR: [
+            { offeringId: id },
+            {
+              status: { in: ['ENROLLED', 'IN_PROGRESS'] },
+              activityVersion: { activityId: version.activityId },
+            },
+          ],
+        },
+        select: { id: true, userId: true, offeringId: true, status: true },
+      }),
     ]);
-    const enrolledAlready = new Set(already.map((e) => e.userId));
+    const enrolledAlready = new Set(already.filter((e) => e.offeringId === id).map((e) => e.userId));
     const candidatos = people.filter((person) => !enrolledAlready.has(person.id));
+
+    /*
+      LA QUE ESTABA VIVA EN OTRA CONVOCATORIA SE RETIRA, no se ignora.
+
+      Reutilizarla —que es lo que hace el autoservicio— aqui no vale: la persona no saldria en la
+      lista de ESTA jornada y no se le podria tomar asistencia, que es justo a lo que se le esta
+      convocando. Y crear la segunda deja dos vivas.
+
+      Asi que se retira la anterior con su motivo. **No se borra** (Decision #11: la evidencia se
+      retira, no desaparece) y lo ya CUMPLIDO no se toca — solo lo que sigue abierto. Convocar a
+      alguien a una jornada presencial es decir "esto lo vas a hacer aqui", y eso es exactamente lo
+      que significa retirar la inscripcion online que no habia terminado.
+    */
+    const idsConvocados = new Set(candidatos.map((p) => p.id));
+    const vivasEnOtra = already.filter(
+      (e) => e.offeringId !== id && idsConvocados.has(e.userId) && (e.status === 'ENROLLED' || e.status === 'IN_PROGRESS'),
+    );
+    if (vivasEnOtra.length > 0) {
+      await this.prisma.scoped.enrollment.updateMany({
+        where: { id: { in: vivasEnOtra.map((e) => e.id) } },
+        data: { status: 'WITHDRAWN' },
+      });
+      await this.audit.record({
+        tenantId,
+        userId: actor.id,
+        action: 'ENROLLMENTS_WITHDRAWN_FOR_OFFERING',
+        resourceType: 'offerings',
+        resourceId: id,
+        newValues: {
+          motivo: 'Convocados a esta jornada: su inscripcion viva en otra convocatoria de la misma formacion se retira.',
+          retiradas: vivasEnOtra.length,
+        },
+      });
+    }
 
     /*
       ── SI NO CABEN TODOS, SE CONVOCA A LOS QUE CABEN (2026-09-04) ──────────────────────────────

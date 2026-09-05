@@ -33,6 +33,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * QUIENES — a quien se le exige esta formacion, decidido AQUI y no en otra pantalla.
@@ -263,8 +264,8 @@ export function ActivityAudienceTab({
             ? `Nacieron ${result.created} obligaciones para quienes ya estan.`
             : 'Nadie nuevo quedo obligado: los que estan ya la tenian.',
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar a quien se le exige' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar a quien se le exige', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -300,8 +301,8 @@ export function ActivityAudienceTab({
         title: 'Requisito retirado',
         description: 'Lo pendiente queda retirado; lo que ya se cumplio no se toca.',
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo retirar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo retirar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -328,8 +329,8 @@ export function ActivityAudienceTab({
         title: 'Obligacion eximida',
         description: 'Deja de contar para el cumplimiento y queda con el motivo en el registro.',
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo eximir' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo eximir', description: motivoDelError(error) });
     }
   };
 
@@ -348,8 +349,8 @@ export function ActivityAudienceTab({
         title: `${result.created} obligaciones creadas`,
         description: result.skipped > 0 ? `${result.skipped} ya la tenian pendiente.` : undefined,
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo asignar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo asignar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }

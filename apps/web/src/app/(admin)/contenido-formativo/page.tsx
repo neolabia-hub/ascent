@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Check, Plus, Search } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { consecuenciasDelTipo, readTypeConfig } from '@/lib/activity-type';
 import { listCatalog, type CatalogRow } from '@/lib/admin-api';
 import { createActivity, listActivities, type ActivitiesPage, type Modality } from '@/lib/catalog-api';
@@ -103,8 +103,8 @@ export default function ContenidoFormativoPage() {
   const load = useCallback(async () => {
     try {
       setData(await listActivities({ q: q || undefined, activityTypeId: typeFilter || undefined, page }));
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar el contenido formativo' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar el contenido formativo', description: motivoDelError(error) });
     }
   }, [q, typeFilter, page, showToast]);
 

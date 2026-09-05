@@ -21,7 +21,7 @@ import {
   Users,
   Video,
 } from 'lucide-react';
-import { ApiError, me } from '@/lib/api';
+import { ApiError, me, motivoDelError } from '@/lib/api';
 import {
   createNextVersion,
   discardDraft,
@@ -196,8 +196,8 @@ export default function ActividadDetallePage() {
         const draft = detail.versions.find((row) => row.status === 'DRAFT');
         return draft?.id ?? detail.versions[0]?.id ?? null;
       });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cargar la formacion' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cargar la formacion', description: motivoDelError(error) });
     }
   }, [activityId, showToast]);
 
@@ -270,8 +270,8 @@ export default function ActividadDetallePage() {
     try {
       await reorderContents(version.id, swapped);
       await refreshVersion();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo reordenar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo reordenar', description: motivoDelError(error) });
     }
   };
 
@@ -280,8 +280,8 @@ export default function ActividadDetallePage() {
       await removeContent(contentId);
       await refreshVersion();
       showToast({ kind: 'success', title: 'Contenido eliminado' });
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo eliminar el contenido' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo eliminar el contenido', description: motivoDelError(error) });
     }
   };
 
@@ -290,8 +290,8 @@ export default function ActividadDetallePage() {
     try {
       await updateVersionSettings(version.id, { [field]: value });
       await refreshVersion();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar el ajuste' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar el ajuste', description: motivoDelError(error) });
     }
   };
 
@@ -1019,8 +1019,8 @@ function PortadaFormacion({
     try {
       await updateActivity(activityId, { coverKey: clave });
       onChange(clave);
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo guardar la portada' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo guardar la portada', description: motivoDelError(error) });
     } finally {
       setSubiendo(false);
     }
@@ -1062,8 +1062,8 @@ function PortadaFormacion({
           try {
             const subido = await uploadMedia(file, 'cover');
             await guardar(subido.storageKey);
-          } catch {
-            showToast({ kind: 'danger', title: 'No se pudo subir la imagen' });
+          } catch (error) {
+            showToast({ kind: 'danger', title: 'No se pudo subir la imagen', description: motivoDelError(error) });
             setSubiendo(false);
           }
         }}

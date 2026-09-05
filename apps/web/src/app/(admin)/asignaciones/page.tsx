@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardCheck, Grid3x3, Plus, ShieldOff, ShieldX, Target, Users } from 'lucide-react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import { listCatalog, type CatalogRow } from '@/lib/admin-api';
 import { listActivities, type ActivityListItem } from '@/lib/catalog-api';
 import {
@@ -160,8 +160,8 @@ export default function AsignacionesPage() {
         });
         if (vigente()) setAssignments(page.items);
       }
-    } catch {
-      if (vigente()) showToast({ kind: 'danger', title: 'No se pudo cargar la informacion' });
+    } catch (error) {
+      if (vigente()) showToast({ kind: 'danger', title: 'No se pudo cargar la informacion', description: motivoDelError(error) });
     }
   }, [tab, assignmentQuery, showToast]);
 
@@ -209,8 +209,8 @@ export default function AsignacionesPage() {
       await updateAssignmentRule(rule.id, { active: false });
       showToast({ kind: 'success', title: 'Requisito retirado', description: 'Lo pendiente quedo retirado; lo cumplido no se toca.' });
       await loadTab();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo retirar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo retirar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -254,8 +254,8 @@ export default function AsignacionesPage() {
       setAudienceOpen(false);
       setAudienceForm({ name: '', jobTitleIds: [], areaIds: [], regionalIds: [], serviceIds: [] });
       await loadTab();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo crear la audiencia' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo crear la audiencia', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -282,8 +282,8 @@ export default function AsignacionesPage() {
       setAssignOpen(false);
       setTab('obligaciones');
       await loadTab();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo asignar' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo asignar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -301,8 +301,8 @@ export default function AsignacionesPage() {
       await waiveAssignment(eximiendo.id, reason);
       showToast({ kind: 'success', title: 'Obligacion eximida' });
       await loadTab();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo eximir' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo eximir', description: motivoDelError(error) });
     }
   };
 
