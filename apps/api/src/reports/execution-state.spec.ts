@@ -42,6 +42,35 @@ describe('resolverEstadoEjecucion', () => {
     expect(resolverEstadoEjecucion(caso({ enrollmentStatus: 'ENROLLED' }))).toBe('SIN_EMPEZAR');
     expect(resolverEstadoEjecucion(caso({ enrollmentStatus: null }))).toBe('SIN_EMPEZAR');
   });
+
+  it('la ronda cerrada sin hacerse es NO_REALIZADA, no "sin empezar"', () => {
+    // Es la mitad que faltaba de la Decision #142: el motor escribia EXPIRED_NOT_DONE y el informe
+    // lo leia como "todavia no la ha empezado", que dice justo lo contrario. Encontrado de punta a
+    // punta el 2026-09-04 con `scripts/recorridos/reinduccion-ciclos.mjs`.
+    expect(resolverEstadoEjecucion(caso({ assignmentStatus: 'EXPIRED_NOT_DONE' }))).toBe('NO_REALIZADA');
+  });
+
+  it('la eximida es su propio estado', () => {
+    // Tiene un motivo escrito que el auditor puede leer: no es trabajo pendiente de nadie.
+    expect(resolverEstadoEjecucion(caso({ assignmentStatus: 'WAIVED' }))).toBe('EXIMIDA');
+  });
+
+  it('el RESULTADO manda sobre los dos estados terminales', () => {
+    // Si alcanzo a aprobarla, esta hecha aunque despues alguien la eximiera o cerrara el periodo.
+    expect(resolverEstadoEjecucion(caso({ assignmentStatus: 'WAIVED', enrollmentStatus: 'PASSED' }))).toBe('TERMINADA');
+    expect(
+      resolverEstadoEjecucion(caso({ assignmentStatus: 'EXPIRED_NOT_DONE', enrollmentStatus: 'PASSED' })),
+    ).toBe('TERMINADA');
+  });
+
+  it('lo cerrado gana a la convocatoria y al plazo', () => {
+    // Preguntar si puede inscribirse a algo que ya cerro no significa nada: no hay nada que hacer.
+    expect(
+      resolverEstadoEjecucion(
+        caso({ assignmentStatus: 'EXPIRED_NOT_DONE', puedeAutoinscribirse: false, overdue: true }),
+      ),
+    ).toBe('NO_REALIZADA');
+  });
 });
 
 describe('resumirEjecucion', () => {
@@ -60,7 +89,28 @@ describe('resumirEjecucion', () => {
     expect(resumen.esperando).toBe(2);
   });
 
+  it('la NO REALIZADA si cuenta en el denominador: es el incumplimiento', () => {
+    const resumen = resumirEjecucion(['TERMINADA', 'NO_REALIZADA']);
+
+    expect(resumen.noRealizadas).toBe(1);
+    expect(resumen.avancePct).toBe(50);
+  });
+
+  it('la EXIMIDA sale del denominador, para que el indicador no tenga techo', () => {
+    // Con la eximida dentro, eximir a una de cuatro haria imposible pasar del 75% aunque las tres
+    // restantes la hicieran: se castigaria una decision legitima y escrita.
+    const resumen = resumirEjecucion(['TERMINADA', 'TERMINADA', 'TERMINADA', 'EXIMIDA']);
+
+    expect(resumen.eximidas).toBe(1);
+    expect(resumen.total).toBe(4);
+    expect(resumen.avancePct).toBe(100);
+  });
+
   it('sin nadie asignado no divide por cero', () => {
     expect(resumirEjecucion([])).toMatchObject({ total: 0, avancePct: 0 });
+  });
+
+  it('con todas eximidas tampoco divide por cero', () => {
+    expect(resumirEjecucion(['EXIMIDA', 'EXIMIDA'])).toMatchObject({ total: 2, eximidas: 2, avancePct: 0 });
   });
 });

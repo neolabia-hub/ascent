@@ -126,7 +126,7 @@ resolución del evaluador de eficacia, los seis estados de ejecución, y el guar
 | Pendiente | Criticidad | Nota |
 |---|---|---|
 | **Asistencia presencial y QR** | **Alta** | Bloquea que lo presencial emita constancia |
-| Exportar el seguimiento a Excel / PDF | **Alta** | Es lo que se lleva el auditor |
+| ~~Exportar el seguimiento a Excel~~ | — | **Hecho el 2026-09-01** (Decision #124). El PDF se descarto: 600 filas en PDF no se ordenan ni se filtran. Ver `docs/modulos/seguimiento.md` |
 | El enlace del plan no filtra al llegar a Seguimiento | Media | Falta leer `?formacion=` |
 | Renombrar «Reportes» a «Seguimiento» en la navegación | Media | Los reportes de verdad llegan en Sprint 6 |
 | Mensaje claro al no poder eliminar un tipo en uso | Media | La regla es correcta; el mensaje no explica |

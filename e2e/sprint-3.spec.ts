@@ -3,6 +3,7 @@ import {
   ANO_PLAN_DESECHABLE,
   ANO_PLAN_DOD,
   ANO_PLAN_IDA_Y_VUELTA,
+  agregarEvaluacion,
   crearPlanDelAno,
   elegirEnCombo,
   limpiarPlanDelAno,
@@ -74,6 +75,9 @@ async function publishedActivity(
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(page.getByText('Contenido agregado')).toBeVisible();
 
+  // El tipo de esta formacion pide evaluacion, y desde el 2026-09-04 publicar sin ella se rechaza.
+  await agregarEvaluacion(page, `Examen ${name} ${suffix}`);
+
   await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
   await expect(page.getByText('Version 1 publicada')).toBeVisible();
@@ -88,7 +92,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
 
     // 1. Audiencia de toda la empresa.
     await page.goto('/asignaciones');
-    await page.getByRole('button', { name: 'Audiencias' }).click();
+    await page.getByRole('tab', { name: 'Audiencias' }).click();
     await page.getByRole('button', { name: 'Nueva audiencia' }).click();
     await page.locator('#a-name').fill(`Toda la empresa ${suffix}`);
     await expect(page.getByText(/Sin filtros, la audiencia es TODA la empresa/)).toBeVisible();
@@ -96,7 +100,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(page.getByText('Audiencia creada')).toBeVisible();
 
     // 2. Requisito de ingreso: vence UN DIA ANTES de empezar a trabajar (D1072).
-    await page.getByRole('button', { name: 'Requisitos' }).click();
+    await page.getByRole('tab', { name: 'Requisitos' }).click();
     // Hay dos: el del encabezado y el del estado vacio. Cualquiera sirve.
     await page.getByRole('button', { name: 'Nuevo requisito' }).first().click();
     // El texto de la opcion incluye el conteo de personas: se resuelve el value real.
@@ -131,7 +135,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
 
     // 4. La obligacion existe sin que nadie la asignara, y vence ANTES del ingreso.
     await page.goto('/asignaciones');
-    await page.getByRole('button', { name: 'Obligaciones' }).click();
+    await page.getByRole('tab', { name: 'Obligaciones' }).click();
     await page.getByPlaceholder('Buscar por nombre o documento').fill(`Persona S3 ${suffix}`);
     // Por persona Y FORMACION: una persona nueva recibe TODAS las obligaciones de reglas vivas
     // de la empresa, asi que `.first()` a secas cogia la fila de otra capacitacion y leia su
@@ -158,9 +162,24 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
       .filter({ hasText: activityName })
       .getByRole('button', { name: 'Retirar' })
       .click();
+    /*
+      HAY QUE PEDIR "TODOS" PARA VERLO (2026-09-03).
+
+      La lista de Requisitos ensena por defecto **solo lo VIGENTE**: un requisito retirado no obliga
+      a nadie y verlo mezclado con los vivos hace contar mal de un vistazo. Asi que al retirarlo la
+      fila desaparece, y esta comprobacion —que no se BORRA, que queda RETIRADO— hay que hacerla
+      cambiando el filtro. Es la propia pantalla la que lo sugiere cuando una busqueda no encuentra
+      nada: "Prueba con «Todos»: puede estar retirado".
+    */
+    // 30 s y no los 5 por defecto: retirar un requisito de TODA la empresa retira una obligacion
+    // por persona —1.111 en la base de desarrollo— en la misma peticion. Es la misma deuda que ya
+    // esta anotada al CREARLO, veinte lineas mas arriba, asomando por el otro lado.
+    await expect(page.getByRole('row').filter({ hasText: activityName })).toHaveCount(0, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Todos' }).click();
+    // Un registro que el sistema borra solo es un registro en el que no se puede confiar.
     await expect(
       page.getByRole('row').filter({ hasText: activityName }).getByText('RETIRADO'),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
   });
 
   test('DoD: publicar la convocatoria congela los proyectados y el plan mide sobre ellos', async ({ page }) => {
@@ -178,7 +197,26 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await page.locator('#o-modality').selectOption('PRESENCIAL');
     await page.locator('#o-date').fill(`${ANO_PLAN_DOD}-03-10`);
     await page.locator('#o-location').fill('Auditorio principal');
-    await page.getByRole('button', { name: 'Crear convocatoria' }).click();
+
+    /*
+      SI HAY UN PLAN APROBADO VIVO, ESTE FORMULARIO PIDE MOTIVO (2026-09-03).
+
+      Desde que programar una jornada de una capacitacion del plan la mete en el plan del ano
+      (Decision #75), el cajon pide el "por que" cuando el plan destino ya esta aprobado — agregar
+      un renglon crea obligaciones reales y el auditor va a preguntar de donde salio.
+
+      Que aparezca o no depende de si existe un plan aprobado del ano en curso o posterior, es
+      decir, del ESTADO de la base, no de esta prueba. Antes fallaba en cuanto otra corrida dejaba
+      uno: el boton salia apagado y el error era un timeout, que no se parece a la causa. Se rellena
+      si lo pide y se sigue. Que el motivo sea OBLIGATORIO lo comprueba la prueba del plan, mas
+      abajo, que si controla el plan que se encuentra.
+    */
+    const motivo = page.locator('#o-justification');
+    if (await motivo.isVisible()) {
+      await motivo.fill('Jornada de la prueba de punta a punta: se programa dentro del ano en curso.');
+    }
+
+    await page.getByRole('button', { name: /^Crear (convocatoria|y agregar al plan)$/ }).click();
     await page.waitForURL('**/convocatorias/**', { timeout: 20_000 });
     await expect(page.getByText('BORRADOR', { exact: true })).toBeVisible();
 

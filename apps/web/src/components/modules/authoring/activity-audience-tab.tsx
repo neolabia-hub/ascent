@@ -1,6 +1,6 @@
 'use client';
 
-import { Info, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { Info, ShieldCheck, ShieldOff, ShieldX, SlidersHorizontal, UserPlus, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { quienDecide, type ActivityTypeConfig } from '@/lib/activity-type';
 import { listCatalog, listPickableUsers, type CatalogRow, type PickableUser } from '@/lib/admin-api';
@@ -12,17 +12,20 @@ import {
   previewAudience,
   retireActivityRequirement,
   setActivityRequirement,
+  waiveAssignment,
   type ActivityRequirement,
   type AssignmentRow,
   type AudiencePreview,
   type AudienceRule,
 } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
+import { EximirObligacion } from '@/components/modules/admin/eximir-obligacion';
 import { cn } from '@/components/ui/cn';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { MesDia } from '@/components/ui/mes-dia';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,6 +54,19 @@ import { useToast } from '@/components/ui/toast';
  *   Induccion especifica             -> lo dice la matriz de cargos; se edita con novedad.
  *   Plan / extraordinaria / pildora  -> lo decide el analista, y por eso ahi si hay que marcarlo.
  */
+/**
+ * QUE CLASE DE OBLIGACION CREA CADA FORMA DE REPETIR.
+ *
+ * Una palabra, no una explicacion: la diferencia entre las dos que repiten no esta en el texto de
+ * la opcion —"cada ano" y "cada N meses" se leen igual de bien— sino en si todos vencen el mismo
+ * dia o cada quien tiene el suyo. Eso es lo que hay que poder ver de un vistazo.
+ */
+const COMO_SE_REPITE: Record<'NO' | 'MESES' | 'ANUAL', string> = {
+  NO: 'Se hace una vez y no vuelve.',
+  ANUAL: 'CAMPANA: todos vencen el mismo dia, sea cuando sea que la hicieran.',
+  MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que la completo.',
+};
+
 export function ActivityAudienceTab({
   activityId,
   activityName,
@@ -84,6 +100,8 @@ export function ActivityAudienceTab({
   const [rows, setRows] = useState<AssignmentRow[] | null>(null);
   const [total, setTotal] = useState(0);
   const [requirements, setRequirements] = useState<ActivityRequirement[] | null>(null);
+  /** Cuantas obligaciones se pusieron A MANO, sin regla detras. Ver `load`. */
+  const [sueltas, setSueltas] = useState(0);
   const [catalogs, setCatalogs] = useState<{
     jobTitles: CatalogRow[];
     areas: CatalogRow[];
@@ -121,21 +139,47 @@ export function ActivityAudienceTab({
 
   const load = useCallback(async () => {
     try {
-      const [page, reqs] = await Promise.all([
+      const [page, reqs, aMano] = await Promise.all([
         listAssignments({ targetId: activityId }),
         listActivityRequirements(activityId),
+        /*
+          LAS SUELTAS, CONTADAS APARTE (2026-09-04).
+
+          "Lo que se exige hoy" listaba SOLO reglas, y la tabla de abajo cuenta a todo el mundo. Al
+          agregar tres personas por "O a personas concretas", el total de abajo pasaba de 460 a 463
+          y arriba no cambiaba nada: tres obligaciones vivas sin un solo renglon que dijera de donde
+          salen. Lo reporto el cliente, que hizo la suma y no le cuadro.
+
+          Se le pide el conteo al SERVIDOR en vez de contarlo sobre `page.items`, porque esa lista
+          viene paginada: con 463 personas, las sueltas pueden estar en cualquier pagina.
+        */
+        listAssignments({ targetId: activityId, source: 'MANUAL' }),
       ]);
       setRows(page.items);
       setTotal(page.total);
       setRequirements(reqs);
+      setSueltas(aMano.total);
     } catch {
       setRows([]);
       setRequirements([]);
+      setSueltas(0);
     }
   }, [activityId]);
 
+  /*
+    SE VUELVE A PREGUNTAR AL PUBLICAR (2026-09-03).
+
+    Publicar crea SOLO el requisito que pide el tipo —la induccion se exige sola, sin que nadie
+    pulse nada—, y eso pasa en la cabecera de la pantalla, no aqui. Esta pestana cargaba una vez al
+    montarse: si estabas en ella al publicar, seguia ensenando "no se le exige a nadie" sobre algo
+    que acababa de exigirse, y solo se corregia al irse a otra pestana y volver. Reportado asi
+    mismo por el cliente.
+  */
   useEffect(() => {
     void load();
+  }, [load, hayContenidoPublicado]);
+
+  useEffect(() => {
     void Promise.all([
       listCatalog('job-titles'),
       listCatalog('areas'),
@@ -263,6 +307,32 @@ export function ActivityAudienceTab({
     }
   };
 
+  /*
+    EXIMIR A UNA PERSONA, DESDE LA LISTA EN LA QUE SE LA ESTA MIRANDO (2026-09-03).
+
+    "Retirar" quita el requisito ENTERO —deja de exigirsele al cargo— y no habia forma de sacar a
+    UNA persona sin salir a Asignaciones, filtrar y encontrarla otra vez. La pregunta se hace aqui:
+    se esta leyendo "Quienes la tienen que hacer" y se ve el nombre de quien no puede hacerla.
+
+    Es la misma ventana y el mismo endpoint que Asignaciones. La obligacion no se borra: queda
+    eximida con motivo, que es lo que se ensena en una auditoria.
+  */
+  const [eximiendo, setEximiendo] = useState<AssignmentRow | null>(null);
+  const eximir = async (motivo: string) => {
+    if (!eximiendo) return;
+    try {
+      await waiveAssignment(eximiendo.id, motivo);
+      await load();
+      showToast({
+        kind: 'success',
+        title: 'Obligacion eximida',
+        description: 'Deja de contar para el cumplimiento y queda con el motivo en el registro.',
+      });
+    } catch {
+      showToast({ kind: 'danger', title: 'No se pudo eximir' });
+    }
+  };
+
   const asignarPersonas = async () => {
     setBusy(true);
     try {
@@ -289,7 +359,34 @@ export function ActivityAudienceTab({
   /** Todas sus reglas obligan solo a quien entre desde ahora: hoy puede no haber NADIE, y esta bien. */
   const soloParaNuevos =
     (requirements ?? []).length > 0 && (requirements ?? []).every((requirement) => requirement.soloNuevos);
-  const novedadLista = decide !== 'POR_CARGO' || novedad.trim().length >= 10;
+  /*
+    LA NOVEDAD SE PIDE AL CAMBIAR, NO AL DECLARAR (2026-09-03).
+
+    Montar la matriz del piloto son decenas de casillas seguidas, y ahi no hay ninguna novedad que
+    contar: se esta escribiendo el documento, no modificandolo. Pedirla en cada una convierte el
+    control en un tramite que se rellena con "carga inicial" cuarenta veces, y un campo que
+    siempre dice lo mismo deja de informar.
+
+    Cuando la casilla YA existe —se ajusta el plazo, se cambia el alcance, se vuelve a exigir algo
+    que se habia retirado— si la hay, y es la frase que va a leer el auditor. El servidor exige lo
+    mismo, para que no dependa de esta pantalla.
+  */
+  const claveDeAlcance = (rule: AudienceRule): string =>
+    [
+      rule.match,
+      [...rule.jobTitleIds].sort().join('|'),
+      [...rule.jobTitleTypeIds].sort().join('|'),
+      [...rule.areaIds].sort().join('|'),
+      [...rule.regionalIds].sort().join('|'),
+      [...rule.serviceIds].sort().join('|'),
+      [...rule.employmentTypes].sort().join('|'),
+      [...rule.roadActors].sort().join('|'),
+    ].join('#');
+  const esCambio =
+    ajustando !== null ||
+    (requirements ?? []).some((requirement) => claveDeAlcance(requirement.scope) === claveDeAlcance(scope));
+  const pideNovedad = decide === 'POR_CARGO' && esCambio;
+  const novedadLista = !pideNovedad || novedad.trim().length >= 10;
   const puedeExigir =
     !busy && novedadLista && (ajustando !== null || (decide === 'TODOS' ? !yaEsDeTodos : !sinMarcar(scope)));
 
@@ -319,15 +416,41 @@ export function ActivityAudienceTab({
                         {yaEsDeTodos
                           ? 'Se aplico sola al publicar: en este tipo de formacion no hay nada que decidir.'
                           : typeConfig.requiresBeforeHire
-                            ? 'Es una induccion de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: a esa gente la cubre la reinduccion.'
+                            ? 'Es una induccion de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada ano es la reinduccion, que es otra formacion.'
                             : `Al publicar quedara exigida a ${reach ?? '...'} personas, y a quien entre despues. No hay que marcar a nadie.`}
                       </p>
+                      {/*
+                        LO QUE VA A PASAR AL PUBLICAR, DICHO ANTES (2026-09-03).
+
+                        Los campos de plazo y recurrencia no se ensenan aqui a proposito —no hay
+                        nada que decidir: lo pone el tipo— pero de ahi se paso a no decir NADA, y
+                        una reinduccion publicada obliga a la empresa entera con un vencimiento y
+                        una campana anual que el usuario no vio en ninguna parte. No tener que
+                        rellenar un campo no es lo mismo que no tener derecho a saberlo.
+                      */}
+                      {!yaEsDeTodos && !typeConfig.requiresBeforeHire ? (
+                        <p className="mt-1 text-sm text-ink-500">
+                          Vencera <strong className="font-medium text-ink-700">al mes</strong> de publicarla
+                          {typeConfig.defaultAnnualDate
+                            ? `, y se repetira cada ano antes del ${diaYMes(typeConfig.defaultAnnualDate)}.`
+                            : typeConfig.defaultRecurrenceMonths
+                              ? `, y se repetira cada ${typeConfig.defaultRecurrenceMonths} meses.`
+                              : ', y no se repite.'}
+                        </p>
+                      ) : null}
                       {/*
                         CUANTAS Y QUIENES, antes de publicar. Saber "a todos" no es saber a cuantos:
                         el numero es lo que hace que alguien mire dos veces antes de publicar algo
                         que va a obligar a la empresa entera.
+
+                        NO SE ENSENA EN UNA INDUCCION DE INGRESO (2026-09-03). Ahi ese numero es el
+                        tamano de la audiencia, no a cuanta gente va a obligar — que hoy es CERO,
+                        porque solo alcanza a quien entre a partir de ahora. Ensenar "768" al lado
+                        de "se exigira a quien entre desde ahora" son dos frases que se contradicen,
+                        y la salvaguarda de "mira dos veces antes de obligar a la empresa entera"
+                        no tiene nada que vigilar cuando no obliga a nadie.
                       */}
-                      {!yaEsDeTodos && reach !== null ? (
+                      {!yaEsDeTodos && !typeConfig.requiresBeforeHire && reach !== null ? (
                         <button
                           type="button"
                           onClick={() => setVerAlcance((visible) => !visible)}
@@ -485,7 +608,15 @@ export function ActivityAudienceTab({
                 "Cada ano en una fecha" es la CAMPANA anual, que es como se hace de verdad la
                 reinduccion y como la pregunta el auditor: "¿hicieron la reinduccion de 2026?".
               */}
-              <Field htmlFor="q-repite-modo" label="Se repite">
+              {/*
+                LA PALABRA QUE NOMBRA LO ELEGIDO, debajo (2026-09-05).
+
+                Las tres opciones se leen parecido —"cada ano en una fecha fija" y "cada N meses"—
+                y la diferencia entre ellas no esta en las palabras sino en QUE clase de obligacion
+                crean: una hace que todos venzan el mismo dia y la otra le da a cada quien su propio
+                aniversario. Lo pidio el cliente: una linea corta que lo nombre.
+              */}
+              <Field htmlFor="q-repite-modo" label="Se repite" hint={COMO_SE_REPITE[plazo.modoRepite]}>
                 <Select
                   id="q-repite-modo"
                   value={plazo.modoRepite}
@@ -504,6 +635,39 @@ export function ActivityAudienceTab({
                 </Select>
               </Field>
 
+              {/*
+                PONERLE RECURRENCIA A UN TIPO QUE NO SE REPITE: SE PUEDE, Y CONVIENE DECIR QUE ES
+                (2026-09-05).
+
+                No se quita la opcion, y es deliberado. El motor lee la recurrencia del REQUISITO,
+                no del tipo, asi que hacerla repetir funciona entero —rondas, ventana, vigencia de
+                la constancia— y hay casos legitimos: una induccion especifica de un puesto que la
+                empresa decide refrescar cada dos anos.
+
+                Lo que si cambia es COMO SE LEE. El tipo es la palabra que usa el auditor: una
+                induccion contesta "¿se la hicieron cuando llego?" y una recertificacion "¿esta
+                vigente HOY?". Una induccion con recurrencia caduca de hecho pero sigue contando
+                en los informes como induccion, y averiguar cual es cual obliga a abrir formacion
+                por formacion. Asi que se avisa una vez, aqui, y se deja decidir.
+
+                Y hay una diferencia que NO se puede arreglar desde esta pantalla: "que pasa si
+                llega la siguiente y no hizo la anterior" y la gracia por ingreso reciente los pone
+                el TIPO, no el requisito. Quien haga repetir una induccion se lleva la politica de
+                las inducciones, no la de las habilitaciones.
+              */}
+              {plazo.modoRepite !== 'NO' && !typeConfig.defaultRecurrenceMonths && !typeConfig.defaultAnnualDate ? (
+                <p className="flex items-start gap-2 rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+                  <Info size={15} className="mt-0.5 shrink-0" strokeWidth={2} />
+                  <span>
+                    Este tipo de formacion normalmente <strong>no se repite</strong>. Hacerla repetir funciona, y su
+                    constancia pasara a vencer — pero en los informes seguira leyendose como lo que dice su tipo. Si es
+                    una <strong>habilitacion legal que hay que renovar</strong> —montacargas, alturas, manipulacion de
+                    alimentos—, va mejor como <strong>Recertificacion</strong>: ahi se busca por vigencia, no por «¿se
+                    la hicieron?».
+                  </span>
+                </p>
+              ) : null}
+
               {plazo.modoRepite === 'MESES' ? (
                 <Field htmlFor="q-repite" label="Cada cuantos meses" hint="Se cuenta desde que cada persona la completo.">
                   <Input
@@ -518,15 +682,14 @@ export function ActivityAudienceTab({
 
               {plazo.modoRepite === 'ANUAL' ? (
                 <Field
-                  htmlFor="q-repite-fecha"
+                  htmlFor="q-repite-fecha-mes"
                   label="Antes de que fecha, cada ano"
-                  hint="Mes y dia. Todos vencen el mismo dia, que es como se hace una campana anual."
+                  hint="Todos vencen el mismo dia, que es como se hace una campana anual."
                 >
-                  <Input
-                    id="q-repite-fecha"
-                    placeholder="03-31"
-                    value={plazo.fixedDate}
-                    onChange={(event) => setPlazo({ ...plazo, fixedDate: event.target.value })}
+                  <MesDia
+                    idBase="q-repite-fecha"
+                    value={plazo.fixedDate || '03-31'}
+                    onChange={(valor) => setPlazo({ ...plazo, fixedDate: valor })}
                   />
                 </Field>
               ) : null}
@@ -549,7 +712,7 @@ export function ActivityAudienceTab({
                 </p>
               ) : null}
 
-              {decide === 'POR_CARGO' ? (
+              {pideNovedad ? (
                 <Field
                   htmlFor="q-novedad"
                   label="Novedad"
@@ -572,10 +735,32 @@ export function ActivityAudienceTab({
                 publicar, ofrecerlo adelantaria la obligacion a una formacion sin contenido;
                 despues, confirmaria lo unico posible. Solo aparece al pulsar "Ajustar".
               */}
+              {/*
+                QUE ALCANZA UN AJUSTE, dicho antes de pulsarlo (2026-09-03).
+
+                Cambiar el plazo NO mueve la fecha de quien ya la tiene asignada: su vencimiento se
+                calculo el dia que le nacio la obligacion y se queda como esta. El plazo nuevo rige
+                para las que nazcan a partir de ahora. Es lo correcto —a nadie se le adelanta un
+                vencimiento por la espalda— pero no se veia en ninguna parte, y quien lo cambiaba se
+                quedaba sin saber si habia movido cien fechas o ninguna.
+              */}
+              {ajustando !== null ? (
+                <p className="rounded-lg bg-paper px-3 py-2 text-xs leading-relaxed text-ink-500">
+                  El plazo nuevo rige para las obligaciones que <strong>nazcan desde ahora</strong>. A quien ya la
+                  tiene asignada no se le mueve la fecha.
+                  {plazo.trigger === 'ON_JOIN' ? ' Y al pasar a "al entrar al grupo", se le exigira tambien a quien ya esta.' : ''}
+                </p>
+              ) : null}
+
               {ajustando !== null || decide !== 'TODOS' ? (
                 <Button className="w-full" onClick={() => void exigir()} loading={busy} disabled={!puedeExigir}>
                   <ShieldCheck size={16} />
-                  {ajustando !== null ? 'Guardar el ajuste' : 'Guardar a quien se le exige'}
+                  {/*
+                    El boton no repite el titulo de la tarjeta. Encima pone "A quien se le exige" y
+                    debajo estan los cargos marcados: "Guardar a quien se le exige" decia por
+                    tercera vez lo que ya se estaba mirando, y en 380px se partia en dos lineas.
+                  */}
+                  {ajustando !== null ? 'Guardar el ajuste' : 'Exigirla'}
                 </Button>
               ) : null}
 
@@ -646,12 +831,15 @@ export function ActivityAudienceTab({
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-display text-lg font-semibold text-ink-900">Lo que se exige hoy</h2>
             {requirements && requirements.length > 0 ? (
-              <span className="text-sm text-ink-500">{requirements.length} regla{requirements.length === 1 ? '' : 's'}</span>
+              <span className="text-sm text-ink-500">
+                {requirements.length} regla{requirements.length === 1 ? '' : 's'}
+                {sueltas > 0 ? ` + ${sueltas} suelta${sueltas === 1 ? '' : 's'}` : ''}
+              </span>
             ) : null}
           </div>
           {!requirements ? (
             <Skeleton className="h-24 w-full" />
-          ) : requirements.length === 0 ? (
+          ) : requirements.length === 0 && sueltas === 0 ? (
             <div className="card px-5 py-4 text-sm text-ink-500">
               {/*
                 El vacio no puede decir lo mismo en los dos casos. En una induccion general lo que
@@ -689,16 +877,60 @@ export function ActivityAudienceTab({
                       vivas de todo el mundo, que es un precio absurdo por editar un numero.
                     */}
                     <Button variant="ghost" size="sm" onClick={() => abrirAjuste(requirement)} disabled={busy}>
+                      <SlidersHorizontal size={15} />
                       Ajustar
                     </Button>
+                    {/*
+                      RETIRAR lleva el escudo TACHADO, hermano del que exige. Una equis o una
+                      papelera dirian "cerrar" o "borrar", y esto no borra nada: deja de exigirse,
+                      y lo cumplido se queda. El par escudo-con-visto / escudo-tachado cuenta que
+                      son la misma decision en los dos sentidos.
+                    */}
                     <Button variant="ghost" size="sm" onClick={() => void retirar(requirement)} disabled={busy}>
+                      <ShieldX size={15} />
                       Retirar
                     </Button>
                   </div>
                 </div>
               ))}
+
+              {/*
+                LAS SUELTAS TIENEN SU RENGLON (2026-09-04).
+
+                Sin el, la cuenta de abajo no cuadraba con nada de aqui arriba y las obligaciones
+                puestas a mano eran invisibles hasta buscarlas persona por persona en la tabla. No
+                lleva "Ajustar" ni "Retirar" porque no hay regla que ajustar: cada una se quita
+                eximiendola en su fila, que es donde queda escrito el motivo.
+              */}
+              {sueltas > 0 ? (
+                <div className="flex items-start justify-between gap-4 px-5 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-ink-900">A personas concretas</p>
+                    <p className="mt-0.5 text-sm text-ink-500">
+                      puestas a mano · {sueltas} persona{sueltas === 1 ? '' : 's'} · no alcanza a quien entre despues
+                    </p>
+                  </div>
+                  <span className="shrink-0 self-center rounded-full bg-paper px-2 py-1 text-[11px] font-semibold text-ink-500">
+                    sin regla
+                  </span>
+                </div>
+              ) : null}
             </div>
           )}
+
+          {/*
+            POR QUE LOS NUMEROS NO SUMAN, dicho antes de que alguien los sume (2026-09-04).
+
+            Cada regla dice a cuanta gente alcanza ELLA, y una persona puede estar en dos: quien es
+            Conductor Y de Antioquia cuenta en las dos reglas y una sola vez abajo. Sumar los
+            alcances y compararlos con el total de abajo da distinto casi siempre, y sin esta linea
+            parece que el sistema pierde gente.
+          */}
+          {requirements && requirements.length > 1 ? (
+            <p className="mt-2 text-xs text-ink-500">
+              Los alcances no se suman: quien cumple dos reglas cuenta en las dos y una sola vez abajo.
+            </p>
+          ) : null}
         </section>
 
         <section>
@@ -716,7 +948,7 @@ export function ActivityAudienceTab({
                 title={soloParaNuevos ? "Todavia nadie: se exige a quien entre desde ahora" : "Nadie tiene que hacerla todavia"}
                 description={
                   soloParaNuevos
-                    ? "No es un fallo. Esta formacion se le exige a cada persona que ingrese a partir de ahora, con su fecha de ingreso. A quien ya lleva tiempo no se le exige: a esa gente la cubre la reinduccion. La lista se ira llenando con cada alta."
+                    ? "A quien ya lleva tiempo no se le exige, porque no esta ingresando: su induccion se hizo cuando entro. La lista se ira llenando con cada alta, cada una con su fecha de ingreso."
                     : `"${activityName}" existe, pero no se le exige a nadie. Dilo a la izquierda: quien entre despues la tendra sola.`
                 }
               />
@@ -728,21 +960,61 @@ export function ActivityAudienceTab({
                   <Tr>
                     <Th>Persona</Th>
                     <Th>Cargo</Th>
+                    {/*
+                      AREA EN LUGAR DE ORIGEN (2026-09-03).
+
+                      "Origen" decia "Requisito" en practicamente todas las filas, y una columna que
+                      contesta lo mismo 200 veces no informa — es lo mismo que la pastilla naranja de
+                      "Pendiente" en las 206 evaluaciones. Lo que si informa es la EXCEPCION, y esa
+                      se dice donde se mira: una marca junto al nombre cuando la obligacion NO viene
+                      de la regla.
+
+                      El sitio que deja libre se lo lleva el AREA, que es lo que hace falta para lo
+                      unico que se hace con esta lista: perseguir a quien falta. El cargo dice que
+                      hace la persona; el area, a quien se le escribe.
+                    */}
+                    <Th>Area</Th>
                     <Th>Vence</Th>
                     <Th>Estado</Th>
-                    <Th>Origen</Th>
+                    <Th className="text-right">Acciones</Th>
                   </Tr>
                 </THead>
                 <TBody>
                   {rows.map((row) => (
                     <Tr key={row.id}>
-                      <Td className="font-medium text-ink-900">{row.user.fullName}</Td>
+                      <Td className="font-medium text-ink-900">
+                        <span className="flex items-center gap-2">
+                          {row.user.fullName}
+                          {row.source !== 'RULE' ? (
+                            <span
+                              className="rounded-full bg-paper px-1.5 py-0.5 text-[11px] font-normal text-ink-500"
+                              title={`Origen: ${sourceLabel(row.source)}`}
+                            >
+                              {row.source === 'MANUAL' ? 'a mano' : sourceLabel(row.source)}
+                            </span>
+                          ) : null}
+                        </span>
+                      </Td>
                       <Td className="text-ink-500">{row.user.jobTitle.name}</Td>
+                      <Td className="text-ink-500">{row.user.area?.name ?? '—'}</Td>
                       <Td className="text-ink-500">{formatDate(row.dueAt)}</Td>
                       <Td>
                         <StatusPill kind={statusKind(row.status)} label={statusLabel(row.status)} />
                       </Td>
-                      <Td className="text-ink-500">{sourceLabel(row.source)}</Td>
+                      <Td className="text-right">
+                        {/* Solo lo que sigue vivo: eximir algo cumplido o ya eximido no significa nada. */}
+                        {row.status === 'PENDING' || row.status === 'OVERDUE' || row.status === 'IN_PROGRESS' ? (
+                          <Button variant="ghost" size="sm" onClick={() => setEximiendo(row)} disabled={busy}>
+                            {/*
+                              El icono lleva el color de la empresa: en una fila de texto gris es lo
+                              unico que dice "aqui hay algo que se puede hacer". El peso de que sea
+                              una decision seria lo lleva la ventana, no el boton de la fila.
+                            */}
+                            <ShieldOff size={15} style={{ color: 'var(--brand-primary)' }} />
+                            Eximir
+                          </Button>
+                        ) : null}
+                      </Td>
                     </Tr>
                   ))}
                 </TBody>
@@ -751,6 +1023,16 @@ export function ActivityAudienceTab({
           )}
         </section>
       </div>
+
+      <EximirObligacion
+        open={eximiendo !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setEximiendo(null);
+        }}
+        personName={eximiendo?.user.fullName ?? ''}
+        activityName={activityName}
+        onConfirm={eximir}
+      />
     </div>
   );
 }
@@ -815,6 +1097,7 @@ function statusLabel(status: string): string {
     WITHDRAWN_LEFT_AUDIENCE: 'RETIRADA',
     WITHDRAWN_PLAN_ITEM_CANCELLED: 'RENGLON CANCELADO',
     WAIVED: 'EXIMIDA',
+    EXPIRED_NOT_DONE: 'NO REALIZADA',
   };
   return map[status] ?? status;
 }
@@ -827,4 +1110,15 @@ function sourceLabel(source: string): string {
     STATIC_SNAPSHOT: 'Instantanea',
   };
   return map[source] ?? source;
+}
+
+/** "03-31" -> "31 de marzo". La fecha de la campana se lee, no se descifra. */
+function diaYMes(fixedDate: string): string {
+  const MESES = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  ];
+  const [mes, dia] = fixedDate.split('-').map(Number);
+  const nombre = MESES[(mes ?? 1) - 1];
+  return nombre ? `${dia} de ${nombre}` : fixedDate;
 }

@@ -234,8 +234,33 @@ export class LearnerService {
       throw new ConflictException({ code: 'OFFERING_WINDOW_CLOSED', message: 'Esta formacion no esta disponible hoy.' });
     }
 
+    /*
+      UNA INSCRIPCION VIVA POR FORMACION, no por convocatoria (2026-09-04).
+
+      Se miraba solo `offeringId`, asi que con DOS convocatorias permanentes publicadas del mismo
+      contenido —que el sistema permite: salen de "creo otra por si acaso" o de un doble clic— la
+      misma persona acababa con DOS inscripciones de la misma formacion. Medido en el recorrido de
+      varias convocatorias.
+
+      El dano no es cosmetico: la obligacion es UNA, asi que al terminar una se cierra la obligacion
+      y **la otra inscripcion se queda viva para siempre**; y los numeros de ejecucion cuentan dos
+      inscritos donde hay una persona, lo que infla la asistencia y la cobertura de la jornada.
+
+      Se mira lo VIVO y no todo el historial a proposito: una formacion que se repite —la
+      reinduccion del ano que viene— necesita inscripcion nueva, y la anterior ya esta terminada.
+    */
     const existing = await this.prisma.scoped.enrollment.findFirst({
-      where: { offeringId: offering.id, userId: actor.id },
+      where: {
+        userId: actor.id,
+        OR: [
+          { offeringId: offering.id },
+          {
+            status: { in: ['ENROLLED', 'IN_PROGRESS'] },
+            activityVersion: { activityId: offering.activityVersion.activityId },
+          },
+        ],
+      },
+      orderBy: { enrolledAt: 'asc' },
       select: { id: true },
     });
     if (existing) return { enrollmentId: existing.id, created: false as const };

@@ -475,7 +475,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
           'mt-6 flex flex-wrap items-center gap-4 rounded-2xl border p-4',
           activa ? 'border-transparent' : 'border-line bg-paper',
         )}
-        style={activa ? { backgroundColor: 'var(--primary-soft)' } : undefined}
+        style={activa ? { backgroundColor: 'var(--brand-primary-soft)' } : undefined}
       >
         <span
           aria-hidden="true"

@@ -1,0 +1,750 @@
+<title>Qué formación le toca a quién</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --warn: #b45309;
+    --warn-soft: #fdf3e6;
+    --info: #0b5cad;
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  :root:not([data-theme="light"]) { color-scheme: light; }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+      --paper: #0e1114; --surface: #171b20; --line: #262c33; --line-strong: #333b44;
+      --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+      --ok: #3ba76f; --warn: #d98324; --warn-soft: #2a1f12; --info: #4d94d8;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+    --paper: #0e1114; --surface: #171b20; --line: #262c33; --line-strong: #333b44;
+    --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+    --ok: #3ba76f; --warn: #d98324; --warn-soft: #2a1f12; --info: #4d94d8;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-700);
+    font-family: var(--body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .marco { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+  @media (min-width: 900px) { .marco { padding-top: 72px; } }
+
+  .eyebrow {
+    display: inline-block; font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(32px, 5vw, 44px); font-weight: 800;
+    line-height: 1.08; letter-spacing: -0.02em; color: var(--ink-900); margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); margin: 0; }
+
+  section { margin-top: 60px; scroll-margin-top: 24px; }
+  h2 {
+    font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--ink-900); margin: 0 0 10px; padding-top: 20px;
+    border-top: 2px solid var(--ink-900); text-wrap: balance;
+  }
+  h3 { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--ink-900); margin: 32px 0 8px; }
+  p { margin: 0 0 16px; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  /* Pasos numerados: aquí SÍ son una secuencia real. */
+  .pasos { list-style: none; margin: 24px 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .paso {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 16px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+  }
+  .numero {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 99px;
+    background: var(--navy); color: #fff;
+    font-family: var(--display); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .paso h4 { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink-900); margin: 4px 0 6px; }
+  .paso p { margin: 0 0 10px; font-size: 15px; }
+  .paso p:last-child { margin-bottom: 0; }
+  .donde {
+    display: inline-block; font-size: 12px; color: var(--ink-500);
+    background: var(--paper); border-radius: 6px; padding: 2px 8px; margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  /* El paso que no se hace: lo hace el sistema. Sin número, porque no es un turno de nadie. */
+  .paso.solo .numero { background: transparent; border: 1px dashed var(--line-strong); color: var(--ink-300); font-size: 17px; }
+
+  .tabla-envoltura { overflow-x: auto; margin: 20px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-500); border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+
+  .clave {
+    margin: 22px 0; padding: 18px 22px; background: var(--navy-soft);
+    border-left: 3px solid var(--navy); border-radius: 0 10px 10px 0;
+  }
+  .clave p { margin: 0; font-size: 15px; }
+  .clave p + p { margin-top: 10px; }
+
+  /* Lo que no hay que hacer. Se distingue de `.clave` porque no es un matiz: es un error. */
+  .cuidado {
+    margin: 22px 0; padding: 18px 22px; background: var(--warn-soft);
+    border-left: 3px solid var(--warn); border-radius: 0 10px 10px 0;
+  }
+  .cuidado p { margin: 0; font-size: 15px; }
+  .cuidado p + p { margin-top: 10px; }
+  .cuidado .rotulo {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 8px;
+  }
+
+  .ejemplo {
+    margin: 22px 0; padding: 18px 20px; background: var(--surface);
+    border: 1px dashed var(--line-strong); border-radius: 12px;
+  }
+  .ejemplo p:first-child {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-300); margin-bottom: 10px;
+  }
+  .ejemplo p:last-child { margin-bottom: 0; }
+
+  /* Ficha de cabecera de cada tipo: lo que hay que saber antes de leer sus pasos. */
+  .ficha {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; margin: 20px 0 26px;
+  }
+  .ficha div { background: var(--surface); padding: 14px 16px; }
+  .ficha dt {
+    font-family: var(--display); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-500); margin-bottom: 4px;
+  }
+  .ficha dd { margin: 0; font-size: 14.5px; color: var(--ink-900); font-weight: 500; }
+
+  .pendiente {
+    display: inline-block; font-family: var(--display); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn);
+    border: 1px solid var(--warn); border-radius: 99px; padding: 2px 10px; margin-left: 10px;
+    vertical-align: middle;
+  }
+
+  footer {
+    margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--line);
+    font-size: 13.5px; color: var(--ink-300);
+  }
+</style>
+
+<div class="marco">
+
+  <header>
+    <p class="eyebrow">NEO PULSE · Guía de uso</p>
+    <h1>Qué formación le toca a quién</h1>
+    <p class="entradilla">
+      Cada tipo de formación decide solo a quién obliga, desde cuándo y si vuelve. Esta guía es el
+      paso a paso de los seis, de la ficha en blanco a la constancia emitida: qué hace falta antes
+      de empezar, qué hace el sistema por su cuenta y qué no hay que hacer.
+    </p>
+  </header>
+
+  <section>
+    <h2>La regla que ordena todo: manda el tipo</h2>
+    <p>
+      Al crear una formación se elige su <strong>tipo</strong>, y esa elección decide casi todo lo
+      que viene después. No es una etiqueta para clasificar: es lo que hace que una inducción se
+      exija sola al publicarla y una capacitación del plan no.
+    </p>
+    <p>
+      Por eso <strong>lo que se pregunta en cada pantalla cambia según el tipo</strong>. Si en una
+      inducción general no aparece el botón de "a quién se le exige", no falta nada: es que ahí no
+      hay nada que decidir.
+    </p>
+
+    <div class="tabla-envoltura">
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>¿A quién obliga?</th>
+            <th>¿Se exige sola al publicar?</th>
+            <th>¿Vuelve?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Inducción general</td>
+            <td>A quien <strong>entre</strong> desde ahora</td>
+            <td>Sí</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Inducción específica</td>
+            <td>A los <strong>cargos</strong> que se marquen</td>
+            <td>No: hay que marcar</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Reinducción</td>
+            <td>A <strong>toda la empresa</strong>, ya</td>
+            <td>Sí</td>
+            <td>Sí, cada año</td>
+          </tr>
+          <tr>
+            <td>Capacitación del plan</td>
+            <td>A quien el <strong>plan</strong> congele al aprobarlo</td>
+            <td>No: la crea el plan</td>
+            <td>No: la del año que viene es otro plan</td>
+          </tr>
+          <tr>
+            <td>Extraordinaria</td>
+            <td>A quien se marque a mano</td>
+            <td>No</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Píldora</td>
+            <td>A quien se marque a mano</td>
+            <td>No</td>
+            <td>No</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Antes de crear la primera formación</h2>
+    <p>Nada de lo de abajo funciona si falta esto, y todo se hace una sola vez:</p>
+    <ul>
+      <li><strong>Los cargos</strong> — de ellos cuelga la matriz de inducciones específicas.</li>
+      <li><strong>Las áreas</strong>, con su responsable.</li>
+      <li><strong>Los procesos</strong> — la ficha de la formación pide uno.</li>
+      <li><strong>Los tipos de formación</strong>, que vienen sembrados y casi nunca se tocan.</li>
+    </ul>
+    <div class="clave">
+      <p>
+        <strong>Las personas van al final, no al principio.</strong> Es lo contrario de lo que
+        parece natural, y decide a quién le nace la inducción general. Está explicado abajo, en
+        "El orden de la carga inicial".
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Inducción general</h2>
+    <p>
+      Lo que toda persona que entra tiene que hacer <strong>antes de empezar a trabajar</strong>. La
+      norma no dice "el primer día": dice <em>previa</em> al inicio de labores, y por eso el sistema
+      la vence un día antes de la fecha de ingreso de cada persona.
+    </p>
+
+    <dl class="ficha">
+      <div><dt>Vence</dt><dd>Un día antes del ingreso</dd></div>
+      <div><dt>Alcanza a</dt><dd>Quien entre desde ahora</dd></div>
+      <div><dt>Se repite</dt><dd>No</dd></div>
+      <div><dt>Emite</dt><dd>Constancia</dd></div>
+    </dl>
+
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <span class="donde">Formaciones → Nueva</span>
+          <h4>La ficha</h4>
+          <p>Nombre, código, proceso y modalidad. Elige el tipo <strong>Inducción general</strong>.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <span class="donde">Ficha → Contenido</span>
+          <h4>El contenido</h4>
+          <p>Crea la lección con sus tarjetas y añádela a la versión en borrador.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <span class="donde">Ficha → Contenido</span>
+          <h4>El examen</h4>
+          <p>
+            Este tipo lo exige. Ármalo con sus preguntas y su nota mínima, y añádelo como contenido.
+            Sin examen, la versión no deja publicarse.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">4</span>
+        <div>
+          <span class="donde">Ficha → Publicar</span>
+          <h4>Publicar</h4>
+          <p>
+            Aquí se congela el contenido: lo que alguien curse no cambiará nunca, aunque después se
+            edite. Para cambiarlo se publica una versión nueva.
+          </p>
+        </div>
+      </li>
+      <li class="paso solo">
+        <span class="numero">·</span>
+        <div>
+          <h4>Y el sistema hace dos cosas solo</h4>
+          <p>
+            <strong>Nace el requisito</strong> —se le exigirá a quien entre desde ahora, venciendo
+            un día antes de su ingreso— y <strong>se abre la convocatoria</strong>, así que la gente
+            puede empezar en el acto. No hay que pulsar nada para ninguna de las dos.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">5</span>
+        <div>
+          <span class="donde">Ficha → Quiénes</span>
+          <h4>Comprobar, no configurar</h4>
+          <p>
+            Aquí no hay que marcar a nadie. Solo se mira que diga <strong>"Ya se le exige a toda la
+            empresa"</strong>, y abajo la lista se irá llenando con cada alta.
+          </p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="cuidado">
+      <span class="rotulo">Lo que no hay que hacer</span>
+      <p>
+        <strong>No marcar cargos ni áreas</strong> para "asegurarse" de que llegue: ya llega a
+        todos. Marcar algo crearía un segundo requisito y la gente acabaría con dos obligaciones de
+        lo mismo, con dos fechas distintas.
+      </p>
+      <p>
+        <strong>No esperar ver gente obligada el primer día.</strong> Sale cero, y está bien: quien
+        lleva tiempo en la empresa no está ingresando. Su inducción se le hizo cuando entró.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Inducción específica</h2>
+    <p>
+      Lo que hay que saber para hacer <strong>ese trabajo</strong>: la de bodega habla de
+      montacargas; la de conducción, de manejo defensivo. Es la <strong>matriz de
+      inducciones</strong>: qué le toca a cada cargo.
+    </p>
+
+    <dl class="ficha">
+      <div><dt>Vence</dt><dd>Un día antes del ingreso</dd></div>
+      <div><dt>Alcanza a</dt><dd>Los cargos que marques</dd></div>
+      <div><dt>Se repite</dt><dd>No</dd></div>
+      <div><dt>Emite</dt><dd>Constancia</dd></div>
+    </dl>
+
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <span class="donde">Formaciones → Nueva</span>
+          <h4>La ficha, el contenido y el examen</h4>
+          <p>Igual que la general, eligiendo el tipo <strong>Inducción específica</strong>.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <span class="donde">Ficha → Publicar</span>
+          <h4>Publicar</h4>
+          <p>
+            Se abre la convocatoria sola, igual que en la general. Pero <strong>no se le exige a
+            nadie todavía</strong>: eso lo decides tú en el paso siguiente.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <span class="donde">Ficha → Quiénes</span>
+          <h4>Marcar los cargos y pulsar "Exigirla"</h4>
+          <p>
+            Puedes marcar varios de una vez. Antes de guardar, la pantalla dice a cuántas personas
+            va a alcanzar: ese número es lo que hay que mirar dos veces.
+          </p>
+          <p>
+            <strong>Deja vacía</strong> la casilla de "solo a quien entre desde ahora": TRANSPRENSA
+            quiere que la hagan los nuevos <em>y</em> los que ya están.
+          </p>
+        </div>
+      </li>
+      <li class="paso solo">
+        <span class="numero">·</span>
+        <div>
+          <h4>Y el sistema obliga en el acto</h4>
+          <p>
+            A todo el que ya tenga ese cargo le nace la obligación al instante, y a quien entre
+            mañana con ese cargo le nacerá sola. También queda encendida la casilla en
+            <strong>Asignaciones → Matriz por cargo</strong>: es el mismo registro visto al revés.
+          </p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>La otra puerta: la matriz</h3>
+    <p>
+      La misma decisión se puede tomar desde <strong>Asignaciones → Matriz por cargo</strong>, que
+      contesta la pregunta al revés: abres un cargo y ves —y marcas— todas sus inducciones de una
+      vez. Es el camino cómodo para montar la matriz completa al principio; la ficha, el camino
+      natural cuando acabas de crear una formación.
+    </p>
+    <div class="clave">
+      <p>
+        Las dos escriben <strong>lo mismo</strong>. No hay que hacerlo en los dos sitios, y no
+        pueden descuadrarse.
+      </p>
+    </div>
+
+    <h3>Cambiar una casilla ya existente pide una novedad</h3>
+    <p>
+      Quitarle una inducción a un cargo, o cambiarle el plazo, pide un motivo de al menos diez
+      caracteres que queda en el registro de auditoría. Declararla por primera vez no lo pide:
+      montar la matriz no es modificarla.
+    </p>
+
+    <div class="cuidado">
+      <span class="rotulo">Lo que no hay que hacer</span>
+      <p>
+        <strong>No marcar la casilla de "solo a quien entre desde ahora"</strong> si quieres que la
+        hagan también los que ya están. Con esa casilla puesta, hoy obliga a cero personas.
+      </p>
+      <p>
+        <strong>No dar por hecho que publicar basta.</strong> Una específica publicada y sin cargos
+        marcados no se le exige a nadie, y en "Lo que se exige hoy" no habrá nada.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Reinducción</h2>
+    <p>
+      La actualización <strong>anual de todo el mundo</strong>: los cambios del año, las novedades,
+      lo que cambió en las políticas. Cae igual sobre quien entró ayer y sobre quien lleva quince
+      años.
+    </p>
+    <div class="clave">
+      <p>
+        <strong>No es la inducción otra vez.</strong> Es otra formación, con su propio contenido, y
+        cada año se publica una versión nueva con lo que cambió ese año.
+      </p>
+    </div>
+
+    <dl class="ficha">
+      <div><dt>Vence</dt><dd>Al mes de publicarla</dd></div>
+      <div><dt>Alcanza a</dt><dd>Toda la empresa, ya</dd></div>
+      <div><dt>Se repite</dt><dd>Cada año, antes del 31 de marzo</dd></div>
+      <div><dt>Emite</dt><dd>Constancia</dd></div>
+    </dl>
+
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <span class="donde">Formaciones → Nueva</span>
+          <h4>La ficha, el contenido y el examen</h4>
+          <p>Eligiendo el tipo <strong>Reinducción</strong>.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <span class="donde">Ficha → Quiénes</span>
+          <h4>Leer lo que va a pasar, antes de publicar</h4>
+          <p>
+            La pantalla dice a cuántas personas va a obligar, cuándo vence y que se repetirá cada
+            año. Hay un enlace para <strong>ver quiénes son</strong>. Es el momento de mirarlo: son
+            todos.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <span class="donde">Ficha → Publicar</span>
+          <h4>Publicar</h4>
+          <p>Tarda unos segundos: está creando la obligación de toda la plantilla.</p>
+        </div>
+      </li>
+      <li class="paso solo">
+        <span class="numero">·</span>
+        <div>
+          <h4>Y queda obligada la empresa entera</h4>
+          <p>
+            <strong>Todos vencen el mismo día</strong>, porque es una campaña y no un aniversario de
+            cada persona. Es también como lo pregunta el auditor: "¿hicieron la reinducción de
+            2026?".
+          </p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="ejemplo">
+      <p>Al año siguiente</p>
+      <p>
+        Sesenta días antes del 31 de marzo, a todo el mundo le nace la reinducción del año nuevo. A
+        quien <strong>no hizo la del año pasado</strong>, esa se le cierra como <strong>NO
+        REALIZADA</strong> —queda en su historial como el incumplimiento de ese año— y recibe la
+        nueva. Así cada campaña es su año, y nadie desaparece de la cuenta por no haber hecho la
+        anterior.
+      </p>
+    </div>
+
+    <div class="cuidado">
+      <span class="rotulo">Lo que no hay que hacer</span>
+      <p>
+        <strong>No publicarla el 25 de marzo.</strong> La primera vence al mes de publicarla, y a
+        partir de la segunda vuelta ya cae el 31 de marzo. Publicar con el año encima deja a 800
+        personas con muy poco margen.
+      </p>
+      <p>
+        <strong>No usarla para cubrir a quien nunca hizo la inducción.</strong> Son dos cosas
+        distintas: la inducción es del ingreso, la reinducción es del año.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>
+      Capacitación del plan
+      <span class="pendiente">Sin verificar de punta a punta</span>
+    </h2>
+    <p>
+      La que la empresa <strong>planeó para el año</strong>. Es la única que cuelga del Plan Anual,
+      con sus metas y su aprobación.
+    </p>
+
+    <dl class="ficha">
+      <div><dt>Vence</dt><dd>Fin del mes que diga el plan</dd></div>
+      <div><dt>Alcanza a</dt><dd>Quien el plan congele</dd></div>
+      <div><dt>La obligación nace</dt><dd>Al aprobar el renglón</dd></div>
+      <div><dt>Convocatoria</dt><dd>Con fecha, la pones tú</dd></div>
+    </dl>
+
+    <p>Lo que la hace distinta de todas las demás:</p>
+    <ul>
+      <li>
+        <strong>La obligación la dispara el plan</strong>, no la formación. En "Quiénes" solo se
+        decide <em>a quiénes</em>; no se pregunta cuándo vence ni si se repite, porque eso lo pone
+        el plan.
+      </li>
+      <li>
+        <strong>La convocatoria no se abre sola</strong>: tiene fecha, lugar e instructor, y los
+        pones tú al programarla.
+      </li>
+      <li>
+        <strong>Programar una jornada es ponerla en el plan.</strong> Si el plan del año está en
+        borrador, el renglón se crea solo con el mes que salga de la fecha.
+      </li>
+      <li>
+        Se puede <strong>programar</strong> con el contenido aún en borrador —para planear el año en
+        enero—, pero no se puede <strong>publicar</strong> la convocatoria hasta que el contenido lo
+        esté.
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>
+      Extraordinaria y píldora
+      <span class="pendiente">Sin verificar de punta a punta</span>
+    </h2>
+    <h3>Extraordinaria</h3>
+    <p>
+      La que no estaba planeada y hay que dar: cambió una norma, hubo un incidente. Tiene fecha y
+      sesión como la del plan, pero <strong>no cuenta para el plan</strong>. A quién se le exige lo
+      marcas tú en "Quiénes": cargos, áreas, regionales o servicios.
+    </p>
+    <div class="clave">
+      <p>
+        Si marcas varios criterios, <strong>se cruzan</strong>: "cargo Conductor" más "regional
+        Neiva" son los conductores <em>de</em> Neiva, no los conductores más todo Neiva.
+      </p>
+    </div>
+
+    <h3>Píldora</h3>
+    <p>
+      Contenido corto, de tres o cuatro minutos, para reforzar algo puntual. <strong>No lleva examen
+      y no emite constancia</strong>: no es una formación de cumplimiento. La convocatoria se abre
+      sola y a quién le llega lo marcas tú.
+    </p>
+  </section>
+
+  <section>
+    <h2>El orden de la carga inicial</h2>
+    <p>
+      Es la decisión con más consecuencias de toda la puesta en marcha, y no hay ninguna casilla que
+      la controle: <strong>la controla el orden</strong>.
+    </p>
+
+    <div class="tabla-envoltura">
+      <table>
+        <thead>
+          <tr>
+            <th>Si haces esto</th>
+            <th>La inducción general la deben</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Formaciones primero, personas después</td>
+            <td><strong>Todos</strong>: los que entran y los que ya estaban</td>
+          </tr>
+          <tr>
+            <td>Personas primero, publicar después</td>
+            <td>Solo los que entren <strong>a partir de ese momento</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="clave">
+      <p>
+        <strong>Para TRANSPRENSA el orden es el primero:</strong> subir las formaciones y sus
+        reglas, y después las personas. Así a todo el mundo le nace la inducción general, que es lo
+        que el cliente pidió.
+      </p>
+    </div>
+
+    <p>El orden completo, de principio a fin:</p>
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <span class="donde">Configuración</span>
+          <h4>Los catálogos</h4>
+          <p>Cargos, áreas con su responsable, procesos, regionales y servicios.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <span class="donde">Formaciones</span>
+          <h4>Las formaciones, con su contenido, publicadas</h4>
+          <p>La inducción general, las específicas de cada cargo y la reinducción del año.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <span class="donde">Asignaciones → Matriz por cargo</span>
+          <h4>La matriz de inducciones específicas</h4>
+          <p>Cargo por cargo, marcando lo que le toca a cada uno.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">4</span>
+        <div>
+          <span class="donde">Usuarios → Carga masiva</span>
+          <h4>Las personas, por archivo</h4>
+          <p>
+            Nunca una por una: por archivo son un par de minutos para 600 personas, y de una en una
+            serían más de una hora.
+          </p>
+        </div>
+      </li>
+      <li class="paso solo">
+        <span class="numero">·</span>
+        <div>
+          <h4>Y a cada persona le nace lo suyo</h4>
+          <p>
+            La inducción general, la específica de su cargo y la reinducción del año, sin que nadie
+            asigne nada a mano.
+          </p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="cuidado">
+      <span class="rotulo">Lo que no hay que hacer</span>
+      <p>
+        <strong>No subir las personas antes de publicar las inducciones.</strong> Se puede arreglar,
+        pero hay que rehacer requisitos con la plantilla ya dentro, y eso se nota en el registro.
+      </p>
+      <p>
+        <strong>No dar de alta a las 600 una por una.</strong> Es el mismo resultado por sesenta
+        veces el tiempo.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Después: lo que pasa solo</h2>
+
+    <h3>Alguien cambia de cargo</h3>
+    <p>
+      En el momento de guardar el cambio: la inducción del cargo que deja queda
+      <strong>retirada</strong> —no se borra, para que se pueda explicar por qué dejó de deberla— y
+      le nace la del cargo nuevo. Lo que ya había empezado, lo conserva.
+    </p>
+
+    <h3>Alguien no puede hacerla</h3>
+    <p>
+      Se <strong>exime</strong>, persona por persona, desde la lista de "Quiénes la tienen que
+      hacer" o desde Asignaciones. Pide un motivo que queda en el registro. La obligación deja de
+      contar para el cumplimiento, pero no desaparece: queda con su motivo, su fecha y quién la
+      eximió.
+    </p>
+    <div class="cuidado">
+      <span class="rotulo">Lo que no hay que hacer</span>
+      <p>
+        <strong>No usar "Retirar" para sacar a una persona.</strong> Retirar quita el requisito
+        entero: deja de exigírsele al cargo completo. Para una sola persona, es Eximir.
+      </p>
+    </div>
+
+    <h3>Se pasa la fecha</h3>
+    <p>
+      La obligación queda <strong>vencida</strong> y no desaparece: la persona la sigue viendo como
+      atrasada y la puede hacer. Un vencimiento que se borra es un incumplimiento que nadie vuelve a
+      ver.
+    </p>
+
+    <h3>Se ajusta el plazo de un requisito</h3>
+    <p>
+      El plazo nuevo rige para las obligaciones que <strong>nazcan desde ese momento</strong>. A
+      quien ya la tiene asignada no se le mueve la fecha: a nadie se le adelanta un vencimiento por
+      la espalda.
+    </p>
+  </section>
+
+  <footer>
+    NEO PULSE · Guía de uso. Los comportamientos de esta guía están verificados de punta a punta
+    para la inducción general, la inducción específica y la reinducción. Los tres tipos marcados
+    como "sin verificar" están descritos a partir del diseño del sistema y se confirmarán con su
+    propio recorrido.
+  </footer>
+
+</div>

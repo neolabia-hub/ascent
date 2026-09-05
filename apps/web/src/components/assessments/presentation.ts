@@ -53,7 +53,7 @@ export function readPresentation(raw: unknown): Presentation {
  * `brand` no trae valores: hereda los del tenant, que es lo correcto por defecto.
  */
 export const ACCENTS: Record<Accent, { label: string; solid: string; soft: string; ring: string; on: string }> = {
-  brand: { label: 'El de la empresa', solid: 'var(--brand-primary)', soft: 'var(--primary-soft)', ring: 'var(--brand-primary)', on: '#ffffff' },
+  brand: { label: 'El de la empresa', solid: 'var(--brand-primary)', soft: 'var(--brand-primary-soft)', ring: 'var(--brand-primary)', on: '#ffffff' },
   indigo: { label: 'Indigo', solid: '#4f46e5', soft: '#eef2ff', ring: '#818cf8', on: '#ffffff' },
   teal: { label: 'Verde azulado', solid: '#0d9488', soft: '#effcf9', ring: '#5eead4', on: '#ffffff' },
   violet: { label: 'Violeta', solid: '#7c3aed', soft: '#f5f3ff', ring: '#c4b5fd', on: '#ffffff' },

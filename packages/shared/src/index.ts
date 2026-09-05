@@ -2,6 +2,23 @@ export { POINTS } from './constants/points.js';
 export { PERMISSIONS, SEED_ROLE_PERMISSIONS } from './constants/permissions.js';
 export type { PermissionCode } from './constants/permissions.js';
 
+export {
+  performanceScales,
+  TOPE_DE_ESCALA,
+  competencySchema,
+  competencyUpdateSchema,
+  formSchema,
+  cycleSchema,
+  reviewSubmitSchema,
+} from './schemas/performance.js';
+export type {
+  PerformanceScaleCode,
+  CompetencyInput,
+  FormInput,
+  CycleInput,
+  ReviewSubmitInput,
+} from './schemas/performance.js';
+
 export { tenantSettingsSchema, tenantBrandingSchema } from './schemas/tenant-settings.js';
 export type { TenantSettings, TenantBranding } from './schemas/tenant-settings.js';
 
@@ -130,6 +147,7 @@ export {
   cancelOfferingSchema,
   enrollOfferingSchema,
   migrateOfferingVersionSchema,
+  previewProjectedSchema,
 } from './schemas/offerings.js';
 export type {
   CreateOfferingInput,
@@ -140,6 +158,7 @@ export type {
   CancelOfferingInput,
   EnrollOfferingInput,
   MigrateOfferingVersionInput,
+  PreviewProjectedInput,
 } from './schemas/offerings.js';
 
 export {
@@ -149,6 +168,7 @@ export {
   assignmentTargetTypeSchema,
   ruleTriggerSchema,
   recurrenceSchema,
+  onExpirySchema,
   createAssignmentRuleSchema,
   updateAssignmentRuleSchema,
   setActivityRequirementSchema,
@@ -163,6 +183,7 @@ export type {
   CreateAudienceInput,
   UpdateAudienceInput,
   Recurrence,
+  OnExpiry,
   CreateAssignmentRuleInput,
   UpdateAssignmentRuleInput,
   SetActivityRequirementInput,

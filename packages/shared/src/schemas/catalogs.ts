@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { fixedDateSchema } from './fixed-date.js';
+import { onExpirySchema } from './assignments.js';
 
 /**
  * Contratos de los catalogos parametrizables por tenant (CLAUDE.md 3.2).
@@ -21,9 +23,20 @@ export const catalogBaseSchema = z.object({
   displayOrder: z.number().int().min(0).max(9999).default(0),
 });
 
+/**
+ * UN SOLO CAMPO PARA "EL JEFE DEL AREA" (Decision #135).
+ *
+ * Habia dos —`managerUserId` y `responsibleUserId`— que significaban lo mismo, y cada funcion leia
+ * uno distinto: el aviso de "alguien reprobo" miraba el primero y la evaluacion de eficacia el
+ * segundo. Ninguno se podia rellenar desde la interfaz, asi que las dos llevaban desde el Sprint 5
+ * apuntando a un vacio, y nadie lo noto: no hay error cuando no hay a quien avisar.
+ *
+ * Se queda `responsibleUserId`, que es como se llama el equivalente en `processes`: quien responde
+ * por esto.
+ */
 export const areaSchema = catalogBaseSchema.extend({
   parentId: z.string().uuid().nullable().optional(),
-  managerUserId: z.string().uuid().nullable().optional(),
+  responsibleUserId: z.string().uuid().nullable().optional(),
 });
 
 export const processSchema = catalogBaseSchema.extend({
@@ -75,11 +88,31 @@ export const activityTypeConfigSchema = z
      *
      * Manda sobre `defaultRecurrenceMonths` cuando las dos estan puestas.
      */
-    defaultAnnualDate: z
-      .string()
-      .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Fecha MM-DD')
-      .nullable()
-      .default(null),
+    defaultAnnualDate: fixedDateSchema.nullable().default(null),
+    /**
+     * QUE PASA CUANDO LLEGA LA RONDA SIGUIENTE Y LA ANTERIOR NO SE HIZO. Ver `onExpirySchema`.
+     *
+     * Es politica de la EMPRESA y no de cada formacion —"aqui la campana cierra y se pasa de ano"
+     * o "aqui hay que ponerse al dia primero"—, por eso vive en el tipo. Llega al requisito cuando
+     * se crea, y desde ahi lo lee el motor.
+     */
+    defaultOnExpiry: onExpirySchema.default('ESPERA'),
+    /**
+     * NO SE LE EXIGE A QUIEN INGRESO HACE MENOS DE N MESES (2026-09-04).
+     *
+     * La campana anual alcanzaba tambien a quien entro la semana pasada y todavia esta haciendo su
+     * induccion: se le encima la actualizacion del ano sobre una induccion a medio hacer, y es
+     * redundante — **su induccion ES su actualizacion de ese ano**. Lo habitual en las empresas es
+     * dejar fuera del ciclo a quien ingreso dentro de el.
+     *
+     * Sin esto habia que eximir a mano a cada ingreso reciente: en TRANSPRENSA son ~50 al ano, cada
+     * uno con su motivo escrito, para decir cincuenta veces lo mismo.
+     *
+     * `0` o sin poner = no se excluye a nadie, que es como se comportaba antes. Vive en el TIPO
+     * porque es politica de empresa, igual que la fecha de la campana: si cada reinduccion eligiera
+     * su propio corte, no habria "la reinduccion de 2026" que ensenarle a un auditor.
+     */
+    exemptRecentHiresMonths: z.number().int().min(0).max(24).default(0),
     participatesInPlan: z.boolean().default(false),
     isMicro: z.boolean().default(false),
     /**

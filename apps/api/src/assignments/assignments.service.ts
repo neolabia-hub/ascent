@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { activityTypeConfigSchema, audienceRuleSchema } from '@neo-pulse/shared';
 import type {
   AudienceRule,
   CreateAssignmentInput,
@@ -17,8 +18,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import {
   buildAudienceWhere,
   ELIGIBLE_MEMBER,
+  jobTitlesOf,
   ruleReachesEveryone,
-  singleJobTitleOf,
 } from './audience-rule.js';
 import { AudiencesService } from './audiences.service.js';
 import { endOfDay, type CalendarDate } from './due-date.js';
@@ -164,8 +165,27 @@ export class AssignmentsService {
   // ─────────────────────────── Matriz cargo -> actividad ───────────────────────────
 
   /**
-   * La forma corta de declarar las inducciones especificas: una cuadricula cargo x actividad.
+   * LA MATRIZ DE INDUCCIONES: que formacion de puesto le toca a cada cargo.
+   *
+   * Es el documento que la empresa ensena en una auditoria, y por eso la pantalla se parece a el.
    * Cada casilla encendida es, por debajo, una audiencia de ese cargo y un requisito de ingreso.
+   *
+   * ─── SOLO LAS QUE SE DECIDEN POR CARGO (2026-09-03) ───
+   *
+   * Antes cruzaba los cargos con TODAS las formaciones activas. En la base de desarrollo eso
+   * daban 5 x 1.606 = 8.030 casillas, y con datos reales seguirian sobrando casi todas: una
+   * induccion general es de toda la empresa, una pildora no se exige, y una capacitacion del plan
+   * saca sus obligaciones del plan. Cruzarlas con los cargos no solo era ruido — era la puerta por
+   * la que se colaba el fallo de abajo. Ahora solo entran las de tipo `BY_JOB_TITLE`.
+   *
+   * ─── Y SE PINTAN TAMBIEN LAS DE VARIOS CARGOS ───
+   *
+   * En "Quienes" se pueden marcar tres cargos de una vez, y eso crea UNA audiencia con los tres.
+   * La matriz solo reconocia las de un cargo exacto, asi que esa formacion aparecia sin ninguna
+   * casilla: decia que no se le exigia a nadie mientras se le exigia a tres cargos. Ahora se
+   * pintan las tres, marcadas como COMPARTIDAS — se ven, pero no se apagan de a una desde aqui,
+   * porque apagar una tendria que partir una audiencia que otras formaciones tambien usan. Esa se
+   * corrige donde se creo.
    */
   async jobTitleMatrix() {
     const [jobTitles, activities, rules, audiences] = await Promise.all([
@@ -181,95 +201,152 @@ export class AssignmentsService {
           id: true,
           code: true,
           name: true,
-          activityType: { select: { code: true, name: true, colorHex: true } },
+          activityType: { select: { code: true, name: true, colorHex: true, config: true } },
+          versions: { where: { status: 'PUBLISHED' }, select: { id: true }, take: 1 },
         },
       }),
-      this.prisma.scoped.assignmentRule.findMany({ where: { active: true, targetType: 'ACTIVITY' } }),
+      this.prisma.scoped.assignmentRule.findMany({
+        where: { active: true, targetType: 'ACTIVITY' },
+        include: { _count: { select: { assignments: true } } },
+      }),
       this.prisma.scoped.audience.findMany({ where: { active: true } }),
     ]);
 
-    const jobTitleByAudience = new Map<string, string>();
+    const porCargo = activities.filter((activity) => {
+      const config = activityTypeConfigSchema.partial().safeParse(activity.activityType.config ?? {});
+      return config.success && config.data.defaultAssignmentMode === 'BY_JOB_TITLE';
+    });
+    const esDeLaMatriz = new Set(porCargo.map((activity) => activity.id));
+
+    /** Cuanta gente tiene hoy cada cargo: una casilla sin nadie detras no urge igual que una de 400. */
+    const plantilla = await this.prisma.scoped.user.groupBy({
+      by: ['jobTitleId'],
+      where: ELIGIBLE_MEMBER,
+      _count: { _all: true },
+    });
+    const personasPorCargo = new Map(plantilla.map((fila) => [fila.jobTitleId, fila._count._all]));
+
+    const cargosPorAudiencia = new Map<string, string[]>();
     for (const audience of audiences) {
-      const jobTitleId = singleJobTitleOf(this.audiences.parseRule(audience.rule));
-      if (jobTitleId) jobTitleByAudience.set(audience.id, jobTitleId);
+      const cargos = jobTitlesOf(this.audiences.parseRule(audience.rule));
+      if (cargos.length > 0) cargosPorAudiencia.set(audience.id, cargos);
     }
 
-    const cells = rules
-      .map((rule) => {
-        const jobTitleId = jobTitleByAudience.get(rule.audienceId);
-        return jobTitleId
-          ? {
-              jobTitleId,
-              activityId: rule.targetId,
-              ruleId: rule.id,
-              trigger: rule.trigger,
-              dueDaysAfterTrigger: rule.dueDaysAfterTrigger,
-            }
-          : null;
-      })
-      .filter((cell): cell is NonNullable<typeof cell> => cell !== null);
+    const cells = rules.flatMap((rule) => {
+      if (!esDeLaMatriz.has(rule.targetId)) return [];
+      const cargos = cargosPorAudiencia.get(rule.audienceId);
+      if (!cargos) return [];
+      return cargos.map((jobTitleId) => ({
+        jobTitleId,
+        activityId: rule.targetId,
+        ruleId: rule.id,
+        trigger: rule.trigger,
+        dueDaysAfterTrigger: rule.dueDaysAfterTrigger,
+        assignmentCount: rule._count.assignments,
+        /** Viene de una audiencia de varios cargos: se ve, pero se corrige en "Quienes". */
+        shared: cargos.length > 1,
+      }));
+    });
 
-    // Requisitos que alcanzan cargos desde audiencias mas amplias: la matriz no los administra,
-    // pero callarlos haria creer que un cargo no tiene nada exigido.
-    const broaderRules = rules.filter((rule) => !jobTitleByAudience.has(rule.audienceId)).length;
+    // Requisitos que alcanzan estas formaciones desde audiencias mas amplias —"toda la empresa",
+    // "los de Antioquia"—: la matriz no los administra, pero callarlos haria creer que un cargo no
+    // tiene nada exigido.
+    const broaderRules = rules.filter(
+      (rule) => esDeLaMatriz.has(rule.targetId) && !cargosPorAudiencia.has(rule.audienceId),
+    ).length;
 
-    return { jobTitles, activities, cells, broaderRules };
+    return {
+      jobTitles: jobTitles.map((jobTitle) => ({ ...jobTitle, people: personasPorCargo.get(jobTitle.id) ?? 0 })),
+      activities: porCargo.map(({ versions, activityType, ...activity }) => ({
+        ...activity,
+        activityType: { code: activityType.code, name: activityType.name, colorHex: activityType.colorHex },
+        /** Sin contenido publicado, la obligacion nace y no hay nada que hacer: la pantalla lo avisa. */
+        published: versions.length > 0,
+      })),
+      cells,
+      broaderRules,
+    };
   }
 
+  /**
+   * Encender o apagar una casilla. Es la MISMA operacion que "exigirla" desde la ficha, dicha con
+   * dos coordenadas en vez de con un formulario.
+   *
+   * ─── POR QUE DELEGA, DESDE EL 2026-09-03 ───
+   *
+   * Antes llamaba a `createRule` por su cuenta, y esa segunda puerta se habia saltado dos reglas
+   * que la primera si aplicaba:
+   *
+   *   1. **La Decision #76.** `setActivityRequirement` fuerza el disparador a PLAN cuando la
+   *      formacion es del plan; la matriz mandaba ON_HIRE a pelo. Comprobado contra la base:
+   *      marcar una casilla de una capacitacion del plan creaba un requisito que disparaba solo y
+   *      **hacia nacer 143 obligaciones de golpe**, que es exactamente lo que esa decision existe
+   *      para impedir. Ahora la matriz solo ensena formaciones por cargo, pero la puerta no puede
+   *      quedar abierta: una llamada directa a la API no mira lo que la pantalla ofrece.
+   *   2. **El plazo.** La ficha manda -1 —D1072 exige que la induccion sea PREVIA al ingreso— y la
+   *      pantalla de la matriz mandaba 0. La misma casilla valia una cosa u otra segun por donde
+   *      se hubiera creado.
+   *
+   * Delegar las arregla las dos, y ademas hereda lo que venga despues sin tener que acordarse de
+   * copiarlo aqui: es la leccion de `audience-rule.ts` —una definicion, dos derivaciones— aplicada
+   * a la escritura.
+   */
   async toggleJobTitleMatrix(actor: AuthUser, input: ToggleJobTitleMatrixInput) {
-    const tenantId = this.prisma.currentTenantId;
     const jobTitle = await this.prisma.scoped.jobTitle.findUnique({ where: { id: input.jobTitleId } });
     if (!jobTitle) throw new NotFoundException({ code: 'JOB_TITLE_NOT_FOUND' });
     await this.assertTargetExists('ACTIVITY', input.activityId);
 
-    const audience = await this.findOrCreateJobTitleAudience(tenantId, input.jobTitleId, jobTitle.name);
-    const existing = await this.prisma.scoped.assignmentRule.findFirst({
-      where: { audienceId: audience.id, targetId: input.activityId },
-    });
+    const scope = audienceRuleSchema.parse({ jobTitleIds: [input.jobTitleId] });
 
     if (!input.enabled) {
+      const tenantId = this.prisma.currentTenantId;
+      const audience = await this.audiences.findOrCreate(tenantId, scope);
+      const existing = await this.prisma.scoped.assignmentRule.findFirst({
+        where: { audienceId: audience.id, targetId: input.activityId },
+      });
       if (existing?.active) {
+        // Retirar una induccion de un cargo es un cambio a la matriz, y de los que mas hay que
+        // explicar: alguien dejo de deber una formacion legal. Misma regla que al modificarla.
+        if (!input.reason) {
+          throw new BadRequestException({
+            code: 'REASON_REQUIRED',
+            message: 'Dejar de exigirsela a un cargo pide una novedad: queda en el registro.',
+          });
+        }
+        await this.audit.record({
+          tenantId,
+          userId: actor.id,
+          action: 'ACTIVITY_REQUIREMENT_CHANGED',
+          resourceType: 'activities',
+          resourceId: input.activityId,
+          newValues: { audienceId: audience.id, scope, retirada: true, reason: input.reason },
+        });
         await this.updateRule(actor, existing.id, { active: false });
       }
       return { enabled: false as const, ruleId: existing?.id ?? null };
     }
 
-    if (existing) {
-      const rule = await this.updateRule(actor, existing.id, {
-        active: true,
-        dueDaysAfterTrigger: input.dueDaysAfterTrigger,
-      });
-      return { enabled: true as const, ruleId: rule.id };
-    }
-
-    const created = await this.createRule(actor, {
-      audienceId: audience.id,
-      targetType: 'ACTIVITY',
-      targetId: input.activityId,
-      // La induccion especifica se exige al ingresar al cargo (D1072).
+    const outcome = await this.setActivityRequirement(actor, {
+      activityId: input.activityId,
+      scope,
       trigger: 'ON_HIRE',
       dueDaysAfterTrigger: input.dueDaysAfterTrigger,
-      recurrence: null,
+      everyMonths: null,
+      fixedDate: null,
+      // La induccion de puesto la deben los que entran Y los que ya estan: es lo que pide
+      // TRANSPRENSA, y es lo que hacia esta pantalla desde siempre.
+      soloNuevos: false,
+      reason: input.reason ?? null,
     });
-    return { enabled: true as const, ruleId: created.rule.id, generated: created.generated };
+    return { enabled: true as const, ruleId: outcome.ruleId, generated: outcome.created };
   }
 
-  private async findOrCreateJobTitleAudience(tenantId: string, jobTitleId: string, jobTitleName: string) {
-    const audiences = await this.prisma.scoped.audience.findMany({ where: { active: true } });
-    const found = audiences.find((audience) => singleJobTitleOf(this.audiences.parseRule(audience.rule)) === jobTitleId);
-    if (found) return found;
-
-    const created = await this.prisma.scoped.audience.create({
-      data: {
-        tenantId,
-        name: `Cargo: ${jobTitleName}`,
-        rule: { match: 'ALL', jobTitleIds: [jobTitleId], jobTitleTypeIds: [], areaIds: [], regionalIds: [], employmentTypes: [], roadActors: [] },
-        isDynamic: true,
-      },
-    });
-    await this.audiences.reevaluate(this.prisma.scoped, tenantId, created.id);
-    return created;
-  }
+  /*
+    Aqui vivia `findOrCreateJobTitleAudience`, que buscaba o creaba la audiencia de UN cargo. Se
+    quito al hacer que la matriz delegue en `setActivityRequirement`: era la tercera copia de lo
+    que hace `audiences.findOrCreate`, y la unica que no reutilizaba las audiencias creadas desde
+    la ficha.
+  */
 
   // ──────────────── Exigirla desde la formacion (una sola operacion) ────────────────
 
@@ -327,8 +404,68 @@ export class AssignmentsService {
    * nuevo, y un error de "ya existe" ahi es un callejon sin salida.
    */
   async setActivityRequirement(actor: AuthUser, input: SetActivityRequirementInput) {
-    const tenantId = this.prisma.currentTenantId;
     await this.assertTargetExists('ACTIVITY', input.activityId);
+
+    /*
+      UNA CASILLA POR CARGO (2026-09-03).
+
+      Marcar tres cargos de una vez creaba UN requisito con una audiencia de los tres dentro. Se
+      guardaba bien y obligaba a quien tenia que obligar, pero dejaba la matriz sin poder
+      administrarlos: quitarle la induccion a UNO de los tres exigia rehacer el requisito entero
+      marcando los otros dos, y apagarlo se los llevaba a los tres por delante. Una audiencia
+      compartida ademas no se puede partir por la espalda: `findOrCreate` la reutiliza entre
+      formaciones, asi que partirla aqui cambiaria a quien alcanzan otras.
+
+      Asi que se parte ARRIBA, al declararla: en los tipos por cargo, marcar tres cargos crea tres
+      requisitos de un cargo. Para quien lo hace sigue siendo un solo gesto —marca los tres y pulsa
+      una vez—; lo que cambia es que cada uno queda independiente, y se enciende y se apaga desde
+      cualquiera de las dos puertas. La contrapartida, a la vista: "Lo que se exige hoy" ensena tres
+      renglones en vez de uno, que es la verdad.
+
+      Solo cuando el alcance habla SOLO de cargos: "conductores de Antioquia" es un grupo de verdad
+      y no tres casillas, y ahi se respeta lo que se marco.
+    */
+    const config = await this.typeConfigOf(input.activityId);
+    if (config.defaultAssignmentMode === 'BY_JOB_TITLE') {
+      const cargos = jobTitlesOf(input.scope);
+      if (cargos.length > 1) {
+        let created = 0;
+        let updated = false;
+        let ultimo: Awaited<ReturnType<AssignmentsService['aplicarRequisito']>> | null = null;
+        for (const jobTitleId of cargos) {
+          const uno = await this.aplicarRequisito(actor, {
+            ...input,
+            scope: audienceRuleSchema.parse({ ...input.scope, jobTitleIds: [jobTitleId] }),
+          });
+          created += uno.created;
+          updated = updated || uno.updated;
+          ultimo = uno;
+        }
+        return {
+          ruleId: ultimo?.ruleId ?? '',
+          audienceId: ultimo?.audienceId ?? '',
+          audienceName: `${cargos.length} cargos`,
+          created,
+          updated,
+        };
+      }
+    }
+    return this.aplicarRequisito(actor, input);
+  }
+
+  /** La config del tipo de una formacion, que decide lo que el servidor fuerza. */
+  private async typeConfigOf(activityId: string) {
+    const tipo = await this.prisma.scoped.activity.findUniqueOrThrow({
+      where: { id: activityId },
+      select: { activityType: { select: { config: true } } },
+    });
+    const parsed = activityTypeConfigSchema.partial().safeParse(tipo.activityType.config ?? {});
+    return parsed.success ? parsed.data : {};
+  }
+
+  /** Exigirla a UN alcance concreto. Lo que antes era el cuerpo entero de `setActivityRequirement`. */
+  private async aplicarRequisito(actor: AuthUser, input: SetActivityRequirementInput) {
+    const tenantId = this.prisma.currentTenantId;
 
     /**
      * SI LA FORMACION ES DEL PLAN, LA OBLIGACION LA DISPARA EL PLAN (Decision #76).
@@ -343,19 +480,147 @@ export class AssignmentsService {
      * capacitacion del plan vence el ultimo dia del mes que diga su renglon, y la del ano que
      * viene es otro plan, no otra ronda de esta.
      */
-    const tipo = await this.prisma.scoped.activity.findUniqueOrThrow({
-      where: { id: input.activityId },
-      select: { activityType: { select: { config: true } } },
-    });
-    const config = (tipo.activityType.config ?? {}) as Record<string, unknown>;
+    const config = await this.typeConfigOf(input.activityId);
     const esDelPlan = config.participatesInPlan === true;
     const trigger = esDelPlan ? ('PLAN' as const) : input.trigger;
     const dueDaysAfterTrigger = esDelPlan ? 0 : input.dueDaysAfterTrigger;
 
     const audience = await this.findOrCreateAudience(tenantId, input.scope);
 
-    // La novedad se registra aparte y contra la FORMACION, no contra la regla: quien audita
-    // pregunta "por que esta formacion se le exige a este cargo", y busca por la formacion.
+    const existing = await this.prisma.scoped.assignmentRule.findFirst({
+      where: { audienceId: audience.id, targetId: input.activityId, targetType: 'ACTIVITY' },
+    });
+
+    // Dos formas de repetir, y solo una a la vez: "cada N meses desde que la completo" (rodante)
+    // o "cada ano en esta fecha" (campana anual, que es como las empresas hacen la reinduccion).
+    //
+    // `onExpiry` viaja con la recurrencia porque es donde el motor la lee, pero la decide el TIPO:
+    // que pasa cuando llega la ronda siguiente y la anterior no se hizo es politica de la empresa.
+    const onExpiry = config.defaultOnExpiry ?? 'ESPERA';
+    // Igual que `onExpiry`: lo decide el TIPO y viaja con la recurrencia, que es donde el motor lo
+    // lee. Quien ingreso hace menos de N meses no entra al ciclo — su induccion es su actualizacion
+    // de ese ano (ver `exemptRecentHiresMonths` en el esquema del tipo).
+    const exemptRecentHiresMonths = config.exemptRecentHiresMonths ?? 0;
+    const recurrence = esDelPlan
+      ? null
+      : input.fixedDate
+        ? { fixedDate: input.fixedDate, windowDays: 60, onExpiry, exemptRecentHiresMonths }
+        : input.everyMonths
+          ? { everyMonths: input.everyMonths, windowDays: 60, onExpiry, exemptRecentHiresMonths }
+          : null;
+
+    if (existing) {
+      /*
+        VOLVER A MANDAR LO MISMO NO ES UN CAMBIO.
+
+        La pestana Quienes abre con los cargos que ya estan marcados, asi que anadir el cuarto
+        reenvia tambien los tres de antes. Si cada uno de esos tres contara como modificacion,
+        anadir un cargo pediria una novedad por los que no se han tocado — y el usuario acabaria
+        escribiendo "sin cambios" para poder pasar, que es como se vacia de sentido un registro de
+        auditoria. Idempotente: si no cambia nada, no se toca nada y no se pide nada.
+      */
+      const igual =
+        existing.active &&
+        existing.trigger === trigger &&
+        (existing.dueDaysAfterTrigger ?? 0) === dueDaysAfterTrigger &&
+        JSON.stringify(existing.recurrence ?? null) === JSON.stringify(recurrence ?? null);
+      if (igual) {
+        return {
+          ruleId: existing.id,
+          audienceId: audience.id,
+          audienceName: audience.name,
+          created: 0,
+          updated: true as const,
+        };
+      }
+
+      /*
+        LA NOVEDAD, EXIGIDA DONDE DE VERDAD HACE FALTA (2026-09-03).
+
+        Era un asterisco que solo vivia en el navegador: el esquema la acepta vacia, asi que una
+        llamada directa a la API —o una pantalla vieja— guardaba sin motivo. Un control de auditoria
+        que solo esta en la pantalla no es un control.
+
+        Y se pide SOLO AL CAMBIAR algo que ya estaba, que es lo que la palabra significa. Declarar
+        por primera vez que una induccion especifica se le exige a un cargo es MONTAR la matriz, no
+        modificarla: en la carga inicial del piloto son decenas de casillas seguidas y no hay
+        ninguna novedad que contar —el alta queda igualmente auditada como ASSIGNMENT_RULE_CREATED—.
+      */
+      /*
+        Y SOLO SI ESTA EN VIGOR. Un requisito RETIRADO no se le exige hoy a nadie: la ficha no lo
+        ensena y la matriz lo pinta apagado, asi que volver a encenderlo es declarar, no modificar.
+        Pedir novedad ahi era pedir explicaciones por cambiar algo que la pantalla dice que no
+        existe — lo destapo la comprobacion automatica, que se comio un 400 al marcar tres cargos
+        de los que uno se habia retirado en una corrida anterior.
+      */
+      if (config.defaultAssignmentMode === 'BY_JOB_TITLE' && existing.active && !input.reason) {
+        throw new BadRequestException({
+          code: 'REASON_REQUIRED',
+          message: 'Cambiar lo que ya se le exige a un cargo pide una novedad: queda en el registro.',
+        });
+      }
+
+      // La novedad se registra contra la FORMACION, no contra la regla: quien audita pregunta
+      // "por que esta formacion se le exige a este cargo", y busca por la formacion.
+      if (input.reason) {
+        await this.audit.record({
+          tenantId,
+          userId: actor.id,
+          action: 'ACTIVITY_REQUIREMENT_CHANGED',
+          resourceType: 'activities',
+          resourceId: input.activityId,
+          newValues: { audienceId: audience.id, scope: input.scope, reason: input.reason },
+        });
+      }
+
+      let nacidas = 0;
+      const rule = await this.updateRule(actor, existing.id, {
+        active: true,
+        dueDaysAfterTrigger,
+        recurrence,
+      });
+      /*
+        EL DISPARADOR no entra en `updateRule` (no se edita desde Asignaciones), pero aqui SI puede
+        haber cambiado: pasar de "al ingresar" a "desde ya" es justo lo que hace falta cuando la
+        formacion empieza a exigirse a gente que lleva anos en la empresa.
+
+        Y AL HACERLO SE LEVANTA EL "SOLO A QUIEN ENTRE DESDE AHORA" (2026-09-03). Ese corte se pone
+        solo al publicar una induccion de INGRESO, y significa "a quien lleva siete anos no se le
+        pide repetir lo que hizo al entrar". En el momento en que alguien cambia el disparador a
+        "al entrar al grupo", esta diciendo lo contrario con todas las letras: que ahora se le exige
+        a la gente que ya esta. Dejar el corte puesto convertia ese cambio en un boton que no hacia
+        nada — se guardaba, no fallaba, y seguian siendo cero personas.
+      */
+      if (rule.trigger !== trigger) {
+        const levantaElCorte = trigger !== 'ON_HIRE' && rule.appliesFrom !== null;
+        await this.prisma.scoped.assignmentRule.update({
+          where: { id: rule.id },
+          data: { trigger, ...(levantaElCorte ? { appliesFrom: null } : {}) },
+        });
+        /*
+          Y SE VUELVE A GENERAR, porque `updateRule` ya paso con el corte todavia puesto.
+
+          Sin esto, quitar el corte no le crearia la obligacion a nadie hasta que el cron nocturno
+          pasara por ahi: quien acaba de decir "ahora se le exige a todos" veria cero, se lo
+          creeria, y volveria a intentarlo de otra forma.
+        */
+        if (levantaElCorte) {
+          const generado = await this.engine.generate(this.prisma.scoped, tenantId, { ruleId: rule.id });
+          nacidas = generado.created;
+        }
+      }
+      return {
+        ruleId: rule.id,
+        audienceId: audience.id,
+        audienceName: audience.name,
+        // Las que nacieron al levantar el corte: decir 0 aqui hacia que la pantalla anunciara
+        // "nadie nuevo quedo obligado" justo despues de obligar a setecientas personas.
+        created: nacidas,
+        updated: true as const,
+      };
+    }
+
+    // Declararla no PIDE novedad, pero si viene se guarda: quien la escribe esta explicando algo.
     if (input.reason) {
       await this.audit.record({
         tenantId,
@@ -365,41 +630,6 @@ export class AssignmentsService {
         resourceId: input.activityId,
         newValues: { audienceId: audience.id, scope: input.scope, reason: input.reason },
       });
-    }
-
-    // Dos formas de repetir, y solo una a la vez: "cada N meses desde que la completo" (rodante)
-    // o "cada ano en esta fecha" (campana anual, que es como las empresas hacen la reinduccion).
-    const recurrence = esDelPlan
-      ? null
-      : input.fixedDate
-        ? { fixedDate: input.fixedDate, windowDays: 60 }
-        : input.everyMonths
-          ? { everyMonths: input.everyMonths, windowDays: 60 }
-          : null;
-
-    const existing = await this.prisma.scoped.assignmentRule.findFirst({
-      where: { audienceId: audience.id, targetId: input.activityId, targetType: 'ACTIVITY' },
-    });
-
-    if (existing) {
-      const rule = await this.updateRule(actor, existing.id, {
-        active: true,
-        dueDaysAfterTrigger,
-        recurrence,
-      });
-      // El disparador no entra en `updateRule` (no se edita desde Asignaciones), pero aqui SI
-      // puede haber cambiado: pasar de "al ingresar" a "desde ya" es justo lo que hace falta
-      // cuando la formacion empieza a exigirse a gente que lleva anos en la empresa.
-      if (rule.trigger !== trigger) {
-        await this.prisma.scoped.assignmentRule.update({ where: { id: rule.id }, data: { trigger } });
-      }
-      return {
-        ruleId: rule.id,
-        audienceId: audience.id,
-        audienceName: audience.name,
-        created: 0,
-        updated: true as const,
-      };
     }
 
     const outcome = await this.createRule(actor, {

@@ -394,14 +394,14 @@ export class AttemptsService {
 
     const person = await this.prisma.scoped.user.findUnique({
       where: { id: actor.id },
-      select: { fullName: true, area: { select: { name: true, managerUserId: true } } },
+      select: { fullName: true, area: { select: { name: true, responsibleUserId: true } } },
     });
     const activity = await this.prisma.scoped.activity.findUnique({
       where: { id: attempt.enrollment.activityVersion.activityId },
       select: { name: true, process: { select: { responsibleUserId: true } } },
     });
 
-    const recipients = [activity?.process.responsibleUserId, person?.area.managerUserId].filter(
+    const recipients = [activity?.process.responsibleUserId, person?.area.responsibleUserId].filter(
       (id): id is string => Boolean(id),
     );
     const targets = await this.prisma.scoped.user.findMany({

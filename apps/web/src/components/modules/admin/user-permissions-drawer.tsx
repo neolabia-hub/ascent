@@ -51,7 +51,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   questions: 'Banco de preguntas',
   attempts: 'Evaluaciones',
   certificates: 'Certificados',
-  reports: 'Reportes',
+  reports: 'Seguimiento y reportes',
   users: 'Usuarios',
   roles: 'Roles',
   config: 'Configuracion',

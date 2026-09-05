@@ -230,7 +230,16 @@ export function getRoster(id: string): Promise<{ total: number; items: RosterRow
   return apiFetch(`/offerings/${id}/roster`, { method: 'GET' });
 }
 
-export function enrollOffering(id: string, body: { allAssigned?: boolean; userIds?: string[] }): Promise<{ enrolled: number; skipped: number }> {
+export function enrollOffering(
+  id: string,
+  body: { allAssigned?: boolean; userIds?: string[] },
+): Promise<{
+  enrolled: number;
+  skipped: number;
+  /** Obligados que NO cupieron. Es lo que permite decir "faltan 17, programa otra jornada". */
+  sinCupo: number;
+  capacity: number | null;
+}> {
   return apiFetch(`/offerings/${id}/enroll`, { method: 'POST', body: { allAssigned: false, userIds: [], ...body } });
 }
 
@@ -288,6 +297,40 @@ export function createAudience(body: { name: string; rule: AudienceRule; isDynam
   return apiFetch('/audiences', { method: 'POST', body });
 }
 
+/** Una faceta que EXISTE entre los obligados de la formacion, con cuantos hay. */
+export interface FacetCount {
+  id: string;
+  count: number;
+}
+
+export interface ProjectedPreview {
+  /** Obligados que caen DENTRO de la tajada: el numero que se congela al publicar. */
+  count: number;
+  /** Obligados en total, sin tajada: el denominador de "N de M". */
+  total: number;
+  source: 'OBLIGATIONS' | 'RULES' | 'NONE';
+  detail: string;
+  facets: {
+    jobTitles: FacetCount[];
+    areas: FacetCount[];
+    regionals: FacetCount[];
+    services: FacetCount[];
+  };
+}
+
+/**
+ * Los proyectados de una convocatoria que todavia no existe. NO es `previewAudience`: aquella
+ * cuenta gente de la EMPRESA que encaja con las facetas —con los campos vacios, la plantilla
+ * entera— y esta cuenta OBLIGADOS dentro del corte, que es lo que de verdad se congela.
+ */
+export function previewProjected(body: {
+  activityVersionId: string;
+  scope: AudienceRule;
+  regionalId: string | null;
+}): Promise<ProjectedPreview> {
+  return apiFetch('/offerings/proyectados', { method: 'POST', body });
+}
+
 /**
  * Que dispara la obligacion. `PLAN` es el unico que NO dispara nada: guarda a quienes se le va
  * a exigir una capacitacion del plan, y las obligaciones las crea el plan al aprobar el renglon
@@ -334,9 +377,26 @@ export function updateAssignmentRule(id: string, body: { active?: boolean; dueDa
 }
 
 export interface JobTitleMatrix {
-  jobTitles: Array<{ id: string; code: string; name: string; jobTitleType: { name: string } }>;
-  activities: Array<{ id: string; code: string; name: string; activityType: { code: string; name: string; colorHex: string | null } }>;
-  cells: Array<{ jobTitleId: string; activityId: string; ruleId: string; trigger: string; dueDaysAfterTrigger: number | null }>;
+  /** `people`: cuanta gente tiene hoy ese cargo. Una casilla sin nadie detras no urge igual. */
+  jobTitles: Array<{ id: string; code: string; name: string; jobTitleType: { name: string }; people: number }>;
+  /** Solo las que se deciden POR CARGO (inducciones especificas). `published`: tiene contenido. */
+  activities: Array<{
+    id: string;
+    code: string;
+    name: string;
+    activityType: { code: string; name: string; colorHex: string | null };
+    published: boolean;
+  }>;
+  cells: Array<{
+    jobTitleId: string;
+    activityId: string;
+    ruleId: string;
+    trigger: string;
+    dueDaysAfterTrigger: number | null;
+    assignmentCount: number;
+    /** Viene de un requisito de VARIOS cargos: se ve, pero se corrige en la ficha. */
+    shared: boolean;
+  }>;
   broaderRules: number;
 }
 
@@ -348,9 +408,12 @@ export function toggleJobTitleMatrix(body: {
   jobTitleId: string;
   activityId: string;
   enabled: boolean;
+  /** Dias respecto al ingreso. Por defecto -1: D1072 exige que la induccion sea PREVIA. */
   dueDaysAfterTrigger?: number;
+  /** La novedad, cuando la casilla ya existia. El servidor la exige. */
+  reason?: string | null;
 }): Promise<{ enabled: boolean; ruleId: string | null; generated?: number }> {
-  return apiFetch('/assignment-rules/job-title-matrix', { method: 'POST', body: { dueDaysAfterTrigger: 0, ...body } });
+  return apiFetch('/assignment-rules/job-title-matrix', { method: 'POST', body: { dueDaysAfterTrigger: -1, ...body } });
 }
 
 // ─────────────────────────── Asignaciones ───────────────────────────
@@ -363,7 +426,9 @@ export type AssignmentStatus =
   | 'WITHDRAWN_LEFT_AUDIENCE'
   /** El renglon del plan que la creo se cancelo: esa jornada ya no se dicta. */
   | 'WITHDRAWN_PLAN_ITEM_CANCELLED'
-  | 'WAIVED';
+  | 'WAIVED'
+  /** Cerro el periodo y no la hizo. SI cuenta como incumplimiento de ese periodo. */
+  | 'EXPIRED_NOT_DONE';
 
 export interface AssignmentRow {
   id: string;

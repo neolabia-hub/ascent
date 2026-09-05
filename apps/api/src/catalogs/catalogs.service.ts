@@ -35,6 +35,20 @@ import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 /** Representacion generica de un registro de catalogo para la respuesta HTTP y la auditoria. */
 type CatalogRecord = Record<string, unknown>;
 
+/**
+ * Un grupo de filas que impide borrar: cuantas son y como se llaman EN LA PANTALLA.
+ *
+ * El nombre no es el de la tabla —`activity_job_titles` no le dice nada a nadie— sino la palabra
+ * del negocio, en singular y plural, porque el mensaje se arma con el conteo delante.
+ */
+interface Referencia {
+  count: number;
+  one: string;
+  many: string;
+}
+
+const cuenta = (count: number, one: string, many: string): Referencia => ({ count, one, many });
+
 export const CATALOG_KEYS = [
   'areas',
   'processes',
@@ -55,15 +69,25 @@ interface CatalogDescriptor {
   create: (prisma: TenantPrisma, tenantId: string, body: unknown) => Promise<CatalogRecord>;
   update: (prisma: TenantPrisma, id: string, body: unknown) => Promise<CatalogRecord>;
   remove: (prisma: TenantPrisma, id: string) => Promise<void>;
-  /** Cantidad de filas que referencian este registro (bloquea el borrado fisico si es > 0). */
-  countReferences: (prisma: TenantPrisma, id: string) => Promise<number>;
+  /**
+   * Quien referencia este registro, DESGLOSADO (bloquea el borrado fisico si suma > 0).
+   *
+   * Antes devolvia solo un numero y la pantalla acababa diciendo "esta en uso" a secas: cierto,
+   * inutil y sin salida —quien lo lee no sabe si estorban tres formaciones o doscientas personas, ni
+   * donde ir a mirar—. El desglose viaja al cliente para que el mensaje diga QUE lo usa y cuanto.
+   */
+  references: (prisma: TenantPrisma, id: string) => Promise<Referencia[]>;
   /** Solo activity-types: is_system=true no se puede borrar (catalogo protegido de fabrica). */
   isSystemProtected?: (record: CatalogRecord) => boolean;
 }
 
 const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
   areas: {
-    list: (prisma) => prisma.area.findMany({ orderBy: { displayOrder: 'asc' } }),
+    list: (prisma) =>
+      prisma.area.findMany({
+        orderBy: { displayOrder: 'asc' },
+        include: { responsible: { select: { id: true, fullName: true } } },
+      }),
     findById: (prisma, id) => prisma.area.findUnique({ where: { id } }),
     create: async (prisma, tenantId, body) => {
       const data = areaSchema.parse(body);
@@ -75,7 +99,7 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
           active: data.active,
           displayOrder: data.displayOrder,
           parentId: data.parentId ?? null,
-          managerUserId: data.managerUserId ?? null,
+          responsibleUserId: data.responsibleUserId ?? null,
         },
       });
     },
@@ -88,20 +112,24 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
           ...(data.active !== undefined && { active: data.active }),
           ...(data.displayOrder !== undefined && { displayOrder: data.displayOrder }),
           ...(data.parentId !== undefined && { parentId: data.parentId }),
-          ...(data.managerUserId !== undefined && { managerUserId: data.managerUserId }),
+          ...(data.responsibleUserId !== undefined && { responsibleUserId: data.responsibleUserId }),
         },
       });
     },
     remove: async (prisma, id) => {
       await prisma.area.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => {
+    references: async (prisma, id) => {
       const [users, processes, analystScopes] = await Promise.all([
         prisma.user.count({ where: { areaId: id } }),
         prisma.process.count({ where: { areaId: id } }),
         prisma.analystScope.count({ where: { areaId: id } }),
       ]);
-      return users + processes + analystScopes;
+      return [
+        cuenta(users, 'persona', 'personas'),
+        cuenta(processes, 'proceso', 'procesos'),
+        cuenta(analystScopes, 'alcance de analista', 'alcances de analista'),
+      ];
     },
   },
 
@@ -147,12 +175,15 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.process.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => {
+    references: async (prisma, id) => {
       const [activities, analystScopes] = await Promise.all([
         prisma.activity.count({ where: { processId: id } }),
         prisma.analystScope.count({ where: { processId: id } }),
       ]);
-      return activities + analystScopes;
+      return [
+        cuenta(activities, 'formacion', 'formaciones'),
+        cuenta(analystScopes, 'alcance de analista', 'alcances de analista'),
+      ];
     },
   },
 
@@ -185,7 +216,9 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.jobTitleType.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => prisma.jobTitle.count({ where: { jobTitleTypeId: id } }),
+    references: async (prisma, id) => [
+      cuenta(await prisma.jobTitle.count({ where: { jobTitleTypeId: id } }), 'cargo', 'cargos'),
+    ],
   },
 
   'job-titles': {
@@ -223,12 +256,15 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.jobTitle.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => {
+    references: async (prisma, id) => {
       const [users, activityJobTitles] = await Promise.all([
         prisma.user.count({ where: { jobTitleId: id } }),
         prisma.activityJobTitle.count({ where: { jobTitleId: id } }),
       ]);
-      return users + activityJobTitles;
+      return [
+        cuenta(users, 'persona', 'personas'),
+        cuenta(activityJobTitles, 'formacion', 'formaciones'),
+      ];
     },
   },
 
@@ -261,7 +297,9 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.service.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => prisma.activityService.count({ where: { serviceId: id } }),
+    references: async (prisma, id) => [
+      cuenta(await prisma.activityService.count({ where: { serviceId: id } }), 'formacion', 'formaciones'),
+    ],
   },
 
   regionals: {
@@ -293,13 +331,17 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.regional.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => {
+    references: async (prisma, id) => {
       const [users, offerings, activityRegionals] = await Promise.all([
         prisma.user.count({ where: { regionalId: id } }),
         prisma.offering.count({ where: { regionalId: id } }),
         prisma.activityRegional.count({ where: { regionalId: id } }),
       ]);
-      return users + offerings + activityRegionals;
+      return [
+        cuenta(users, 'persona', 'personas'),
+        cuenta(offerings, 'convocatoria', 'convocatorias'),
+        cuenta(activityRegionals, 'formacion', 'formaciones'),
+      ];
     },
   },
 
@@ -334,7 +376,9 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.norm.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => prisma.activityNorm.count({ where: { normId: id } }),
+    references: async (prisma, id) => [
+      cuenta(await prisma.activityNorm.count({ where: { normId: id } }), 'formacion', 'formaciones'),
+    ],
   },
 
   'activity-types': {
@@ -372,7 +416,9 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     remove: async (prisma, id) => {
       await prisma.activityType.delete({ where: { id } });
     },
-    countReferences: async (prisma, id) => prisma.activity.count({ where: { activityTypeId: id } }),
+    references: async (prisma, id) => [
+      cuenta(await prisma.activity.count({ where: { activityTypeId: id } }), 'formacion', 'formaciones'),
+    ],
     isSystemProtected: (record) => record.isSystem === true,
   },
 };
@@ -453,9 +499,22 @@ export class CatalogsService {
       throw new ForbiddenException({ code: 'SYSTEM_CATALOG' });
     }
 
-    const references = await descriptor.countReferences(prisma, id);
+    /*
+      EL "NO SE PUEDE" VIAJA CON SU MOTIVO.
+
+      La regla no cambia —lo que otros usan no se borra, se desactiva— pero un 409 pelado obliga a
+      quien administra a adivinar que estorba. Van el total y el desglose para que la pantalla pueda
+      decir "3 formaciones lo usan" y ofrecer la salida que si existe.
+    */
+    const usedBy = (await descriptor.references(prisma, id)).filter((r) => r.count > 0);
+    const references = usedBy.reduce((suma, r) => suma + r.count, 0);
     if (references > 0) {
-      throw new ConflictException({ code: 'CATALOG_IN_USE', hint: 'Desactivelo en su lugar' });
+      throw new ConflictException({
+        code: 'CATALOG_IN_USE',
+        references,
+        usedBy: usedBy.map((r) => ({ count: r.count, label: r.count === 1 ? r.one : r.many })),
+        hint: 'Desactivelo en su lugar',
+      });
     }
 
     await descriptor.remove(prisma, id);

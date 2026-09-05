@@ -25,6 +25,7 @@ import { RolesModule } from './roles/roles.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { CertificatesModule } from './certificates/certificates.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { PerformanceModule } from './performance/performance.module.js';
 import { SurveysModule } from './surveys/surveys.module.js';
 import { PlatformModule } from './platform/platform.module.js';
 import { PublicTenantsController } from './tenants/public-tenants.controller.js';
@@ -94,6 +95,8 @@ import { WorkersModule } from './workers/workers.module.js';
     CertificatesModule,
     // Encuestas de satisfaccion y de eficacia (Sprint 5).
     SurveysModule,
+    // Desempeno: aparte de la formacion a proposito (Decision #134).
+    PerformanceModule,
     // Seguimiento de la ejecucion: quien la hizo y quien no (Sprint 5).
     ReportsModule,
     // La capa del PROVEEDOR, por encima de todos los clientes (Decision #100).

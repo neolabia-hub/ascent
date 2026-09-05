@@ -6,6 +6,7 @@ import {
   enrollOfferingSchema,
   listOfferingsQuerySchema,
   migrateOfferingVersionSchema,
+  previewProjectedSchema,
   publishOfferingSchema,
   updateOfferingSchema,
 } from '@neo-pulse/shared';
@@ -31,6 +32,17 @@ export class OfferingsController {
   @RequirePermissions('offerings:read')
   list(@CurrentUser() actor: AuthUser, @Query() query: Record<string, string>) {
     return this.offerings.list(actor, listOfferingsQuerySchema.parse(query));
+  }
+
+  /**
+   * Los proyectados de una convocatoria que TODAVIA NO EXISTE, mientras se marca la tajada.
+   * Declarada ANTES de las rutas con `:id` a proposito: un segmento fijo no puede quedar detras
+   * de un comodin del mismo nivel.
+   */
+  @Post('proyectados')
+  @RequirePermissions('offerings:read')
+  previewProjectedForForm(@Body() body: unknown) {
+    return this.offerings.previewProjectedForForm(previewProjectedSchema.parse(body));
   }
 
   @Get(':id')

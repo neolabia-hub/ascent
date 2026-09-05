@@ -53,7 +53,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/hoy', label: 'Inicio', icon: House },
-  { href: '/mi-formacion', label: 'Mi formacion', icon: GraduationCap },
+  { href: '/mi-formacion', label: 'Mi aprendizaje', icon: GraduationCap },
   { href: '/repaso', label: 'Repaso', icon: Repeat2 },
   { href: '/perfil', label: 'Perfil', icon: CircleUser },
 ];

@@ -1,0 +1,619 @@
+<title>Alta y gestión de personas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --warn: #b45309;
+    --info: #0b5cad;
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  :root:not([data-theme="light"]) { color-scheme: light; }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+      --paper: #0e1114; --surface: #171b20; --line: #262c33; --line-strong: #333b44;
+      --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+      --ok: #3ba76f; --warn: #d98324; --info: #4d94d8;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+    --paper: #0e1114; --surface: #171b20; --line: #262c33; --line-strong: #333b44;
+    --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+    --ok: #3ba76f; --warn: #d98324; --info: #4d94d8;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-700);
+    font-family: var(--body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .marco { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+  @media (min-width: 900px) { .marco { padding-top: 72px; } }
+
+  .eyebrow {
+    display: inline-block; font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(32px, 5vw, 44px); font-weight: 800;
+    line-height: 1.08; letter-spacing: -0.02em; color: var(--ink-900); margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); margin: 0; }
+
+  section { margin-top: 60px; scroll-margin-top: 24px; }
+  h2 {
+    font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--ink-900); margin: 0 0 10px; padding-top: 20px;
+    border-top: 2px solid var(--ink-900); text-wrap: balance;
+  }
+  h3 { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--ink-900); margin: 32px 0 8px; }
+  p { margin: 0 0 16px; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  /* Pasos numerados: aquí SÍ son una secuencia real. */
+  .pasos { list-style: none; margin: 24px 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .paso {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 16px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+  }
+  .numero {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 99px;
+    background: var(--navy); color: #fff;
+    font-family: var(--display); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .paso h4 { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink-900); margin: 4px 0 6px; }
+  .paso p { margin: 0 0 10px; font-size: 15px; }
+  .paso p:last-child { margin-bottom: 0; }
+  .donde {
+    display: inline-block; font-size: 12px; color: var(--ink-500);
+    background: var(--paper); border-radius: 6px; padding: 2px 8px; margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabla-envoltura { overflow-x: auto; margin: 20px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-500); border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+
+  .clave {
+    margin: 22px 0; padding: 18px 22px; background: var(--navy-soft);
+    border-left: 3px solid var(--navy); border-radius: 0 10px 10px 0;
+  }
+  .clave p { margin: 0; font-size: 15px; }
+  .clave p + p { margin-top: 10px; }
+
+  .ejemplo {
+    margin: 22px 0; padding: 18px 20px; background: var(--surface);
+    border: 1px dashed var(--line-strong); border-radius: 12px;
+  }
+  .ejemplo p:first-child {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-300); margin-bottom: 10px;
+  }
+  .ejemplo p:last-child { margin-bottom: 0; }
+
+  /* Muestra de escala, igual que en pantalla */
+  .escala { display: flex; gap: 8px; margin: 12px 0 6px; }
+  .escala span {
+    flex: 1; min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+    font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-700);
+  }
+  /* Marcado = relleno sólido, como en el producto desde el 2026-09-02. */
+  .escala span.marcado { border-color: var(--navy); background: var(--navy); color: #fff; }
+  .extremos { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-500); }
+
+  footer {
+    margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--line);
+    font-size: 13.5px; color: var(--ink-300);
+  }
+</style>
+
+<div class="marco">
+  <header>
+    <p class="eyebrow">NEO PULSE · Guía de uso</p>
+    <h1>Alta y gestión de personas</h1>
+    <p class="entradilla">
+      Cómo se crea a alguien, qué le pasa automáticamente cuando entra, y en qué orden cargar todo
+      la primera vez para que nadie se quede sin sus formaciones.
+    </p>
+  </header>
+
+  <section>
+    <h2>Una persona no es solo un nombre</h2>
+    <p>
+      Al dar de alta a alguien se piden cinco datos, y <strong>tres de ellos deciden qué le va a
+      tocar hacer</strong>. No son etiquetas para el listado: son el mecanismo.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Dato</th><th>Para qué se usa de verdad</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Documento</strong></td>
+            <td>Es su identidad y su usuario para entrar. No se repite y no se cambia</td>
+          </tr>
+          <tr>
+            <td><strong>Cargo</strong></td>
+            <td>Decide <strong>qué formaciones le tocan</strong> (la matriz cargo → inducción) y <strong>qué formulario responde</strong> en la evaluación de desempeño</td>
+          </tr>
+          <tr>
+            <td><strong>Área</strong></td>
+            <td>Hace <strong>cuatro cosas</strong>, no una: entra en las reglas de quién debe qué («todo Operaciones hace esta capacitación»), decide <strong>quién lo evalúa</strong> —el responsable del área—, decide <strong>quién responde si la formación sirvió</strong>, y es por donde se cortan los informes</td>
+          </tr>
+          <tr>
+            <td>Regional y servicio</td>
+            <td>Opcionales. Sirven para acotar audiencias («solo los de la costa») y para filtrar en Seguimiento</td>
+          </tr>
+          <tr>
+            <td>Correo</td>
+            <td>A dónde llegan los avisos. También sirve para entrar</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="clave">
+      <p>
+        <strong>Un cargo mal puesto no es un error cosmético.</strong> Es una persona a la que no le
+        va a nacer la inducción que le corresponde, y nadie lo va a notar hasta la auditoría. Vale
+        más rato revisando la columna de cargos que corrigiendo después.
+      </p>
+      <p>
+        <strong>Y el área tampoco es solo una etiqueta de informe.</strong> Las áreas forman un
+        árbol: si un área no tiene responsable, la evaluación de eficacia sube al área de arriba
+        buscando quién responda. Un área suelta, sin padre y sin responsable, deja a su gente sin
+        nadie que la evalúe.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Quién ve qué: los tres roles</h2>
+    <p>
+      Todas las personas entran por el mismo sitio y con su documento. Lo que cambia es qué ven
+      dentro, y eso lo decide el <strong>rol</strong> —no el cargo—.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Rol</th><th>Quién suele serlo</th><th>Qué ve</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Usuario</strong></td>
+            <td>La inmensa mayoría</td>
+            <td>Solo su lado: sus formaciones, su repaso, su perfil y sus constancias. <strong>Ninguna pantalla de administración</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Analista</strong></td>
+            <td>Quien lleva un sistema de gestión (SST, calidad)</td>
+            <td>Administración, pero <strong>acotada a sus procesos o áreas</strong>: ve y gestiona lo suyo, no lo de los demás. El alcance por área incluye sus áreas hijas</td>
+          </tr>
+          <tr>
+            <td><strong>Administrador</strong></td>
+            <td>Gestión Humana</td>
+            <td>Todo: personas, formaciones, plan, desempeño y configuración</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="clave">
+      <p>
+        <strong>Un jefe de área normalmente es rol «Usuario».</strong> No necesita administración
+        para nada: calificar a su equipo y responder si la formación sirvió le aparecen en
+        <em>su propio menú</em>, del lado del aprendiz. Darle acceso de administrador «para que pueda
+        evaluar» es un error frecuente y le abre pantallas que no le tocan.
+      </p>
+      <p>
+        Ser <strong>responsable de un área</strong> no es un rol: es un campo del área. Se puede ser
+        responsable de un área siendo rol Usuario, y es lo normal.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Antes de cargar a nadie: los catálogos</h2>
+    <p>
+      El archivo de personas <strong>no crea cargos ni áreas</strong>: los busca. Si una fila dice
+      «Conductor» y ese cargo no existe en el catálogo, esa fila falla — las demás entran igual.
+    </p>
+    <p>Así que primero, en <strong>Configuración</strong>, tienen que existir:</p>
+    <ul>
+      <li><strong>Cargos</strong> — todos los de la empresa, no solo los del primer grupo que se cargue.</li>
+      <li><strong>Áreas</strong> — y a cada una, <strong>su responsable</strong> (ver más abajo: es el paso que todo el mundo olvida).</li>
+      <li><strong>Regionales</strong> y <strong>servicios</strong>, si se van a usar.</li>
+    </ul>
+    <div class="clave">
+      <p>
+        <strong>El archivo acepta el código o el nombre</strong>, y no distingue tildes ni
+        mayúsculas: «LOGISTICA», «Logística» y «logistica» encuentran la misma área. No hace falta
+        traducir 300 filas a códigos.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Las dos formas de dar de alta</h2>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th></th><th>Una persona</th><th>Carga masiva</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Dónde</td>
+            <td>Usuarios → <strong>Nueva persona</strong></td>
+            <td>Usuarios → <strong>Cargar archivo</strong></td>
+          </tr>
+          <tr>
+            <td>Para qué</td>
+            <td>Un ingreso nuevo, el día a día</td>
+            <td>La carga inicial, o una tanda de ingresos</td>
+          </tr>
+          <tr>
+            <td>Cuánto tarda</td>
+            <td>Menos de un segundo</td>
+            <td><strong>600 personas en 1 o 2 minutos</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="clave">
+      <p>
+        <strong>La carga inicial va SIEMPRE por archivo.</strong> Dar de alta a 600 personas desde el
+        botón de «Nueva persona» son horas de espera y no aporta nada: el archivo hace exactamente lo
+        mismo, de una vez, y deja el resultado fila por fila.
+      </p>
+    </div>
+
+    <h3>El archivo</h3>
+    <p>
+      Es un CSV o un Excel con una fila por persona. Hasta <strong>2.000 filas</strong> y 5 MB por
+      archivo; si son más, se parte en varios.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Columna</th><th>¿Obligatoria?</th><th>Qué va</th></tr></thead>
+        <tbody>
+          <tr><td>documento</td><td><strong>Sí</strong></td><td>Cédula. Es el usuario para entrar</td></tr>
+          <tr><td>nombre_completo</td><td><strong>Sí</strong></td><td>Como se va a ver en las constancias</td></tr>
+          <tr><td>correo</td><td><strong>Sí</strong></td><td>A dónde llegan los avisos</td></tr>
+          <tr><td>cargo</td><td><strong>Sí</strong></td><td>Código o nombre del catálogo</td></tr>
+          <tr><td>area</td><td><strong>Sí</strong></td><td>Código o nombre del catálogo</td></tr>
+          <tr><td>telefono</td><td>No</td><td></td></tr>
+          <tr><td>regional</td><td>No</td><td>Código o nombre</td></tr>
+          <tr><td>servicio</td><td>No</td><td>Código o nombre</td></tr>
+          <tr><td>fecha_nacimiento</td><td>No</td><td>AAAA-MM-DD</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <strong>Una fila mala no tumba la carga.</strong> Al terminar, la pantalla dice cuántas
+      entraron y cuáles fallaron con el motivo (documento repetido, cargo que no existe, correo mal
+      escrito). Se corrigen esas y se vuelve a cargar solo esas: las que ya entraron no se duplican.
+    </p>
+  </section>
+
+  <section>
+    <h2>La contraseña se ve UNA vez</h2>
+    <p>
+      El sistema genera una contraseña por persona y <strong>la muestra en el momento y nunca más</strong>:
+      no queda guardada en ningún sitio legible, ni siquiera para quien administra. En la carga
+      masiva salen todas juntas en el resultado —<strong>hay que copiarlas o descargarlas antes de
+      cerrar esa pantalla</strong>.
+    </p>
+    <p>
+      Si alguien la pierde, no se recupera: se genera otra desde la ficha de la persona
+      (<em>Restablecer contraseña</em>). La primera vez que entra, el sistema le obliga a cambiarla.
+    </p>
+  </section>
+
+  <section>
+    <h2>Qué pasa solo cuando entra alguien</h2>
+    <p>
+      Esto es lo que hace el sistema sin que nadie pulse nada, y es la razón de que el cargo y el
+      área importen tanto:
+    </p>
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <h4>Se le calcula a qué audiencias pertenece</h4>
+          <p>
+            Una <strong>audiencia</strong> es un grupo que se define por reglas —«todos los
+            conductores», «todo el personal de la costa»—, no por una lista escrita a mano. Al crear
+            a la persona, el sistema mira todas las audiencias y la mete en las que le correspondan.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <h4>Le nacen sus obligaciones</h4>
+          <p>
+            Cada audiencia puede tener requisitos colgando: «los de este grupo deben hacer la
+            inducción general». Al entrar al grupo, esa obligación aparece en su lista con su fecha
+            límite calculada.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <h4>Se le avisa</h4>
+          <p>
+            Recibe la notificación de lo que se le exige, y a partir de ahí aparece en Seguimiento
+            como cualquier otra persona.
+          </p>
+        </div>
+      </li>
+    </ol>
+    <div class="clave">
+      <p>
+        <strong>Y funciona igual al revés.</strong> Si a alguien se le cambia el cargo o el área, sus
+        obligaciones se recalculan en el acto: entra a los grupos nuevos y <em>sale</em> de los que
+        ya no le tocan. Lo que ya había completado se queda como evidencia; lo que estaba pendiente y
+        deja de exigírsele se retira, y su aviso se marca leído para que no siga reclamando algo que
+        ya no debe.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>El orden de la carga inicial</h2>
+    <p>
+      Aquí el orden sí importa. Es una secuencia real, no una lista de tareas:
+    </p>
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <span class="donde">Configuración</span>
+          <h4>Los catálogos completos</h4>
+          <p>
+            Cargos, áreas, regionales, servicios, procesos y normas. <strong>Todos los cargos</strong>,
+            no solo los del primer grupo: de ellos depende a quién le toca qué.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <span class="donde">Configuración → Áreas</span>
+          <h4>El responsable de cada área</h4>
+          <p>
+            <strong>Es el paso que todo el mundo olvida.</strong> Sin él, esa área no tiene quién
+            evalúe el desempeño de su gente ni quién responda si la formación sirvió. Se puede poner
+            después, pero entonces hay que volver atrás.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <span class="donde">Formaciones</span>
+          <h4>Las formaciones y su contenido</h4>
+          <p>
+            Las inducciones, capacitaciones y evaluaciones, publicadas. Una formación en borrador no
+            se le puede exigir a nadie.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">4</span>
+        <div>
+          <span class="donde">Asignaciones</span>
+          <h4>A quién se le exige cada una</h4>
+          <p>
+            Aquí se crean las audiencias y las reglas: «a los conductores, la inducción general».
+            Muchas nacen solas al publicar la formación; estas son las que haya que añadir a mano.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">5</span>
+        <div>
+          <span class="donde">Usuarios → Cargar archivo</span>
+          <h4>Las personas, por archivo</h4>
+          <p>
+            Al entrar, a cada una le nacen las obligaciones de los pasos anteriores. <strong>Las
+            personas van al final y no es una preferencia: es el mecanismo.</strong> Una inducción
+            de ingreso solo alcanza a quien entre al grupo después de publicarla, así que si las
+            personas entran antes, a ninguna se le exige. La sección siguiente lo explica con los
+            dos órdenes y en qué acaba cada uno.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">6</span>
+        <div>
+          <span class="donde">Seguimiento</span>
+          <h4>Comprobar antes de anunciar nada</h4>
+          <p>
+            Mirar el total de personas, que cada una tenga cargo y área, y que las obligaciones
+            esperadas estén ahí. Es más barato descubrir aquí que faltó un cargo que cuando alguien
+            pregunte por qué no le aparece su inducción.
+          </p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>El detalle que decide si los antiguos también la hacen</h2>
+    <p>
+      Aquí no hay ninguna casilla que marcar: <strong>lo decide el tipo de formación, solo</strong>.
+      Y por eso el <em>orden</em> de la carga inicial deja de ser una comodidad y pasa a ser el
+      mecanismo.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Al publicar…</th><th>A quién se le exige</th><th>Por qué</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Una <strong>inducción de ingreso</strong></td>
+            <td>Solo a quien <strong>entre al grupo a partir de ese momento</strong></td>
+            <td>La inducción es parte del ingreso. A quien lleva siete años no se le pide repetir lo que hizo el día que entró</td>
+          </tr>
+          <tr>
+            <td>Una <strong>reinducción</strong></td>
+            <td>A <strong>todos</strong> los del grupo</td>
+            <td>Es la obligación anual de la plantilla entera: dejar fuera a los actuales la vaciaría de sentido</td>
+          </tr>
+          <tr>
+            <td>Cualquier otra, o un requisito puesto <strong>a mano</strong></td>
+            <td>A <strong>todos</strong> los del grupo</td>
+            <td>Es lo que se está pidiendo explícitamente</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      No se pregunta al publicar a propósito: la respuesta la da el propio tipo de formación, y cada
+      pregunta que sobra es una en la que se puede acertar mal. En la pestaña
+      <em>«A quién se le exige»</em> de la formación se ve cuál de los dos casos es, dicho con esas
+      palabras y con la cifra al lado.
+    </p>
+
+    <div class="clave">
+      <p>
+        <strong>Y aquí está lo que hay que entender del arranque:</strong> «quien entre al grupo»
+        significa <em>quien entre al grupo en el sistema</em>, no quien entre a la empresa. Una
+        persona con quince años de casa, el día que se sube su ficha, <strong>entra al grupo ese
+        día</strong>.
+      </p>
+      <p>
+        Por eso el orden funciona: <strong>publicar las formaciones primero y subir a las personas
+        después</strong> hace que las 600 entren a los grupos <em>después</em> de que exista la
+        inducción — y a las 600 se les exige. Que es exactamente lo que se quiere aquí: que la hagan
+        nuevos y antiguos.
+      </p>
+    </div>
+
+    <div class="ejemplo">
+      <p>Los dos órdenes, y en qué acaban</p>
+      <p>
+        <strong>Formaciones primero, personas después</strong> (el orden correcto). Se publica la
+        inducción general: hoy no obliga a nadie porque no hay nadie. Se suben las 600 personas:
+        entran al grupo hoy, después de la inducción, y <strong>las 600 la tienen pendiente</strong>.
+      </p>
+      <p>
+        <strong>Personas primero, formaciones después</strong> (el error). Se suben las 600: entran
+        al grupo hoy. Mañana se publica la inducción de ingreso: como es de ingreso, solo alcanza a
+        quien entre <em>desde mañana</em> — y las 600 ya estaban. <strong>Resultado: cero
+        pendientes</strong>, y nadie avisa.
+      </p>
+    </div>
+
+    <p>
+      <strong>Cómo se comprueba en dos minutos</strong>, y conviene hacerlo: en la formación,
+      pestaña <em>«A quién se le exige»</em>, un requisito de inducción dice
+      «<em>solo a quien entre desde ahora (N hasta hoy)</em>». Después de subir a la gente, ese N
+      tiene que ser el número de personas que esperas. Si dice <strong>0</strong>, el orden se
+      invirtió y hay que retirar el requisito y volver a exigirlo.
+    </p>
+    <p>
+      Y si ya pasó: se retira el requisito y se vuelve a exigir desde la misma pestaña. Al ser un
+      requisito nuevo, su «desde ahora» es ahora — y la gente que ya está en el grupo entró antes,
+      así que <strong>hay que exigirlo a mano marcando el alcance</strong>, no republicando la
+      formación. Lo que ya esté cumplido no se toca.
+    </p>
+  </section>
+
+  <section>
+    <h2>Después: los cambios del día a día</h2>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Cuando…</th><th>Qué hay que hacer</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Entra alguien nuevo</td>
+            <td>Usuarios → Nueva persona. Sus obligaciones nacen solas; hay que <strong>entregarle la contraseña</strong> que aparece</td>
+          </tr>
+          <tr>
+            <td>Alguien cambia de cargo o de área</td>
+            <td>Se edita su ficha. El sistema recalcula: entra a lo nuevo y sale de lo viejo, <strong>sin perder lo ya hecho</strong></td>
+          </tr>
+          <tr>
+            <td>Alguien se retira</td>
+            <td>Se marca la salida en su ficha. Deja de contar en los indicadores y de recibir avisos; su historial se conserva como evidencia</td>
+          </tr>
+          <tr>
+            <td>Entra un cargo nuevo a la empresa</td>
+            <td>Primero el cargo en Configuración, después las reglas que le apliquen. Si se hace al revés, la gente de ese cargo no encaja en ninguna audiencia</td>
+          </tr>
+          <tr>
+            <td>Alguien no puede entrar</td>
+            <td>Restablecer contraseña desde su ficha. No hay recuperación por correo: la pantalla de ingreso dice a quién pedírsela</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Lo que más se rompe, y cómo se ve</h2>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Síntoma</th><th>Casi siempre es…</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>«A esta persona no le aparece ninguna formación»</td>
+            <td>Su <strong>cargo o su área</strong> no encajan en ninguna audiencia</td>
+          </tr>
+          <tr>
+            <td>«A NADIE le apareció la inducción»</td>
+            <td>Se subieron las personas <strong>antes</strong> de publicar la inducción. Se comprueba en la formación: dirá «(0 hasta hoy)»</td>
+          </tr>
+          <tr>
+            <td>«Media empresa no tiene evaluación de desempeño»</td>
+            <td>Esas <strong>áreas no tienen responsable</strong>. Sin responsable no hay quien evalúe</td>
+          </tr>
+          <tr>
+            <td>Filas rechazadas en la carga</td>
+            <td>Cargo o área que no existen en el catálogo, documento repetido, o correo mal escrito. El resultado dice cuál de las tres</td>
+          </tr>
+          <tr>
+            <td>«Le llegó un aviso de algo que no tiene»</td>
+            <td>Cambió de cargo y la obligación se retiró. El aviso queda marcado como leído; es normal</td>
+          </tr>
+          <tr>
+            <td>Dos personas con el mismo documento</td>
+            <td>No es posible: el sistema rechaza la segunda. Si la persona ya existía, se edita, no se crea otra vez</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    NEO PULSE · Guía de alta y gestión de personas. Preparada para TRANSPRENSA.
+  </footer>
+</div>

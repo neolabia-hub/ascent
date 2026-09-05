@@ -20,6 +20,2057 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-05 — Lo que ya hizo no se le vuelve a pedir, y una campana que acusaba al que cumplia
+
+El encargo era cerrar el ultimo pendiente de la induccion especifica —*"pense que la 1 ya estaba
+resuelta; si no, aplicala, porque puede que dos cargos tengan la misma formacion"*—, actualizar la
+documentacion y decidir que hacer con las opciones de "se repite" de la pestana Quienes. Salio eso
+y, de rebote, **un fallo del motor que solo castigaba a quien cumplia**.
+
+### 1. Lo que ya hizo no se le vuelve a pedir (Decision #155)
+
+La deduplicacion del motor es **por regla**, no por formacion. Es correcto mientras cada formacion
+cuelgue de un solo cargo, y deja de serlo en cuanto la matriz repite una formacion en varios — que
+en transporte es lo normal: la de bodega vale para auxiliar, montacarguista y coordinador. Sin esto,
+a quien la **completo** y cambia de cargo le nacia la ronda 1 de algo que acababa de terminar, con
+constancia emitida.
+
+`decidirPrimeraRonda` (`next-cycle.ts`, logica pura) decide tres caminos:
+
+| | |
+|---|---|
+| No se repite | no le nace nunca: el hecho no caduca |
+| Vigente | no le nace todavia; le nacera en su ventana, **con SU vencimiento** — el certificado es de la persona, no del cargo |
+| Caducada | le nace como a cualquiera, con gracia. **Nunca se hereda una fecha ya pasada** |
+
+Solo cuenta lo **CUMPLIDO**: una eximida o una retirada explican por que no se le exigio, no que
+sepa hacer el trabajo. Paso 14 nuevo en `induccion-especifica.mjs`: antes **1 CUMPLIDA**, despues
+**1 CUMPLIDA y ninguna viva**, y cero veces en la pantalla del aprendiz.
+
+### 2. Y detras habia esto, que es lo gordo del dia (Decision #156)
+
+Escribiendo la unitaria de la vigencia heredada con una recurrencia de **fecha fija**, la asercion
+dio lo contrario de lo esperado. El ancla de la ronda siguiente era `completedAt` para las dos
+formas de repetir, y en una **campana** eso es falso:
+
+| Quien | Que le pasaba |
+|---|---|
+| Hizo la reinduccion **antes** del 31 de marzo (o sea, cumplio) | ronda 2 abierta al dia siguiente con vencimiento **el mismo 31 de marzo**, vencida el 1 de abril, **NO REALIZADA** en enero |
+| La hizo tarde, o no la hizo | su siguiente era la del ano que viene: **correcto** |
+
+MEDIDO reproduciendo lo que hace el motor: completada el 20/03/2026 → ronda 2 venciendo el
+31/03/2026. **Un indicador que solo castiga a quien cumple esta al reves.**
+
+Arreglado con `cycleAnchor`: fecha fija ancla en el **vencimiento** —lo que se satisface es el
+periodo—, "cada N meses" sigue anclando en `completedAt`.
+
+**Y no lo cubre ningun recorrido, ni puede.** El truco de este proyecto para probar "el ano que
+viene" es comprimir la recurrencia a un mes; una campana no se comprime, su periodo es el ano. Lo
+prueban 5 unitarias sobre las funciones de fecha reales. Queda dicho en vez de fingir cobertura.
+
+### 3. La pregunta de las opciones de "se repite": se quedan, con aviso
+
+Se pregunto si convenia quitar de la pestana Quienes las opciones que dejan hacer repetir una
+induccion. **Se quedan.** No falla nada: el motor lee la recurrencia del REQUISITO, no del tipo, asi
+que hacerla repetir funciona entero. Lo que cambia es como se LEE — el informe la sigue contando
+como induccion— y hay una asimetria real: `onExpiry` y la gracia por ingreso reciente los pone el
+TIPO, no el requisito.
+
+Asi que se avisa y se deja decidir: al elegir una recurrencia en un tipo cuyo defecto es "no se
+repite", sale una linea que dice que su constancia pasara a vencer y que una habilitacion legal va
+mejor como **Recertificacion**.
+
+### El barrido, al cerrar
+
+```
+12 recorridos           TODO BIEN     (los 7 tipos + ciclos, varias convocatorias, tajadas,
+                                       proyectados-ajuste y la suite estandar)
+385 pruebas unitarias   pasan         (374 + 11 nuevas: 6 de primera ronda, 5 de ancla)
+build - lint - types    limpios       (1 aviso de lint, ninguno nuevo)
+```
+
+### Lo que sigue abierto
+
+1. **El numero del certificado EXTERNO.** Lo pidio el cliente al cerrar la sesion: TRANSPRENSA no
+   emite certificados de montacargas —los emite la ARL o un centro— pero necesita saber **a quien se
+   le vence**. Hoy el sistema sabe la fecha y no sabe **que documento** la respalda, que es lo
+   primero que pide el auditor. Sin disenar todavia: ver el final de esta entrada en el RUNBOOK.
+2. **Una fila por persona en Seguimiento, no por ronda** — decidido: por persona, pero **despues**
+   del informe por periodo del Sprint 6.
+3. **NADA SE HA SUBIDO A GIT EN 9+ SESIONES** (150+ archivos). Sigue siendo lo mas urgente del
+   proyecto y no es tecnico: todo el trabajo vive en un solo disco.
+
+---
+
+## 2026-09-04 (noche) — RECERTIFICACION: el septimo tipo, y no costo codigo
+
+El encargo fue una pregunta: *"no creo que transprensa certifique en alturas... pero es buena opcion
+para otros clientes como recertificacion, ¿o es mejor dejarlo como dices?"*. Se creo el tipo, se
+probo de punta a punta —seguimiento incluido— y se documento.
+
+### Lo que se hizo
+
+- **Tipo `RECERTIFICACION`** en el seed y en el tenant vivo (`#65a30d`, `BY_JOB_TITLE`, `EVENT`,
+  12 meses de aniversario, `ESPERA`, sin gracia por ingreso reciente, fuera del plan).
+- **`scripts/recorridos/recertificacion.mjs`** — 11 pasos, en verde, con `comprobarSeguimiento`.
+- **Guia de usuario** `docs/guias/recertificacion.html`, y el indice
+  `docs/guia-montar-formaciones.html` ahora **enlaza las siete guias por tipo** (no lo hacia:
+  existian siete paginas y ninguna estaba enlazada desde el indice).
+- **`docs/modulos/formaciones/07-recertificacion.md`** y la tabla de `00-el-motor.md`.
+- **Decision #154** en `CLAUDE.md`.
+
+### Lo que importa de esto
+
+**La suite estandar cubrio el tipo nuevo sola, sin tocarla.** Es el primer tipo creado despues de
+`estandar.mjs`, y es la prueba que le faltaba a la Decision #8: el contrato se deriva del `config`
+del tipo, no de una lista escrita a mano. Un cliente que cree su propio tipo queda cubierto el mismo
+dia.
+
+**Por que un tipo y no una induccion especifica que se repite** (la pregunta del cliente): las dos
+cuelgan del cargo y usan el mismo motor, pero **el tipo es lo que lee el auditor**. La especifica
+pregunta "¿se la hicieron cuando llego?"; la recertificacion, "¿esta vigente HOY?". Una especifica
+vencida es una tarea pendiente; una recertificacion vencida es alguien que **no puede hacer su
+trabajo**.
+
+### El barrido completo, al cerrar
+
+```
+12 recorridos           TODO BIEN     (los 7 tipos + ciclos, varias convocatorias, tajadas,
+                                       proyectados-ajuste y la suite estandar)
+374 pruebas unitarias   pasan
+21 e2e                  pasan         (4,1 min)
+build · lint · types    limpios       (1 aviso de lint, ninguno nuevo)
+```
+
+### Lo que sigue abierto
+
+1. **Una fila por persona en Seguimiento, no por ronda** — decidido: por persona, pero **despues**
+   del informe por periodo del Sprint 6. Cambiar el grano ahora obligaria a rehacerlo.
+2. **NADA SE HA SUBIDO A GIT EN 8+ SESIONES** (150+ archivos). Es lo mas urgente del proyecto y no
+   es tecnico: hoy todo el trabajo vive en un solo disco.
+
+---
+
+## 2026-09-04 (tarde) — Los seis tipos cerrados, y el numero del auditor estaba mal por cinco
+
+Sesion corta con un solo encargo —*"revisa reinduccion que no falte nada, y sigue con las pruebas
+que faltan"*— que acabo tocando los tres informes de cumplimiento. **Lo que hay que leer si se
+retoma manana esta aqui.**
+
+### Lo primero, que lo pidio el cliente a media sesion
+
+El tipo **«Prueba de encuesta W6PWX»** que llevaba desde el 2026-09-01 en Configuracion → Tipos de
+formacion. No era un tipo: lo dejo `demo:encuesta`. No se dejaba borrar porque **dos formaciones lo
+usaban** — la del script y **«videos logistica11», que la creo el cliente eligiendo ese tipo de la
+lista**, que es exactamente el dano de dejar basura en la configuracion. Borradas las dos y el tipo,
+con copia de la base antes. Quedan los seis tipos reales.
+
+Y los tres arreglos para que no vuelva: `demo:encuesta --limpiar` (probado, crea y recoge), el
+mensaje de la pantalla —decia **"Conflict Exception"** y ahora dice "lo usan 2 formaciones" y ofrece
+desactivar—, y la pastilla "Desactivado", porque desactivar no tenia efecto visible. Detalle en el
+RUNBOOK.
+
+### Reinduccion: solo quedaba un hueco, y detras habia otro mucho mayor
+
+Lo unico abierto de codigo era **«cierra y abre» (Decision #142)**, probado con unitarias pero no de
+punta a punta. El modulo decia que haria falta *"esperar un ano o manipular fechas en la base"*.
+**Ninguna de las dos**: la ventana esta fijada en 60 dias, asi que con una recurrencia de **un mes**
+ya esta abierta el dia que nace la ronda 1. Se comprime la recurrencia, no el reloj — es el mismo
+codigo que correra en 2027. `scripts/recorridos/reinduccion-ciclos.mjs`, 10 pasos.
+
+**El motor esta perfecto:** ronda 1 → `EXPIRED_NOT_DONE`, ronda 2 nace, el aprendiz debe una sola.
+
+**El informe no se habia enterado**, y esto es lo gordo de la sesion:
+
+| Lo que el motor escribia | Lo que el Seguimiento ensenaba |
+|---|---|
+| Ronda cerrada NO REALIZADA | **"Sin empezar"** — lo contrario de lo que es |
+| **96.246** obligaciones retiradas | **"Sin empezar"**, y sumando al denominador |
+
+Los tres informes no filtraban por estado **ninguno**. El avance global salia **0,18%** cuando lo
+real es **0,89%**: cinco veces peor de lo que era. Tras arreglarlo el informe pasa de **121.819
+renglones a 25.208** — sobraba el 79%.
+
+Lo peor es que estaba escrito que no podia pasar: `00-el-motor.md` §7 aseguraba que la lista blanca
+protegia. Cierto para las consultas de lo abierto, falso para los informes. Corregido, con la
+medicion al lado.
+
+**Arreglado** (Decision #144): `ESTADOS_RETIRADOS` filtrando en los tres informes, dos estados de
+lectura nuevos —**No realizada** y **Eximida**— y el avance es `terminadas / (total - eximidas)`,
+porque dejar la eximida dentro pone techo al indicador.
+
+### Extraordinaria: el ultimo tipo, en verde a la primera
+
+`scripts/recorridos/extraordinaria.mjs`, 13 pasos. **Los seis tipos tienen recorrido.** Lo medido:
+publicar no crea ni requisito ni convocatoria; las facetas del alcance **se cruzan** (cargo 256 ·
+area 142 · las dos: **51**, no la suma); programar la jornada **no crea renglon** de plan; colarla en
+un plan por la API da 409; el aprendiz no se apunta solo; una sola ronda, no vuelve.
+
+### La e2e llevaba una sesion en rojo sin que nadie lo supiera
+
+Al correr la suite entera salieron **5 de 21 en rojo**, y **ninguna era de hoy**: las cinco son
+rotulos y comportamientos que cambiaron ayer y la suite no se volvio a correr. Vale la pena
+mirarlas, porque son el inventario de lo que ayer se rehizo:
+
+| Lo que la prueba esperaba | Lo que hay desde ayer |
+|---|---|
+| pestanas como `button` | son `role="tab"` (`view-tabs.tsx`) |
+| boton "Guardar a quien se le exige" | se llama **"Exigirla"** |
+| la novedad se pide SIEMPRE | solo cuando la casilla **ya existe** — la primera vez se escribe la matriz, no se modifica |
+| columna "Requisito" en la tabla de obligaciones | la tabla se rehizo; ahora es "Quienes la tienen que hacer" y el origen es el encabezado |
+| el requisito retirado se ve en la lista | la lista ensena **solo lo VIGENTE**; hay que pedir "Todos" |
+
+Y una sexta que no era rotulo sino **estado**: la prueba de la convocatoria del plan fallaba con un
+timeout si en la base habia un plan aprobado vivo, porque entonces el formulario pide motivo. Ahora
+lo rellena si se lo piden. Una prueba que depende de lo que dejaron otras corridas falla el dia mas
+inoportuno y con el error que menos se parece a la causa.
+
+### Lo demas
+
+- **`mirar.ps1` fallaba** si se lanzaba con la ruta entera desde `Documents`: compilaba en la
+  carpeta actual y moria en `EPERM ... 'Mi musica'`, con el mensaje "Fallo la compilacion de
+  shared", que no se parece a la causa. Un `Set-Location $raiz` lo arregla.
+- Verificado **en el navegador**: el aviso de "no se puede eliminar", el boton de desactivar, la
+  pastilla y la vuelta atras.
+
+### Y despues, revisando la pantalla con el cliente delante, salieron cuatro cosas mas
+
+**1. El fallo de las tajadas, que es el mas caro de hoy.** Lo pregunto el cliente: *"dos jornadas de
+la misma formacion para regionales diferentes, ¿se suman bien?"*. No. Cada jornada acotada proyectaba
+a **todos** los obligados, no a los suyos:
+
+| Faceta | Debia proyectar | Proyectaba |
+|---|---|---|
+| Area | 198 y 207 | **405 y 405** |
+| Cargo | 288 y 57 | **345 y 345** |
+| Tipo de cargo | 345 y 559 | **904 y 904** |
+
+Una colision de claves: la tajada y las audiencias del requisito usaban las dos `audienceMembers` y
+la segunda pisaba a la primera. Publicar CONGELA los proyectados, asi que dos jornadas de 405 para
+405 personas dejan la cobertura del ano sin poder pasar del 50%. **No se veia porque solo falla
+ANTES de aprobar el plan** —despues, el escalon de los ya obligados usa otra clave— y es justo cuando
+se decide como partir las jornadas. Arreglado (Decision #145) y probado con `tajadas.mjs`, que
+el cliente hizo crecer con dos preguntas seguidas —"¿solo en el plan?" y "¿y con varias reglas?"—:
+ahora cubre **los seis tipos** y **los dos escalones de derivacion** (por reglas antes de que haya
+obligaciones, por obligados despues), que son codigo distinto. Identico en los seis. Y con **dos
+reglas que se solapan** —area 211 y cargo 294, 89 personas comunes— los proyectados dan **416**, la
+union, no 505.
+
+**2. Todos los recorridos cruzan ahora el Seguimiento.** Lo pidio el cliente: *"tienes que hacer todas
+las pruebas de todos los tipos teniendo en cuenta el seguimiento, si los datos son reales"*. Los ocho
+llaman a `comprobarSeguimiento` antes de limpiar: lo retirado fuera, los estados terminales bien
+leidos, el avance recalculado y los estados sumando el total.
+
+**3. "Lo que se exige hoy" no contaba las obligaciones sueltas.** El cliente sumo 267 + 145 + 48 = 460
+y abajo decia 463: las tres personas agregadas por "O a personas concretas" no tenian renglon. Ahora
+sale "3 reglas + 3 sueltas" con su renglon propio. Vale para **todos los tipos** que admiten
+asignacion individual, no solo extraordinaria. Y se dice que los alcances **no se suman** entre
+reglas, porque una persona puede cumplir dos.
+
+**4. Tipos de formacion, rehecha.** La tarjeta era un formulario de cuatro casillas + selector de
+encuesta + linea de repeticion, por tipo: siete pantallas de alto para algo que se mira mas de lo que
+se toca. Ahora es una linea de resumen y un boton **Configurar** que abre el cajon con todo. Ademas:
+desactivar y eliminar son **dos botones** (antes habia que pulsar Eliminar y leerse el error para
+descubrir que se podia desactivar), el nombre se edita al pulsarlo en vez de vivir en un campo
+abierto, el color es un circulo con lapiz, y el icono de estado ya no es el mismo en los dos
+sentidos.
+
+**Y una comprobacion nueva del motor**, que tambien pidio el cliente: **dos reglas sobre la misma
+persona** llevan contadores de ronda independientes. Cada una cierra SU ronda 1 como NO REALIZADA y
+abre SU ronda 2, sin pisar a la otra. Verificado en `reinduccion-ciclos.mjs`.
+
+### Y al final, tres cosas mas que pidio el cliente
+
+**5. Pruebas ESTANDARIZADAS por tipo (Decision #147).** `estandar.mjs` recorre **los tipos que
+existan en el tenant** —los seis de fabrica y los que cree el cliente— y comprueba de punta a punta
+que el sistema hace lo que el tipo dice. **Sin tabla de expectativas escrita aparte**: se derivan de
+`activity_types.config`, porque una tabla aparte es justo lo que se desincroniza. Cambiar el tipo
+desde la pantalla cambia lo que se espera, y la prueba sigue siendo cierta sin tocarla.
+
+Conviven dos capas y no se sustituyen: la estandar prueba lo COMUN (se corre al tocar el motor o
+anadir un tipo), y `<tipo>.mjs` prueba lo SUYO (el renglon del plan, la ronda de la reinduccion).
+
+**Lo primero que encontro:** el `LEEME` afirmaba que *"publicar sin evaluacion se rechaza"*. **No se
+rechaza.** La Decision #74 lo dejo en AVISO —a la auditoria, no a la respuesta— con dos motivos
+escritos: que el config no se podia editar desde la interfaz, y que ninguna prueba anadia evaluacion.
+**Los dos han dejado de ser ciertos**, y el propio comentario dice cuando cambiarlo: *"se convierte
+en compuerta el dia que el config del tipo se edite desde la interfaz"*. Ese dia llego. **Decision
+del cliente**, anotada abajo.
+
+**6. "Ajustar proyectados" movido (Decision #146).** Estaba dentro del cajon de publicar, cuando el
+numero acaba de derivarse y no ha tenido tiempo de quedarse viejo — y el motivo acababa diciendo
+"ajuste inicial". Ahora publicar congela y punto; corregir tiene su boton sobre la cifra congelada.
+`proyectados-ajuste.mjs` prueba la situacion entera: congela 97, entran 2 personas, se derivarian
+99 y **el congelado no se mueve solo**, sin motivo da 422, y ajustado queda 99 con el motivo escrito.
+
+**7. Acotamientos en los SEIS tipos** (antes solo en el plan), por las siete facetas y por los dos
+escalones de derivacion. Identico en los seis. Y con dos reglas solapadas los proyectados son la
+UNION —416, no 505—.
+
+**8. Una fecha de campana que no existe (Decision #148).** Al leer la configuracion REAL del tenant
+para escribir la guia de usuario: la reinduccion tenia la campana en **`09-31`**, y septiembre tiene
+30 dias. No falla nada —`Date.UTC` desborda al mes siguiente en silencio—, asi que **vencia el 1 de
+octubre** mientras la pantalla decia 09-31. El patron estaba copiado a mano en TRES sitios y los
+tres aceptaban `3[01]` en cualquier mes. Arreglado en un solo `fixedDateSchema` compartido, mas la
+red de abajo en `nextFixedDate`.
+
+**Ojo: la fecha guardada hay que cambiarla a mano.** El arreglo impide guardar una nueva mala; la que
+ya esta puesta sigue ahi. Esta avisado en la guia de usuario.
+
+**9. La guia de usuario, publicada.** "Montar cada formacion, paso a paso": los seis tipos con la
+misma espina —para que es · lo que promete · paso a paso · lo que pasa solo · lo que hay que
+vigilar— mas la tabla de estados con los casos reales de EXIMIDA y NO REALIZADA que pedia el
+cliente. `claude.ai/code/artifact/77d23f2e-9ea7-4f1e-a074-680f9d77159b`
+
+### Y para cerrar: los pendientes que quedaban, ejecutados
+
+El cliente reviso la guia de usuario y **encontro un error real en ella**: decia que publicar una
+induccion general "nace un requisito para toda la empresa", y no es cierto — nace con el corte de
+solo-nuevos puesto **por el sistema** y obliga a CERO hoy. Medido: alcance 1.060, obligadas 0. La
+guia esta corregida, y con el procedimiento real para que la deban tambien los antiguos (Quienes →
+Ajustar → "al entrar al grupo", que hace nacer 1.060 obligaciones de golpe).
+
+Con eso encima, se ejecutaron los pendientes:
+
+| | |
+|---|---|
+| **#74 cerrada** | publicar sin lo que el tipo pide da **409**. La salida es apagar la regla en el TIPO, no un "publicar igualmente" |
+| **Primera ronda de la campana** | cae en la fecha si faltan mas de 60 dias; si no, a los 30. Medido: vence el 31-mar-2027 |
+| **Ingresos recientes** | fuera de la campana (`exemptRecentHiresMonths`, 6 meses). Medido: 747 de 1.071 |
+| **Cupo** | convoca a los que caben, por orden de vencimiento, y dice cuantos faltan |
+| **Fecha de campana** | dos listas (mes y dia): el 31 de septiembre ya no se puede ni intentar |
+| **"En el plan anual"** | solo dice "agregala desde el plan" en las que pueden entrar; en las otras explica por que no |
+| **Atras** | vuelve a la ficha de la formacion si viniste de ahi, no a la lista de convocatorias |
+
+**Y salio un fallo de rendimiento serio de rebote.** La e2e se puso en rojo y la captura mostraba el
+boton "Retirar" **deshabilitado**: la peticion seguia en vuelo pasados 30 s. Medido: **crear un
+requisito de toda la empresa 1,0 s, retirarlo 61,1 s**. Un `OR` de mil clausulas para marcar avisos,
+donde caben dos `IN`. **61,1 s → 1,3 s.** Es la tercera vez que este patron muerde, y esta vez lo
+destapo una prueba funcional que empezo a agotar su tiempo — subirle el tiempo sin mirar lo habria
+enterrado.
+
+**Lo que NO se hizo, y es deliberado:** parametrizar la convocatoria automatica. El cliente pregunto
+y su propio razonamiento lo resolvio: para varias regionales se crean varias convocatorias, y
+"ejecutada por" es casi siempre PROPIOS. La modalidad, que parecia el descuido, **ya sale de la
+formacion** — mi lectura anterior era erronea.
+
+### Lo ultimo: una guia POR TIPO, y el campo que no se podia tocar
+
+El cliente pidio documentacion de usuario **por tipo**, no una para todo: quien va a montar una
+pildora no deberia leerse las inducciones para llegar a lo suyo. `docs/guias/` tiene ahora seis
+paginas con la misma espina y el color de su tipo.
+
+Y preguntando "¿desde donde se configuran esos 6 meses?" destapo que `exemptRecentHiresMonths`
+**no estaba en ninguna pantalla**: funcionaba en el motor y solo se podia cambiar resembrando. Ya
+esta en Configuracion → Tipos de formacion → Configurar.
+
+**Lo medido para contestar la pregunta de los proyectados**, que es la que mas se repite: una
+jornada programada para un area deriva las personas de ESE momento (10) y las congela al publicar;
+otra jornada del mismo alcance meses despues deriva **las que hay entonces** (12). **No hay que
+ajustar nada**: cada jornada deriva su numero en su propio momento. El ajuste es solo para cuando la
+realidad se mueve DESPUES de congelar esa jornada concreta, y **mueve el numero, no la lista**.
+
+### Estado al cerrar
+
+| | |
+|---|---|
+| Recorridos de punta a punta | **11 / 11 en verde**, y los ocho de tipo cruzan el Seguimiento |
+| Cobertura de tajadas | 6 tipos x 7 facetas x 2 escalones |
+| Suite estandar | los 6 tipos, derivada de su configuracion |
+| e2e de Playwright | **21 / 21** (venian 16/21 sin saberlo) |
+| Unitarias | **374 / 374** |
+| Retirar un requisito de toda la empresa | 61,1 s → **1,3 s** |
+| Lint, typecheck, build | En verde |
+| Git | **Nada confirmado.** Van OCHO sesiones |
+
+### PARA ARRANCAR LA PROXIMA SESION
+
+1. **Confirmar en git.** Se dijo ayer y no se hizo. Es lo mas barato de arreglar y lo que mas duele
+   si se pierde. Van mas de cien archivos sin confirmar y ocho sesiones.
+2. **Mirar los numeros de Seguimiento con ojos nuevos.** El avance global cambio hoy en todas las
+   pantallas; conviene abrirlas y ver si algo mas chirria ahora que el denominador es el bueno.
+3. **Ninguna de las pantallas nuevas de ayer se ha clicado** salvo Tipos de formacion. Sigue
+   pendiente de la sesion anterior — y la e2e demuestra que ese pendiente tiene coste: los cinco
+   fallos de hoy se habrian visto ayer corriendola.
+4. **Correr la e2e al cerrar la sesion, no al abrirla.** Es lo que la habria mantenido en verde.
+5. ~~Llevar a las guias la explicacion de EXIMIDA y NO REALIZADA~~ **HECHO**: estan en la guia nueva
+   con sus casos reales.
+5 bis. **CORREGIR LA FECHA DE LA CAMPANA de la reinduccion**, que esta en `09-31`. El sistema ya no
+   deja guardar una fecha imposible, pero la que hay guardada no se arregla sola.
+6. **LA UNICA PENDIENTE DE VERDAD: un renglon por ronda o por persona** en el informe. Con DOS reglas
+   sobre la misma persona ya no son dos filas sino **cuatro**. El cliente decidio el orden: **por
+   persona**, pero DESPUES del informe por periodo (Sprint 6), porque si se cambia antes el
+   incumplimiento cerrado desaparece de todas las pantallas y no queda donde verlo.
+7. ~~Decidir si publicar sin evaluacion pasa a ser compuerta~~ **HECHO** (Decision #149).
+8. ~~Mover "ajustar proyectados"~~ **HECHO** (Decision #146). Antes decia: Lo pidio el cliente: hoy se ofrece AL PUBLICAR la
+   convocatoria, que es cuando el numero acaba de derivarse y no ha tenido tiempo de quedarse viejo.
+   Tiene sentido DESPUES, cuando la realidad ya se movio. Hay que moverlo y probar esa situacion:
+   congelar, que cambie la plantilla, ajustar con motivo y ver que el plan lo recoge.
+
+### PENDIENTES POR TIPO DE FORMACION
+
+**Induccion general** — nada abierto.
+
+**Induccion especifica**
+- Quien **completo** la formacion y pasa a otro cargo que exige la misma, **la vuelve a deber**.
+  Ocurrira con la matriz real del cliente si repite una induccion en varios cargos.
+
+**Reinduccion** — sin nada de codigo abierto. **Tres decisiones del CLIENTE**, ninguna bloquea:
+- La primera ronda **no cae el 31 de marzo**: vence a los 30 dias de publicarla.
+- La campana **alcanza a quien acaba de ingresar** y aun no termino su induccion.
+- **NUEVA:** quien tiene una ronda cerrada y otra viva sale **dos veces** en el informe, y cuenta
+  dos en el denominador. Un renglon por ronda (historial, lo de hoy) o por persona (campana en
+  curso). Cambia lo que lee el auditor.
+
+**Capacitacion del plan**
+- **Convocar a todos falla ENTERO si se pasa del cupo**, y el mensaje no dice cuantos hay obligados
+  ni cuantas sillas faltan. **No arreglado.**
+- **La cuenta del requisito sigue en cero** aunque haya gente obligada: las del plan cuelgan del
+  RENGLON, no de la regla.
+
+**Extraordinaria** — nada abierto. Recorrido en verde a la primera.
+
+**Pildora** — nada abierto.
+
+**Transversales**
+- **Varias convocatorias en los tipos permanentes**: el sistema deja publicar dos permanentes del
+  mismo contenido y **nada avisa**.
+
+---
+
+## 2026-09-04 — Cinco recorridos de punta a punta, y ocho fallos que solo se ven caminando
+
+Sesion larga que empezo en "sigue con los pendientes" y acabo tocando el motor de obligaciones, el
+plan y media docena de pantallas. **Lo que hay que leer si se retoma manana esta aqui.**
+
+### Los recorridos: de uno a cinco
+
+`scripts/recorridos/` tiene ahora **induccion general (10 pasos), especifica (16), reinduccion (12),
+capacitacion del plan (19) y varias convocatorias (9)**, todos en verde. Prueban el CAMINO, no la
+pantalla, y por eso encuentran lo que ninguna prueba de interfaz ve.
+
+### Los ocho fallos, todos reproducidos antes de arreglarse
+
+1. **Las obligaciones nacian VENCIDAS.** El plazo se contaba desde que la persona entro a la
+   AUDIENCIA, y las audiencias se REUTILIZAN entre formaciones: al estrenar un requisito la gente ya
+   llevaba meses "dentro". Medido con una audiencia de 60 dias: **7 de 7 vencidas**, con fecha de
+   hacia un mes. En produccion, 600 personas en rojo el dia de publicar la reinduccion. Ancla ahora
+   en el maximo entre la creacion de la regla y la entrada (Decision #143).
+2. **La matriz por cargo se saltaba la Decision #76.** Marcar una casilla de una capacitacion del
+   plan creaba un requisito que disparaba solo y hacia nacer **143 obligaciones de golpe**. Habia
+   dos puertas que no hacian lo mismo; ahora la matriz delega en `setActivityRequirement`.
+3. **El PLAN proyectaba a la misma gente dos veces.** Dos jornadas de lo mismo: **26 proyectados con
+   13 obligados reales**, y la cobertura del ano sin poder pasar del 50%. El renglon congelaba el
+   bruto de la jornada y el reparto le saltaba a quien ya contaba otro renglon.
+4. **Cualquier formacion entraba al plan por la API.** El filtro de la Decision #78 vivia solo en la
+   pantalla: meter una induccion general subio los proyectados del plan **de 22 a 819**.
+5. **Cancelar una jornada no cancelaba un renglon REPROGRAMADO**, que seguia contando como
+   programado en el cumplimiento del ano.
+6. **Con dos convocatorias publicadas, la misma persona se inscribia DOS veces.** Al terminar una,
+   la otra inscripcion se quedaba viva para siempre, y los numeros contaban dos inscritos donde hay
+   una persona.
+7. **`pnpm db:seed` borraba la parametrizacion del tenant.** Resembrar tras una migracion borro las
+   encuestas que el cliente habia activado desde la interfaz. Ahora la semilla MEZCLA.
+8. **La novedad era un asterisco que solo vivia en el navegador**: el servidor la aceptaba vacia.
+
+### Lo que se construyo
+
+- **"Cierra y abre" (Decision #142).** Que pasa cuando llega la ronda siguiente y no hizo la
+  anterior pasa a ser politica de la empresa: `ESPERA` / `ACUMULA` / `CIERRA`, con estado terminal
+  nuevo `EXPIRED_NOT_DONE` ("NO REALIZADA"), que **si** cuenta como incumplimiento. Migracion
+  aplicada.
+- **Un requisito por cargo**: marcar tres cargos crea tres casillas independientes.
+- **La matriz de inducciones, rehecha entera** — cuatro formas probadas hasta dar con la buena: se
+  LEE en una lista de cargos y se EDITA en una ventana ancha con las dos listas al lado.
+- **Previsualizacion de proyectados**: la convocatoria decia "cubre a 773 personas de la empresa" en
+  una formacion que obliga a nueve. Ahora dice "proyecta N de las M obligadas".
+- **Programar significa lo mismo por las tres puertas** —ficha, modulo de Convocatorias y plan— y se
+  quito el cuarto boton, el de la tarjeta del plan.
+- **Configuracion -> Tipos de formacion** gana "cada cuanto vuelve": no se repite / cada ano en
+  fecha fija / cada N meses, mas que pasa si no la hizo. Plegado tras un "Ajustar", con la decision
+  resumida en una linea.
+- **Eximir a una persona** desde la ficha, con ventana propia en vez del `window.prompt`.
+- **Pestanas y filtros** de Asignaciones unificados (`view-tabs.tsx`, `list-filter.tsx`).
+
+### La documentacion, que era la deuda mas vieja
+
+- `docs/modulos/formaciones/` — **un documento tecnico por tipo**, mas `00-el-motor.md` con lo
+  comun. Los cuatro verificados llevan sus numeros medidos; los dos pendientes dicen que lo suyo
+  sale de leer el codigo.
+- `docs/guia-formaciones.html` — guia de usuario, paso a paso, con "lo que no hay que hacer":
+  `claude.ai/code/artifact/a4e94cb6-7dd6-4fb4-8f7d-eb51e82d6089`
+- Glosario, y decisiones **#142** y **#143** en CLAUDE.md.
+
+### Y una frase que estaba mal en cuatro pantallas
+
+Decia que a quien lleva anos "lo cubre la reinduccion". **No es cierto**: su induccion se le hizo
+cuando entro. Lo corrigio el cliente.
+
+### PARA ARRANCAR LA PROXIMA SESION
+
+1. **Confirmar en git.** Siguen sin confirmar mas de cien archivos y ya son siete sesiones. Es lo
+   mas barato de arreglar y lo que mas duele si se pierde.
+2. **Hay una migracion nueva** (`20260904090000_estado_no_realizada`). En cualquier maquina que no
+   sea esta: `prisma migrate deploy` -> `db:rls` -> `prisma:generate` (con el stack APAGADO) ->
+   `pnpm build` -> `mirar.ps1`.
+3. Ya solo falta el recorrido de **extraordinaria**.
+
+### PENDIENTES POR TIPO DE FORMACION
+
+**Induccion general** — nada abierto.
+
+**Induccion especifica**
+- Quien **completo** la formacion y pasa a otro cargo que exige la misma, **la vuelve a deber**: la
+  regla nueva no tiene historia suya. Hoy no ocurre porque ninguna se exige a dos cargos con
+  contenido identico; ocurrira con la matriz real del cliente si repite una induccion en varios
+  cargos, que es probable (bodega vale para auxiliar, montacarguista y coordinador).
+
+**Reinduccion** — dos decisiones del CLIENTE, ninguna bloquea el piloto:
+- **La primera ronda no cae el 31 de marzo**: vence a los 30 dias de publicarla y la campana rige
+  desde la segunda. La pantalla dice "cada ano el 31 de marzo" y la primera no vence ese dia.
+- **La campana alcanza a quien acaba de ingresar** y aun no termino su induccion. Lo habitual es
+  dejar fuera del ciclo a quien ingreso dentro de el: su induccion ES su actualizacion del ano.
+- Y una salvedad tecnica: **"cierra y abre" esta probado con unitarias, no de punta a punta**. Haria
+  falta esperar un ano o manipular fechas. Se vera de verdad en la campana de 2027.
+
+**Capacitacion del plan**
+- **Convocar a todos falla ENTERO si se pasa del cupo** (`OFFERING_CAPACITY_EXCEEDED`): no convoca a
+  los que caben, y el mensaje dice solo "el cupo es de 30 personas". Fallar es defendible —no se
+  eligen 30 de 40 al azar— pero falta lo accionable: cuantos hay obligados, cuantas sillas faltan y
+  que la salida es partir en dos jornadas con su tajada. **No arreglado**: en el recorrido solo se
+  esquivo poniendo un cupo proporcional.
+- **La cuenta del requisito sigue en cero** aunque haya gente obligada: las del plan cuelgan del
+  RENGLON, no de la regla. Es correcto, pero "Lo que se exige hoy" ensena 0 obligadas con 11
+  personas obligadas de verdad.
+
+**Extraordinaria** — recorrido PENDIENTE.
+
+**Pildora** — recorrido en verde a la primera, nada abierto.
+
+**Transversales**
+- **Varias convocatorias en los tipos permanentes**: el sistema deja crear y publicar dos
+  permanentes del mismo contenido. Ya no duplica inscripciones, pero **nada avisa** de que hay dos.
+- **Ninguna de las pantallas nuevas se ha clicado en un navegador.** Las llamadas estan probadas por
+  los recorridos; el cableado de la interfaz, no.
+
+---
+
+
+
+## 2026-09-03 — CIERRE: desempeno terminado, y la carga de las 600 personas resuelta con numeros
+
+Entrada de cierre de la sesion larga del 2026-09-02. **Lo que hay que leer si se retoma manana**
+esta todo aqui; el detalle de cada cosa, en las entradas de abajo.
+
+### La pregunta que quedaba viva, contestada MIDIENDO
+
+El plan del piloto es: subir primero las formaciones y sus reglas, despues las personas, para que a
+todo el mundo —nuevos y antiguos— le nazcan las inducciones generales. La duda era si el alta de
+personas, anotada en 5,6 s desde el 2026-09-01, lo hacia inviable.
+
+**Medido contra la base de desarrollo (184 audiencias, ~750 personas, peor que produccion):**
+
+| Camino | Medicion | 600 personas |
+|---|---|---|
+| Alta individual, boton "Nueva persona" | 6,2 s · **9,0 s** tras anadir 125 personas | **60-90 min** |
+| **Carga masiva (CSV)** | 25 en 9,5 s · 100 en 18,0 s = **180 ms/persona** | **1-2 min** |
+
+**Conclusion: el plan funciona, y no hay que arreglar nada antes.** Son dos caminos distintos del
+motor: el individual recorre todas las audiencias por cada persona; el lote llama a `reevaluateAll`
+UNA vez y reparte ese costo — por eso 100 personas salen a la mitad de ms que 25. **La carga inicial
+va por Usuarios -> carga masiva, nunca una por una.**
+
+**Lo que queda, y ya no es sospecha sino dato:** el alta individual **empeora con el tamano del
+tenant** (6,2 -> 9,0 s solo por anadir 125 personas). No bloquea el piloto, pero Gestion Humana va a
+esperar ~9 s cada vez que cree a alguien en el dia a dia. La forma del arreglo se ve: acotar en
+`syncPerson` el recorrido a las audiencias que puedan aplicar a esa persona, en vez de todas. Queda
+en el RUNBOOK con los numeros.
+
+### Y despues se arreglo, porque el dato invitaba a mirar
+
+Con la medicion delante, el alta individual de 9 s dejo de ser "deuda anotada" y se volvio obvia.
+**Ninguna consulta pasaba de 150 ms**: eran 1.680 transacciones por persona. Dos sitios, el mismo
+error de forma:
+
+- **Una fila por audiencia**, en `audiences.syncPerson`: 133 INSERT sueltos. El camino por lote ya
+  usaba `createMany` desde siempre; este no se habia alineado.
+- **`withdrawLeavers` recorria las 569 reglas del tenant** (diez de verdad, el resto residuo de e2e)
+  con dos consultas cada una, para no hacer nada en 559.
+
+Arreglados los dos sin cambiar ninguna regla de negocio: **9,0 s -> 0,4 s**. Verificado con la suite
+entera, incluida la e2e "la obligacion nace sola al ingresar", que es justo ese camino. El detalle y
+el metodo de diagnostico quedan en el RUNBOOK.
+
+**Efecto en el plan del piloto:** la carga por archivo sigue siendo la via (600 en 1-2 min), pero
+ahora el dia a dia tambien esta bien — dar de alta a un ingreso nuevo es instantaneo en vez de una
+pantalla congelada nueve segundos.
+
+### La guia de personas, publicada
+
+Nueva, aparte de la de desempeno: **"Alta y gestion de personas"**, con el paso a paso de la carga
+inicial en seis pasos, que decide el cargo y que el area, que pasa solo cuando entra alguien, y la
+casilla de "se le exige a quien entre desde" — que es la que decide si los antiguos tambien deben la
+induccion. Para TRANSPRENSA va **vacia**, porque el cliente quiere que la hagan nuevos y antiguos.
+
+`claude.ai/code/artifact/86adfee0-f639-4c84-b2fe-7e44817348b7`
+
+### Estado al cerrar
+
+| | |
+|---|---|
+| Unitarias | **349** en verde |
+| e2e | **21 / 21** |
+| Alta de una persona | **0,4 s** (era 9,0 s) |
+| Lint, typecheck, build | En verde |
+| Migraciones | 2 nuevas, aplicadas en desarrollo y con RLS puesto |
+| Git | **98 archivos sin confirmar** — seis sesiones |
+| Stack | Levantado (`mirar.ps1`, web 3200 / api 3012) |
+
+**Desempeno queda cerrado.** En esta sesion: un ciclo con varios formularios repartidos por cargo
+(#139), una sola puerta para evaluar (#140), las dos capas de competencias (#141), el recordatorio
+del ciclo parametrizable por tenant, el consolidado en Excel, y una tanda de interfaz que empezo
+por un fallo real —`--primary-soft` no existia y llevaba semanas sin pintar en catorce sitios—.
+
+### PARA ARRANCAR LA PROXIMA SESION
+
+1. **Ponerse al dia con la base**, que hay dos migraciones nuevas. Con el stack APAGADO:
+   `prisma migrate deploy` -> `pnpm db:rls` -> `prisma:generate` -> `pnpm build` -> `mirar.ps1`.
+   Los pasos exactos estan en el RUNBOOK (2026-09-03).
+2. **Confirmar en git.** Son seis sesiones y 98 archivos; es lo mas barato de arreglar y lo que mas
+   duele si se pierde.
+3. Y de ahi, la lista de abajo.
+
+### LO QUE QUEDA, EN ORDEN
+
+**Para que el piloto exista** (nada de esto es codigo de producto):
+
+1. **Elegir proveedor y levantar la maquina.** El compose, los Dockerfiles y el Caddyfile estan
+   escritos. Es lo unico que separa esto de estar en linea.
+2. **Secretos reales**: `REFRESH_TOKEN_PEPPER` sigue en `change-me-in-prod`; faltan RS256, R2,
+   Resend, Sentry. Y `TRUSTED_PROXY_HOPS` bien puesto al montar el proxy.
+3. **Probar la restauracion** con un volcado real (`scripts/restaurar-prueba.sh`). Sin restauracion
+   probada no hay copias, hay archivos.
+4. **Verificar R2 contra un bucket real**: ninguna subida ha tocado Cloudflare todavia.
+5. **LibreOffice no va en la imagen** -> subir un PPT se rechaza pidiendo el PDF.
+
+**Datos, que solo puede dar el cliente:**
+
+6. **Los cargos definitivos.** Los cinco de la base son los que se subieron; los de verdad son
+   muchos mas, y de ellos dependen el reparto de formularios de desempeno y la matriz de induccion.
+7. **Matriz cargo -> induccion** y el **plan 2026**.
+8. **Responsable de cada area** (Configuracion -> Areas). Sin eso, la primera campana de desempeno
+   solo genera autoevaluaciones: se comprobo con 723 personas saliendo "SIN_RESPONSABLE".
+9. **Contenido y firmantes de la constancia**, y las **cuatro preguntas de desempeno**
+   (`docs/modulos/desempeno.md` seccion 6). Ninguna bloquea codigo; bloquean tener una campana real
+   en vez de una vacia.
+
+**Sprint 5, abierto:**
+
+10. **Asistencia presencial y QR** — bloquea que las formaciones presenciales emitan constancia.
+11. **Pantalla del jefe para la eficacia** + el programador de la cita a los N dias (hoy la eficacia
+    esta apagada por decision del cliente, asi que no bloquea).
+12. **Emision manual de constancia** para lo completado antes de activar la plantilla.
+
+**Deuda con numeros:**
+
+13. ~~El alta individual de personas~~ **RESUELTO el 2026-09-03**: 9,0 s -> 0,4 s.
+14. **La analitica tarda 3,4 s** contra las 90.000 obligaciones de la base de desarrollo.
+15. **`MultiSelect`**: el aspa de quitar un chip vive dentro del boton que abre y cierra.
+16. **La base de desarrollo esta gorda** y las corridas de e2e la engordan mas.
+
+**Desempeno, lo unico que quedo fuera a proposito:**
+
+17. **El puente hacia el plan.** La costura esta sembrada (`suggested_activity_id`) y la pantalla no.
+    Se construye cuando armen el plan 2027 y con un ciclo CERRADO detras; el diseno de lo que haria
+    falta esta escrito mas abajo, en la entrada de las dos capas.
+
+---
+
+## 2026-09-02 (noche, 2) — Desempeno tiene una sola puerta, y una variable que llevaba semanas sin pintar
+
+Tanda de interfaz sobre el modulo, a partir de una lista de dudas del cliente. Casi todas eran de
+diseno; una resulto ser un fallo de verdad que afectaba a media aplicacion.
+
+### El fallo: `--primary-soft` no existe
+
+La queja fue *"al seleccionar, la opcion ahora solo tiene borde"*. Y era cierto, pero no era una
+decision de diseno: **la variable CSS estaba mal escrita**. La que existe es
+`--brand-primary-soft`; se habia escrito `--primary-soft` en **catorce sitios** —barra
+lateral, barra superior, conmutador de espacio, encuestas, la escala de puntuacion, constancias—.
+
+Una variable CSS que no existe no pinta nada **y tampoco falla**: el navegador se la salta y no dice
+ni una palabra. Asi que el relleno que marca "esto esta activo" llevaba semanas sin verse en ninguna
+de esas pantallas, y lo que quedaba era el borde. Corregido en los catorce.
+
+### La escala: marcado es RELLENO, no un tinte
+
+Aun arreglada la variable, un 10% de color sobre blanco no basta aqui. Marca bien un item de menu
+—hay uno solo y siempre en el mismo sitio— pero en una fila de cinco botones iguales, donde lo unico
+que se pregunta es CUAL elegiste, se pierde; en el telefono de una bodega con mala luz, directamente
+no se ve. Ahora el elegido va **relleno solido con el numero en blanco**. Lo hereda tambien la
+encuesta de satisfaccion, que usa el mismo componente a proposito.
+
+### El boton de entregar ES el medidor
+
+Era un boton apagado con un "faltan 2" en gris a tres centimetros: dos sitios para mirar lo mismo.
+Ahora usa `meterPct`, la pieza que ya existia en el reproductor: **se rellena con lo que
+llevas respondido** y se abre con un latido al llegar al final. La microinteraccion de la marca,
+puesta donde de verdad hay un avance que contar.
+
+### La lista de evaluaciones dejo de ser una tabla
+
+Eran 206 filas identicas, cada una con su pastilla naranja de "Pendiente". Un estado que llevan
+TODOS los elementos de una lista no informa: solo pinta la pantalla de naranja. Ahora:
+
+- **Un medidor arriba**: "2 de 208", cuantas faltan, cuando cierra y una barra. Doscientas deja de
+  ser una palabra y pasa a ser un tamano — es lo mismo que hace la tarjeta de repaso dibujando las
+  preguntas en vez de contarlas.
+- **Pastillas** Por responder / Entregadas, y **buscador** cuando pasan de ocho.
+- **Iniciales de cada persona** en vez del mismo portapapeles veinte veces: se califica a gente, y
+  se la reconoce antes de leer el nombre.
+- **Agrupadas por formulario** cuando hay mas de uno, que es lo que estrena la Decision #139.
+- La nota cuando ya se entrego; una flecha cuando falta. Ninguna pastilla de estado.
+
+### La ventana de calificar, y la de confirmar
+
+Cada competencia es ahora una tarjeta con borde, el peso va en pastilla de color en vez de gris, y
+**el comentario se pide en vez de imponerse**: una caja de texto abierta bajo cada competencia
+triplicaba el alto de la ventana y convertia "marcar cinco numeros" en un formulario de redaccion.
+Aparece al pulsar "Anadir comentario", y se queda si ya tiene algo escrito.
+
+La confirmacion era una ventana blanca con un parrafo gris y un boton igual que los demas: se leia
+como un tramite. Ahora el aviso lleva el color de advertencia con su icono, se dice **de quien** es
+la evaluacion, y el boton dice **"Entregar la evaluacion"** y no "Entregar" — la regla de siempre
+para lo irreversible: verbo + objeto.
+
+### UNA SOLA PUERTA (Decision #140)
+
+Era la duda mas de fondo del cliente y tenia razon. Habia **tres** entradas para el mismo asunto y
+cual te tocaba dependia de quien eras: administracion para configurar, "Evaluaciones" en el menu
+para calificar, y "Perfil" para leer lo tuyo.
+
+- **Se quito la pestana "Evaluar" de administracion.** Eran las mismas evaluaciones en dos sitios.
+  Dos puertas a una tarea no son una comodidad: son tener que acordarse de por donde se entro la vez
+  pasada. Y decia algo falso del producto — calificar a tu equipo NO es administrar la plataforma,
+  lo hace tambien quien no administra nada. Quien entre sin el permiso ve un estado vacio que le
+  dice donde estan sus evaluaciones.
+- **Lo tuyo salio del perfil.** El razonamiento de la #138 era bueno (se mira dos veces al ano, no
+  merece entrada permanente) y el resultado no: nadie busca su evaluacion de desempeno entre sus
+  constancias. Ahora esta arriba de la misma pantalla, **con el color secundario de la empresa**
+  para que se distinga de un vistazo del trabajo de abajo, que va en el principal.
+- **El item del menu sigue sin ser fijo**, que es la parte de la #138 que si se sostiene: aparece
+  cuando hay ALGO —que responder o algo tuyo que leer— y desaparece cuando no queda nada. Lo unico
+  que cambio es que antes solo miraba lo que hay que calificar, y por eso a quien no evalua a nadie
+  no le salia nunca.
+
+### El formulario, con la vista previa al lado
+
+La ventana pasa a **880px en dos columnas**: a la izquierda se arma, a la derecha se ve. Estaba
+escondida detras de "Ver como lo vera quien califique", y una vista previa que hay que ir a buscar
+no se mira — se descubre como quedo con el ciclo ya abierto.
+
+Y **"a quien se le hace" se pregunta en vez de deducirse de un vacio**. Antes, no marcar ningun
+cargo significaba "toda la empresa": funcionaba con cinco cargos en pantalla, pero con cuarenta la
+lista se come la ventana, y ademas un vacio se lee igual de bien como "todavia no elegi" que como
+"no aplica a nadie". Ahora se elige entre **Toda la empresa** y **Solo algunos cargos**, y solo
+entonces aparece el selector — con buscador cuando hay muchos y lo elegido arriba como pastillas
+que se quitan de una en una. Elegir "algunos" y no marcar ninguno ya no guarda.
+
+### Por cargo y no por area, con el razonamiento escrito
+
+Otra pregunta del cliente, y de las buenas. No: los dos ejes ya tienen su papel. El **cargo decide
+QUE se pregunta** —se evalua como alguien hace su trabajo— y el **area decide QUIEN califica** (el
+responsable del area) **y como se corta el resultado**. Dentro de un area conviven cargos muy
+distintos, y preguntarles lo mismo obliga a competencias tan genericas que dejan de medir nada. Es
+tambien lo que hacen SuccessFactors, Cornerstone y Workday: competencias atadas al puesto, y la
+estructura organizativa para la jerarquia y los reportes. Queda escrito en
+`docs/modulos/desempeno.md` seccion 6 octies y en la guia del cliente.
+
+### Lo del verde, contestado con las reglas del propio producto
+
+La pregunta era si usar verde en botones y acentos en vez de siempre el azul. **El acento de
+TRANSPRENSA ES verde** (`#205908`), asi que no hace falta inventar nada — pero el sistema ya
+dice donde va cada uno y conviene no romperlo: el **principal manda** y significa "esto es lo
+activo, esto es la accion"; el **secundario acompana** en refuerzos de otra naturaleza (racha,
+puntos, el halo del repaso). Los dos no pueden significar lo mismo en la misma pieza o ninguno se
+lee.
+
+Aplicado aqui: el bloque **"Lo tuyo" es lo unico verde** de la pantalla —no es una accion con fecha
+limite, es lo que se escribio sobre ti— y la lista de trabajo se queda en azul. El otro verde que
+aparece es el semantico de "hecho": el visto de entregada y el de firmada.
+
+### Y el boton del repaso, que gusto
+
+Es `Button glow`: la sombra no es gris sino del COLOR del boton y muy difusa, asi que parece
+encendido en vez de recortado. No es mas informal — es la llamada principal, y la regla es **uno por
+vista**. Se puso en los dos sitios donde hay una sola accion que cierra la tarea: entregar la
+evaluacion y firmarla.
+
+### Verificacion
+
+Lint, typecheck y build en verde; **339 unitarias**; **e2e 21 de 21** en la corrida final. Durante
+la sesion hubo una corrida en 20/21: la que fallaba es la de siempre —el alta de una persona
+pasando de los 10 segundos del limite, punto 13 de la deuda conocida— y va y viene segun lo cargada
+que este la maquina. Sigue esperando que se mida con datos de produccion; no se toco.
+
+Y revisado en el navegador con el stack levantado: la lista con su medidor y las iniciales, la
+ventana con el 3 relleno y el boton medio lleno, el panel de administracion con dos pestanas y el
+aviso de donde se califica, y el formulario ancho con la previa poblandose al marcar.
+
+**La guia del cliente se reescribio y se publico como artefacto nuevo**, con el paso a paso completo
+y la seccion de por que el formulario va por cargo:
+`claude.ai/code/artifact/1b9e3ee4-8ca5-4800-841b-b7caf3b08bc7`. El artefacto viejo
+(`09af1950-...`) queda obsoleto: no se pudo republicar por permisos.
+
+### La segunda vuelta, con la pantalla delante
+
+El cliente miro lo anterior y salieron cuatro cosas mas. Tres eran defectos de verdad:
+
+- **"El relleno del item activo sigue sin verse."** El nombre de la variable estaba corregido, pero
+  la FORMULA seguia mal: los "soft" se mezclaban con `white` fijo. Un 10% de azul oscuro sobre
+  blanco da un gris casi invisible, y en la superficie OSCURA del aprendiz producia un bloque casi
+  blanco sobre fondo negro. Ahora se mezclan con `--surface` —14% en claro, 34% en oscuro—,
+  asi que la formula sirve en los dos temas.
+- **"Logros del ano y Comentario general tienen otra interfaz."** Cierto: al poner las competencias
+  en tarjeta, el comentario general se quedo suelto y parecia de otra pantalla. Ahora lleva la misma
+  tarjeta, y la competencia de solo texto dice que lo es ("se responde escribiendo · no da nota") en
+  vez de verse como una a la que le falta la escala.
+- **"En Entregar se ve una ventana encima de la otra."** Era literal: la confirmacion era un segundo
+  modal sobre el primero, con dos velos difuminados apilados. **Ya no se apilan ventanas**: la
+  confirmacion es un PASO de la misma —cambian titulo, icono, contenido y botones—. Queda escrito en
+  la skill de interfaz como regla.
+
+Y una era una duda razonable: **"¿un aprendiz tiene que ver 3 de 208 y la fecha de cierre?"**. Si,
+porque **no es el informe de la empresa: es su propio trabajo** —las evaluaciones que le tocan a el,
+con su plazo—, y quien no califica a nadie no ve esa pieza. Lo que si estaba mal era como se leia:
+el nombre del ciclo iba arriba en mayusculas, como cabecera de reporte. Ahora el rotulo dice **"Lo
+que te toca calificar"** y el nombre de la campana baja a la linea de apoyo, donde sirve para
+distinguir dos ciclos abiertos.
+
+**Un descuido mio, dicho:** probando en el navegador entregue **una evaluacion de verdad** del ciclo
+demo —"Persona S3 73467541", nota 80—. Es dato de desarrollo y no se puede deshacer por diseno; ahi
+esta si molesta, se borra con un DELETE.
+
+### Cuarta vuelta: se cierra desempeno
+
+- **Los dias del recordatorio los pone el tenant.** Estaban en el codigo y no son una constante
+  tecnica: `performanceReminderDays` en Configuracion -> Preferencias, 3 por defecto y **0 lo
+  apaga**. En una campana de seis semanas tres dias llegan tarde; en una de dos, avisar con diez es
+  avisar el primer dia. Misma clase de decision que `efficacyDaysDefault`.
+
+- **El consolidado se exporta a Excel**, que era el ultimo pendiente con valor claro:
+  `GET /desempeno/ciclos/:id/consolidado/xlsx`. **Dos hojas** —por formulario y persona por
+  persona— porque responden preguntas distintas y mezcladas no se puede filtrar ninguna. La nota va
+  como NUMERO en fraccion, no como texto, para poder promediar y ordenar la columna; sin nota, la
+  celda queda **vacia y no en cero**. Las filas salen del mismo metodo que pinta la pantalla.
+
+- **El formato de los libros se saco a `common/xlsx.ts`** al aparecer el segundo: cabecera con
+  empresa, fecha y filtros declarados, y titulos congelados con autofiltro. Tenerlo dos veces
+  garantiza que un dia un informe lleve fecha y el otro no. El export de Seguimiento se refactorizo
+  encima y sus 6 pruebas siguen en verde.
+
+- **Los dos textos largos, acortados.** "Nuevo ciclo" dice ahora "La campana del ano. Queda en
+  borrador hasta que la abras.", y el rotulo de formularios "Marca todos los que apliquen: cada
+  persona responde el de su cargo, y el que no declara cargos recoge al resto." La primera version
+  explicaba el modelo entero en la ventana; una vez entendido, sobra.
+
+### LAS DOS CAPAS, CONSTRUIDAS (Decision #141)
+
+Se habian descartado hace dos horas con este razonamiento: "con cinco cargos, repetir las comunes en
+cada formulario es copiar tres lineas una vez al ano". **El cliente corrigio el dato**: los cinco
+cargos de la base son los que se han subido, y los de verdad son muchos mas. Con cuarenta, cambiar
+"trabajo en equipo" obliga a editar cuarenta formularios y el que se olvide se evalua distinto sin
+que nadie lo note. Con el dato correcto, la decision se da vuelta.
+
+**Un formulario HEREDA de otro.** Uno se marca como base —las organizacionales de la empresa— y los
+de cargo dicen "hereda de ese" y anaden las suyas. Al abrir el ciclo, la copia congelada junta las
+dos listas: primero las comunes, despues las del cargo.
+
+**Lo que NO cambia, y es la razon de elegir esta forma sobre las otras dos que se consideraron:**
+cada persona sigue respondiendo UN formulario, con UNA evaluacion y UNA nota. A partir de la
+composicion, el modulo entero trabaja con una sola lista — el calculo, el congelado, la pantalla del
+evaluador y el consolidado no saben que hubo dos capas. Por eso **no hubo que tocar nada mas**.
+
+Las alternativas y por que no:
+
+- **Que una persona responda dos formularios** (el general y el suyo) con la nota sumada. Dos
+  ventanas para calificar a la misma persona, y un modelo de nota repartido entre dos evaluaciones.
+- **Marcar competencias como "organizacionales" e inyectarlas solas.** Menos clicks, pero el
+  contenido de un formulario deja de ser explicito —marcas una y cambias en silencio cuarenta— y
+  sobre todo **solo admite UN juego de comunes**. Con formularios base caben "Comunes operativos" y
+  "Comunes administrativos", que es lo que pide una empresa con dos realidades.
+
+**Tres reglas, probadas contra la base real:** no se encadena (heredar de uno que ya hereda ->
+409 `BASE_CHAIN`), no se repite lo que ya viene de la base (-> 409 `COMPETENCY_IN_BASE`,
+y la pantalla ni las ofrece), y editar la base cambia el PROXIMO ciclo pero no los pasados, porque
+la copia se congela al abrir. Verificado: ciclo abierto con un formulario que hereda, y la copia
+congelada trae las dos competencias en orden con sus pesos.
+
+**Y lo que hace esto usable con cuarenta cargos:** **Duplicar** pasa a estar siempre disponible —no
+solo como salida de un formulario bloqueado—, porque armar el numero 12 desde cero cuando se parece
+al 11 es media hora tirada; y el selector de formularios del ciclo tiene **buscador** a partir de
+ocho.
+
+### Lo que sigue sin hacerse, y por que
+
+- **El puente hacia el plan** (que una nota baja sugiera la formacion que la fortalece). La costura
+  esta sembrada —`suggested_activity_id` en cada competencia, que hoy no lee nadie— y **la
+  pantalla no**. Tiene sentido construirla cuando armen el plan 2027 y con un ciclo CERRADO detras:
+  hacerla ahora seria disenar contra datos imaginados, sin saber que competencias van a existir ni
+  como se van a leer. **Lo que haria falta cuando toque:** una vista que, dado un ciclo cerrado,
+  liste las competencias por promedio ascendente, cuanta gente quedo por debajo de un umbral, y la
+  formacion que cada una apunta; desde ahi, un boton que anada ese renglon al plan del ano
+  siguiente. Nada de automatico: decidir a quien se forma es una decision de personas.
+
+### Tercera vuelta: el recordatorio que faltaba, y dos colores de menos
+
+- **El recordatorio del ciclo, construido.** Era el unico aviso que faltaba: al abrir se avisa una
+  vez y despues nada, asi que una campana de seis semanas se olvida en la primera y el dia del
+  cierre aparecen cuarenta evaluaciones sin responder. Ahora, **faltando tres dias**, se avisa
+  **solo a quien aun no ha respondido**, una vez por ciclo y persona. La regla de cuando avisar va
+  aparte y probada (`performance-reminder.ts`, 5 pruebas) para poder cambiar "tres dias" sin
+  leer el worker; el disparo es diario a las 8 (`workers/performance-reminder.worker.ts`), no
+  cada hora como el de pildoras: aquello va en la franja en que cada quien estudia, esto es trabajo
+  de oficina. Los tres avisos del modulo quedan en `docs/modulos/desempeno.md` 5 bis.
+
+- **El conmutador de espacio, sin color.** Al empezar a pintar de verdad el "soft", la pastilla de
+  "donde estas" quedo azul dentro de un control que ya es azul palido por fuera: dos tonos de lo
+  mismo, uno encima de otro, para marcar algo que no es una accion. Vuelve al papel neutro.
+
+- **Una sola letra para las lineas de apoyo.** El aviso de la competencia de solo texto estaba en
+  mayusculas con tracking y la descripcion del comentario general en gris normal: dos voces para lo
+  mismo dentro de la misma tarjeta. Se queda la **normal** —son frases que explican, no rotulos de
+  seccion— y el texto se acorta a "Se responde escribiendo. No suma a la nota."
+
+- **Y se dice en la pantalla que NO hace falta un ciclo por cargo**, que fue la duda del cliente:
+  el rotulo del selector lo dice con esas palabras y la ventana empieza por "una sola campana para
+  toda la empresa".
+
+### LO QUE SIGUE
+
+1. **Las cuatro preguntas al cliente** (`docs/modulos/desempeno.md` seccion 6). Sigue siendo
+   lo primero: no bloquea codigo, pero si sembrar el contenido real. Son: que competencias evalua
+   hoy y con que escala, si la persona se autoevalua o solo califica el jefe, si el resultado se le
+   muestra, y cada cuanto se hace.
+2. **Dos capas de competencias** (organizacionales + del cargo) sobre la misma persona. Hoy cada
+   quien responde UN formulario, asi que quien quiera las dos repite las organizacionales en cada
+   formulario de cargo. Con cinco cargos es razonable; el dia que sean cuarenta, hay que sumarlas.
+3. **El puente hacia el plan**: cada competencia ya puede apuntar a la formacion que la fortalece
+   (`suggested_activity_id`) y **hoy no lo lee nadie**. Falta la pantalla que, al armar el plan
+   del ano siguiente, diga "esto salio bajo, esta formacion lo cubre".
+4. **Exportar el consolidado a Excel**, como el de Seguimiento, y ahora tambien por formulario.
+5. Y lo de siempre: **sin confirmar en git**, ya son seis sesiones.
+
+---
+
+## 2026-09-02 (noche) — Un ciclo, varios formularios: el reparto lo decide el cargo
+
+Era el primero de los pendientes de desempeno y el unico que partia algo en dos. Hasta hoy un ciclo
+usaba UN formulario, asi que tener el de conductores y el de analistas en la misma campana obligaba
+a abrir dos ciclos — y con dos ciclos el consolidado son dos consolidados, que alguien suma a mano
+en una hoja aparte. Los formularios ya declaraban a que cargos aplican: el dato estaba, faltaba el
+reparto.
+
+### Las tres reglas, y por que ninguna se elige a mano
+
+1. **El cargo manda.** El formulario que declara cargos se lleva a las personas de esos cargos.
+2. **El que no declara ninguno es el general** y recoge a quien no encaje en otro. Es exactamente lo
+   que ya significaba «sin cargos = a toda la empresa», asi que **una campana de un solo formulario
+   se comporta igual que antes** — que era la condicion para no romper nada.
+3. **Lo ambiguo no se abre.** Dos formularios peleandose el mismo cargo, o dos generales, dejarian a
+   quien le toca cual en manos del orden de la consulta. Se rechaza al crear el ciclo y otra vez al
+   abrirlo, diciendo cual es el choque; y la pantalla lo dice antes, al marcar la casilla.
+
+Elegir formulario por persona no se ofrece, y es deliberado: con seiscientas personas eso no es
+parametrizar, es escribir a mano lo que el cargo ya sabe.
+
+### Y una cuarta que no estaba prevista: una campana vacia no se abre
+
+Abrir es irreversible —congela los formularios y genera las evaluaciones—, y hasta ahora se podia
+abrir un ciclo que no generaba ni una. Pasa cuando ningun cargo de la empresa encaja con los
+formularios elegidos, o cuando nadie tiene responsable de area y el ciclo no lleva autoevaluacion.
+Lo que quedaba era una campana en OPEN, vacia y ya sin arreglo. Ahora se para antes y se dice
+cuantos se quedaron fuera y por que.
+
+### El fallo que me destapo mi propia prueba
+
+Habia escrito el aviso de «a estas personas no las cubre ningun formulario» **y no podia aparecer
+nunca**: antes de repartir, la consulta ya filtraba a la gente por los cargos declarados, asi que
+todo el que llegaba al reparto encajaba por construccion. Un aviso muerto y un bloque de pantalla
+que no se pinta jamas.
+
+El arreglo no fue borrarlo sino quitar el filtro: **se reparte sobre toda la plantilla y lo que queda
+fuera se cuenta**. Filtrar de entrada es mas corto y deja fuera EN SILENCIO a los conductores porque
+nadie hizo su formulario — que es la forma exacta en que esto se descubre en diciembre. Si la
+campana era a proposito solo para unos cargos, el aviso sobra y no estorba; si fue un olvido, es la
+unica ocasion de verlo.
+
+### El modelo: la copia congelada se muda al formulario
+
+`performance_cycle_forms` es la tabla nueva: que formularios lleva la campana, **cada uno con su
+propia copia congelada**. La copia estaba en el ciclo y ahi ya no cabe: si el conductor responde el
+suyo y el analista el suyo, una sola copia por ciclo obligaria a adivinar cual le tocaba a cada quien
+al leer una evaluacion de hace tres anos. Y `performance_reviews` gana `cycle_form_id`: cada
+evaluacion sabe con que formulario se respondio.
+
+**La migracion no pierde nada.** Cada ciclo que existia se convierte en un ciclo con un solo
+formulario, con su copia congelada intacta, y sus evaluaciones quedan apuntando a el. Se comprobo
+contra la base de desarrollo: 4 ciclos, 4 filas nuevas, **2.788 evaluaciones rellenadas y ninguna
+huerfana** — la columna se anade anulable, se rellena y solo entonces se exige, que al reves no
+cabria en una tabla con filas.
+
+### El consolidado, que era el motivo de todo esto
+
+Va entero y **formulario a formulario**: cuantas evaluaciones, cuantas entregadas y el promedio de
+cada uno. Se pueden promediar entre si porque la nota esta normalizada a 100 desde el primer dia —un
+4 sobre 5 y un «cumple» valen 80 y 100 en cualquier formulario—. Con un solo formulario ese desglose
+no se ensena: seria repetir las cifras de arriba.
+
+### Verificacion
+
+**339 unitarias en verde** (7 nuevas del reparto), lint y typecheck y build en verde, y **contra la
+base real por HTTP, con sesion**:
+
+| | |
+|---|---|
+| Dos formularios peleandose «Conductor» | 409 `JOB_TITLES_OVERLAP` |
+| Dos formularios generales | 409 `TOO_MANY_GENERAL_FORMS` |
+| Campana de dos cargos, sin general | 511 personas cubiertas, **212 fuera y dichas** |
+| La misma campana + el general | 206 evaluaciones, **0 fuera** |
+| Abrir una evaluacion | trae SU formulario, no el del ciclo |
+
+Los datos de prueba se borraron despues: la base queda con los mismos 4 ciclos y 2.788 evaluaciones
+que antes. El stack quedo levantado con lo nuevo (`mirar.ps1`, 3200 / 3012).
+
+### La suite e2e, entera y en verde — y lo que costo llegar
+
+**21 de 21**, en 4,7 minutos. La primera corrida dio **4 rojas** y la tentacion era darlas por
+ambientales, porque la maquina estaba compilando y yo tenia el navegador encima. Repetida en limpio
+salieron **las mismas cuatro**, asi que no era el entorno. Ninguna era del cambio de hoy:
+
+- **Tres eran el alta de personas** tardando mas de los 10 segundos del limite: es el punto 13 de la
+  deuda conocida (177 audiencias, 90.000 obligaciones en la base de desarrollo). Con la maquina
+  libre entran de sobra —13,5 s y 42,6 s de prueba completa— y por eso pasan ahora. **No se toco**:
+  la recomendacion sigue siendo medirlo con datos de produccion el dia de la carga de las 600
+  personas, no antes.
+- **La cuarta era una asercion vieja.** `sprint-1` esperaba que el panel saludara con «Hola», y el
+  rediseno del inicio del 2026-09-01 lo cambio a «Buenos dias / tardes / noches, Nombre». Llevaba
+  en rojo desde entonces sin que nadie corriera la suite. Ahora comprueba lo que no depende de la
+  hora: que saluda, y por el nombre.
+
+Dicho de otra forma: **el 19/21 que decia el diario ya no era cierto — eran 17/21**, y una de las
+dos nuevas no tenia nada que ver con el rendimiento. Correr la suite entera al cerrar el bloque es
+exactamente lo que la encontro.
+
+### La guia del cliente: actualizada en el repo, PENDIENTE de republicar
+
+`docs/guia-desempeno.html` decia, en un recuadro destacado, *«Limitacion de hoy: un ciclo usa un
+formulario»*. Ya no es verdad, asi que se reescribio: como se marcan varios, que es el formulario
+general, que pasa con quien no queda cubierto, y dos filas nuevas en la tabla de «lo que el sistema
+no deja hacer».
+
+**El archivo del repo esta al dia; el artefacto publicado NO.** Republicarlo requiere permiso y se
+denego, asi que la version que el cliente puede tener abierta
+(`claude.ai/code/artifact/09af1950-2f5a-41be-9e9c-e741a0a6eace`) sigue anunciando una limitacion que
+ya no existe. **Hay que republicarla desde `docs/guia-desempeno.html` antes de volver a enviar el
+enlace.**
+
+### LO QUE SIGUE — desempeno, en orden
+
+1. **Las cuatro preguntas al cliente** (`docs/modulos/desempeno.md` seccion 6): que competencias
+   evalua hoy y con que escala, si se autoevalua o solo califica el jefe, si el resultado se le
+   muestra a la persona, y cada cuanto. Pasa a ser lo primero: no bloquea el codigo —todo es
+   parametrizable— pero si sembrar su contenido real.
+2. **El puente hacia el plan.** Cada competencia ya puede apuntar a la formacion que la fortalece;
+   falta la pantalla que, al armar el plan del ano siguiente, diga «esto salio bajo, esta formacion
+   lo cubre». Tiene sentido construirlo cuando armen el plan 2027.
+3. **Recordatorios del ciclo** a los evaluadores que no han respondido cuando se acerca el cierre.
+4. **Exportar el consolidado a Excel**, como el de Seguimiento — y ahora tambien por formulario.
+
+Y lo que no es de desempeno pero sigue siendo lo mas grande: **86 archivos sin confirmar** desde el
+commit del 2026-09-01, y el **responsable de area sin rellenar en produccion**, que es lo que decide
+si la primera campana genera evaluaciones de verdad o solo autoevaluaciones.
+
+---
+
+## 2026-09-02 (tarde) — Desempeno: por donde entra cada quien, y dos cosas que el cliente vio antes que yo
+
+Tanda de correcciones sobre el modulo recien construido. Las dos mas importantes salieron de
+preguntas del cliente, no de una revision.
+
+### El hueco: "¿por que Evaluar sale en admin? los jefes son rol aprendiz tambien"
+
+Tenia razon y era grave. **Un jefe de area normalmente NO tiene acceso a administracion**: entra por
+la superficie del aprendiz como todo el mundo. Mientras "Evaluar" vivio solo en el panel, la mitad
+de los evaluadores recibia el aviso de que tenia veinte evaluaciones y **no tenia por donde
+abrirlas**. El modulo estaba completo y a la vez era inutilizable para su usuario principal.
+
+Ahora hay `/mi-desempeno` en la superficie del aprendiz, con su item en el menu — y **el item solo
+aparece cuando hay algo pendiente** (Decision #138). Fijo seria un recordatorio permanente para la
+mayoria, que no califica a nadie nunca; escondido en el perfil, un jefe con veinte evaluaciones no lo
+encontraria. Aparece cuando es una tarea y se va cuando deja de serlo.
+
+**Perfil y menu quedaron como dos trabajos distintos:** calificar tiene fecha limite y se busca en el
+menu; leer lo propio es "lo mio" y se busca en el perfil.
+
+Los dos componentes se mudaron a `components/modules/desempeno/`: ya no son ni de admin ni de
+aprendiz, son de las dos superficies.
+
+### "Un formulario que ya uso el ciclo no se puede editar, ¿como se duplica? No veo"
+
+Tambien tenia razon. La regla es correcta —lo que ya uso un ciclo no se reescribe, porque cambiaria
+la pregunta debajo de respuestas ya dadas— pero **deshabilitar el boton dejaba sin salida**: se veia
+un boton apagado y ningun camino.
+
+Ahora se pulsa, se explica POR QUE no se puede, y se ofrece **Duplicar y editar**: se crea uno nuevo
+con "(copia)" en el nombre, el original no se toca y los ciclos viejos siguen diciendo lo que decian.
+Esconder una regla no la explica.
+
+### Un defecto viejo que solo aparece mirando la pantalla
+
+**Un boton deshabilitado se veia identico a uno pulsable** —mismo relleno de marca, mismo texto
+blanco— y solo se notaba al pulsarlo y no pasar nada. Afectaba a TODO el producto, no solo a este
+modulo. Ahora se atenua, salvo mientras carga: un boton con la rueda girando esta trabajando, no
+apagado (Decision #137).
+
+### La escala, unificada
+
+Se extrajo a `ui/escala.tsx` la del cuestionario de encuestas —botones grandes, todas las opciones a
+la vista, extremos escritos— y ahora la usan las dos. Tener dos formas de "elegir un numero" en el
+mismo producto solo garantiza que un dia se sientan distintas.
+
+**Con numeros y no caras al calificar a una persona**, y esa es la unica diferencia deliberada: las
+caras son perfectas para medir satisfaccion, pero convierten un juicio profesional en un emoticono, y
+quien lo lea dentro de un ano merece "4 de 5" (Decision #136).
+
+### Tambien: cargos, vista previa y de donde sale el formulario
+
+- **Selector de cargos** en el formulario. Sin marcar ninguno aplica a toda la empresa, y se dice: un
+  selector vacio se lee igual de bien como "todavia no elegi" que como "no aplica a nadie".
+- **Vista previa** de como lo vera quien califique.
+- **Al crear el ciclo se ensena QUE PREGUNTA** el formulario elegido —competencias, escalas, pesos y
+  cargos—, que era la duda del cliente: "no veo de donde sale ese formulario".
+
+### Preguntas contestadas, para no volver a explicarlas
+
+- **Autoevaluarse** es que sale tu propio nombre y te calificas: una evaluacion mas, con las mismas
+  competencias, respondida desde el mismo sitio donde calificas a tu gente.
+- **Firmar** solo aplica a la evaluacion DEL JEFE y aparece cuando el la entrega. Firmar la propia no
+  significaria nada.
+- Quien es responsable de su propia area sale como `ES_SU_PROPIO_JEFE` y **no tiene quien lo evalue**:
+  por eso ve su autoevaluacion y ningun boton de firmar. No es un fallo.
+- **Cada cuanto:** un ciclo al ano para toda la empresa es lo normal, con formularios distintos por
+  cargo dentro de la misma campana. Semestral solo donde hay mucha rotacion.
+
+Todo esto quedo tambien en la guia del cliente (`docs/guia-desempeno.html`), que se actualizo.
+
+### Verificacion
+
+332 unitarias en verde, lint/typecheck/build en verde, y revisado en el navegador: el item
+"Evaluaciones" apareciendo en el menu del aprendiz con 206 pendientes, la pagina listandolas, y el
+boton "Guardar" atenuado cuando no hay nada marcado.
+
+---
+
+## PENDIENTE de desempeno, por orden
+
+1. **Un ciclo, VARIOS formularios.** Hoy un ciclo usa uno solo, asi que tener el de conductores y el
+   de analistas en la misma campana obliga a abrir dos ciclos — y eso parte el consolidado en dos y
+   hay que sumar a mano. Los formularios ya declaran a que cargos aplican: el dato esta, falta el
+   reparto. **Es lo primero.**
+2. **Las cuatro preguntas al cliente** (`docs/modulos/desempeno.md` seccion 6): que competencias
+   evalua hoy y con que escala, si se autoevalua o solo califica el jefe, si el resultado se le
+   muestra a la persona, y cada cuanto. No bloquean el codigo —todo es parametrizable— pero si
+   sembrar su contenido real.
+3. **El puente hacia el plan.** Cada competencia ya puede apuntar a la formacion que la fortalece;
+   falta la pantalla que, al armar el plan del ano siguiente, diga "esto salio bajo, esta formacion
+   lo cubre". Tiene sentido construirlo cuando armen el plan 2027, no antes.
+4. **Recordatorios del ciclo.** Hoy se avisa al abrir y al entregar; falta el recordatorio a los
+   evaluadores que no han respondido cuando se acerca el cierre.
+5. **Exportar el consolidado a Excel**, como el de Seguimiento.
+
+---
+
+## 2026-09-02 (tarde) — El responsable del area: dos campos, ninguno rellenable
+
+El cliente aviso de algo pequeno —"no hay campo en area para asignar al responsable"— y detras habia
+tres cosas.
+
+### 1. El campo existia y ninguna pantalla lo exponia
+
+`areas.responsible_user_id` esta en el modelo desde el Sprint 5. Lo leen **la evaluacion de
+eficacia** (quien responde si la formacion sirvio) y ahora **el desempeno** (quien califica). No
+habia forma de rellenarlo: ni en la interfaz, ni siquiera en la API — el contrato de areas no
+aceptaba ese campo.
+
+Asi que las dos funciones llevaban meses apuntando a un vacio **sin dar error**, porque no falla
+nada cuando simplemente no hay a quien avisar. Es la peor forma de estar roto: la que no se nota.
+
+### 2. Eran DOS campos que significaban lo mismo (Decision #135)
+
+Mirando el modelo aparecieron `manager_user_id` y `responsible_user_id`, los dos en `areas`, los dos
+"el jefe del area" — y cada funcion leia uno distinto: el aviso de "alguien reprobo" miraba el
+primero y la eficacia el segundo. En la base los dos estaban vacios en las diez areas.
+
+Se unifico en `responsible_user_id`, que es como se llama el equivalente en `processes` (quien
+responde por esto). La migracion **copia antes de borrar**: se escribio a mano en vez de dejarsela a
+Prisma justamente por eso — un `DROP COLUMN` a secas habria perdido lo que alguien hubiera guardado
+en la columna vieja.
+
+### 3. Y de paso, una migracion que habria reventado el despliegue
+
+Al crear la migracion, la base sombra de Prisma —que es una base NUEVA— fallo:
+
+```
+ERROR: index "areas_responsible_user_id_idx" does not exist
+```
+
+La migracion de desempeno del dia anterior habia arrastrado tres sentencias de limpieza de deriva
+—dos `DROP INDEX` y un `DROP CONSTRAINT`— sobre objetos que existen en la base de desarrollo y **no
+en una base nueva**. Tal cual estaban, `migrate deploy` habria muerto ahi el dia del despliegue.
+
+Se volvieron idempotentes (`IF EXISTS`). **La base sombra hizo de simulacro de produccion**: fallo
+en el sitio donde fallar es gratis.
+
+### Verificacion
+
+Con un responsable asignado desde la API: **206 evaluaciones de jefe generadas**, 516 personas
+todavia `SIN_RESPONSABLE` —las areas que aun no lo tienen— y quien dirige el area salio como
+`ES_SU_PROPIO_JEFE` en vez de autoasignarse. 332 unitarias en verde.
+
+### Las pantallas, el mismo dia
+
+`/desempeno`, seccion propia en la barra —no dentro de Formaciones: el cliente pidio que no se
+mezcle, y la navegacion es donde primero se mezclan las cosas—. Tres pestanas:
+
+| Pestana | Quien | Que hace |
+|---|---|---|
+| **Evaluar** | todo el mundo | Responder lo que le toca calificar, y su autoevaluacion |
+| **Ciclos** | Gestion Humana | Crear, abrir, ver como va y cerrar |
+| **Que se evalua** | Gestion Humana | Competencias y formularios |
+
+"Evaluar" va primera aunque fue la ultima en construirse: es la que abre mas gente y la unica con
+algo que hacer hoy. Las otras dos solo aparecen con `performance:manage`.
+
+Decisiones de esa pantalla:
+
+- **No hay autoguardado al calificar.** Es un texto que se piensa y se corrige mientras se escribe;
+  guardar cada tecla dejaria en el servidor versiones a medias de un juicio sobre una persona. Se
+  entrega entera, con una confirmacion que dice que no se puede deshacer.
+- **Al abrir un ciclo se dice a quien no se le pudo asignar jefe**, agrupado por motivo y con el
+  camino para arreglarlo. Es la unica forma de que "faltan responsables de area" se vea el dia que
+  importa y no en diciembre.
+- **El peso se muestra al calificar**: si una competencia vale el triple, quien califica tiene
+  derecho a saberlo antes de marcar.
+- **La escala se responde con botones, no con un desplegable**: son cinco opciones que se comparan
+  entre si, y verlas todas a la vez es el gesto.
+
+### Y la pantalla de la persona evaluada
+
+En SU PERFIL, debajo de sus constancias. No una entrada propia en la navegacion: se mira una o dos
+veces al ano, justo despues de la conversacion con el jefe, y una entrada permanente para eso seria
+un recordatorio doce meses de algo que ocurre dos veces. Si no hay evaluaciones, la seccion no se
+pinta.
+
+La autoevaluacion y la del jefe se ven juntas —por separado son dos opiniones sueltas; juntas, la
+diferencia ES la conversacion—, los valores se muestran como se respondieron ("4 de 5", no "80%"), y
+la firma se explica con palabras: *"firmar no es estar de acuerdo, es dejar constancia de que leiste
+tu evaluacion"*. Sin esa frase, quien cree que firmar es aceptar una nota injusta no firma, y la
+empresa se queda sin la evidencia.
+
+### Verificado recorriendo la interfaz
+
+Ciclo creado y abierto (929 evaluaciones), autoevaluacion respondida con la escala de botones, el
+aviso de "no se puede corregir", entrega, y la evaluacion apareciendo en el perfil del aprendiz con
+su 90%. El fondo difuminado de la ventana y el peso "x3" de la competencia, comprobados a ojo.
+
+### Preguntas del cliente, contestadas
+
+- **¿Quien evalua?** Lo decide el ciclo. Con autoevaluacion activada se generan DOS por persona —la
+  suya y la de su jefe— y se comparan lado a lado. El empleado no evalua a su jefe: eso es 360 y
+  esta fuera de la primera version a proposito.
+- **¿Y si el plan ya se cerro?** La necesidad que aparece a mitad de ano no se fuerza dentro del
+  plan: para eso esta la **capacitacion extraordinaria**. Cuenta como evidencia, sale en Seguimiento
+  y en el expediente, y **no mueve el cumplimiento del plan** — que es deliberado: el plan mide lo
+  que se prometio en diciembre, y si cada reaccion del ano entrara ahi, el indicador dejaria de
+  poder compararse entre anos.
+- **¿La evaluacion solo alimenta el plan?** No: son dos caminos segun si la necesidad es estructural
+  ("todo el equipo de SAC esta flojo en atencion al cliente" -> renglon del plan del ano siguiente) o
+  puntual ("este agente necesita reforzar ya" -> extraordinaria, ahora). Por eso la costura apunta a
+  una FORMACION y no a un renglon de plan: una formacion se entrega de las dos maneras.
+
+### Cerrado despues: cargos, vista previa, y dos cosas que salieron de mirar la pantalla
+
+- **El selector de cargos** ya esta en el armador de formularios. Sin marcar ninguno aplica a toda la
+  empresa, y **se dice**: un selector vacio se lee igual de bien como "todavia no elegi" que como "no
+  aplica a nadie", y son cosas opuestas.
+- **Vista previa** ("ver como lo vera quien califique"). Es lo unico que se tomo del editor de
+  examenes: armar el formulario es marcar casillas, pero lo que importa es lo que llega a los ojos
+  de quien evalua.
+- **Al crear el ciclo se ensena QUE PREGUNTA el formulario elegido** —competencias, escalas, pesos y
+  cargos—. Elegir por el nombre de un desplegable obliga a acordarse de que llevaba dentro, y de eso
+  depende la campana del ano. Era la duda del cliente: "no veo de donde sale ese formulario".
+
+**La escala se extrajo a un componente compartido** (`ui/escala.tsx`) con el cuestionario de
+encuestas: botones grandes, todas las opciones a la vista, extremos escritos. Con NUMEROS y no caras
+al calificar a una persona — las caras son perfectas para satisfaccion, pero convierten un juicio
+profesional en un emoticono, y quien lo lea en un ano merece "4 de 5".
+
+**Y un defecto viejo que solo se ve mirando la pantalla:** un boton DESHABILITADO se veia identico a
+uno pulsable —mismo relleno de marca, mismo texto blanco— y solo se notaba al pulsarlo y no pasar
+nada. Afectaba a todo el producto. Ahora se atenua, salvo mientras carga: un boton con la rueda
+girando esta trabajando, no apagado.
+
+### Lo que sigue
+
+Las cuatro preguntas al cliente (seccion 6 de `docs/modulos/desempeno.md`).
+
+---
+
+## 2026-09-02 — Desempeno: el servidor completo, y una costura decidida antes de implementarla
+
+Se paso del diseno al codigo el mismo dia. Lo que hay ahora: **permisos, siete tablas migradas con
+RLS, las dos reglas con pruebas, y la API entera funcionando contra la base real.** Faltan las
+pantallas.
+
+### La costura hacia el plan, decidida ANTES
+
+La pregunta del cliente fue buena: *"esa idea de que desempeno alimente el plan, ¿cambia algo antes
+de implementar?"*. Si, una cosa: si una calificacion baja debe convertirse en necesidad de
+formacion, la competencia tiene que poder decir **que formacion la fortalece**. Es una columna
+anulable hoy (`suggested_activity_id`); manana seria una migracion mas volver a pedirle al cliente
+que rellene el catalogo entero.
+
+**Hoy no la lee nadie, y esta bien.** Apuntar no es exigir: convertir una nota baja en obligacion
+automatica seria que el sistema decida a quien se forma el ano que viene, y eso lo decide una
+persona.
+
+### Las dos reglas que se probaron sin base de datos
+
+1. **La nota.** Promedio ponderado NORMALIZADO: un formulario puede mezclar "1 a 5" con "cumple / no
+   cumple", y promediar los numeros crudos haria que un "cumple" (1) hunda la nota de alguien con
+   cincos. Cada respuesta se lleva a su porcentaje de escala y despues se promedia. **Lo que no se
+   respondio no cuenta como cero** —un cero es una calificacion pesima, no contestar es no
+   contestar— y un formulario de solo texto **no tiene nota**, que no es lo mismo que tener 0.
+2. **Quien evalua a quien.** El jefe sale de `areas.responsible_user_id`, que ya existia desde el
+   Sprint 5. Y quien no tiene jefe **se reporta, no se le inventa uno**: abrir un ciclo con cuarenta
+   evaluaciones asignadas a quien no corresponde se descubre cuando alguien recibe una que no le
+   toca; un aviso se ve antes.
+
+### Tres decisiones tomadas al construir
+
+- **La escala de una competencia no se cambia si ya tiene respuestas.** Un 4 sobre 5 y un 4 sobre 10
+  son notas distintas: cambiarla reescribiria en silencio lo que significan las respuestas
+  guardadas, y los numeros seguirian ahi sin querer decir lo mismo.
+- **Un formulario que ya uso un ciclo no se reescribe: se duplica.** El ciclo guarda su copia
+  congelada, asi que lo abierto no se rompe; pero editar el original haria que el ciclo del ano
+  pasado y el del que viene se llamen igual y no lo sean.
+- **Calificar se autoriza por IDENTIDAD, no por permiso.** No existe `performance:evaluate`: se abre
+  la evaluacion si esta asignada a ti. Un permiso global de "evaluar" dejaria a cualquiera con el rol
+  calificando a cualquiera.
+
+### Verificacion contra la base real
+
+Crear competencias (y el 409 del codigo repetido), formulario con pesos, ciclo, **apertura con 723
+evaluaciones generadas**, entrega con la nota ponderada correcta, el 409 al entregar dos veces,
+firma, consolidado y cierre. Todo por HTTP, con sesion.
+
+Dos cosas que salieron de ahi:
+
+1. **Las 723 personas salieron "sin evaluador"**, motivo `SIN_RESPONSABLE`: en la base de desarrollo
+   ninguna area tiene responsable. El sistema hizo lo correcto —avisar en vez de inventarse un
+   jefe— pero es **lo primero que hay que configurar en produccion**: sin responsable de area solo
+   hay autoevaluacion.
+2. **Los permisos nuevos exigen resembrar.** Los tres `performance:*` no existian en la base y todo
+   respondia 403 hasta correr `pnpm db:seed`, que es idempotente. En el despliegue lo hace el
+   servicio `migrate`; en un entorno ya montado hay que acordarse.
+
+### Lo que sigue
+
+1. **Las pantallas**: catalogo de competencias y formularios, ciclos con su apertura, la del
+   evaluador, la de la persona (leer y firmar) y el consolidado.
+2. **Las cuatro preguntas al cliente** (`docs/modulos/desempeno.md` seccion 6). No bloquean el
+   codigo —todo es parametrizable— pero si sembrar su contenido real.
+3. **Seccion propia en la barra lateral.** No debajo de Formaciones: el cliente pidio que no se
+   mezcle, y la navegacion es donde primero se mezclan las cosas.
+
+### Estado
+
+| | |
+|---|---|
+| Pruebas unitarias | **332** en verde (9 nuevas de desempeno) |
+| Lint, typecheck, build | En verde |
+| Migracion | `desempeno` aplicada, RLS activo en las siete tablas |
+
+---
+
+## 2026-09-01 (noche, 5) — Desempeno pasa a requisito de produccion, y las aprobaciones ya eran lo que se pedia
+
+### Evaluacion de desempeno: habia una nota de brief y nada mas
+
+Se reviso que existia y la respuesta es: **el Bloque 4 del brief crudo y una linea en dos listas de
+pendientes**. Ningun modelo, ninguna pantalla, ninguna decision tomada. El cliente lo aplazo el
+2026-08-25 —"puede esperar, lo dijo el"— y hoy dijo que **tiene que estar en produccion**.
+
+Queda escrito el diseno completo en `docs/modulos/desempeno.md`, con lo que hay que decidir antes de
+escribir codigo. Lo que importa de ahi:
+
+**La decision que estaba abierta —¿motor propio o compartido?— se responde: PROPIO, reusando el
+patron de las encuestas y no el de los examenes.** Un examen lo responde el dueno de la nota; una
+evaluacion de desempeno la responde OTRO. Todo el motor de examenes vive sobre `enrollments` y
+`attempts` —intentos, bloqueo, nota minima—, y encajar ahi el desempeno obligaria a inventar una
+inscripcion falsa por persona evaluada. Esa inscripcion entraria en las metricas de formacion, que
+es exactamente lo que el cliente prohibio: *"no deben afectar ni mezclarse con capacitaciones"*. Lo
+que si se comparte son los TIPOS DE PREGUNTA (escalas de caras/estrellas/numeros, opcion unica,
+texto), que se extraen a una pieza comun en vez de copiarse.
+
+Regla que evita el desastre: **una evaluacion de desempeno nunca escribe en `enrollments`,
+`assignments` ni `certification_grants`.** Si algun dia alimenta el plan del ano siguiente —que es la
+idea del cliente— sera generando una NECESIDAD de formacion, no tocando el cumplimiento.
+
+Del catalogo de lo que traen SAP, Workday, Cornerstone y compania, entra lo minimo que hace que esto
+sea util —ciclo, competencias por tenant, formulario por cargo, autoevaluacion + jefe, firma— y se
+deja fuera con nombre y apellido lo que multiplica la complejidad sin que nadie lo haya pedido: 360
+grados, calibracion, 9-box y objetivos individuales.
+
+**Lo que bloquea empezar no es tecnico: son cuatro preguntas al cliente.** Que competencias evalua
+hoy y con que escala (si tienen el formato en papel, ese formato ES la especificacion), si se
+autoevalua o solo califica el jefe, si el resultado se le muestra a la persona y si lo firma, y cada
+cuanto se hace. Con eso en mano son unos nueve dias de construccion.
+
+### Aprobaciones: ya era lo que se pide ahora
+
+Se pidio revisar si estaba bien, porque el encargo original era "cualquier modificacion del analista
+debe ser aprobada" y ahora se quiere "en borrador que hagan lo que quieran, pero publicar lo aprueba
+el admin".
+
+**Lo segundo es lo que ya hace el sistema**, y es lo correcto de los dos. El mecanismo:
+`requestOrExecute` mira si quien actua tiene el permiso; si lo tiene, ejecuta; si no, guarda la
+solicitud CON EL CAMBIO DENTRO (`payload`) y lo aplica al aprobarse. El rol ANALISTA tiene
+`catalog:manage_draft` y no tiene `catalog:publish`, asi que en borrador trabaja libre y al publicar
+el boton ya dice **"Enviar a aprobacion"** en vez de "Publicar". Al crearse la solicitud se avisa a
+todo el que tenga `approvals:decide`, y al decidirse se avisa a quien la pidio, con la nota.
+
+Por que la idea original era peor: aprobar cada cambio de borrador ahogaria al administrador con
+solicitudes para corregir una tilde y dejaria al analista sin poder trabajar. Y aprobar el PUBLICAR
+—que es cuando el contenido empieza a obligar a gente— es exactamente donde el control vale algo.
+
+Lo unico que se separa de lo pedido es la palabra: el boton dice "Enviar a aprobacion" y no "Enviar
+a revision". Se deja asi por coherencia con el modulo, que se llama Aprobaciones.
+
+### Interfaz
+
+- **"Mi formacion" pasa a "Mi aprendizaje"** en el aprendiz. La RUTA no cambia: renombrarla romperia
+  los enlaces de los correos ya enviados y los accesos directos de la PWA instalada, todo por un
+  rotulo.
+- **La barra de arriba del aprendiz: siempre visible y sin fondo, las dos cosas.** El velo al
+  desplazar que se habia puesto no vale —no puede tener fondo en ningun estado—, y sin fondo y fija
+  el texto se leeria encima de las tarjetas. La salida no estaba en la barra sino en el armazon: el
+  que se desplaza pasa a ser el CONTENIDO, no la ventana, igual que en administracion. Con eso la
+  barra no se superpone a nada. Se usa `100dvh` y no `100vh` porque en el movil `vh` cuenta con la
+  barra del navegador plegada y la navegacion inferior se iria bajo el filo. Precio conocido: la
+  barra del navegador movil ya no se recoge al bajar.
+- **La ventana difumina el fondo** en vez de solo oscurecerlo: el ojo deja de poder leer lo de atras
+  y la ventana pasa a ser lo unico legible. Es el recurso de las hojas de iOS, y el mismo gesto que
+  ya hace el buscador.
+- **Editar salio del pie y subio junto a la X**, como icono que despliega su palabra al pasar por
+  encima: un pie entero para un solo boton gasta una franja de ventana en algo que no cierra ninguna
+  tarea — ahi no se rellena nada, se lee.
+
+### Pendientes anotados a peticion del cliente
+
+- **Revisar la gamificacion**: existe (racha, puntos, congelaciones) y no se ha vuelto a mirar desde
+  el Sprint 4. No es urgente; que no se olvide.
+- **Revisar la interfaz del perfil del aprendiz.**
+
+### Guia de lectura para el cliente
+
+Se pidio "un documento que explique que son cada dato en Seguimiento, y algo especial para el plan".
+Esta en `docs/guia-numeros-neo-pulse.html` y publicada como artefacto para poder enviarla tal cual.
+
+No es documentacion tecnica traducida: esta escrita desde el lado de quien mira la pantalla. Los seis
+estados con su accion al lado, por que lo que espera convocatoria cuenta en el denominador, por que
+las normas suman mas que el total, la diferencia entre una certificacion que caduca y una obligacion
+por hacer — y, para el plan, **tres lecturas cruzadas resueltas**: que significa 100% de programa con
+60% de cobertura, 60% con 95%, y 80% con 35% de personas al dia. Esa parte es la que pidio "algo
+especial para el plan": el porcentaje lo lee cualquiera, la contradiccion entre dos porcentajes no.
+
+Usa la tipografia y la paleta del propio producto (Manrope + Inter, sistema Pulso) para que se lea
+como parte de el y no como un anexo.
+
+La documentacion tecnica de todo lo que faltaba de Seguimiento —las tres pestanas, los cambios del
+plan, y los detalles de posicion y color que son decisiones— quedo en `docs/modulos/seguimiento.md`,
+secciones 9 y 10.
+
+### Verificacion
+
+323 unitarias en verde, lint/typecheck/build en verde.
+
+---
+
+## 2026-09-01 (noche, 4) — Donde estoy: contraste, la ventana deja de ser plana y la barra del aprendiz vuelve
+
+Tanda de correcciones de interfaz, todas salidas de mirar la pantalla y no encontrar algo.
+
+### La pestana activa no se veia (Decision #132)
+
+Era una pastilla BLANCA sobre un carril gris clarisimo. Sobre fondo blanco, la unica pista de en que
+pestana estabas era una sombra de un pixel. Ahora la activa va **pintada con el color de la
+empresa** y texto blanco: no hay que buscarla. Se aplico en Seguimiento, en las cinco vistas del
+plan y en los chips de horizonte de Vencimientos, que tenian el mismo patron.
+
+El boton fantasma tambien: tenia `hover:bg-paper`, un gris casi invisible sobre una tarjeta blanca,
+asi que no parecia pulsable hasta despues de pulsarlo. Ahora se tine con el color de la empresa.
+
+### La barra del aprendiz vuelve a estar (Decision #133)
+
+Se iba con el contenido: al bajar, la persona perdia su avatar, sus avisos y el buscador, y para
+recuperarlos tenia que subir del todo. En el telefono —donde vive el 80% de esa superficie— es un
+gesto largo y constante.
+
+La razon original de dejarla suelta era buena: **fija y sin fondo, el texto se leia encima de las
+tarjetas**. Lo que estaba mal era la disyuntiva. Ahora se queda arriba y **el velo aparece solo
+cuando hay algo pasando por debajo** (a partir de 8 px de desplazamiento) y desaparece arriba del
+todo, que es donde ensuciaba la portada. Cristal difuminado, no una franja opaca.
+
+Detalle que casi cuesta el arreglo entero: la clase llevaba `relative` y se le anadio `sticky`. Son
+la misma propiedad CSS, y dejar las dos deja el resultado a merced del orden de la hoja generada
+—una forma silenciosa de que la barra no se quede fija en algunos casos—. Se quito `relative`.
+
+### La barra lateral, otra vez (Decision #130 corregida)
+
+Dos cosas del dia anterior estaban mal:
+
+1. **Configuracion se desplegaba sola al entrar.** La idea era "abrirla cuando se necesita"; el
+   efecto real es que el menu crecia seis renglones de golpe sin que nadie lo pidiera y empujaba el
+   resto fuera de la vista, justo al llegar. Ahora solo se despliega con su flecha.
+2. **Se veia el rail del desplazamiento**, gris y pegado al borde de una tarjeta redondeada: parece
+   un desperfecto. Se oculto el adorno (`.sin-rail`) **y ademas se ajusto el aire** —2 px menos por
+   renglon, menos separacion entre grupos— para que los nueve items quepan sin desplazar. Esconder
+   la barra sin hacer que quepa habria dejado Configuracion siempre bajo el filo y sin nada que
+   insinuara que existe.
+
+### La ventana del plan: tenida, y editable desde ahi (Decision #131 ampliada)
+
+Se pregunto si ponerle el borde aurora del buscador. **No**: en este producto ese halo significa una
+cosa concreta —ahi hay busqueda inteligente— y prestarselo a una ventana de solo lectura lo vaciaria
+de significado. Un lenguaje visual sirve mientras cada senal signifique una sola cosa. Lo que si
+tenia razon de ser era la queja de fondo —se veia plana—: ahora la cabecera va **tenida**, que es la
+misma division que ya usan las tarjetas.
+
+Y se anadio **Editar** dentro de la ventana, pero **sin duplicar el formulario**: abre el mismo
+editor de cabecera que ya existia. Dos formularios sobre los mismos datos siempre acaban
+divergiendo, y nadie se entera hasta que alguien guarda desde el equivocado.
+
+De paso, **ese editor paso de cajon lateral a ventana centrada**: aqui no hay tabla detras que
+consultar mientras se escribe —se esta dentro del plan— y 480 px estrechan un formulario con dos
+areas de texto. La regla de la skill se afina: **campos sobre una tabla que hay que seguir viendo,
+cajon; formulario de la propia pantalla, ventana; construir una pieza, pantalla completa.**
+
+### Lo que quedo sin tocar, y por que
+
+**La barra superior del administrador ya no tiene fondo**: el `<header>` es `bg-transparent` sobre
+el papel, y lo unico con superficie propia son el buscador y los botones —que es el efecto de
+"flotar" buscado—. Si sigue viendose una franja, hace falta senalar en que pantalla: puede ser algo
+de una pantalla concreta y no del armazon.
+
+### Verificacion
+
+323 unitarias en verde, lint/typecheck/build en verde, y revisado en el navegador: la pestana activa
+en color de empresa, la barra sin rail, Configuracion sin desplegarse sola.
+
+---
+
+## 2026-09-01 (noche, 3) — Medir el plan sin confundirlo con todo, el inicio deja de estar vacio, y la barra se reordena
+
+Sesion de las que valen: casi todo salio de mirar la pantalla y preguntar "¿esto que significa?".
+
+### Tres porcentajes que sonaban igual (Decision #127)
+
+El plan tenia "cumplimiento del programa", "cobertura" y "avance del plan", y la analitica anadio
+"avance general". Cuatro numeros, palabras intercambiables, y nadie sabia cual citar en un comite.
+**Un indicador que hay que explicar cada vez que se ensena no se usa: se ignora.**
+
+Ahora la pestana "Como va" del plan abre con los tres juntos y **la pregunta delante del numero**:
+
+| Pregunta | Indicador | Formula |
+|---|---|---|
+| ¿Hicimos lo que dijimos? | Programa | jornadas ejecutadas / programadas |
+| ¿Llego la gente que dijimos? | Cobertura | capacitados / proyectados |
+| ¿Quien la tiene hecha hoy? | Personas al dia | obligaciones cumplidas / total |
+
+Y debajo, **la conclusion escrita**: un plan al 100% de programa y al 60% de cobertura no es "va
+bien con un matiz", es que **las jornadas se hicieron y la gente no fue**, y eso pide convocar
+mejor, no programar mas. El porcentaje lo lee cualquiera; la contradiccion entre dos porcentajes,
+no.
+
+En la analitica general el rotulo dejo de ser "Avance general" —que no decia de que— y ahora dice
+"Obligaciones cumplidas · toda la formacion viva: plan, inducciones, pildoras y extraordinarias".
+
+**Los cortes por dimension tambien viven ya dentro del plan**, acotados a el (regla de oro 2): saber
+que area va peor DENTRO del plan ya no obliga a salir a otra pantalla donde ademas contaban las
+pildoras.
+
+### "¿A que se refieren los 90 puntos?"
+
+La pregunta del usuario, y tenia toda la razon: la barra decia "Faltan 90 puntos" y en este producto
+**los PUNTOS son otra cosa** —los que gana el aprendiz al completar formaciones—. Dos significados
+para la misma palabra en la misma pantalla, y el que se lee primero es el equivocado. Ahora dice
+**"Meta del 90%"**: el anillo ya ensena donde va, y lo unico que falta al lado es hasta donde hay
+que llegar. Se corrigio en los tres sitios donde aparecia.
+
+### Objetivo y alcance: detras de un boton, en ventana (Decision #131)
+
+El objetivo ocupaba una tarjeta fija en una pantalla que se abre todos los dias, y **el alcance no
+se veia en ninguna parte** aunque se pudiera escribir: estaba guardado y nunca se ensenaba. Los dos
+son texto que se escribe una vez al ano y se lee una vez al trimestre, casi siempre para una
+auditoria.
+
+Ahora hay un boton "Objetivo, alcance y meta" que abre una **ventana centrada** (`ui/modal.tsx`,
+nueva). No un cajon lateral: el cajon es para EDITAR —aparece al lado y deja ver la tabla de
+atras—, y para leer dos parrafos secuestra media pantalla. La regla queda escrita en la skill de
+diseno: **campos -> cajon; leer -> ventana; construir -> pantalla.**
+
+### La barra lateral, reordenada (Decision #130)
+
+Seguimiento estaba en el octavo puesto. El orden viejo seguia el ciclo de vida del producto
+—primero se crea la formacion, luego se convoca, luego se asigna— que es el orden en que se
+CONSTRUYE una vez, no el orden en que se TRABAJA todos los dias.
+
+```
+Inicio · Seguimiento · Plan anual        (el dia a dia, sin rotulo)
+PROGRAMAR    Formaciones · Convocatorias · Asignaciones
+ADMINISTRAR  Usuarios · Aprobaciones · Configuracion (desplegable)
+```
+
+**Configuracion se despliega y el plan no**, y la diferencia no es de gusto: debajo de Configuracion
+hay SEIS pantallas propias con su URL, y sin desplegar la unica forma de saber que existe "Encuestas"
+es entrar y buscarla. Las vistas del plan —Cronograma, Por proceso, Como va— son la MISMA pantalla
+mirada de otra forma: sacarlas al menu prometeria cinco destinos donde hay uno y obligaria a
+sincronizar el estado de la pantalla con el subrayado del menu, que es de las cosas que se rompen sin
+que nadie lo note. **Se despliega lo que son destinos; no lo que son filtros.** Asignaciones, por lo
+mismo, se queda sin desplegar: es una sola pantalla.
+
+Al plegar la barra los rotulos de seccion se sustituyen por una linea —en 76px no cabe el texto pero
+la separacion si tiene que sobrevivir— y el boton de contraer se tine con el color de la empresa al
+pasar por encima.
+
+### Las constancias, desde la ficha de la persona (Decision #128)
+
+El aprendiz ya podia bajar las suyas, pero **la peticion real la hace la empresa**: "mandame el
+certificado de alturas de Juan" llega un viernes, y Juan puede estar en carretera o haberse ido. El
+endpoint existia desde el Sprint 5 y **ninguna pantalla lo usaba**: la unica forma de bajar una
+constancia ajena era encontrar a esa persona dentro del detalle de una formacion concreta, es decir
+sabiendo de antemano cual buscar.
+
+Ahora Usuarios tiene un boton por fila que abre el expediente: emitidas, vigencia, estado calculado
+—vigente / vencida / revocada—, descarga y revocacion con motivo. Va ahi porque la peticion siempre
+llega con un NOMBRE delante, nunca con una formacion.
+
+### El inicio deja de estar vacio (Decision #129)
+
+Eran tres tarjetas con un guion y la leyenda "Disponible en el Sprint de reportes". La pantalla de
+entrada del producto no contaba nada, asi que la primera accion de todo el mundo era irse a otra.
+
+Ahora responde cuatro preguntas, en orden de urgencia: **¿hay algo cayendose ahora?** (lo vencido, lo
+atrasado, lo que espera aprobacion), **¿como vamos?**, **¿donde esta el problema?** (las peores areas
+y regionales) y **¿que se viene?** (30 y 90 dias). Cada cifra enlaza a la pantalla que la explica.
+
+Dos reglas que lo mantienen honesto: **un numero que no lleva a una accion no entra**, y **no hay
+endpoint nuevo** — se compone de lo que ya existe, porque un resumen calculado aparte acabaria
+diciendo un numero distinto al de la pantalla que lo explica.
+
+Y "esperando convocatoria" **no se enciende en ambar** aunque sean 62.000: no es culpa de nadie,
+nadie les abrio la puerta. Un cero en rojo, o un rojo que no es un problema, entrenan a ignorar el
+rojo.
+
+### Verificacion
+
+323 unitarias en verde, lint/typecheck/build en verde, y revisado en el navegador: el inicio, la
+barra con sus grupos, el submenu de Configuracion desplegando, la ventana de objetivo y alcance, y
+el rotulo "Meta del 90%" en la barra.
+
+### Lo que queda de esta tanda
+
+1. **Exportar analitica y vencimientos a Excel** (la ejecucion ya se exporta).
+2. **Matriz de competencia** (cargo x formacion): la cuadricula de SST.
+3. **Selector de plan en la analitica general**: el servidor ya acepta `?plan=`.
+4. **Medir el rendimiento con datos reales**: la analitica tarda 3,4 s contra las 90.000
+   obligaciones de la base de desarrollo.
+
+---
+
+## 2026-09-01 (noche, 2) — Analitica por dimensiones y vencimientos: lo que mira quien decide
+
+El encargo fue explicito: *"lo que quisiera ver el admin que toma decisiones, que mide el plan, pero
+todo tambien"* — cortes por regional, por norma, por lo que haga falta.
+
+### La decision de fondo: un motor, no cuatro pantallas
+
+"Por area", "por regional", "por norma" y "por cargo" NO son cuatro informes: son el mismo dato
+agrupado por otra columna. Construirlos por separado garantiza que dentro de tres meses uno diga
+62% y otro 58% sobre lo mismo, porque alguien arreglo el criterio en un sitio y no en los otros.
+
+Asi que hay UN hecho —una obligacion de una persona, con su estado ya resuelto por
+`resolverEstadoEjecucion`, que sigue siendo el unico sitio donde vive el criterio— y siete formas de
+agruparlo: area, cargo, regional, servicio, proceso, tipo y norma. Cuatro consultas fijas, sea una
+dimension o las siete.
+
+**Los siete se ven juntos, sin selector.** Un desplegable obliga a recordar el numero del corte
+anterior para compararlo con el siguiente, y nadie lo recuerda. Uno al lado del otro, "Logistica va
+mal" y "la regional Caribe va mal" se leen de un golpe — y muchas veces son la MISMA gente vista de
+dos formas, que es justo lo que hay que descubrir.
+
+**Se puede acotar al plan** (`?plan=<id>`, regla de oro 2): quien ingreso en agosto no hace la
+jornada de marzo y no puede contar como incumplimiento de ese plan. El servidor ya lo acepta; el
+selector en pantalla queda pendiente.
+
+### Dos cosas que no se esconden
+
+1. **Por norma, los grupos suman mas que el universo.** Alturas cuenta para SST y para BASC, asi que
+   esa obligacion aparece en las dos. No es un error de conteo —la pregunta "¿como vamos con BASC?"
+   incluye todo lo que BASC exige— pero callarlo haria que alguien intentara cuadrar los numeros, no
+   pudiera, y acabara desconfiando de los dos. La pantalla lo dice donde pasa.
+2. **Lo que no tiene valor se agrupa, no se descarta.** "23 personas sin regional" es un hallazgo:
+   normalmente significa que faltan datos por cargar. Y si esas filas desaparecieran, el total
+   dejaria de cuadrar con el del seguimiento.
+
+### Vencimientos: lo unico que mira hacia adelante
+
+De aqui sale el plan del ano siguiente —hoy esa lista se arma a mano en una hoja de calculo y por eso
+siempre llega tarde— y es la segunda pregunta del auditor: la primera es "¿quien lo hizo?", la
+segunda "¿sigue vigente?".
+
+**Dos cosas vencen y no se suman:** una CERTIFICACION que caduca (la persona lo hizo bien y aun asi
+deja de estar acreditada -> hay que reprogramar) y una OBLIGACION abierta con fecha limite (hay a
+quien perseguir). Sumarlas daria un numero grande sin significado y las acciones son opuestas.
+
+Lo ya vencido va aparte y primero: no es "lo que viene", es lo que ya se cayo. Los tramos se
+acumulan —lo de 20 dias tambien esta dentro de 90— porque la pregunta real es "cuanto tengo que
+resolver este trimestre". Los meses vacios se dibujan igual: el hueco es donde se puede reprogramar
+lo que se amontona al lado. Y cada mes filtra la lista de abajo, porque despues de "en marzo hay
+cuarenta" siempre viene "¿quienes?".
+
+**El color de las dos series se valido, no se eligio a ojo:** son categorias, no estados, asi que no
+reutilizan el ambar de "atrasado" ni el rojo de "reprobado" —prestarlos los vaciaria de significado—.
+Los dos tonos pasan los seis chequeos (luminosidad, croma, separacion para daltonismo, contraste)
+en claro Y en oscuro.
+
+### La pantalla
+
+`/reportes` pasa a tener tres pestanas, que son tres preguntas y tres momentos distintos:
+
+| Pestana | Contesta | Para quien |
+|---|---|---|
+| Ejecucion | ¿como va esta formacion y quien la ha hecho? | quien persigue |
+| **Analitica** | ¿donde esta el problema? | **quien decide** |
+| **Vencimientos** | ¿que se me viene encima? | quien programa el ano |
+
+### Dos regresiones propias, encontradas y cerradas
+
+1. **`output: 'standalone'` rompio el build local.** Lo habia dejado encendido en `next.config.mjs`
+   para la imagen de Docker, y en Windows Next no puede crear los enlaces simbolicos que necesita:
+   `mirar.ps1` moria con un error que hablaba de React y no tenia nada que ver con React. Ahora se
+   enciende con `NEXT_OUTPUT`, solo dentro del contenedor.
+2. **Mi propia validacion de R2 tumbo la API en desarrollo.** La regla "o estan las cuatro variables
+   o ninguna" sonaba prudente: el `.env` llevaba meses con `R2_BUCKET_NAME` puesto y sin
+   credenciales, y el servidor dejo de arrancar. Quien decide si se quiere R2 son las CREDENCIALES,
+   no el nombre del bucket. Las dos lecciones estan en el RUNBOOK.
+
+### Verificacion
+
+| | |
+|---|---|
+| Unitarias | **323** en verde (8 nuevas: agrupador, solapamiento de normas, tramos y calendario) |
+| Lint, typecheck, build | En verde |
+| Contra la base real | `/reportes/analitica` responde en **3,4 s** con 89.994 obligaciones y devuelve los siete cortes; `/reportes/vencimientos` en **0,7 s** |
+| En el navegador | Las tres pestanas revisadas a ojo: cortes, aviso de normas, calendario, filtros y lista nominal |
+
+**Sobre esos 3,4 s:** son de la base de desarrollo, que arrastra 90.000 obligaciones de meses de
+e2e. En produccion el orden es 12.000 (600 personas por ~20 formaciones), asi que deberia quedar por
+debajo del segundo. **Hay que medirlo con datos reales antes de darlo por bueno**, y si con el
+volumen del cliente sigue tardando, el camino es agregar en SQL en vez de traer los hechos.
+
+---
+
+## 2026-09-01 (noche) — El piloto ya se puede desplegar: R2, contenedores y un fallo que solo aparecia con la base vacia
+
+El encargo: entregar formalmente, gratis, sin atarse a un proveedor y sin que mudarse al VPS de pago
+sea otro proyecto.
+
+### La forma elegida, y por que
+
+Todo el sistema en un `docker/docker-compose.prod.yml`: Caddy con TLS, web, API, Postgres y Redis en
+una sola maquina. Nada atado a un proveedor —ni funciones, ni colas gestionadas, ni almacenamiento
+propietario—, asi que el mismo archivo corre igual en una VM gratuita de Google, en Oracle o en el
+VPS de pago del mes que viene. **Mudarse es operacion, no desarrollo.**
+
+Lo que descarta los gratuitos tipo Render, Koyeb o Fly no es el rendimiento: **duermen el contenedor
+cuando nadie entra**, y aqui el motor de obligaciones y los avisos corren DENTRO del proceso de la
+API. Un servicio dormido no ejecuta un cron: las obligaciones no nacerian y nadie se enteraria hasta
+que el cliente pregunte por que no le llega nada.
+
+Procedimiento completo en `docs/04-despliegue-piloto.md`.
+
+### R2: la decision no fue "subir archivos", fue quien sirve los bytes
+
+El adaptador estaba sin cablear a proposito (lanzaba un error para que fuera imposible desplegar a
+medias). Ya esta, con `@aws-sdk/client-s3`. Lo que importa no es el `put`:
+
+**Con R2, los bytes NO pasan por la API.** El controlador de medios comprueba su propia firma,
+resuelve el paquete contra la base y entonces **redirige** a una URL prefirmada del bucket. Servirlos
+desde el servidor haria que cada video viajara dos veces —del bucket a la maquina y de la maquina al
+telefono— y convertiria el ancho de banda del servidor en el techo de cuanta gente puede ver una
+formacion a la vez. Es justo lo que R2 existe para evitar. Los rangos los resuelve R2 nativamente,
+que es lo que necesita el reproductor para saltar dentro de un video.
+
+Por eso `stream()` en R2 no esta implementado y falla con un mensaje explicito: es un hueco
+deliberado, no uno olvidado.
+
+Ademas, o estan las CUATRO variables de R2 o ninguna: con tres de cuatro el servidor **no arranca** y
+dice cual falta, en vez de fallar en la primera subida con alguien esperando delante.
+
+### El dominio resulto ser funcional, no estetico
+
+`resolveTenantSlug` contaba los puntos del host: "tres trozos o mas, el primero es la empresa". Con
+`transprensa.neopulse.app` acierta, y **con `neopulse.duckdns.org` o `algo.vercel.app` se inventa una
+empresa llamada "neopulse"** y no habria forma de entrar. Como la entrega va sobre un host gratuito
+de tercer nivel, esto era un bloqueo real.
+
+Ahora el dominio raiz es CONFIGURACION (`NEXT_PUBLIC_ROOT_HOST`), no adivinanza: si no esta puesto,
+del host no se deduce nada y se entra con `?tenant=`. Preferir "no lo se" a "creo que es esta
+empresa" es lo correcto en multi-empresa: acertar por accidente la equivocada no se nota hasta que
+alguien ve datos que no son suyos.
+
+### El fallo que solo se veia con la base VACIA
+
+Levantando el stack en local aparecio esto, y habria aparecido igual en la VM el dia de la entrega:
+
+```
+Applying migration 20260831230000_user_sessions
+ERROR: role "neopulse_app" does not exist
+```
+
+Dos migraciones hacen `GRANT` sobre el rol de la aplicacion, y ese rol lo creaba `rls.sql`, que corre
+DESPUES de migrar. En desarrollo nunca se noto —el rol ya existia desde la primera vez— pero contra
+una base nueva la migracion muere.
+
+Y detras venia el segundo: `rls.sql` crea el rol con la contrasena de DESARROLLO. Aunque la migracion
+hubiera pasado, la API no habria podido conectarse con la contrasena de produccion.
+
+Los dos se cierran en `scripts/release.sh`: crea el rol ANTES de migrar y le fija la contrasena del
+entorno (`APP_DB_PASSWORD`), siempre, tambien si ya existia. `rls.sql` se queda como la fuente de las
+policies y su `CREATE ROLE` idempotente ya no pisa nada.
+
+**Es exactamente lo que se buscaba probando el despliegue en local**: encontrarlo aqui cuesta media
+hora; encontrarlo el dia de la entrega, con el cliente mirando, cuesta la entrega.
+
+### Verificacion (contra una base creada desde cero)
+
+| | |
+|---|---|
+| Imagenes | API 393 MB, web 82 MB de contenido. Las dos construyen |
+| Migraciones + RLS + semilla | En verde, sobre base vacia. `SEED OK — login: 999999999` |
+| Caddy con TLS | `GET /v1/health` 200 y `GET /login` 200 por HTTPS |
+| **Login real** | 200 con token RS256: llaves montadas, rol de aplicacion conectando con RLS encima |
+| Unitarias / lint / typecheck / build | 315 en verde, todo lo demas en verde |
+
+### Lo que falta, y quien puede hacerlo
+
+**Solo lo puede hacer una persona** (es cuenta y tarjeta): crear la cuenta del proveedor. Una tarjeta
+con deuda sirve mientras le quede cupo —la verificacion es una retencion de USD 1—; si esta al tope,
+la rechazan. Oracle y GCP suspenden al acabarse el credito; **AWS y Azure pasan a cobrar en silencio**
+al terminar los 12 meses.
+
+Con `gcloud` ya autenticado en el equipo, lo demas es automatizable desde aqui: crear la VM
+(`e2-micro` en `us-central1`, que es el shape que entra en Always Free), abrir 80/443, swap, Docker,
+subir el repo y levantar.
+
+**Plan B sin tarjeta ninguna:** tunel de Cloudflare desde una maquina propia. Mismo compose, URL
+HTTPS publica, cero cuentas. El equipo tiene que quedarse encendido: sirve para presentar, no para
+que la empresa lo use a diario.
+
+### Pendientes que deja este trabajo
+
+1. **Elegir proveedor y levantar la maquina.** Es lo unico que separa esto de estar en linea.
+2. **Probar la restauracion de verdad** (`scripts/restaurar-prueba.sh`) con un volcado de la maquina
+   real. Hasta entonces no hay copias de seguridad, hay archivos.
+3. **LibreOffice no va en la imagen**: subir un PPT se rechaza pidiendo el PDF. Son 500 MB de imagen
+   y otro tanto de RAM al convertir, y no cabe en una VM de 1 GB. Se anade cuando haya maquina.
+4. **Verificar R2 contra un bucket real.** El adaptador esta probado por tipos y por arranque, pero
+   ninguna subida ha tocado todavia Cloudflare.
+5. **Sin dominio propio no hay subdominio por empresa.** Con un cliente da igual; con dos, hace falta.
+
+---
+
+## 2026-09-01 (tarde) — Los cinco pendientes del cliente, el Excel del auditor y la IP real
+
+Sesion corta y de cierre. El encargo fue explicito: **solo lo importante para salir a produccion; lo
+que pueda esperar, que espere.** Lo que sigue respeta ese corte, y al final esta lo que se dejo
+fuera A PROPOSITO.
+
+(La entrada de abajo quedo fechada 2026-09-02 por un desliz de la sesion anterior: es la misma
+jornada, la del commit `77f930b`.)
+
+### Los cinco que dejo el cliente
+
+1. **Eliminar un tipo en uso ya dice por que.** La regla no cambio —lo que otros usan se desactiva,
+   no se borra—; lo que cambio es que ahora se sabe QUE estorba. El 409 viaja con el desglose
+   ("3 formaciones", "2 personas y 1 proceso") y el panel se queda ABIERTO con el motivo y con el
+   boton de desactivar, que es lo que quien administra queria hacer. Antes se cerraba con un aviso
+   rojo que decia "esta en uso" y dejaba a la persona donde empezo.
+
+   De paso dejo de ser un problema solo del tipo: los ocho catalogos comparten pantalla y ahora los
+   ocho explican. Y `countReferences` paso a `references`, que devuelve el desglose con la palabra
+   del negocio —"cargo", "convocatoria", "alcance de analista"— en vez de un numero pelado.
+
+2. **El numero grande de la tarjeta es SIEMPRE el avance**, tambien con un filtro puesto. Antes
+   cambiaba de significado —con "Atrasadas" pasaba a ser cuantas atrasadas— y eso obliga a releer la
+   tarjeta cada vez para saber que se esta mirando: el mismo sitio, el mismo tamano, dos magnitudes
+   distintas. El conteo del estado va al lado, mas pequeno y con su color.
+
+3. **El enlace del plan ya abre la formacion.** `/reportes?formacion=<id>` lee el parametro, abre el
+   detalle y lo retira de la URL para que cerrarlo devuelva a la lista. Si esa formacion no tiene
+   obligaciones vivas no se abre nada y **se dice por que**: dejar la lista entera sin explicacion se
+   lee como un enlace roto.
+
+4. **"Reportes" se llama "Seguimiento"** en la barra lateral y en el buscador. El cliente tenia
+   razon: eso es el estado de la ejecucion, no un informe. El grupo de permisos quedo como
+   "Seguimiento y reportes", que es lo que `reports:*` cubre de verdad.
+
+5. **Filtro de seguimiento dentro del plan:** sigue siendo pregunta abierta del cliente. No se toco.
+
+### El Excel del auditor (Decision #124)
+
+Era el pendiente 7 del Sprint 5 y **es lo que se lleva el auditor**, asi que entro. Dos
+exportaciones, las mismas dos preguntas de la pantalla: una fila por formacion, o una fila por
+persona con cedula, area, cargo, estado, vencimiento, version, intentos, nota, encuesta y
+constancia.
+
+Lo que parece formato y no lo es: la **cedula va como texto** (con ceros delante los pierde si Excel
+la lee como numero, y es el dato con el que se cruza contra nomina); el **avance va como numero**
+(0,62 con formato de porcentaje, no el texto "62%") para poder promediarlo; **el filtro se declara
+DENTRO del archivo**, porque doce filas sin decir que solo son las atrasadas se leen como el
+universo entero; y **el filtro por texto no viaja**, porque buscar es una forma de encontrar algo en
+pantalla, no un criterio de informe.
+
+Va bajo `reports:export` —el permiso existia desde el Sprint 1 y no lo usaba ningun endpoint—:
+mirar la pantalla y sacar de la plataforma una lista nominal no son el mismo acto.
+
+**El PDF no se hizo, y no por falta de tiempo.** Un PDF de 600 filas no se ordena ni se filtra: es
+el peor formato para lo que se hace con esto. Tendra sentido el dia que se pida una hoja **para
+firmar** —una pagina, totales por proceso—, que es otro informe y no la misma tabla en otro
+envoltorio.
+
+### La IP real detras del proxy (lo primero de la lista de endurecimiento)
+
+`TRUSTED_PROXY_HOPS` dice cuantos proxies propios hay delante (Cloudflare + proxy inverso = 2). Sin
+esto, en produccion **toda la empresa es una sola IP**: el aviso de "no puedo entrar" son 3 cada 5
+minutos, asi que el tercero del dia dejaba a los demas sin poder pedir ayuda; y la auditoria
+guardaba la IP del proxy en vez de la de quien entro.
+
+Se declara un NUMERO y no `trust proxy: true` a proposito: con `true`, Express cree el primer valor
+de la cabecera —que lo escribe el cliente— y cualquiera se inventa una IP por peticion para saltarse
+el limite. **Ponerlo mal duele en los dos sentidos**, y por eso esta escrito en el `.env.example` y
+en el CLAUDE.md.
+
+### La suite recoge lo que ensucia
+
+`e2e/global-teardown.ts` corre la limpieza de reglas al terminar cualquier corrida, en verde o en
+rojo. No sustituye a que cada spec retire lo suyo, pero quita del camino el fallo que mas confunde:
+una prueba de ALTA DE PERSONAS que expira por unas reglas que nadie relaciona con ella.
+
+---
+
+## Estado al cerrar
+
+| | |
+|---|---|
+| Pruebas unitarias | **315** en verde (6 nuevas, del Excel) |
+| e2e | **19 / 21**. Los dos fallos son de tiempo de espera, no de asercion: ver abajo |
+| Lint, typecheck, build | En verde |
+| Git | **Nada confirmado.** Todo lo de esta sesion esta sin commit |
+
+**El Excel se verifico ademas contra la base real**, no solo con unitarias: descarga con sesion, 452
+formaciones, encabezado con la empresa y la fecha, autofiltro puesto; y el mismo archivo con
+`?estado=ATRASADA` recortado a 3 filas y declarando el filtro dentro.
+
+### Los dos fallos del e2e, y por que no son del producto
+
+`alcance-analista` y `sprint-3` fallan esperando el dialogo "Contrasena generada": **crear una
+persona tarda 5,6 segundos** y el limite de la prueba son 10, asi que unas veces entra y otras no.
+
+Se midio la causa: la base de desarrollo lleva **177 audiencias, 723 personas y 90.000 obligaciones**
+de meses de corridas, y el alta evalua a la persona contra TODAS las audiencias. Con solo **10
+reglas activas** —ya limpias— el tiempo sigue ahi, asi que no es la basura de reglas de la que habla
+el RUNBOOK: es el volumen de audiencias.
+
+**No se toco, y esa es la recomendacion:** en produccion se arranca con una decena de audiencias, no
+con 177. Lo que si hay que hacer antes de darlo por bueno es **medirlo con datos de produccion** el
+dia de la carga de las 600 personas (ahi se usa `syncPeople`, que recalcula por lotes y es otro
+camino). Si con veinte audiencias sigue tardando segundos, entonces si es del motor y no del
+entorno.
+
+---
+
+## PENDIENTE
+
+### Antes de salir a produccion (casi nada de esto es codigo de producto)
+
+1. **No existe `docker-compose.prod.yml` ni imagen de la API.** Es el hueco mas grande: hoy no hay
+   con que desplegar. `docs/03-infraestructura-produccion.md` tiene las decisiones (Hetzner,
+   Cloudflare R2, Cloudflare delante) y falta escribirlo.
+2. **Secretos de verdad.** `REFRESH_TOKEN_PEPPER` sigue en `change-me-in-prod`, y hacen falta las
+   llaves RS256, R2, Resend y Sentry del entorno real.
+3. **`TRUSTED_PROXY_HOPS` bien puesto** al montar el proxy (equivocarse duele en los dos sentidos).
+4. **Copias de seguridad de Postgres y prueba de restauracion.** Sin restauracion probada no hay
+   copia: hay una carpeta con archivos.
+5. **Datos reales del piloto**: cargos definitivos, matriz cargo -> induccion y el plan 2026 (P4 y P5
+   del CLAUDE.md). Sin eso se despliega un sistema vacio.
+6. **Contenido y firmantes de la constancia** (P1). La plantilla existe; lo que va escrito en el
+   papel lo aprueba el cliente antes de emitir el primero.
+7. **La imagen de la API necesita LibreOffice** o las presentaciones PPT/PPTX se rechazan.
+
+### Sprint 5, lo que sigue abierto (por orden de dano)
+
+8. **Asistencia presencial y QR.** El cliente dijo que no es urgente, pero **bloquea que las
+   formaciones presenciales emitan constancia**: una jornada de 8 horas acredita y ahi no hay
+   reproductor que marque completado, sino asistencia marcada.
+9. **Pantalla del jefe** para responder la eficacia, y el programador que crea la cita a los N dias.
+   Hoy la eficacia esta apagada en todo por decision del cliente, asi que no bloquea.
+10. **Emision manual de constancia** para lo completado antes de activar la plantilla.
+11. **Prueba de navegador de la exportacion.** Las unitarias cubren el contenido del archivo y se
+    verifico a mano contra la base real, pero nada impide que una regresion en el boton pase sin que
+    salte.
+
+### Deuda conocida (no bloquea)
+
+12. **`MultiSelect`: el aspa de quitar un chip vive DENTRO del boton que abre y cierra.** Con una
+    sola opcion marcada y etiqueta larga, el clic para cerrar puede borrar la seleccion.
+13. **El alta de una persona tarda 5,6 s con 177 audiencias.** Medir con datos reales antes de
+    decidir si hay que tocar el motor.
+14. **La base de desarrollo esta gorda** (90.000 obligaciones). Un `db:seed` limpio deberia entrar en
+    la rutina, o la suite seguira dando sustos que no son del producto.
+
+### Sprint 6, lo que el cliente quiere
+
+15. **Analiticas y reportes agregados**: cobertura por proceso, matriz de competencia, vencimientos,
+    cortes por area y regional. El Excel de hoy es la evidencia NOMINAL; eso es otra cosa, son los
+    indicadores.
+16. **La evaluacion de desempeno anual deberia alimentar el plan del ano siguiente.** Y sin esperar a
+    ese modulo, el plan ya podria alimentarse de lo que hoy se sabe: quien reprobo, quien tiene
+    eficacia negativa, a quien le vence la certificacion.
+
+---
+
+## Para arrancar la proxima sesion
+
+1. Levantar: `.\scripts\mirar.ps1`
+2. **Confirmar en git.** Hay una sesion entera sin commit.
+3. Si el e2e falla en el alta de personas, no es el codigo: mirar el punto 13 de arriba.
+
+---
+
 ## 2026-09-02 — Sprint 5: constancias, encuestas, seguimiento y la capa de plataforma
 
 Sesión larga y con muchas idas y venidas del cliente. Lo que sigue está ordenado por tema, no por

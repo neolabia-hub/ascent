@@ -1,0 +1,215 @@
+<title>Píldora, paso a paso</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* ── Sistema heredado de las otras guías: mismo azul, mismo naranja, mismas letras ──────────
+     Lo que se añade aquí es UNA cosa: cada tipo trae su propio color, el mismo con el que la
+     aplicación lo marca en las listas. Así la guía y la pantalla dicen lo mismo. */
+  :root {
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --ok-soft: #e9f5ee;
+    --warn: #b45309;
+    --warn-soft: #fdf3e6;
+    --danger: #b02a37;
+    --danger-soft: #fbeced;
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+      --paper: #0e1114; --surface: #171b20; --surface-2: #1e242b;
+      --line: #262c33; --line-strong: #333b44;
+      --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+      --ok: #3ba76f; --ok-soft: #12251b; --warn: #d98324; --warn-soft: #2a1f12;
+      --danger: #e2707c; --danger-soft: #2b1418;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+    --paper: #0e1114; --surface: #171b20; --surface-2: #1e242b;
+    --line: #262c33; --line-strong: #333b44;
+    --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+    --ok: #3ba76f; --ok-soft: #12251b; --warn: #d98324; --warn-soft: #2a1f12;
+    --danger: #e2707c; --danger-soft: #2b1418;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-700);
+    font-family: var(--body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .envoltorio { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── Cabecera ───────────────────────────────────────────────────────────────────────────── */
+  header.principal { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-family: var(--display); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(34px, 5.2vw, 52px); font-weight: 800;
+    line-height: 1.08; letter-spacing: -0.022em; color: var(--ink-900);
+    margin: 0 0 18px; text-wrap: balance; max-width: 18ch;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); max-width: 62ch; margin: 0; }
+
+  /* ── Índice de tipos ────────────────────────────────────────────────────────────────────── */
+  nav.tipos { position: sticky; top: 0; z-index: 20; background: var(--paper);
+    border-bottom: 1px solid var(--line); padding: 12px 0; margin-bottom: 44px; }
+  nav.tipos ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0;
+    counter-reset: none; }
+  nav.tipos a {
+    display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    font-size: 13px; font-weight: 600; color: var(--ink-700); text-decoration: none;
+    transition: border-color .15s, color .15s;
+  }
+  nav.tipos a:hover, nav.tipos a:focus-visible { border-color: var(--line-strong); color: var(--ink-900); }
+  nav.tipos a:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--tono); flex: none; }
+
+  /* ── Secciones ──────────────────────────────────────────────────────────────────────────── */
+  section.tipo { padding-top: 20px; margin-bottom: 72px; scroll-margin-top: 72px; }
+  .titulo-tipo { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
+  .barra { width: 5px; align-self: stretch; min-height: 42px; border-radius: 3px; background: var(--tono); flex: none; }
+  h2 {
+    font-family: var(--display); font-size: clamp(25px, 3.2vw, 33px); font-weight: 800;
+    letter-spacing: -0.018em; color: var(--ink-900); margin: 0; line-height: 1.15; text-wrap: balance;
+  }
+  .subtitulo { color: var(--ink-500); font-size: 16px; margin: 2px 0 26px 19px; max-width: 64ch; }
+
+  h3 {
+    font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--ink-500); margin: 34px 0 12px;
+  }
+  h3:first-of-type { margin-top: 0; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  a { color: var(--navy); }
+
+  /* ── Ficha técnica del tipo ─────────────────────────────────────────────────────────────── */
+  .ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 1px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .ficha div { background: var(--surface); padding: 13px 15px; }
+  .ficha dt { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-500); margin-bottom: 3px; }
+  .ficha dd { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink-900); }
+  .ficha dd.no { color: var(--ink-300); }
+
+  /* ── Pasos: numerados porque son una secuencia real ─────────────────────────────────────── */
+  ol.pasos { counter-reset: paso; list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 14px; }
+  ol.pasos > li { counter-increment: paso; position: relative; padding-left: 42px; max-width: 70ch; }
+  ol.pasos > li::before {
+    content: counter(paso); position: absolute; left: 0; top: 0;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--tono); color: #fff;
+    font-family: var(--display); font-size: 13px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  ol.pasos b { display: block; color: var(--ink-900); font-weight: 600; }
+
+  ul.limpia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  ul.limpia > li { position: relative; padding-left: 18px; max-width: 70ch; }
+  ul.limpia > li::before { content: ''; position: absolute; left: 2px; top: 10px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--ink-300); }
+
+  /* ── Avisos ─────────────────────────────────────────────────────────────────────────────── */
+  .aviso { border-left: 3px solid var(--warn); background: var(--warn-soft);
+    padding: 13px 16px; border-radius: 0 8px 8px 0; margin: 0 0 14px; max-width: 70ch; }
+  .aviso.bien { border-color: var(--ok); background: var(--ok-soft); }
+  .aviso.grave { border-color: var(--danger); background: var(--danger-soft); }
+  .aviso p:last-child { margin-bottom: 0; }
+  .aviso .etiqueta { font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 4px; }
+  .aviso.bien .etiqueta { color: var(--ok); }
+  .aviso.grave .etiqueta { color: var(--danger); }
+
+  /* ── Tablas ─────────────────────────────────────────────────────────────────────────────── */
+  .tabla-envuelve { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { background: var(--surface-2); font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink-900); }
+
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 56px 0; }
+  footer { border-top: 1px solid var(--line); padding-top: 22px; color: var(--ink-500); font-size: 14px; }
+
+  @media (max-width: 640px) {
+    .envoltorio { padding: 0 18px 64px; }
+    header.principal { padding: 44px 0 30px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<div class="envoltorio" style="--tono:#be185d">
+<header class="principal">
+  <p class="kicker" style="color:#be185d">NEO PULSE · Guía de uso · Píldora</p>
+  <h1>Píldora, paso a paso</h1>
+  <p class="entradilla">Microaprendizaje: tres minutos en el teléfono. Se define por lo que <em>no</em> hace, y eso es justo lo que la hace útil.</p>
+</header>
+
+<section class="tipo">
+  <h3>Lo que promete su tipo</h3>
+  <div class="ficha">
+    <div><dt>Se evalúa</dt><dd class="no">No</dd></div>
+    <div><dt>Encuesta</dt><dd class="no">No</dd></div>
+    <div><dt>Constancia</dt><dd class="no">No</dd></div>
+    <div><dt>A quién</dt><dd>Lo marcas tú</dd></div>
+    <div><dt>Convocatoria</dt><dd>Permanente</dd></div>
+    <div><dt>Entra al plan</dt><dd class="no">No</dd></div>
+  </div>
+
+  <h3>Paso a paso</h3>
+  <ol class="pasos">
+    <li><b>Crea la ficha</b> con el tipo <em>Píldora</em> y una sola lección corta.</li>
+    <li><b>Publica.</b> Se publica <strong>sin examen</strong> — en los demás tipos el sistema no
+      dejaría. Se abre sola la convocatoria permanente.</li>
+    <li><b>Márcasela a quien quieras</b> en <em>Quiénes</em>: a quien le llega lo decide una
+      persona, no hay automatismo.</li>
+  </ol>
+
+  <h3>Lo que hay que saber</h3>
+  <div class="aviso bien">
+    <span class="etiqueta">Cumplida con ver el contenido</span>
+    <p>Sin examen no hay nada más que hacer: al pasar las tarjetas queda cumplida y desaparece de
+      sus pendientes.</p>
+  </div>
+  <div class="aviso bien">
+    <span class="etiqueta">No acredita, y es correcto</span>
+    <p><strong>No emite constancia y no entra al plan.</strong> Una píldora de tres minutos no
+      acredita nada, y meter papel en un expediente de cumplimiento por tres minutos de vídeo sería
+      peor que no tenerlo.</p>
+  </div>
+  <div class="aviso">
+    <span class="etiqueta">Si necesitas que acredite</span>
+    <p>Entonces no es una píldora: es una capacitación extraordinaria o del plan. El tipo no es una
+      etiqueta, decide lo que el sistema hace con ella.</p>
+  </div>
+</section>
+<footer>
+  <p>NEO PULSE para TRANSPRENSA · Guía de uso, septiembre de 2026. Lo de aquí está medido contra el sistema, no supuesto.</p>
+</footer>
+</div>

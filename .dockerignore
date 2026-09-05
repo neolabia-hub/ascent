@@ -1,0 +1,39 @@
+# Contexto de construccion minimo: lo que no entra aqui no se sube al motor de Docker.
+#
+# Sin esto, el contexto son varios GB de node_modules y `.next`, y la construccion tarda minutos
+# antes de ejecutar la primera instruccion. Ademas node_modules del anfitrion es de Windows: dentro
+# de la imagen (Linux) no serviria, y de colarse taparia al que se instala en el propio Dockerfile.
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.next-mirar
+**/.next-mirar
+.turbo
+**/.turbo
+coverage
+**/coverage
+test-results
+playwright-report
+storage-dev
+
+# Repositorio y meta
+.git
+.github
+.claude
+
+# SECRETOS: nunca entran en una imagen. Las llaves se montan desde la maquina.
+.env
+.env.*
+keys/*.pem
+
+# Documentacion y adjuntos: no hacen falta en tiempo de ejecucion.
+docs
+*.md
+*.xlsx
+*.docx
+*.pdf
+*.jpg
+~$*

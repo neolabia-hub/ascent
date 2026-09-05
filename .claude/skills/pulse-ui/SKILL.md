@@ -131,6 +131,15 @@ Derivadas en runtime: --brand-primary-soft (10% sobre superficie), --brand-prima
   El ESQUELETO de carga dibuja ESTA pantalla, no la anterior. Se quedo pintando la barra oscura y
   la franja con filo, y cada carga ensenaba medio segundo del diseno viejo antes de saltar al
   nuevo: un esqueleto que no coincide con lo que llega es peor que no tener esqueleto.
+- Barra lateral: el orden es la FRECUENCIA CON QUE SE ABRE cada cosa, no el ciclo de vida del
+  producto (Decision #130). Lo que se mira cada manana —Inicio, Seguimiento, Plan— va arriba; el
+  catalogo se toca unas semanas al ano y baja. Las secciones (`Programar`, `Administrar`) llevan
+  rotulo de 10px en mayusculas, y al plegar la barra el rotulo se sustituye por una linea: el texto
+  no cabe en 76px pero la separacion entre grupos si tiene que sobrevivir.
+  **Se despliega lo que son DESTINOS PROPIOS** (las seis pantallas de Configuracion), **no lo que
+  son filtros de una misma pantalla** (las vistas del plan): sacar filtros al menu promete varios
+  destinos donde hay uno, y obliga a mantener sincronizado el estado de la pantalla con el
+  subrayado del menu.
 - Contenido: max-width 1280px, titulo de pagina (display 28) + subtitulo gris + acciones a la
   derecha. Tablas densas con: busqueda, filtros como pills, orden por columna, paginacion
   "1-20 de 134". Filas con hover --paper. Estados con StatusPill (texto + punto de color).
@@ -143,6 +152,22 @@ Derivadas en runtime: --brand-primary-soft (10% sobre superficie), --brand-prima
   para ver lo que se acaba de escribir, y no hay sitio para la vista previa —que es lo unico que
   dice si la evaluacion quedo bien—. La linea es: rellenar campos, cajon; armar una pieza,
   pantalla.
+  **LEER algo tampoco va en cajon: va en VENTANA CENTRADA** (`ui/modal.tsx`, Decision #131). El
+  cajon secuestra la mitad derecha de la pantalla, y eso se paga con gusto cuando hay que ver la
+  tabla de atras mientras se rellena — pero no para ensenar dos parrafos que se consultan una vez
+  al trimestre (el objetivo y el alcance del plan). Se abre en el centro, se lee, se cierra.
+  **La regla completa: campos SOBRE UNA TABLA que hay que seguir viendo, cajon; formulario de la
+  propia pantalla (la cabecera del plan), VENTANA; leer, ventana; construir una pieza, pantalla.**
+- Un boton DESHABILITADO se ve deshabilitado: `disabled:opacity-45` y sin sombra (Decision #137).
+  Con solo `cursor-not-allowed` conservaba su relleno de marca y su texto blanco, asi que parecia
+  pulsable y solo se descubria al pulsarlo y no pasar nada. **No se atenua mientras carga**: un boton
+  con la rueda girando esta trabajando, no apagado.
+- Una ESCALA se marca siempre igual, con `ui/escala.tsx`: botones grandes, todas las opciones a la
+  vista y los extremos escritos. Caras para satisfaccion; numeros para calificar a una persona —un
+  emoticono convierte un juicio profesional en otra cosa (Decision #136).
+- La pestana o vista ACTIVA se pinta con `var(--brand-primary)` y texto blanco, nunca una pastilla
+  blanca sobre carril claro: sobre fondo blanco eso solo se distingue por una sombra de un pixel y
+  deja de decir donde estas (Decision #132).
 - Formularios: label arriba (13/500), input 40px, ayuda 12 gris debajo, error --danger con
   icono; validacion en blur + on-submit. Grupos de 2 columnas maximo.
 
@@ -386,6 +411,34 @@ Todas mueren solas con `prefers-reduced-motion` por la regla global del final de
   Sobre una FOTO el boton se queda BLANCO y solo el halo lleva color: encima de una portada
   cualquiera, el blanco es lo unico que se lee igual siempre, y el halo es lo que lo despega del
   fondo sin robarle contraste al texto.
+
+- **Escala** (`ui/escala.tsx`): MARCADO = RELLENO SOLIDO del color principal con el numero en
+  blanco, no un tinte. Cambio del 2026-09-02. Un 10% de color marca bien un item de menu —hay uno
+  solo y siempre en el mismo sitio—; en una fila de cinco botones iguales, donde lo unico que se
+  pregunta es CUAL elegiste, ese tinte se pierde. En el telefono de la bodega, directamente no se ve.
+
+- **`--primary-soft` NO EXISTE: es `--brand-primary-soft`.** Se escribio mal en 14 sitios —barra
+  lateral, barra superior, conmutador de espacio, encuestas, la escala, constancias— y como una
+  variable CSS que no existe no pinta nada y tampoco falla, el relleno de "activo" llevaba semanas
+  sin verse en ninguno. Corregido el 2026-09-02. Si algo que deberia estar resaltado se ve solo con
+  borde, este es el primer sitio donde mirar.
+
+- **Los "soft" se mezclan con `--surface`, no con `white`** (2026-09-02), y el porcentaje sube:
+  **14% en claro, 34% en la superficie oscura del aprendiz**. Con `white` fijo, un 10% de un azul
+  oscuro sobre blanco daba un gris tan palido que el item activo no se distinguia —el cliente lo
+  reporto como "esto no se ve"—, y en oscuro producia un bloque casi blanco sobre fondo negro. La
+  formula con `--surface` sirve en los dos temas.
+
+- **NO SE APILAN VENTANAS.** Una confirmacion encima de la ventana que confirma son dos velos
+  difuminados, dos cajas redondeadas y la de abajo asomando por los lados: se lee como un error de
+  la pantalla, no como una advertencia. La confirmacion es un **PASO de la misma ventana** —cambian
+  titulo, icono, contenido y botones—: no te abrieron algo nuevo, te piden confirmar lo que ya
+  tenias delante. Ver `desempeno/evaluar-desempeno.tsx`.
+
+- **Modal**: `size="lg"` (880px) cuando la ventana se arma MIRANDO el resultado —el formulario de
+  desempeno con su vista previa fija al lado—; `md` (560) para todo lo demas. Y `icon` para la
+  pastilla de color en la cabecera: en un producto donde se abren cinco ventanas al dia, el icono es
+  lo que hace reconocible cual es antes de leer el titulo.
 
 - **StatusPill**: punto 6px + etiqueta MAYUSCULAS 11/600 tracking .04em. CUMPLIDO=ok,
   PENDIENTE=warn, VENCIDO=danger, BORRADOR=ink-300, PUBLICADA=info, BLOQUEADO=danger.

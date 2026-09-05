@@ -69,9 +69,9 @@ function MyLearning() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-[26px] font-semibold text-ink-900 lg:text-[32px]">Mi formacion</h1>
+      <h1 className="font-display text-[26px] font-semibold text-ink-900 lg:text-[32px]">Mi aprendizaje</h1>
 
-      <div role="tablist" aria-label="Mi formacion" className="flex gap-1 rounded-full bg-paper p-1 sm:max-w-md">
+      <div role="tablist" aria-label="Mi aprendizaje" className="flex gap-1 rounded-full bg-paper p-1 sm:max-w-md">
         <TabButton active={tab === 'pendiente'} onClick={() => setTab('pendiente')}>
           Pendiente{pending && pending.length > 0 ? ` (${pending.length})` : ''}
         </TabButton>

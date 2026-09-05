@@ -172,6 +172,14 @@ enum AssignmentStatus {
   // consultas porque lo abierto se pide por lista blanca (PENDING/IN_PROGRESS/OVERDUE).
   WITHDRAWN_PLAN_ITEM_CANCELLED
   WAIVED
+  // CERRO EL PERIODO Y NO LA HIZO. Es lo que faltaba para que una CAMPANA anual pueda pasar de
+  // ano: la reinduccion de 2026 se cierra, quien no la hizo queda asi —y eso ES un incumplimiento
+  // de 2026, a diferencia de RETIRADA o EXIMIDA, que no cuentan— y la de 2027 nace para todos.
+  //
+  // Sin este estado el motor solo abria la ronda siguiente si la anterior estaba CUMPLIDA, asi que
+  // quien nunca la hacia desaparecia del denominador de todos los anos siguientes: el peor
+  // incumplidor salia de la cuenta y la cobertura se veia mejor de lo que era.
+  EXPIRED_NOT_DONE
 }
 
 // QUE DISPARA la obligacion. El eje es siempre el mismo: quien decide que a esta persona le toca.
@@ -351,12 +359,12 @@ model Tenant {
 // ──────────────────────── 6.2 Organizacion (catalogos) ────────────────────────
 
 model Area {
-  id            String  @id @default(uuid()) @db.Uuid
-  tenantId      String  @map("tenant_id") @db.Uuid
-  name          String
-  code          String
-  parentId      String? @map("parent_id") @db.Uuid
-  parent        Area?   @relation("AreaTree", fields: [parentId], references: [id])
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  name     String
+  code     String
+  parentId String? @map("parent_id") @db.Uuid
+  parent   Area?   @relation("AreaTree", fields: [parentId], references: [id])
 
   /// QUIEN DIRIGE EL AREA (Decision #115). Es quien responde la encuesta de EFICACIA sobre su
   /// gente: el unico que puede decir si lo aprendido se aplica en el puesto.
@@ -365,10 +373,10 @@ model Area {
   /// eficacia. Es mejor que inventar un evaluador que no ha visto trabajar a nadie.
   responsibleUserId String? @map("responsible_user_id") @db.Uuid
   responsible       User?   @relation("AreasQueDirige", fields: [responsibleUserId], references: [id])
-  children      Area[]  @relation("AreaTree")
-  managerUserId String? @map("manager_user_id") @db.Uuid
-  active        Boolean @default(true)
-  displayOrder  Int     @default(0) @map("display_order")
+  children          Area[]  @relation("AreaTree")
+
+  active       Boolean @default(true)
+  displayOrder Int     @default(0) @map("display_order")
 
   users         User[]
   processes     Process[]
@@ -430,8 +438,9 @@ model JobTitle {
   active         Boolean      @default(true)
   displayOrder   Int          @default(0) @map("display_order")
 
-  users              User[]
-  activityJobTitles  ActivityJobTitle[]
+  users             User[]
+  activityJobTitles ActivityJobTitle[]
+  performanceForms  PerformanceFormJobTitle[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -452,10 +461,10 @@ model Service {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  users     User[]
 
   @@unique([tenantId, code])
   @@map("services")
-  users     User[]
 }
 
 model Regional {
@@ -509,28 +518,28 @@ model User {
   /// Foto de perfil, subida por la propia persona. Nulable siempre: sin ella van las iniciales.
   avatarKey      String?      @map("avatar_key")
 
-  passwordHash        String    @map("password_hash")
-  mustChangePassword  Boolean   @default(true) @map("must_change_password")
-  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime? @map("locked_until")
-  lastLogin           DateTime? @map("last_login")
+  passwordHash        String        @map("password_hash")
+  mustChangePassword  Boolean       @default(true) @map("must_change_password")
+  failedLoginAttempts Int           @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?     @map("locked_until")
+  lastLogin           DateTime?     @map("last_login")
   /// OBSOLETA (Decision #91): las sesiones viven en `user_sessions`. Se conserva la columna para
   /// no romper la migracion; deja de escribirse y de leerse.
-  refreshTokenHash    String?   @map("refresh_token_hash")
+  refreshTokenHash    String?       @map("refresh_token_hash")
   sessions            UserSession[]
 
-  jobTitleId String    @map("job_title_id") @db.Uuid
-  jobTitle   JobTitle  @relation(fields: [jobTitleId], references: [id])
-  areaId     String    @map("area_id") @db.Uuid
-  area       Area      @relation(fields: [areaId], references: [id])
+  jobTitleId     String    @map("job_title_id") @db.Uuid
+  jobTitle       JobTitle  @relation(fields: [jobTitleId], references: [id])
+  areaId         String    @map("area_id") @db.Uuid
+  area           Area      @relation(fields: [areaId], references: [id])
   /// Las areas que DIRIGE (distinto de la suya): a quien evalua en las encuestas de eficacia.
-  areasQueDirige Area[]   @relation("AreasQueDirige")
-  regionalId String?   @map("regional_id") @db.Uuid
+  areasQueDirige Area[]    @relation("AreasQueDirige")
+  regionalId     String?   @map("regional_id") @db.Uuid
   // Linea de servicio a la que pertenece (almacenamiento, masivo, paqueteo). OPCIONAL: hay
   // empresas que no organizan asi a su gente, y exigirlo bloquearia su carga masiva entera.
-  serviceId  String?   @map("service_id") @db.Uuid
-  service    Service?  @relation(fields: [serviceId], references: [id])
-  regional   Regional? @relation(fields: [regionalId], references: [id])
+  serviceId      String?   @map("service_id") @db.Uuid
+  service        Service?  @relation(fields: [serviceId], references: [id])
+  regional       Regional? @relation(fields: [regionalId], references: [id])
 
   birthDate      DateTime?      @map("birth_date") @db.Date // felicitaciones, indicadores por edad
   hiredAt        DateTime?      @map("hired_at") @db.Date // dispara induccion PREVIA al inicio (D1072)
@@ -559,13 +568,13 @@ model User {
   assignments     Assignment[]
   attempts        Attempt[]
   audienceMembers AudienceMember[]
-  processesLed    Process[]               @relation("ProcesosQueLidera")
-  versionsLed     ActivityVersion[]       @relation("VersionesQueResponde")
+  processesLed    Process[]                @relation("ProcesosQueLidera")
+  versionsLed     ActivityVersion[]        @relation("VersionesQueResponde")
   streak          UserStreak?
 
   @@unique([tenantId, documentNumber])
   @@unique([tenantId, email])
-    @@index([tenantId, active, fullName])
+  @@index([tenantId, active, fullName])
   // Lo creo la migracion `user_service` y nunca se declaro aqui: sin esta linea, la siguiente
   // migracion generada lo BORRA. Lo usa el filtro de audiencias por linea de servicio.
   @@index([tenantId, serviceId])
@@ -725,7 +734,7 @@ model Activity {
   /// NULL es un estado NORMAL, no un hueco: sin foto se pinta una portada generada a partir del
   /// id y del tipo (ver `cover.tsx`). Exigirla dejaria media biblioteca en gris el primer dia, y
   /// bloquear la publicacion de una capacitacion obligatoria por una foto seria absurdo.
-  coverKey          String?      @map("cover_key")
+  coverKey String? @map("cover_key")
 
   /// ¿ESTA FORMACION ENTREGA CONSTANCIA? (Decision #110). Editable aqui y CONGELADO al publicar en
   /// `ActivityVersion.issuesCertificate`: desmarcarlo manana no puede dejar sin explicacion las
@@ -735,12 +744,12 @@ model Activity {
   /// `false` fuerza que no. La pregunta es por CLASE de formacion, no por formacion: una pildora
   /// no acredita y una induccion si, y eso no cambia entre las doscientas de una empresa. Lo que
   /// hay que marcar doscientas veces se olvida.
-  issuesCertificate Boolean?     @map("issues_certificate")
+  issuesCertificate Boolean? @map("issues_certificate")
 
   /// Horas que acredita el papel. Es el numero que el auditor SUMA por persona y por tema, asi que
   /// no es lo mismo que `estimatedMinutes` —lo que se tarda en cursarla— y por eso es un campo
   /// aparte: una capacitacion presencial de 8 horas puede tener 20 minutos de contenido virtual.
-  certificateHours  Int?         @map("certificate_hours")
+  certificateHours Int? @map("certificate_hours")
 
   /// ¿SE MIDE LA EFICACIA de esta formacion? (Decision #118)
   ///
@@ -750,13 +759,15 @@ model Activity {
   /// tipo— la eficacia depende de la naturaleza de la formacion concreta: en alturas importa si
   /// usa el arnes como le ensenaron; en una actualizacion documental, preguntarle al jefe a los 30
   /// dias si "aplica" no significa nada. Dentro de un mismo tipo conviven las dos.
-  requiresEfficacy  Boolean?     @map("requires_efficacy")
+  requiresEfficacy Boolean? @map("requires_efficacy")
 
-  versions   ActivityVersion[]  @relation("ActivityVersions")
-  norms      ActivityNorm[]
-  services   ActivityService[]
-  regionals  ActivityRegional[]
-  jobTitles  ActivityJobTitle[]
+  versions    ActivityVersion[]       @relation("ActivityVersions")
+  norms       ActivityNorm[]
+  services    ActivityService[]
+  /// Competencias de desempeno que esta formacion fortalece (solo un puntero; ver PerformanceCompetency).
+  strengthens PerformanceCompetency[]
+  regionals   ActivityRegional[]
+  jobTitles   ActivityJobTitle[]
 
   active    Boolean   @default(true)
   version   Int       @default(1) // optimistic lock
@@ -767,7 +778,7 @@ model Activity {
   deletedAt DateTime? @map("deleted_at")
 
   @@unique([tenantId, code])
-    @@index([tenantId, active, updatedAt])
+  @@index([tenantId, active, updatedAt])
   @@index([tenantId, activityTypeId])
   @@index([tenantId, processId])
   @@map("activities")
@@ -855,34 +866,34 @@ model ActivityVersion {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([activityId, versionNumber])
-    @@index([activityId, status])
+  @@index([activityId, status])
   @@map("activity_versions")
 }
 
 model ActivityContent {
-  id                  String            @id @default(uuid()) @db.Uuid
-  tenantId            String            @map("tenant_id") @db.Uuid
-  activityVersionId   String            @map("activity_version_id") @db.Uuid
-  activityVersion     ActivityVersion   @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
-  type                ContentType
-  title               String
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  activityVersionId String          @map("activity_version_id") @db.Uuid
+  activityVersion   ActivityVersion @relation(fields: [activityVersionId], references: [id], onDelete: Cascade)
+  type              ContentType
+  title             String
   /// Descripcion editorial de ESTA pieza, no de la actividad. La lee quien cursa.
-  description         String?
-  displayOrder        Int               @map("display_order")
-  isRequired          Boolean           @default(true) @map("is_required")
-  config              Json              @default("{}") // min_watch_pct, min_seconds...
-  lessonId            String?           @map("lesson_id") @db.Uuid
-  lesson              Lesson?           @relation(fields: [lessonId], references: [id])
-  contentPackageId    String?           @map("content_package_id") @db.Uuid
-  contentPackage      ContentPackage?   @relation(fields: [contentPackageId], references: [id])
-  assessmentId        String?           @map("assessment_id") @db.Uuid
-  assessment          Assessment?       @relation(fields: [assessmentId], references: [id])
-  surveyTemplateId    String?           @map("survey_template_id") @db.Uuid
-  surveyTemplate      SurveyTemplate?   @relation(fields: [surveyTemplateId], references: [id])
+  description       String?
+  displayOrder      Int             @map("display_order")
+  isRequired        Boolean         @default(true) @map("is_required")
+  config            Json            @default("{}") // min_watch_pct, min_seconds...
+  lessonId          String?         @map("lesson_id") @db.Uuid
+  lesson            Lesson?         @relation(fields: [lessonId], references: [id])
+  contentPackageId  String?         @map("content_package_id") @db.Uuid
+  contentPackage    ContentPackage? @relation(fields: [contentPackageId], references: [id])
+  assessmentId      String?         @map("assessment_id") @db.Uuid
+  assessment        Assessment?     @relation(fields: [assessmentId], references: [id])
+  surveyTemplateId  String?         @map("survey_template_id") @db.Uuid
+  surveyTemplate    SurveyTemplate? @relation(fields: [surveyTemplateId], references: [id])
 
   progress ActivityProgress[]
 
-    @@index([activityVersionId, displayOrder])
+  @@index([activityVersionId, displayOrder])
   @@map("activity_contents")
 }
 
@@ -900,7 +911,7 @@ model Lesson {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-    @@index([tenantId, status, updatedAt])
+  @@index([tenantId, status, updatedAt])
   @@map("lessons")
 }
 
@@ -914,7 +925,7 @@ model LessonCard {
   payload      Json     @default("{}")
   mediaKey     String?  @map("media_key")
 
-    @@index([lessonId, displayOrder])
+  @@index([lessonId, displayOrder])
   @@map("lesson_cards")
 }
 
@@ -976,6 +987,10 @@ model Offering {
   instructorCredentialKey String?    @map("instructor_credential_key") // idoneidad adjuntable
   executedBy              ExecutedBy @default(PROPIOS) @map("executed_by")
   executedByOther         String?    @map("executed_by_other")
+  /// EL ACTA firmada de la jornada: UN documento para todos los que asistieron, no uno por
+  /// persona. Es como se hace de verdad —una hoja que circula y se firma— y pedirla por cabeza
+  /// obligaria a subir veinte veces el mismo escaneo.
+  attendanceSheetKey      String?    @map("attendance_sheet_key")
 
   location   String?
   regionalId String?   @map("regional_id") @db.Uuid
@@ -1018,7 +1033,7 @@ model Offering {
   updatedBy String?  @map("updated_by") @db.Uuid
 
   @@unique([tenantId, code])
-    @@index([tenantId, status, scheduledDate])
+  @@index([tenantId, status, scheduledDate])
   @@index([activityVersionId])
   @@index([audienceId])
   @@map("offerings")
@@ -1035,24 +1050,52 @@ model Enrollment {
   activityVersion   ActivityVersion @relation(fields: [activityVersionId], references: [id])
   assignmentId      String?         @map("assignment_id") @db.Uuid
 
-  status      EnrollmentStatus @default(ENROLLED)
-  enrolledAt  DateTime         @default(now()) @map("enrolled_at")
-  startedAt   DateTime?        @map("started_at")
-  completedAt DateTime?        @map("completed_at")
-  finalScore  Decimal?         @map("final_score") @db.Decimal(5, 2)
+  status        EnrollmentStatus @default(ENROLLED)
+  enrolledAt    DateTime         @default(now()) @map("enrolled_at")
+  startedAt     DateTime?        @map("started_at")
+  completedAt   DateTime?        @map("completed_at")
+  finalScore    Decimal?         @map("final_score") @db.Decimal(5, 2)
   // Por VALOR: titulo, version, nota minima exigida, temario ref, y cargo/area/vinculacion
   // del usuario AL MOMENTO (Decision #33).
-  scoreSnapshot Json           @default("{}") @map("score_snapshot")
+  scoreSnapshot Json             @default("{}") @map("score_snapshot")
 
   blockedAt     DateTime? @map("blocked_at") // intentos agotados -> refuerzo
   blockedReason String?   @map("blocked_reason")
   unblockedBy   String?   @map("unblocked_by") @db.Uuid
 
+  /// ─────────── LA SEGUNDA VIA DE EVIDENCIA: LA ASISTENCIA (Decision #157) ───────────
+  ///
+  /// Hasta aqui una ejecucion solo se cerraba de UNA forma: la persona entrando a la plataforma
+  /// y completando el contenido. En una empresa bajo SG-SST la mayor parte del plan anual se
+  /// dicta en salon —charlas de seguridad vial, brigadas, lo que trae la ARL—, y de eso no queda
+  /// contenido que completar: queda una LISTA DE ASISTENCIA firmada, que es la evidencia que el
+  /// auditor pide. Sin esto, todo lo dictado presencialmente contaba como incumplido.
+  attendedAt   DateTime? @map("attended_at")
+  /// Quien la marco. Cerrar por asistencia SALTA la evaluacion que exige el tipo —el examen lo
+  /// puso el instructor en el salon— asi que tiene que constar quien respondio por ello.
+  attendanceBy String?   @map("attendance_by") @db.Uuid
+
+  /// ─────────── LA TERCERA: EL PAPEL DE UN TERCERO (Decision #157) ───────────
+  ///
+  /// Alturas, espacios confinados, montacargas, manipulacion de alimentos: la norma exige el
+  /// certificado de un organismo acreditado, y ahi la empresa es RECEPTORA, no emisora. El
+  /// sistema no emite ese papel; lo REGISTRA, porque quien necesita saber cuando vence es la
+  /// empresa. Es UNO POR PERSONA —cada quien tiene su numero— a diferencia del acta, que es una
+  /// por jornada.
+  extCertIssuer     String?   @map("ext_cert_issuer")
+  extCertNumber     String?   @map("ext_cert_number")
+  extCertIssuedAt   DateTime? @map("ext_cert_issued_at")
+  /// LO QUE DICE EL PAPEL, que MANDA sobre lo que calcula el motor: si la ARL certifica por tres
+  /// anos y el tipo dice doce meses, vale el papel. Se copia a `assignments.valid_until_override`
+  /// para que el motor no tenga que venir hasta aqui a buscarlo.
+  extCertValidUntil DateTime? @map("ext_cert_valid_until")
+  extCertFileKey    String?   @map("ext_cert_file_key")
+
   progress ActivityProgress[]
   attempts Attempt[]
 
   @@unique([offeringId, userId])
-    @@index([tenantId, userId, status])
+  @@index([tenantId, userId, status])
   @@index([offeringId, status])
   @@map("enrollments")
 }
@@ -1135,7 +1178,7 @@ model Audience {
   members   AudienceMember[]
   // Jornadas cuya TAJADA es esta audiencia (Decision #68).
   offerings Offering[]
-  rules   AssignmentRule[]
+  rules     AssignmentRule[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1160,25 +1203,25 @@ model AudienceMember {
 
 // El "Requisito": obligacion viva en el tiempo (Decision #12).
 model AssignmentRule {
-  id                   String               @id @default(uuid()) @db.Uuid
-  tenantId             String               @map("tenant_id") @db.Uuid
-  audienceId           String               @map("audience_id") @db.Uuid
-  audience             Audience             @relation(fields: [audienceId], references: [id])
-  targetType           AssignmentTargetType @map("target_type")
-  targetId             String               @map("target_id") @db.Uuid
-  trigger              RuleTrigger
-  dueDaysAfterTrigger  Int?                 @map("due_days_after_trigger")
-  recurrence           Json?                // {every_months} | {fixed_date: "01-31"}
+  id                  String               @id @default(uuid()) @db.Uuid
+  tenantId            String               @map("tenant_id") @db.Uuid
+  audienceId          String               @map("audience_id") @db.Uuid
+  audience            Audience             @relation(fields: [audienceId], references: [id])
+  targetType          AssignmentTargetType @map("target_type")
+  targetId            String               @map("target_id") @db.Uuid
+  trigger             RuleTrigger
+  dueDaysAfterTrigger Int?                 @map("due_days_after_trigger")
+  recurrence          Json? // {every_months} | {fixed_date: "01-31"}
   /// Solo obliga a quien entre a la audiencia DESPUES de esta fecha. NULL = a todos, tambien a
   /// los que ya estaban. Es el caso de la puesta en marcha: las inducciones que la plantilla
   /// actual ya hizo en papel no deben aparecerle como pendientes, y eximir 116 veces no es una
   /// salida. No es la GRACIA de `due-date.ts`: la gracia da PLAZO a quien ya estaba; esto decide
   /// si se le exige siquiera.
-  appliesFrom          DateTime?            @map("applies_from")
-  active               Boolean              @default(true)
-  createdBy            String?              @map("created_by") @db.Uuid
-  createdAt            DateTime             @default(now()) @map("created_at")
-  updatedAt            DateTime             @updatedAt @map("updated_at")
+  appliesFrom         DateTime?            @map("applies_from")
+  active              Boolean              @default(true)
+  createdBy           String?              @map("created_by") @db.Uuid
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
   assignments Assignment[]
 
@@ -1208,6 +1251,18 @@ model Assignment {
   waivedBy     String? @map("waived_by") @db.Uuid
   waivedReason String? @map("waived_reason")
 
+  /// HASTA CUANDO VALE DE VERDAD, cuando lo dice un papel y no la configuracion (Decision #157).
+  ///
+  /// La regla general sigue siendo la de la Decision #111: la vigencia sale de la recurrencia, y
+  /// pedirla aparte seria pedir el mismo dato dos veces. La excepcion es el certificado de un
+  /// TERCERO, donde la fecha no la pone la empresa: la pone quien lo expidio. Si la ARL certifica
+  /// por tres anos y el tipo dice doce meses, reclamar al ano seria inventar un incumplimiento.
+  ///
+  /// Vive aqui y no solo en la inscripcion porque es el motor quien lo necesita —`cycleAnchor`
+  /// lo lee para saber desde cuando contar la ronda siguiente— y la obligacion es la fila que el
+  /// auditor ya rastrea. `null` es lo normal: sin papel, manda la recurrencia.
+  validUntilOverride DateTime? @map("valid_until_override")
+
   // Enlace asignacion -> ejecucion que la satisfizo (Decision #2: se enlazan, no se fusionan).
   completedEnrollmentId String?   @map("completed_enrollment_id") @db.Uuid
   // Cuando quedo cumplida. Es el ANCLA de la recurrencia ("cada 12 meses desde que la hizo"):
@@ -1223,6 +1278,8 @@ model Assignment {
   @@index([tenantId, userId, status])
   @@index([tenantId, targetType, targetId])
   @@index([tenantId, status, dueAt])
+  /// Lo que se vence mirando hacia adelante: la consulta del informe de Vencimientos.
+  @@index([tenantId, validUntilOverride])
   @@map("assignments")
 }
 
@@ -1326,15 +1383,15 @@ model PathItem {
 }
 
 model PathEnrollment {
-  id          String       @id @default(uuid()) @db.Uuid
-  tenantId    String       @map("tenant_id") @db.Uuid
-  pathId      String       @map("path_id") @db.Uuid
-  path        LearningPath @relation(fields: [pathId], references: [id])
-  userId      String       @map("user_id") @db.Uuid
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  pathId      String           @map("path_id") @db.Uuid
+  path        LearningPath     @relation(fields: [pathId], references: [id])
+  userId      String           @map("user_id") @db.Uuid
   status      EnrollmentStatus @default(ENROLLED)
-  progressPct Int          @default(0) @map("progress_pct")
-  completedAt DateTime?    @map("completed_at")
-  createdAt   DateTime     @default(now()) @map("created_at")
+  progressPct Int              @default(0) @map("progress_pct")
+  completedAt DateTime?        @map("completed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   @@unique([pathId, userId])
   @@map("path_enrollments")
@@ -1358,20 +1415,20 @@ model QuestionCategory {
 }
 
 model Question {
-  id               String           @id @default(uuid()) @db.Uuid
-  tenantId         String           @map("tenant_id") @db.Uuid
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
   // El TEMA es opcional (Decision #84): solo hace falta para los bloques al azar, que sacan
   // N preguntas de un tema. Obligarlo ponia una ceremonia delante de la primera pregunta.
   categoryId       String?           @map("category_id") @db.Uuid
   category         QuestionCategory? @relation(fields: [categoryId], references: [id])
-  currentVersionId String?          @unique @map("current_version_id") @db.Uuid
-  active           Boolean          @default(true)
+  currentVersionId String?           @unique @map("current_version_id") @db.Uuid
+  active           Boolean           @default(true)
 
   versions QuestionVersion[]
 
   createdAt DateTime @default(now()) @map("created_at")
 
-    @@index([tenantId, categoryId, active])
+  @@index([tenantId, categoryId, active])
   @@map("questions")
 }
 
@@ -1394,7 +1451,7 @@ model QuestionVersion {
   attemptQuestions AttemptQuestion[]
 
   @@unique([questionId, versionNumber])
-    @@index([questionId, versionNumber])
+  @@index([questionId, versionNumber])
   @@map("question_versions")
 }
 
@@ -1444,14 +1501,14 @@ model UserSession {
   previousValidUntil DateTime? @map("previous_valid_until")
 
   /// Para que la persona pueda reconocer sus sesiones si algun dia se listan.
-  userAgent String?  @map("user_agent")
-  ipAddress String?  @map("ip_address")
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  userAgent  String?  @map("user_agent")
+  ipAddress  String?  @map("ip_address")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
   lastUsedAt DateTime @default(now()) @map("last_used_at")
 
-    @@index([userId, expiresAt])
-    @@index([tokenHash])
+  @@index([userId, expiresAt])
+  @@index([tokenHash])
   @@map("user_sessions")
 }
 
@@ -1492,8 +1549,8 @@ model Assessment {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-    @@index([tenantId, status, updatedAt])
-    @@index([sourceId])
+  @@index([tenantId, status, updatedAt])
+  @@index([sourceId])
   @@map("assessments")
 }
 
@@ -1508,31 +1565,31 @@ model AssessmentSection {
   fixedQuestionVersionIds String[]    @default([]) @map("fixed_question_version_ids") @db.Uuid
   displayOrder            Int         @default(0) @map("display_order")
 
-    @@index([assessmentId, displayOrder])
+  @@index([assessmentId, displayOrder])
   @@map("assessment_sections")
 }
 
 model Attempt {
-  id                  String            @id @default(uuid()) @db.Uuid
-  tenantId            String            @map("tenant_id") @db.Uuid
-  enrollmentId        String            @map("enrollment_id") @db.Uuid
-  enrollment          Enrollment        @relation(fields: [enrollmentId], references: [id])
-  assessmentId        String            @map("assessment_id") @db.Uuid
-  assessment          Assessment        @relation(fields: [assessmentId], references: [id])
-  userId              String            @map("user_id") @db.Uuid
-  user                User              @relation(fields: [userId], references: [id])
-  attemptNumber       Int               @map("attempt_number")
-  status              AttemptStatus     @default(IN_PROGRESS)
-  startedAt           DateTime          @default(now()) @map("started_at")
-  submittedAt         DateTime?         @map("submitted_at")
-  score               Decimal?          @db.Decimal(5, 2)
-  passed              Boolean?
-  anomalyFlags        Json?             @map("anomaly_flags") // completitud en tiempo anomalo, etc.
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  enrollmentId  String        @map("enrollment_id") @db.Uuid
+  enrollment    Enrollment    @relation(fields: [enrollmentId], references: [id])
+  assessmentId  String        @map("assessment_id") @db.Uuid
+  assessment    Assessment    @relation(fields: [assessmentId], references: [id])
+  userId        String        @map("user_id") @db.Uuid
+  user          User          @relation(fields: [userId], references: [id])
+  attemptNumber Int           @map("attempt_number")
+  status        AttemptStatus @default(IN_PROGRESS)
+  startedAt     DateTime      @default(now()) @map("started_at")
+  submittedAt   DateTime?     @map("submitted_at")
+  score         Decimal?      @db.Decimal(5, 2)
+  passed        Boolean?
+  anomalyFlags  Json?         @map("anomaly_flags") // completitud en tiempo anomalo, etc.
 
   questions AttemptQuestion[]
 
   @@unique([enrollmentId, assessmentId, attemptNumber])
-    @@index([enrollmentId, attemptNumber])
+  @@index([enrollmentId, attemptNumber])
   @@map("attempts")
 }
 
@@ -1553,7 +1610,7 @@ model AttemptQuestion {
   gradedAt          DateTime?       @map("graded_at")
   invalidated       Boolean         @default(false) // anular y recalificar
 
-    @@index([attemptId, displayOrder])
+  @@index([attemptId, displayOrder])
   @@map("attempt_questions")
 }
 
@@ -1579,17 +1636,17 @@ model SurveyTemplate {
 }
 
 model SurveyResponse {
-  id                    String         @id @default(uuid()) @db.Uuid
-  tenantId              String         @map("tenant_id") @db.Uuid
-  surveyTemplateId      String         @map("survey_template_id") @db.Uuid
-  surveyTemplate        SurveyTemplate @relation(fields: [surveyTemplateId], references: [id])
-  templateVersion       Int            @map("template_version")
-  enrollmentId          String         @map("enrollment_id") @db.Uuid
-  respondentUserId      String         @map("respondent_user_id") @db.Uuid // participante o JEFE (eficacia)
-  answers               Json           @default("{}")
-  result                SurveyResult?
-  followUpAssignmentId  String?        @map("follow_up_assignment_id") @db.Uuid // refuerzo si eficacia negativa
-  respondedAt           DateTime       @default(now()) @map("responded_at")
+  id                   String         @id @default(uuid()) @db.Uuid
+  tenantId             String         @map("tenant_id") @db.Uuid
+  surveyTemplateId     String         @map("survey_template_id") @db.Uuid
+  surveyTemplate       SurveyTemplate @relation(fields: [surveyTemplateId], references: [id])
+  templateVersion      Int            @map("template_version")
+  enrollmentId         String         @map("enrollment_id") @db.Uuid
+  respondentUserId     String         @map("respondent_user_id") @db.Uuid // participante o JEFE (eficacia)
+  answers              Json           @default("{}")
+  result               SurveyResult?
+  followUpAssignmentId String?        @map("follow_up_assignment_id") @db.Uuid // refuerzo si eficacia negativa
+  respondedAt          DateTime       @default(now()) @map("responded_at")
 
   @@map("survey_responses")
 }
@@ -1609,17 +1666,17 @@ model EfficacySchedule {
 // ──────────────────── 6.11 Certificacion y certificados ────────────────────
 
 model Certification {
-  id               String  @id @default(uuid()) @db.Uuid
-  tenantId         String  @map("tenant_id") @db.Uuid
-  name             String
-  code             String
-  awardedByType    PathItemType @map("awarded_by_type") // ACTIVITY | PATH
-  awardedById      String  @map("awarded_by_id") @db.Uuid
-  renewalTargetId  String? @map("renewal_target_id") @db.Uuid // actividad de renovacion (puede ser distinta)
-  validityMonths   Int?    @map("validity_months")
-  fixedExpiryRule  Json?   @map("fixed_expiry_rule") // {month, day} — anclaje por fecha fija anual
-  renewalWindowDays Int    @default(60) @map("renewal_window_days")
-  active           Boolean @default(true)
+  id                String       @id @default(uuid()) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  name              String
+  code              String
+  awardedByType     PathItemType @map("awarded_by_type") // ACTIVITY | PATH
+  awardedById       String       @map("awarded_by_id") @db.Uuid
+  renewalTargetId   String?      @map("renewal_target_id") @db.Uuid // actividad de renovacion (puede ser distinta)
+  validityMonths    Int?         @map("validity_months")
+  fixedExpiryRule   Json?        @map("fixed_expiry_rule") // {month, day} — anclaje por fecha fija anual
+  renewalWindowDays Int          @default(60) @map("renewal_window_days")
+  active            Boolean      @default(true)
 
   grants CertificationGrant[]
 
@@ -1646,7 +1703,7 @@ model CertificationGrant {
   certificates Certificate[]
 
   @@unique([certificationId, userId, cycleNumber])
-    @@index([tenantId, userId, status])
+  @@index([tenantId, userId, status])
   @@index([tenantId, validUntil])
   @@map("certification_grants")
 }
@@ -1720,18 +1777,18 @@ model SequenceCounter {
 
 // Motor determinista 2-7-14-30 tipo Leitner (Decision #22).
 model ReviewQueueItem {
-  id                 String    @id @default(uuid()) @db.Uuid
-  tenantId           String    @map("tenant_id") @db.Uuid
-  userId             String    @map("user_id") @db.Uuid
-  questionVersionId  String    @map("question_version_id") @db.Uuid
-  sourceEnrollmentId String    @map("source_enrollment_id") @db.Uuid
-  stage              Int       @default(0) // 0..4
-  dueAt              DateTime  @map("due_at")
-  lapses             Int       @default(0)
-  lastResult         String?   @map("last_result") // PASS | FAIL
-  retired            Boolean   @default(false) // dominada (test out)
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  questionVersionId  String   @map("question_version_id") @db.Uuid
+  sourceEnrollmentId String   @map("source_enrollment_id") @db.Uuid
+  stage              Int      @default(0) // 0..4
+  dueAt              DateTime @map("due_at")
+  lapses             Int      @default(0)
+  lastResult         String?  @map("last_result") // PASS | FAIL
+  retired            Boolean  @default(false) // dominada (test out)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, questionVersionId])
   @@index([tenantId, userId, dueAt, retired])
@@ -1793,7 +1850,7 @@ model AiGenerationJob {
   sourceDocumentKey String      @map("source_document_key")
   target            AiJobTarget
   status            AiJobStatus @default(QUEUED)
-  draft             Json?       // tarjetas/preguntas propuestas; NUNCA se publica sin revision (Decision #24)
+  draft             Json? // tarjetas/preguntas propuestas; NUNCA se publica sin revision (Decision #24)
   requestedBy       String      @map("requested_by") @db.Uuid
   reviewedBy        String?     @map("reviewed_by") @db.Uuid
   createdAt         DateTime    @default(now()) @map("created_at")
@@ -1951,4 +2008,278 @@ model PlatformSettings {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// EVALUACION DE DESEMPENO (Decision #134). Ver docs/modulos/desempeno.md.
+//
+// NO COMPARTE MOTOR CON LOS EXAMENES, y es la decision de fondo del modulo. Un examen lo responde
+// el dueno de la nota; una evaluacion de desempeno la responde OTRA persona. Todo el motor de
+// examenes vive sobre `enrollments` y `attempts` —intentos, bloqueo, nota minima, recalificacion—
+// y encajar el desempeno ahi obligaria a inventar una inscripcion falsa por persona evaluada. Esa
+// inscripcion entraria en las metricas de formacion, que es exactamente lo que el cliente
+// prohibio: "no deben afectar ni mezclarse con capacitaciones o inducciones".
+//
+// REGLA QUE NO SE ROMPE: nada de aqui escribe en `enrollments`, `assignments` ni
+// `certification_grants`. Si algun dia alimenta el plan del ano siguiente, sera generando una
+// NECESIDAD de formacion, nunca tocando el cumplimiento.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/// La escala con la que se califica una competencia. Vive en la COMPETENCIA y no en la respuesta:
+/// es lo que permite tener "1 a 5" y "cumple / no cumple" en el mismo formulario sin columnas
+/// nulas por todas partes.
+enum PerformanceScale {
+  ONE_TO_FIVE
+  ONE_TO_TEN
+  YES_NO
+  /// Sin escala: solo texto. Para "logros del ano" o "plan de mejora".
+  TEXT_ONLY
+}
+
+enum PerformanceCycleStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+/// Quien califica. Una FILA POR EVALUADOR y no una fila con dos columnas: anadir pares o el jefe
+/// del jefe seria un valor mas en este enum, no una migracion de la tabla.
+enum PerformanceReviewerRole {
+  SELF
+  MANAGER
+}
+
+enum PerformanceReviewStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+}
+
+/// QUE se evalua. Catalogo del tenant, editable desde la interfaz: es lo que hace el modulo
+/// "muy parametrizable" sin tocar codigo, que fue el pedido literal del cliente.
+model PerformanceCompetency {
+  id           String           @id @default(uuid()) @db.Uuid
+  tenantId     String           @map("tenant_id") @db.Uuid
+  code         String
+  name         String
+  description  String?
+  scale        PerformanceScale @default(ONE_TO_FIVE)
+  active       Boolean          @default(true)
+  displayOrder Int              @default(0) @map("display_order")
+
+  /// QUE FORMACION FORTALECE ESTA COMPETENCIA. Es la costura hacia el plan del ano siguiente: la
+  /// idea del cliente es que una calificacion baja se convierta en una necesidad de formacion, y
+  /// para eso hace falta saber QUE formacion la cubre.
+  ///
+  /// Se anade ahora y no cuando se construya ese puente: es una columna anulable hoy, y despues
+  /// seria una migracion mas volver a pedirle al cliente que rellene el catalogo entero.
+  ///
+  /// HOY NO LA LEE NADIE. Apuntar no es exigir: nada la convierte en obligacion automaticamente,
+  /// porque decidir a quien se forma el ano que viene es una decision de personas, no un disparo
+  /// del sistema.
+  suggestedActivityId String?   @map("suggested_activity_id") @db.Uuid
+  suggestedActivity   Activity? @relation(fields: [suggestedActivityId], references: [id])
+
+  items PerformanceFormItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@map("performance_competencies")
+}
+
+/// El formulario: que competencias se preguntan y con que peso. Puede acotarse a unos cargos
+/// —lo que se le pregunta a un conductor no es lo que se le pregunta a un analista— y sin cargos
+/// aplica a toda la empresa.
+model PerformanceForm {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  name        String
+  description String?
+  active      Boolean @default(true)
+
+  /// DE QUE FORMULARIO HEREDA LAS COMPETENCIAS COMUNES (Decision #141).
+  ///
+  /// Las dos capas que usa todo el sector: unas competencias ORGANIZACIONALES iguales para todos
+  /// —seguridad, trabajo en equipo, los valores— y unas DEL CARGO. Sin esto, las comunes hay que
+  /// repetirlas dentro de cada formulario de cargo: con cinco cargos da igual, con cuarenta,
+  /// cambiar una obliga a editar cuarenta formularios y el que se olvide se evalua distinto sin
+  /// que nadie lo note.
+  ///
+  /// SE HEREDA UN SOLO NIVEL, a proposito. Una cadena de plantillas heredando de plantillas es
+  /// imposible de leer en pantalla y de explicar a quien la configura una vez al ano: al elegir
+  /// base solo se ofrecen formularios que no heredan de nadie.
+  ///
+  /// Lo que NO cambia: cada persona sigue respondiendo UN formulario, con UNA evaluacion y UNA
+  /// nota. Al abrir el ciclo la copia congelada junta las dos listas —primero las comunes, despues
+  /// las del cargo— y a partir de ahi el modulo entero funciona igual que antes.
+  baseFormId String?           @map("base_form_id") @db.Uuid
+  base       PerformanceForm?  @relation("FormBase", fields: [baseFormId], references: [id])
+  derivados  PerformanceForm[] @relation("FormBase")
+
+  items      PerformanceFormItem[]
+  jobTitles  PerformanceFormJobTitle[]
+  cycleForms PerformanceCycleForm[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, active])
+  @@map("performance_forms")
+}
+
+model PerformanceFormItem {
+  id           String                @id @default(uuid()) @db.Uuid
+  tenantId     String                @map("tenant_id") @db.Uuid
+  formId       String                @map("form_id") @db.Uuid
+  form         PerformanceForm       @relation(fields: [formId], references: [id], onDelete: Cascade)
+  competencyId String                @map("competency_id") @db.Uuid
+  competency   PerformanceCompetency @relation(fields: [competencyId], references: [id])
+  /// Peso relativo dentro del formulario. Con todos a 1 es un promedio simple.
+  weight       Int                   @default(1)
+  displayOrder Int                   @default(0) @map("display_order")
+
+  @@unique([formId, competencyId])
+  @@index([tenantId])
+  @@map("performance_form_items")
+}
+
+model PerformanceFormJobTitle {
+  id         String          @id @default(uuid()) @db.Uuid
+  tenantId   String          @map("tenant_id") @db.Uuid
+  formId     String          @map("form_id") @db.Uuid
+  form       PerformanceForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  jobTitleId String          @map("job_title_id") @db.Uuid
+  jobTitle   JobTitle        @relation(fields: [jobTitleId], references: [id])
+
+  @@unique([formId, jobTitleId])
+  @@index([tenantId])
+  @@map("performance_form_job_titles")
+}
+
+/// LA CAMPANA: "Desempeno 2026", con sus fechas y sus reglas. Sin ciclo no existe el "cada ano"
+/// que pidio el cliente.
+model PerformanceCycle {
+  id       String                 @id @default(uuid()) @db.Uuid
+  tenantId String                 @map("tenant_id") @db.Uuid
+  name     String
+  startsAt DateTime               @map("starts_at")
+  endsAt   DateTime               @map("ends_at")
+  status   PerformanceCycleStatus @default(DRAFT)
+
+  /// Si la persona se autoevalua ademas de que la califique su jefe. Es lo que sostiene la
+  /// conversacion; se deja configurable porque no todas las empresas lo hacen.
+  selfEvaluation    Boolean @default(true) @map("self_evaluation")
+  /// Si la persona ve el resultado de su jefe.
+  visibleToEmployee Boolean @default(true) @map("visible_to_employee")
+  /// Si la persona tiene que firmar que la conversacion ocurrio. Es lo que lo vuelve evidencia.
+  requiresSignature Boolean @default(true) @map("requires_signature")
+
+  /// LOS FORMULARIOS DE LA CAMPANA (Decision #139). Varios, no uno: el de conductores y el de
+  /// analistas son la MISMA campana, y obligar a abrir un ciclo por cada uno partia el consolidado
+  /// en dos y obligaba a sumar a mano. Cada uno lleva su propia copia congelada.
+  forms PerformanceCycleForm[]
+
+  openedAt DateTime? @map("opened_at")
+  closedAt DateTime? @map("closed_at")
+
+  reviews PerformanceReview[]
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, status])
+  @@map("performance_cycles")
+}
+
+/// UN FORMULARIO DENTRO DE UNA CAMPANA, con su copia congelada (Decision #139).
+///
+/// La copia vive AQUI y no en el ciclo porque en la misma campana conviven varias: si el conductor
+/// responde el formulario de conductores y el analista el suyo, guardar una sola copia por ciclo
+/// obligaria a adivinar cual le tocaba a cada quien al leer una evaluacion de hace tres anos.
+///
+/// El REPARTO sale de los cargos que ya declara cada formulario (`performance_form_job_titles`):
+/// el que no declara ninguno es el general, y recoge a quien no encaje en ningun otro.
+model PerformanceCycleForm {
+  id       String           @id @default(uuid()) @db.Uuid
+  tenantId String           @map("tenant_id") @db.Uuid
+  cycleId  String           @map("cycle_id") @db.Uuid
+  cycle    PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  formId   String           @map("form_id") @db.Uuid
+  form     PerformanceForm  @relation(fields: [formId], references: [id])
+
+  /// Lo que se pregunto en ESTE ciclo con ESTE formulario. Se escribe al abrir.
+  formSnapshot Json? @map("form_snapshot")
+
+  displayOrder Int @default(0) @map("display_order")
+
+  reviews PerformanceReview[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// El mismo formulario dos veces en la misma campana no significa nada.
+  @@unique([cycleId, formId])
+  @@index([tenantId])
+  @@map("performance_cycle_forms")
+}
+
+/// UNA evaluacion: un ciclo, una persona evaluada y UN evaluador. Si hay autoevaluacion, la misma
+/// persona tiene dos filas —la suya y la de su jefe— y por eso se pueden comparar lado a lado.
+model PerformanceReview {
+  id              String                  @id @default(uuid()) @db.Uuid
+  tenantId        String                  @map("tenant_id") @db.Uuid
+  cycleId         String                  @map("cycle_id") @db.Uuid
+  cycle           PerformanceCycle        @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  /// CON QUE FORMULARIO se evalua a esta persona. Dos personas del mismo ciclo pueden responder
+  /// formularios distintos, asi que la copia congelada se lee por aqui y no por el ciclo.
+  cycleFormId     String                  @map("cycle_form_id") @db.Uuid
+  cycleForm       PerformanceCycleForm    @relation(fields: [cycleFormId], references: [id], onDelete: Cascade)
+  /// A quien se evalua.
+  subjectUserId   String                  @map("subject_user_id") @db.Uuid
+  /// Quien califica. En SELF es la misma persona.
+  evaluatorUserId String                  @map("evaluator_user_id") @db.Uuid
+  reviewerRole    PerformanceReviewerRole @map("reviewer_role")
+  status          PerformanceReviewStatus @default(PENDING)
+
+  /// Promedio ponderado de las respuestas con escala. `null` mientras no se haya entregado o si el
+  /// formulario era solo texto.
+  score       Decimal?  @db.Decimal(4, 2)
+  comment     String?
+  submittedAt DateTime? @map("submitted_at")
+
+  /// Cuando la persona reconocio que la conversacion ocurrio. No es "estoy de acuerdo".
+  signedAt DateTime? @map("signed_at")
+  signedIp String?   @map("signed_ip")
+
+  answers PerformanceAnswer[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Una sola evaluacion por ciclo, persona y rol del evaluador.
+  @@unique([cycleId, subjectUserId, reviewerRole])
+  @@index([tenantId, evaluatorUserId, status])
+  @@index([tenantId, subjectUserId])
+  @@map("performance_reviews")
+}
+
+model PerformanceAnswer {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  reviewId       String            @map("review_id") @db.Uuid
+  review         PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  /// Se guarda el ID y TAMBIEN el nombre: la competencia puede renombrarse o desactivarse despues,
+  /// y lo que se respondio tiene que poder leerse dentro de cinco anos tal como se pregunto.
+  competencyId   String            @map("competency_id") @db.Uuid
+  competencyName String            @map("competency_name")
+  /// El valor numerico de la escala. `null` en las competencias de solo texto.
+  value          Int?
+  comment        String?
+
+  @@unique([reviewId, competencyId])
+  @@index([tenantId])
+  @@map("performance_answers")
 }

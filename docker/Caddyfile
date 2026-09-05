@@ -1,0 +1,36 @@
+# NEO PULSE — Caddy: TLS automatico (Let's Encrypt) y reparto entre web y API.
+#
+# UN SOLO DOMINIO para las dos cosas. La API cuelga de /v1 y el resto va al web. Es lo que evita
+# el problema clasico de partirlo en dos dominios: cookies de sesion que el navegador no manda
+# porque son de otro sitio, y CORS que hay que abrir a mano y se acaba abriendo de mas.
+#
+# El dominio y el correo llegan por entorno (DOMINIO, ACME_EMAIL) para que este archivo no cambie
+# al mover el piloto de una maquina a otra ni al pasar de DuckDNS a un dominio propio.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	# Refuerzo en el borde; la aplicacion ya pone lo suyo con Helmet.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	# La API primero: el prefijo /v1 es suyo y no lo comparte con ninguna ruta del web.
+	handle /v1/* {
+		reverse_proxy api:3002 {
+			health_uri /v1/health
+			health_interval 30s
+		}
+	}
+
+	# Todo lo demas, al web.
+	handle {
+		reverse_proxy web:3100
+	}
+}

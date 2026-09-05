@@ -2,14 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CalendarRange, Plus } from 'lucide-react';
+import { CalendarRange } from 'lucide-react';
 import type { ActivityTypeConfig } from '@/lib/activity-type';
-import type { Modality } from '@/lib/catalog-api';
-import { addPlanItem, getPlan, listPlans, type PlanDetail } from '@/lib/delivery-api';
+import { getPlan, listPlans, type PlanDetail } from '@/lib/delivery-api';
 import { monthName } from '@/lib/format';
-import { NewOfferingDrawer } from '@/components/modules/delivery/new-offering-drawer';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/toast';
 
 /**
  * "ESTA ES DEL PLAN" — Y QUE HACE FALTA PARA QUE DE VERDAD LO ESTE.
@@ -33,25 +29,14 @@ import { useToast } from '@/components/ui/toast';
 
 interface ActivityPlanCardProps {
   activityId: string;
-  activityName: string;
   typeConfig: ActivityTypeConfig;
-  modality: Modality;
   /** La version publicada. Sin ella no hay nada que convocar: un borrador todavia puede cambiar. */
   publishedVersion: { id: string; versionNumber: number } | null;
 }
 
-export function ActivityPlanCard({
-  activityId,
-  activityName,
-  typeConfig,
-  modality,
-  publishedVersion,
-}: ActivityPlanCardProps) {
-  const { showToast } = useToast();
-
+export function ActivityPlanCard({ activityId, typeConfig, publishedVersion }: ActivityPlanCardProps) {
   /** `undefined` = todavia se esta mirando; `null` = no hay ningun plan abierto al que agregarla. */
   const [plan, setPlan] = useState<PlanDetail | null | undefined>(undefined);
-  const [open, setOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -90,7 +75,6 @@ export function ActivityPlanCard({
   const meses = [...new Set(renglones.map((item) => item.plannedMonth))].sort((a, b) => a - b);
   // El plan elegido ya viene sin CERRADOS, asi que aqui solo queda la pregunta del motivo:
   // agregar a un plan vivo obliga a decir por que (Decision #55).
-  const necesitaMotivo = plan !== null && plan.status !== 'DRAFT';
   const enCurso = new Date().getFullYear();
 
   return (
@@ -143,47 +127,24 @@ export function ActivityPlanCard({
           </div>
         </div>
 
-        {plan !== null ? (
-          publishedVersion ? (
-            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-              <Plus size={15} />
-              {meses.length > 0 ? 'Otra jornada' : `Programar en el plan ${plan.year}`}
-            </Button>
-          ) : (
-            // No se ofrece un boton que va a rechazar el servidor: solo se convoca contenido
-            // PUBLICADO. Se dice que falta, que es lo accionable.
-            <p className="text-xs text-ink-500">Publica el contenido para poder programarla.</p>
-          )
+        {/*
+          AQUI YA NO SE PROGRAMA (2026-09-04).
+
+          Habia un boton que abria un cajon para crear la jornada, y en la misma pantalla, una
+          pestana mas abajo, esta "Convocatorias" haciendo lo mismo. Dos caminos para lo mismo en la
+          misma pantalla no son una comodidad: obligan a preguntarse cual de los dos es el bueno.
+
+          Se queda el que la gente ya usa —la pestana— y desde hoy esa entra al plan SIEMPRE, tambien
+          con el plan aprobado, pidiendo el motivo. Antes solo entraba sola con el plan en borrador, y
+          esa diferencia invisible era la unica razon para tener dos botones.
+
+          La tarjeta se queda como lo que de verdad es: el aviso de si esta o no en el plan.
+        */}
+        {plan !== null && !publishedVersion ? (
+          <p className="text-xs text-ink-500">Publica el contenido para poder programarla.</p>
         ) : null}
       </div>
 
-      {plan !== null && publishedVersion ? (
-        <NewOfferingDrawer
-          open={open}
-          onOpenChange={setOpen}
-          lockedVersion={{
-            id: publishedVersion.id,
-            label: `${activityName} (v${publishedVersion.versionNumber})`,
-            config: typeConfig,
-            modality,
-          }}
-          askPlanMonth
-          askJustification={necesitaMotivo}
-          onCreated={async (offering, plannedMonth, justification) => {
-            await addPlanItem(plan.id, {
-              offeringId: offering.id,
-              plannedMonth: plannedMonth ?? new Date().getMonth() + 1,
-              justification,
-            });
-            await load();
-            showToast({
-              kind: 'success',
-              title: `Agregada al plan ${plan.year}`,
-              description: 'Queda en borrador: publicala para congelar sus proyectados.',
-            });
-          }}
-        />
-      ) : null}
     </>
   );
 }

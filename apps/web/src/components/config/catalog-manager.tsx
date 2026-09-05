@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { ApiError } from '@/lib/api';
+import { frasearUso, leerEnUso, type EnUso } from '@/lib/catalog-en-uso';
 import {
   createCatalogRow,
   deleteCatalogRow,
@@ -87,6 +88,8 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CatalogRow | null>(null);
+  /** Por que no se pudo borrar, cuando la API lo impidio. Mantiene el drawer abierto. */
+  const [enUso, setEnUso] = useState<EnUso | null>(null);
 
   const articulo = feminine ? 'la' : 'el';
   const nuevoLabel = feminine ? `Nueva ${singular}` : `Nuevo ${singular}`;
@@ -200,12 +203,36 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
       setConfirmDelete(null);
       await load();
     } catch (error) {
+      /*
+        SI ESTA EN USO, EL DRAWER SE QUEDA ABIERTO con el motivo y con la salida.
+
+        Cerrarlo y lanzar un toast rojo dejaba a quien administra donde empezo: sin saber que
+        estorba y sin nada que pulsar. Aqui se dice cuantas formaciones lo usan y se ofrece
+        desactivarlo, que es lo que de verdad queria hacer.
+      */
+      const motivo = leerEnUso(error);
+      if (motivo) {
+        setEnUso(motivo);
+        return;
+      }
       showToast({ kind: 'danger', title: errorMessage(error) });
       setConfirmDelete(null);
     }
   };
 
-  const extraColumn = useMemo(() => extraFields.find((f) => f.kind === 'select' || f.kind === 'number'), [extraFields]);
+  /** Desactivar desde el drawer del borrado: es la salida que se ofrece cuando esta en uso. */
+  const desactivarDesdeDrawer = async () => {
+    if (!confirmDelete) return;
+    const fila = confirmDelete;
+    setConfirmDelete(null);
+    setEnUso(null);
+    await toggleActive(fila);
+  };
+
+  const extraColumn = useMemo(
+    () => extraFields.find((f) => f.kind === 'select' || f.kind === 'number' || f.kind === 'user'),
+    [extraFields],
+  );
 
   if (rows === null) {
     return (
@@ -292,7 +319,10 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setConfirmDelete(row)}
+                        onClick={() => {
+                          setEnUso(null);
+                          setConfirmDelete(row);
+                        }}
                         aria-label={`Eliminar ${row.name}`}
                         className="text-danger"
                       >
@@ -427,24 +457,53 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
       <Drawer
         open={confirmDelete !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmDelete(null);
+          if (!open) {
+            setConfirmDelete(null);
+            setEnUso(null);
+          }
         }}
-        title={`Eliminar ${singular}`}
+        title={enUso ? 'No se puede eliminar' : `Eliminar ${singular}`}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
-              Cancelar
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmDelete(null);
+                setEnUso(null);
+              }}
+            >
+              {enUso ? 'Cerrar' : 'Cancelar'}
             </Button>
-            <Button variant="danger" onClick={doDelete}>
-              Eliminar {singular}
-            </Button>
+            {!enUso ? (
+              <Button variant="danger" onClick={doDelete}>
+                Eliminar {singular}
+              </Button>
+            ) : confirmDelete?.active ? (
+              // Solo si sigue activo: ofrecer desactivar lo que ya esta desactivado es ruido.
+              <Button onClick={desactivarDesdeDrawer}>Desactivar {singular}</Button>
+            ) : null}
           </div>
         }
       >
-        <p className="text-sm text-ink-700">
-          Se eliminara <span className="font-semibold">{confirmDelete?.name}</span> de forma permanente. Si esta en
-          uso, el sistema lo impedira y debera desactivarse en su lugar.
-        </p>
+        {enUso ? (
+          <div className="space-y-3 text-sm text-ink-700">
+            <p>
+              <span className="font-semibold">{confirmDelete?.name}</span> lo usan{' '}
+              <span className="font-semibold">{frasearUso(enUso.usedBy)}</span>. Borrarlo dejaria esos registros
+              apuntando a algo que ya no existe, y por eso no se permite.
+            </p>
+            <p>
+              {confirmDelete?.active
+                ? `Al desactivarlo deja de ofrecerse de aqui en adelante y lo que ya lo usa se queda como esta. Es lo que se hace cuando ${articulo} ${singular} deja de utilizarse.`
+                : `Ya esta desactivado: no se ofrece para elegir y lo que ya lo usa se queda como esta. Para borrarlo del todo habria que quitarlo antes de esos ${enUso.references} registros.`}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-700">
+            Se eliminara <span className="font-semibold">{confirmDelete?.name}</span> de forma permanente. Si esta en
+            uso, el sistema lo impedira y debera desactivarse en su lugar.
+          </p>
+        )}
       </Drawer>
     </div>
   );

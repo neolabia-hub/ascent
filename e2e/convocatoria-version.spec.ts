@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { elegirEnCombo, loginAsAdmin, unique } from './helpers';
+import { agregarEvaluacion, elegirEnCombo, loginAsAdmin, unique } from './helpers';
 
 /**
  * PUBLICAR UNA VERSION NUEVA NO ACTUALIZA SOLO LA CONVOCATORIA — y hasta esta prueba tampoco
@@ -45,6 +45,9 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
   await page.locator('#c-lesson').selectOption(lessonValue as string);
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await expect(page.getByText('Contenido agregado')).toBeVisible();
+
+  // El tipo de esta formacion pide evaluacion, y desde el 2026-09-04 publicar sin ella se rechaza.
+  await agregarEvaluacion(page, `Examen ${name} ${suffix}`);
 
   await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();

@@ -1,0 +1,154 @@
+# NEO PULSE — stack de PRODUCCION del piloto: una sola maquina con Docker.
+#
+#   docker compose -f docker/docker-compose.prod.yml --env-file .env.prod up -d
+#   docker compose -f docker/docker-compose.prod.yml logs -f api
+#
+# ─── POR QUE ESTO Y NO UNA PLATAFORMA GESTIONADA ───
+#
+# El motor de obligaciones y los avisos corren DENTRO del proceso de la API (@nestjs/schedule). Los
+# planes gratuitos de Render, Koyeb o Fly duermen el contenedor cuando nadie entra, y un servicio
+# dormido no ejecuta un cron: las obligaciones no nacerian, los vencimientos no se detectarian y
+# nadie se enteraria hasta que el cliente pregunte por que no le llegan los avisos. Una VM con
+# Docker no se duerme.
+#
+# ─── ES PORTABLE A PROPOSITO ───
+#
+# No hay nada aqui atado a un proveedor: ni funciones, ni colas, ni almacenamiento propietario. Este
+# mismo archivo corre igual en una VM gratuita de Google, en una de Azure o en el VPS de pago del
+# mes que viene. Cambiar de sitio es copiar el repositorio y el `.env.prod`, no tocar codigo.
+#
+# ─── AISLAMIENTO (docs/02-aislamiento-proyectos.md) ───
+#
+# `name: neo-pulse` explicito: sin el, Compose usa el nombre de la CARPETA —"docker"— y se comeria
+# los contenedores de SAC-NEO si algun dia comparten maquina. Ya paso una vez.
+
+name: neo-pulse
+
+services:
+  # --- Proxy inverso + TLS automatico (Let's Encrypt). Lo unico expuesto a Internet. ---
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge, internal]
+
+  # --- Postgres. SIN puerto publicado: solo se llega desde la red interna. ---
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: neopulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: neopulse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neopulse -d neopulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  # --- Migraciones + RLS. Corre una vez, termina, y solo entonces arranca la API. ---
+  migrate:
+    image: ${IMAGE_API:-neo-pulse-api:local}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    command: ["sh", "/app/scripts/release.sh"]
+    env_file: ../.env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [internal]
+
+  # --- API NestJS. REPLICA UNICA mientras el cron viva dentro del proceso: con dos, cada ronda de
+  #     obligaciones se ejecutaria dos veces. Escalar exige antes sacar el disparador a un worker.
+  api:
+    image: ${IMAGE_API:-neo-pulse-api:local}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: ../.env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      # Las llaves RS256 se generan EN la maquina y no viajan en la imagen: una llave privada
+      # dentro de una imagen se filtra en cuanto alguien la comparte o la sube a un registro.
+      # Misma carpeta que en desarrollo (apps/api/keys), para que no haya dos sitios donde buscar.
+      - ../apps/api/keys:/app/apps/api/keys:ro
+      # Solo se usa si no hay R2 configurado. Con R2 esta carpeta queda vacia y no estorba.
+      - storage:/app/apps/api/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${PORT:-3002}/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    networks: [internal]
+
+  # --- Web Next.js. Las NEXT_PUBLIC_* van horneadas en la imagen (ver apps/web/Dockerfile). ---
+  web:
+    image: ${IMAGE_WEB:-neo-pulse-web:local}
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_ROOT_HOST: ${NEXT_PUBLIC_ROOT_HOST}
+        NEXT_PUBLIC_DEV_TENANT: ${NEXT_PUBLIC_DEV_TENANT:-transprensa}
+    restart: unless-stopped
+    environment:
+      PORT: 3100
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3100/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks: [internal]
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+  caddy_data:
+  caddy_config:
+
+networks:
+  edge:
+  internal:

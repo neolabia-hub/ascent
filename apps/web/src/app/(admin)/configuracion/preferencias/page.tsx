@@ -151,6 +151,20 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, efficacyDaysDefault: num(e.target.value, 1, 180, 30) })}
               />
             </Field>
+            <Field
+              htmlFor="pref-desempeno"
+              label="Recordar el ciclo de desempeno (dias antes)"
+              hint="Solo a quien no ha respondido, y una vez. 0 = sin recordatorio."
+            >
+              <Input
+                id="pref-desempeno"
+                type="number"
+                min={0}
+                max={30}
+                value={settings.performanceReminderDays}
+                onChange={(e) => setSettings({ ...settings, performanceReminderDays: num(e.target.value, 0, 30, 3) })}
+              />
+            </Field>
             <Field htmlFor="pref-pills" label="Pildoras por semana" hint="Cadencia gobernada por el sistema (2-3 recomendado).">
               <Input
                 id="pref-pills"

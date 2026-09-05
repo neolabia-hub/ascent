@@ -75,7 +75,7 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
 
   // `to` es el DESTINO, asi que el espacio actual es el otro.
   const IconoActual = to === 'learner' ? LayoutGrid : GraduationCap;
-  const nombreActual = to === 'learner' ? 'Administracion' : 'Mi formacion';
+  const nombreActual = to === 'learner' ? 'Administracion' : 'Mi aprendizaje';
   const href = to === 'learner' ? LEARNER_HOME : ADMIN_HOME;
 
   const total = pending?.total ?? 0;
@@ -128,9 +128,16 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
       // Mismo tono de reposo que la campana y la cuenta: los tres son una familia (Decision #108).
       style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
     >
+      {/*
+        LA PASTILLA DE "DONDE ESTAS" VA NEUTRA, no con el color de la empresa (2026-09-02).
+
+        Cuando `--brand-primary-soft` empezo a pintar de verdad, esto se lleno de azul dentro de un
+        control que ya es azul palido por fuera: dos tonos de lo mismo, uno encima de otro, para
+        marcar algo que no es una accion sino donde estas. Con el papel del producto se distingue
+        igual —es mas claro que el fondo del control— y el color se reserva para lo que si se pulsa.
+      */}
       <span
-        className="relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2"
-        style={{ backgroundColor: 'var(--primary-soft)' }}
+        className="relative flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-paper px-2"
       >
         <IconoActual
           className="h-[17px] w-[17px] shrink-0"

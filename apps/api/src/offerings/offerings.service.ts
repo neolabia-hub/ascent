@@ -8,6 +8,7 @@ import type {
   EnrollOfferingInput,
   ListOfferingsQuery,
   MigrateOfferingVersionInput,
+  PreviewProjectedInput,
   PublishOfferingInput,
   UpdateOfferingInput,
 } from '@neo-pulse/shared';
@@ -366,6 +367,24 @@ export class OfferingsService {
   }
 
   /**
+   * Lo mismo, pero para una convocatoria que todavia se esta armando: la tajada llega como REGLA
+   * y no como audiencia, porque la audiencia se crea al guardar. Sale del mismo servicio que
+   * congela al publicar, asi que lo que se ve al cortar es lo que se va a guardar.
+   */
+  async previewProjectedForForm(input: PreviewProjectedInput) {
+    const version = await this.prisma.scoped.activityVersion.findUnique({
+      where: { id: input.activityVersionId },
+      select: { activityId: true },
+    });
+    if (!version) throw new NotFoundException({ code: 'ACTIVITY_VERSION_NOT_FOUND' });
+    return this.projected.preview(version.activityId, {
+      audienceId: null,
+      regionalId: input.regionalId,
+      rule: input.scope,
+    });
+  }
+
+  /**
    * Publicar CONGELA los proyectados y abre la convocatoria. A partir de aqui la cobertura
    * tiene denominador fijo: editar despues los requisitos no reescribe el indicador de esta
    * jornada (Decision #5).
@@ -551,8 +570,22 @@ export class OfferingsService {
         where: { id },
         data: { status: 'CANCELLED', cancelledReason: input.cancelledReason, updatedBy: actor.id },
       });
-      // El renglon del plan refleja la realidad: una convocatoria cancelada no queda "planeada".
-      await tx.planItem.updateMany({ where: { offeringId: id, status: 'PLANNED' }, data: { status: 'CANCELLED' } });
+      /*
+        El renglon del plan refleja la realidad: una convocatoria cancelada no queda "planeada".
+
+        Y TAMPOCO "REPROGRAMADA" (2026-09-04). Solo se miraba `PLANNED`, asi que un renglon al que
+        alguien le habia cambiado el mes —queda en `RESCHEDULED`, que es lo correcto al moverlo— se
+        quedaba diciendo que estaba reprogramado despues de cancelar la jornada. Y es falso: no se
+        reprogramo a ninguna parte, se cancelo. El plan lo seguia contando como programado, asi que
+        el cumplimiento del ano se calculaba contra una jornada que nadie iba a dictar. Lo encontro
+        el recorrido de punta a punta al reprogramar y cancelar en la misma corrida.
+
+        Se excluyen los terminales: lo ya EJECUTADO no se cancela hacia atras.
+      */
+      await tx.planItem.updateMany({
+        where: { offeringId: id, status: { in: ['PLANNED', 'RESCHEDULED'] } },
+        data: { status: 'CANCELLED' },
+      });
       if (renglones.length > 0) {
         await tx.assignment.updateMany({
           where: {
@@ -1102,13 +1135,50 @@ export class OfferingsService {
       this.prisma.scoped.enrollment.findMany({ where: { offeringId: id }, select: { userId: true } }),
     ]);
     const enrolledAlready = new Set(already.map((e) => e.userId));
-    const toEnroll = people.filter((person) => !enrolledAlready.has(person.id));
+    const candidatos = people.filter((person) => !enrolledAlready.has(person.id));
 
-    if (offering.capacity !== null && enrolledAlready.size + toEnroll.length > offering.capacity) {
-      throw new ConflictException({
-        code: 'OFFERING_CAPACITY_EXCEEDED',
-        message: `El cupo es de ${offering.capacity} personas.`,
+    /*
+      ── SI NO CABEN TODOS, SE CONVOCA A LOS QUE CABEN (2026-09-04) ──────────────────────────────
+
+      Antes fallaba ENTERO con `OFFERING_CAPACITY_EXCEEDED` y un mensaje que solo decia el cupo:
+      "el cupo es de 30 personas". Ni convocaba a los treinta que si caben, ni decia cuantos
+      obligados hay, ni cuantas sillas faltan, ni que la salida es partir en dos jornadas.
+
+      Fallar era defendible —nadie quiere que el sistema elija 30 de 40 al azar— pero el problema no
+      era elegir: era hacerlo **al azar**. Con un criterio que se pueda defender delante de un
+      auditor, convocar a los que caben es mejor que no convocar a nadie:
+
+        **primero quien esta mas cerca de incumplir**, es decir, quien vence antes.
+
+      No es arbitrario y se explica en una frase. Quien se queda fuera no pierde nada —sigue
+      obligado y sin inscribir, que es justo lo que la cobertura tiene que ensenar— y la respuesta
+      dice cuantos faltan, para que se programe la otra jornada.
+    */
+    const sillasLibres = offering.capacity === null ? candidatos.length : offering.capacity - enrolledAlready.size;
+    let toEnroll = candidatos;
+    let sinCupo = 0;
+    if (offering.capacity !== null && candidatos.length > sillasLibres) {
+      const porVencimiento = await this.prisma.scoped.assignment.findMany({
+        where: {
+          targetType: 'ACTIVITY',
+          targetId: version.activityId,
+          userId: { in: candidatos.map((p) => p.id) },
+          status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
+        },
+        select: { userId: true, dueAt: true },
+        orderBy: { dueAt: 'asc' },
       });
+      const orden = new Map<string, number>();
+      porVencimiento.forEach((fila, i) => {
+        if (!orden.has(fila.userId)) orden.set(fila.userId, i);
+      });
+      // Quien no tiene obligacion viva va al final: convocar antes a un obligado que a alguien que
+      // no lo esta es el mismo criterio, llevado al borde.
+      const ordenados = [...candidatos].sort(
+        (a, b) => (orden.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (orden.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+      );
+      toEnroll = ordenados.slice(0, Math.max(0, sillasLibres));
+      sinCupo = candidatos.length - toEnroll.length;
     }
 
     if (toEnroll.length > 0) {
@@ -1150,9 +1220,12 @@ export class OfferingsService {
       action: 'OFFERING_ENROLLED',
       resourceType: 'offerings',
       resourceId: id,
-      newValues: { enrolled: toEnroll.length, skipped: people.length - toEnroll.length },
+      newValues: { enrolled: toEnroll.length, skipped: people.length - toEnroll.length, sinCupo },
     });
-    return { enrolled: toEnroll.length, skipped: people.length - toEnroll.length };
+    // `sinCupo` es lo que la pantalla necesita para decir algo util: "convocados 30 de 47; faltan 17,
+    // programa otra jornada". `skipped` es otra cosa —los que ya estaban inscritos— y mezclarlos
+    // daria un numero que no significa nada.
+    return { enrolled: toEnroll.length, skipped: people.length - toEnroll.length, sinCupo, capacity: offering.capacity };
   }
 
   // ─────────────────────────── Apoyo ───────────────────────────

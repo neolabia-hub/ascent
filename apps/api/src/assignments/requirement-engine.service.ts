@@ -5,7 +5,14 @@ import { AuditService } from '../common/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import { AudiencesService } from './audiences.service.js';
-import { computeFirstDueAt, computeNextCycleDueAt, cycleOpensAt, type Trigger } from './due-date.js';
+import {
+  computeFirstDueAt,
+  computeNextCycleDueAt,
+  cycleAnchor,
+  cycleOpensAt,
+  type Trigger,
+} from './due-date.js';
+import { decidirPrimeraRonda, decidirRondaSiguiente } from './next-cycle.js';
 
 export interface EngineSummary {
   audiencesJoined: number;
@@ -227,17 +234,80 @@ export class RequirementEngineService {
 
     const recurrence = this.parseRecurrence(rule.recurrence);
     const now = new Date();
+
+    // Quien no tiene historia con ESTA regla puede tener la formacion hecha por OTRA: es el caso
+    // del cambio de cargo cuando la matriz repite una formacion en varios puestos. Se pregunta una
+    // sola vez y solo por ellos — en la pasada de rutina esa lista esta vacia y no cuesta ni una
+    // consulta. Ver `decidirPrimeraRonda`.
+    const yaLaHizo = await this.completadaPorOtraRegla(
+      db,
+      rule,
+      members.filter((m) => !byUser.has(m.userId)).map((m) => m.userId),
+    );
     const rows: Prisma.AssignmentCreateManyInput[] = [];
     const created: CreatedAssignment[] = [];
+    /** Rondas que cerraron sin hacerse y hay que marcar antes de abrir la siguiente. */
+    const aCerrar: Array<{ userId: string; cycleNumber: number }> = [];
     let cyclesOpened = 0;
+
+    /*
+      QUIEN ACABA DE INGRESAR NO ENTRA A LA CAMPANA (2026-09-04).
+
+      La reinduccion alcanzaba tambien a quien entro la semana pasada y todavia esta haciendo su
+      induccion: se le encimaba la actualizacion del ano sobre una induccion a medio hacer. Es
+      redundante —**su induccion ES su actualizacion de ese ano**— y lo habitual en las empresas es
+      dejar fuera del ciclo a quien ingreso dentro de el.
+
+      Sin esto habia que eximir a mano a cada ingreso reciente: ~50 al ano en TRANSPRENSA, cada uno
+      con su motivo escrito para decir cincuenta veces lo mismo.
+
+      Solo afecta a la PRIMERA ronda de esa persona: quien ya tiene historia con la regla sigue su
+      ciclo normal, porque a el la campana anterior si le toco. Y solo excluye a quien tiene fecha
+      de ingreso registrada — sin ella no se puede saber si es reciente, y en la duda se exige, que
+      es la direccion que protege el registro.
+    */
+    const mesesDeGracia = recurrence?.exemptRecentHiresMonths ?? 0;
+    const cortePorIngreso =
+      mesesDeGracia > 0 ? new Date(new Date(now).setMonth(now.getMonth() - mesesDeGracia)) : null;
 
     for (const member of members) {
       const history = byUser.get(member.userId) ?? [];
 
+      if (cortePorIngreso && history.length === 0 && member.user.hiredAt && member.user.hiredAt > cortePorIngreso) {
+        continue;
+      }
+
       if (history.length === 0) {
+        /*
+          YA LA HIZO POR OTRA REGLA (2026-09-05).
+
+          Sin esto, quien COMPLETO una formacion y cambia a otro cargo que exige LA MISMA la vuelve
+          a deber: la regla del cargo nuevo no tiene historia suya y le abre la ronda 1 como si
+          nunca la hubiera hecho. En su pantalla aparece una formacion que hizo el mes pasado, con
+          constancia emitida, y no hay nada que se lo explique.
+
+          La decision —no le nace, le nace con SU vencimiento, o le nace como a cualquiera— es
+          logica pura y vive en `decidirPrimeraRonda`.
+        */
+        const primera = decidirPrimeraRonda({
+          cumplida: yaLaHizo.get(member.userId) ?? null,
+          recurrencia: recurrence,
+          ahora: now,
+        });
+        if (!primera.abrir) continue;
+        if (primera.venceEl) {
+          rows.push(this.newRow(tenantId, rule, member.userId, 1, primera.venceEl));
+          created.push({ userId: member.userId, targetId: rule.targetId, dueAt: primera.venceEl });
+          continue;
+        }
+
         const dueAt = computeFirstDueAt(rule.trigger as Trigger, rule.dueDaysAfterTrigger ?? 0, {
           hiredAt: member.user.hiredAt,
           joinedAt: member.joinedAt,
+          // La obligacion no puede vencer antes de que existiera la regla que la crea: las
+          // audiencias se REUTILIZAN entre formaciones y pueden llevar meses creadas, y sin esto
+          // toda la plantilla quedaba obligada con una fecha ya pasada (ver `computeFirstDueAt`).
+          ruleCreatedAt: rule.createdAt,
           recurrence,
         });
         rows.push(this.newRow(tenantId, rule, member.userId, 1, dueAt));
@@ -247,17 +317,55 @@ export class RequirementEngineService {
 
       if (!recurrence) continue;
 
-      // Solo se abre la ronda siguiente cuando la anterior quedo cumplida.
       const last = history[history.length - 1];
-      if (!last || last.status !== 'COMPLETED') continue;
+      if (!last) continue;
 
-      const anchor = last.completedAt ?? last.dueAt ?? now;
+      /*
+        LA ANTERIOR NO SE HIZO: LAS TRES SALIDAS (2026-09-03).
+
+        Antes solo habia una —no abrir nada hasta que la anterior quedara CUMPLIDA— y tiene un
+        efecto que casi nadie quiere: **quien nunca la hace desaparece del denominador de todos los
+        anos siguientes**. El peor incumplidor sale de la cuenta y la cobertura del ano que viene
+        se ve mejor de lo que es. Para una campana de calendario eso es un indicador que miente.
+
+        Ahora lo decide la empresa, en el tipo de formacion:
+
+          ESPERA   como antes: no nace la siguiente hasta que haga la anterior.
+          ACUMULA  nace la siguiente Y la anterior sigue pendiente: debe las dos.
+          CIERRA   la anterior se cierra como NO REALIZADA —que SI cuenta como incumplimiento de
+                   ese periodo, a diferencia de retirada o eximida— y la siguiente nace para todos.
+                   Es como funciona el cumplimiento por calendario: cada campana es su periodo.
+      */
+      // El ancla NO es la misma en las dos formas de repetir: una campana se satisface por
+      // PERIODO y un aniversario por fecha de cumplimiento. Ver `cycleAnchor` — anclar las dos en
+      // `completedAt` le abria a quien cumplia antes del 31 de marzo una ronda 2 con ese mismo
+      // 31 de marzo, once dias despues de haberla hecho.
+      const anchor = cycleAnchor(recurrence, last, now);
       const nextDueAt = computeNextCycleDueAt(recurrence, anchor);
-      if (now < cycleOpensAt(nextDueAt, recurrence)) continue;
+      const decision = decidirRondaSiguiente({
+        estadoAnterior: last.status,
+        politica: recurrence.onExpiry ?? 'ESPERA',
+        ventanaAbierta: now >= cycleOpensAt(nextDueAt, recurrence),
+      });
+      if (!decision.abrir) continue;
+
+      // Se cierra la que quedo sin hacer ANTES de abrir la nueva.
+      if (decision.cerrarAnterior) aCerrar.push({ userId: member.userId, cycleNumber: last.cycleNumber });
 
       rows.push(this.newRow(tenantId, rule, member.userId, last.cycleNumber + 1, nextDueAt));
       created.push({ userId: member.userId, targetId: rule.targetId, dueAt: nextDueAt });
       cyclesOpened += 1;
+    }
+
+    if (aCerrar.length > 0) {
+      await db.assignment.updateMany({
+        where: {
+          ruleId: rule.id,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          OR: aCerrar.map((fila) => ({ userId: fila.userId, cycleNumber: fila.cycleNumber })),
+        },
+        data: { status: 'EXPIRED_NOT_DONE' },
+      });
     }
 
     if (rows.length > 0) {
@@ -266,6 +374,41 @@ export class RequirementEngineService {
       await db.assignment.createMany({ data: rows, skipDuplicates: true });
     }
     return { created, cyclesOpened };
+  }
+
+  /**
+   * La ULTIMA vez que cada una de estas personas completo esta misma formacion.
+   *
+   * Se busca por FORMACION, no por regla: el punto es justamente que la evidencia la dejo otra
+   * —el cargo anterior, el plan, una asignacion suelta—. No hace falta excluir la regla actual
+   * porque solo se pregunta por quienes no tienen ninguna fila suya.
+   *
+   * Solo cuenta lo CUMPLIDO. Una eximida o una retirada no son evidencia de que la persona sepa
+   * hacer el trabajo: son la explicacion de por que no se le exigio, y esa explicacion pertenece
+   * al cargo donde se escribio.
+   */
+  private async completadaPorOtraRegla(
+    db: TenantPrisma,
+    rule: AssignmentRule,
+    userIds: string[],
+  ): Promise<Map<string, { completedAt: Date | null; dueAt: Date | null }>> {
+    if (userIds.length === 0) return new Map();
+    const filas = await db.assignment.findMany({
+      where: {
+        userId: { in: userIds },
+        targetType: rule.targetType,
+        targetId: rule.targetId,
+        status: 'COMPLETED',
+        completedAt: { not: null },
+      },
+      select: { userId: true, completedAt: true, dueAt: true },
+      orderBy: { completedAt: 'desc' },
+    });
+    const ultima = new Map<string, { completedAt: Date | null; dueAt: Date | null }>();
+    for (const fila of filas) {
+      if (!ultima.has(fila.userId)) ultima.set(fila.userId, { completedAt: fila.completedAt, dueAt: fila.dueAt });
+    }
+    return ultima;
   }
 
   private newRow(
@@ -302,7 +445,39 @@ export class RequirementEngineService {
    * se retira con motivo; lo que ya estaba EN CURSO se respeta, porque hay trabajo hecho.
    */
   async withdrawLeavers(db: TenantPrisma, userId?: string): Promise<number> {
-    const rules = await db.assignmentRule.findMany({ select: { id: true, audienceId: true, active: true } });
+    /*
+      SOLO LAS REGLAS QUE TIENEN ALGO QUE RETIRAR (2026-09-03).
+
+      Antes se recorrian TODAS las reglas del tenant, activas o no, y por cada una se hacian dos
+      consultas. En la base de desarrollo hay 569 reglas —diez de verdad y el resto residuo de las
+      corridas de pruebas—, asi que dar de alta a UNA persona costaba mas de mil viajes a la base
+      para no hacer nada en 559 de ellos. Medido: 1.680 transacciones por alta.
+
+      Una regla sin obligaciones PENDIENTES ni VENCIDAS no puede retirar ninguna, asi que saltarsela
+      no cambia el resultado: se pregunta primero cuales tienen algo, y se recorren solo esas. Con
+      una persona son dos o tres; en la pasada global, las que de verdad tengan pendientes.
+
+      No se filtra por regla ACTIVA a proposito: una regla desactivada tambien tiene que retirar lo
+      que dejo pendiente, y ese es justo el caso que el bloque de abajo distingue.
+    */
+    const conPendientes = await db.assignment.findMany({
+      where: {
+        status: { in: ['PENDING', 'OVERDUE'] },
+        ruleId: { not: null },
+        ...(userId ? { userId } : {}),
+      },
+      select: { ruleId: true },
+      distinct: ['ruleId'],
+    });
+    const idsConPendientes = conPendientes
+      .map((fila) => fila.ruleId)
+      .filter((id): id is string => id !== null);
+    if (idsConPendientes.length === 0) return 0;
+
+    const rules = await db.assignmentRule.findMany({
+      where: { id: { in: idsConPendientes } },
+      select: { id: true, audienceId: true, active: true },
+    });
     let withdrawn = 0;
     for (const rule of rules) {
       const where = {
@@ -326,13 +501,35 @@ export class RequirementEngineService {
       // pendientes, y el aviso seguia sin leer reclamandolo. Se marca leido —no se borra: eso lo
       // hace el ciclo de retencion a los 30 dias— porque mientras tanto es la unica frase que
       // explica por que alguien creyo tener esa formacion.
+      /*
+        DOS LISTAS, NO UN `OR` DE MIL CLAUSULAS (2026-09-04).
+
+        Esto era `OR: afectados.map(...)`, un par (persona, formacion) por cada obligacion retirada.
+        Con un requisito de toda la empresa son MIL PARES en una sola condicion, y Postgres tiene
+        que evaluar esa expresion booleana entera.
+
+        MEDIDO con 1.116 personas: **crear el requisito 1,0 s; retirarlo 61,1 s**. Sesenta veces mas
+        lento deshacer que hacer, para la operacion inversa — y en la pantalla es un boton apagado
+        un minuto, sin nada que explique la espera.
+
+        El `OR` ademas no hacia falta: el bucle va POR REGLA, y todas las obligaciones de una regla
+        apuntan a la misma formacion (`newRow` copia `rule.targetId`). Asi que el producto cartesiano
+        de las dos listas es exactamente el mismo conjunto, no una aproximacion mas ancha.
+
+        Es la tercera vez que este patron muerde en el proyecto: `syncPerson` con un INSERT por
+        audiencia (9,0 s -> 0,4 s) y `withdrawLeavers` recorriendo 569 reglas. Siempre igual —
+        algo por fila donde cabe algo por lote.
+      */
       if (afectados.length > 0) {
+        const personas = [...new Set(afectados.map((fila) => fila.userId))];
+        const formaciones = [...new Set(afectados.map((fila) => fila.targetId))];
         await db.notification.updateMany({
           where: {
             channel: 'IN_APP',
             readAt: null,
             referenceType: 'activities',
-            OR: afectados.map((fila) => ({ recipientUserId: fila.userId, referenceId: fila.targetId })),
+            recipientUserId: { in: personas },
+            referenceId: { in: formaciones },
           },
           data: { readAt: new Date() },
         });

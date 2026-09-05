@@ -98,7 +98,7 @@ function Notifications() {
           open ? 'border-transparent text-ink-900' : 'border-line text-ink-500 hover:border-line-strong hover:text-ink-900',
         )}
         // Ver la nota del tono en `barras`: 5% de marca en reposo, --primary-soft al abrir.
-        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+        style={{ backgroundColor: open ? 'var(--brand-primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
         {/* Se inclina al pasar. Es lo que hace una campana, y basta para que se sienta viva. */}
         <Bell
@@ -239,7 +239,7 @@ function UserMenu({
           'group/av focus-ring flex h-10 items-center gap-2 rounded-full border p-1 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
           open ? 'border-transparent' : 'border-line hover:border-line-strong',
         )}
-        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+        style={{ backgroundColor: open ? 'var(--brand-primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
         <Avatar avatarKey={avatarKey} fullName={fullName} size={32} />
         {/*
@@ -371,16 +371,25 @@ export function LearnerTopbar({
           hay nada que se pise. La navegacion no se pierde por eso —vive en la barra lateral, que
           si esta fija— y el buscador sigue a un Ctrl K desde cualquier sitio.
         */
-        'relative z-30',
+        'z-30',
         // Sin linea inferior nunca: lo que separa la barra del contenido es el aire, no un filo.
         // Con contenido pasando por debajo conserva el velo difuminado para que el texto no se
         // lea encima. La barra NUNCA se superpone al contenido: el heroe empieza DEBAJO. Se probo
         // flotando sobre la portada y tapaba justo la primera franja de la imagen, que es donde
         // la foto tiene su asunto.
-        // SIN FONDO, NUNCA. Tenia un velo difuminado y sobraba: la barra ya se separa por el aire
-        // y por el hecho de que lo de dentro son piezas con superficie propia. El velo solo
-        // ensuciaba el borde de la portada al pasar por debajo.
-        'bg-transparent',
+        /*
+          SIEMPRE VISIBLE Y SIN FONDO, LAS DOS COSAS.
+
+          Se probo con un velo que aparecia al desplazar y no vale: la barra no puede tener fondo
+          en ningun estado. Y sin fondo, fija sobre el contenido, el saludo se leeria encima de las
+          tarjetas.
+
+          La salida no esta en la barra sino en el ARMAZON: quien desplaza no es la ventana, es el
+          contenido (`learner-shell`). Con eso la barra no se superpone a nada —esta fuera de la
+          zona que se mueve— y no necesita superficie para separarse. Es lo que ya hacia la
+          superficie de administracion.
+        */
+        'shrink-0 bg-transparent',
       )}
     >
       <div className={cn('flex h-16 w-full items-center gap-3 px-5 lg:px-8', wide ? '' : 'mx-auto max-w-[1100px]')}>

@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 // Usuario de pruebas del seed (rol ADMIN, contrasena ya cambiada y politicas aceptadas):
@@ -130,4 +131,31 @@ export async function elegirEnCombo(page: Page, comboId: string, nombre: string)
     await buscador.fill(nombre);
   }
   await page.getByRole('option', { name: new RegExp(nombre) }).first().click();
+}
+
+/**
+ * AGREGA UNA EVALUACION al borrador abierto, desde la pestana Contenido.
+ *
+ * ─── POR QUE EXISTE (2026-09-04) ───
+ *
+ * Desde que publicar sin lo que el tipo pide se RECHAZA (Decision #74, cerrada), los tres
+ * `publishedActivity` de la suite dejaron de poder publicar: los tipos que usan —induccion general,
+ * capacitacion del plan, extraordinaria— piden evaluacion, y ninguno la anadia.
+ *
+ * Eso no era un descuido de las pruebas: era la senal, escrita en su dia, de que la regla no estaba
+ * acordada. Ahora lo esta, y las pruebas se ponen al dia.
+ *
+ * Usa el ATAJO del cajon —un bloque de N preguntas al azar del banco— porque aqui la evaluacion no
+ * es lo que se prueba: es el requisito para poder publicar. Quien quiera probar el constructor de
+ * preguntas tiene `sprint-2.spec.ts`.
+ */
+export async function agregarEvaluacion(page: import('@playwright/test').Page, titulo: string) {
+  await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
+  await page.getByRole('button', { name: 'Evaluacion' }).click();
+  await page.locator('#c-title').fill(titulo);
+  // El banco por defecto: el primero con preguntas. Sin categorias no hay examen posible, y eso lo
+  // cubre la semilla.
+  await page.locator('#c-category').selectOption({ index: 0 });
+  await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+  await expect(page.getByText('Contenido agregado')).toBeVisible({ timeout: 20_000 });
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Download, KeyRound, Pencil, Plus, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
+import { Award, Copy, Download, KeyRound, Pencil, Plus, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
   createUser,
@@ -21,6 +21,7 @@ import {
   type UsersPage,
 } from '@/lib/admin-api';
 import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
+import { ConstanciasDePersona } from '@/components/modules/admin/constancias-de-persona';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -94,6 +95,14 @@ export default function UsuariosPage() {
 
   // Drawer crear/editar
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /*
+    EL EXPEDIENTE DE CONSTANCIAS, desde la ficha de la persona.
+
+    Aqui y no en una pantalla aparte porque la peticion siempre llega con un nombre delante
+    —"mandame el certificado de alturas de Juan"— y nunca con una formacion. Buscar a Juan es el
+    primer gesto, asi que la descarga tiene que estar donde se acaba de encontrar a Juan.
+  */
+  const [constanciasDe, setConstanciasDe] = useState<UserRow | null>(null);
   const [editing, setEditing] = useState<UserRow | null>(null);
   /** Persona cuyas excepciones de permiso se estan revisando. */
   const [permissionsFor, setPermissionsFor] = useState<UserRow | null>(null);
@@ -431,6 +440,15 @@ export default function UsuariosPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => setConstanciasDe(user)}
+                          aria-label={`Constancias de ${user.fullName}`}
+                          title="Constancias: descargar o revocar"
+                        >
+                          <Award size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setPermissionsFor(user)}
                           aria-label={`Permisos de ${user.fullName}`}
                           title="Permisos y excepciones"
@@ -461,6 +479,15 @@ export default function UsuariosPage() {
           />
         </div>
       )}
+
+      <ConstanciasDePersona
+        userId={constanciasDe?.id ?? null}
+        nombre={constanciasDe?.fullName ?? ''}
+        open={constanciasDe !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setConstanciasDe(null);
+        }}
+      />
 
       {/* Drawer crear/editar */}
       <Drawer

@@ -13,8 +13,10 @@ test.describe('Sprint 1 — administracion del tenant', () => {
   test('acceso: sesion, marca del tenant y navegacion del panel', async ({ page }) => {
     await loginAsAdmin(page);
 
-    // El panel carga con el nombre del tenant y el saludo.
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Hola');
+    // El panel carga con el nombre del tenant y el saludo. El saludo depende de la hora
+    // —"Buenos dias" / "Buenas tardes" / "Buenas noches"— asi que se comprueba lo que no cambia:
+    // que saluda por el nombre. Antes decia "Hola" y el rediseno del inicio lo dejo en rojo.
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Buenos dias|Buenas tardes|Buenas noches/);
     await expect(page.locator('aside')).toContainText('TRANSPRENSA');
 
     // Navegacion a las secciones del sprint.

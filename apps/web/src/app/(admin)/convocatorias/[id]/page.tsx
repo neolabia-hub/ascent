@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, UserPlus, Users, XCircle } from 'lucide-react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, SlidersHorizontal, UserPlus, Users, XCircle } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import {
+  adjustProjected,
   cancelOffering,
   completeOffering,
   enrollOffering,
@@ -53,10 +54,24 @@ const MIGRATION_EFFECT: Record<MigrationPolicyCode, string> = {
     'Todos los que no han cerrado pasan a la version nueva y vuelven a empezar. Lo ya completado no se toca.',
 };
 
-function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  accion,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  /** Accion pequena en la esquina, para el numero que se puede corregir. */
+  accion?: React.ReactNode;
+}) {
   return (
     <div className="card p-4">
-      <p className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">{label}</p>
+        {accion}
+      </div>
       <p className="mt-1 font-display text-[28px] font-bold tabular-nums text-ink-900">{value}</p>
       {hint ? <p className="mt-1 text-xs text-ink-500">{hint}</p> : null}
     </div>
@@ -66,15 +81,29 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
 export default function ConvocatoriaDetallePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
 
   const [offering, setOffering] = useState<OfferingDetail | null>(null);
+  /*
+    AJUSTAR LOS PROYECTADOS ES OTRA COSA QUE PUBLICAR (2026-09-04).
+
+    Vivia DENTRO del cajon de publicar, y ahi no tiene sentido: el numero acaba de derivarse de los
+    obligados de hoy y no ha tenido tiempo de quedarse viejo. Ofrecer corregirlo en ese momento
+    invita a teclear un numero sobre un dato que todavia es exacto — y el motivo, que es la
+    evidencia que lee el auditor, acaba diciendo "ajuste inicial".
+
+    La Regla de oro 3 sigue igual: el numero se DERIVA y se congela, y corregirlo exige motivo. Lo
+    que cambia es CUANDO se ofrece: despues, sobre la cifra ya congelada, que es cuando la realidad
+    se ha movido —"ingresaron 7 conductores despues de congelar"— y el motivo dice algo.
+  */
+  const [ajusteOpen, setAjusteOpen] = useState(false);
+  const [ajusteCount, setAjusteCount] = useState('');
+  const [ajusteReason, setAjusteReason] = useState('');
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [busy, setBusy] = useState(false);
 
   const [publishOpen, setPublishOpen] = useState(false);
-  const [override, setOverride] = useState('');
-  const [adjustReason, setAdjustReason] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [migrateOpen, setMigrateOpen] = useState(false);
@@ -102,21 +131,41 @@ export default function ConvocatoriaDetallePage() {
     void load();
   }, [load]);
 
+  const ajustar = async () => {
+    const cantidad = Number(ajusteCount);
+    if (!Number.isInteger(cantidad) || cantidad < 0 || ajusteReason.trim().length < 10) return;
+    setBusy(true);
+    try {
+      const result = await adjustProjected(id, { projectedCount: cantidad, reason: ajusteReason.trim() });
+      showToast(
+        result.executed
+          ? { kind: 'success', title: 'Proyectados ajustados', description: 'El motivo queda en la auditoria.' }
+          : { kind: 'info', title: 'Enviado a aprobacion', description: 'Un administrador debe autorizar el ajuste.' },
+      );
+      setAjusteOpen(false);
+      setAjusteCount('');
+      setAjusteReason('');
+      await load();
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo ajustar', description: error instanceof ApiError ? error.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const publish = async () => {
     setBusy(true);
     try {
-      const result = await publishOffering(id, {
-        projectedOverride: override ? Number(override) : undefined,
-        projectedAdjustReason: override ? adjustReason : undefined,
-      });
+      // Publicar ya no lleva ajuste: congela lo derivado y punto. Corregirlo es otra decision, con
+      // su propio cajon (ver la nota de `ajusteOpen`). La API sigue admitiendo el override para no
+      // romper a quien lo llame, pero la pantalla no lo manda.
+      const result = await publishOffering(id, {});
       showToast(
         result.executed
           ? { kind: 'success', title: 'Convocatoria publicada', description: 'Los proyectados quedaron congelados.' }
           : { kind: 'info', title: 'Enviada a aprobacion', description: 'Un administrador debe autorizar la publicacion.' },
       );
       setPublishOpen(false);
-      setOverride('');
-      setAdjustReason('');
       await load();
     } catch {
       showToast({ kind: 'danger', title: 'No se pudo publicar' });
@@ -172,10 +221,26 @@ export default function ConvocatoriaDetallePage() {
     setBusy(true);
     try {
       const result = await enrollOffering(id, { allAssigned: true });
+      /*
+        CUANDO NO CABEN TODOS, EL AVISO TIENE QUE SER ACCIONABLE (2026-09-04).
+
+        Antes el servidor fallaba entero y esto solo decia "Se supera el cupo". Ahora convoca a los
+        que caben —primero quien vence antes— y aqui se dice cuantos quedaron fuera y que hacer,
+        que es lo unico que le sirve a quien esta programando: partir en dos jornadas.
+      */
+      const restos = [
+        result.skipped > 0 ? `${result.skipped} ya estaban inscritas` : null,
+        result.sinCupo > 0 ? `faltan ${result.sinCupo} por cupo: programa otra jornada` : null,
+      ].filter(Boolean).join(' · ');
       showToast({
-        kind: result.enrolled > 0 ? 'success' : 'info',
-        title: result.enrolled > 0 ? `${result.enrolled} personas inscritas` : 'No habia obligados sin inscribir',
-        description: result.skipped > 0 ? `${result.skipped} ya estaban inscritas.` : undefined,
+        kind: result.sinCupo > 0 ? 'warning' : result.enrolled > 0 ? 'success' : 'info',
+        title:
+          result.sinCupo > 0
+            ? `${result.enrolled} inscritas de ${result.enrolled + result.sinCupo} obligadas`
+            : result.enrolled > 0
+              ? `${result.enrolled} personas inscritas`
+              : 'No habia obligados sin inscribir',
+        description: restos || undefined,
       });
       await load();
     } catch (error) {
@@ -245,14 +310,33 @@ export default function ConvocatoriaDetallePage() {
    * ensenar "faltan por convocar" invita a inscribir a mano a gente que iba a entrar sola, lo que
    * ademas cuenta como inscrita antes de que haya hecho nada.
    */
+  /** Por que puerta se entro: la lista de Convocatorias, o la ficha de la formacion. */
+  const desdeLaFormacion = searchParams.get('desde') === 'formacion';
   const esAutoservicio = offering.kind !== 'EVENT';
+  /** Solo la capacitacion del plan participa del programa anual (Decision #78). */
+  const entraAlPlan = offering.activityVersion.activity.activityType.config?.participatesInPlan === true;
   const upgrade = offering.versionUpgrade;
 
   return (
     <div>
-      <Link href="/convocatorias" className="focus-ring mb-4 inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900">
+      {/*
+        ATRAS VUELVE A DONDE ESTABAS (2026-09-04).
+
+        A esta pantalla se llega por dos puertas: la lista de Convocatorias y la pestana
+        "Programacion" de la ficha de una formacion. El enlace de volver decia siempre
+        "Convocatorias", asi que quien venia de la ficha acababa en una lista de doscientas jornadas
+        buscando por donde entro. Lo noto el cliente.
+
+        La puerta de entrada viaja en `?desde=formacion`. Se prefiere eso al historial del
+        navegador —`router.back()`— porque el historial miente en cuanto alguien recarga la pagina,
+        abre el enlace en otra pestana o llega desde un correo.
+      */}
+      <Link
+        href={desdeLaFormacion ? `/contenido-formativo/${offering.activityVersion.activity.id}?tab=programacion` : '/convocatorias'}
+        className="focus-ring mb-4 inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900"
+      >
         <ArrowLeft size={15} />
-        Convocatorias
+        {desdeLaFormacion ? offering.activityVersion.activity.name : 'Convocatorias'}
       </Link>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -355,6 +439,23 @@ export default function ConvocatoriaDetallePage() {
           label="Proyectados"
           value={offering.projectedCount ?? '—'}
           hint={offering.projectedFrozenAt ? `Congelados el ${formatDate(offering.projectedFrozenAt)}` : offering.derivedProjected.detail}
+          accion={
+            offering.projectedFrozenAt ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAjusteCount(String(offering.projectedCount ?? ''));
+                  setAjusteReason('');
+                  setAjusteOpen(true);
+                }}
+                title="Corregir el denominador de la cobertura. Pide motivo."
+                aria-label="Ajustar los proyectados"
+                className="focus-ring -mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-ink-500 transition-colors hover:text-ink-900"
+              >
+                <SlidersHorizontal className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            ) : null
+          }
         />
         {/*
           INSCRITOS, y no "convocados": eran DOS NOMBRES para la misma fila de la base. La tarjeta
@@ -478,9 +579,26 @@ export default function ConvocatoriaDetallePage() {
           ) : null}
         </div>
 
+        {/*
+          LA TARJETA DEL PLAN DICE LA VERDAD SEGUN EL TIPO (2026-09-04).
+
+          Decia "no pertenece a ningun plan — agregala desde el plan si debe contar para el programa
+          anual" tambien en las CINCO formaciones que, por su tipo, **no pueden** entrar a ninguno:
+          era pedirle a alguien que hiciera algo que el servidor rechaza con un 409. Lo noto el
+          cliente.
+
+          De los seis tipos solo la capacitacion del plan participa (`participatesInPlan`, Decision
+          #78). En el resto la tarjeta no desaparece —"¿donde esta lo del plan?" es una pregunta
+          legitima cuando esa tarjeta si sale en las de al lado— sino que dice que no entra y por que.
+        */}
         <div className="card p-5">
           <h2 className="font-display text-base font-semibold text-ink-900">En el plan anual</h2>
-          {offering.planItems.length === 0 ? (
+          {!entraAlPlan ? (
+            <p className="mt-2 text-sm text-ink-500">
+              Una <span className="font-medium text-ink-700">{offering.activityVersion.activity.activityType.name}</span> no
+              entra al plan anual: el cumplimiento del ano solo lo mueve lo que estaba planeado.
+            </p>
+          ) : offering.planItems.length === 0 ? (
             <p className="mt-2 text-sm text-ink-500">
               Esta convocatoria no pertenece a ningun plan. Agregala desde el plan si debe contar para el programa anual.
             </p>
@@ -548,6 +666,46 @@ export default function ConvocatoriaDetallePage() {
       </div>
 
       <Drawer
+        open={ajusteOpen}
+        onOpenChange={setAjusteOpen}
+        title="Ajustar los proyectados"
+        description="Es el denominador de la cobertura. Se congelo al publicar y solo se corrige con motivo."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setAjusteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={ajustar}
+              loading={busy}
+              disabled={ajusteReason.trim().length < 10 || !Number.isInteger(Number(ajusteCount)) || Number(ajusteCount) < 0}
+            >
+              Guardar el ajuste
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-md bg-paper px-3 py-2 text-sm text-ink-700">
+            Congelados el {offering.projectedFrozenAt ? formatDate(offering.projectedFrozenAt) : '—'} en{' '}
+            <strong>{offering.projectedCount ?? '—'}</strong>. Hoy se derivarian{' '}
+            <strong>{offering.derivedProjected.count}</strong>: {offering.derivedProjected.detail}
+          </div>
+          <Field htmlFor="a-count" label="Proyectados" required hint="Cuantas personas deberian capacitarse de verdad en esta jornada.">
+            <Input id="a-count" type="number" min={0} value={ajusteCount} onChange={(event) => setAjusteCount(event.target.value)} />
+          </Field>
+          <Field
+            htmlFor="a-reason"
+            label="Motivo del ajuste"
+            required
+            hint="Minimo 10 caracteres. Queda en la auditoria y visible en la convocatoria: es lo que lee quien audita."
+          >
+            <Input id="a-reason" value={ajusteReason} onChange={(event) => setAjusteReason(event.target.value)} maxLength={500} />
+          </Field>
+        </div>
+      </Drawer>
+
+      <Drawer
         open={publishOpen}
         onOpenChange={setPublishOpen}
         title="Publicar convocatoria"
@@ -557,7 +715,7 @@ export default function ConvocatoriaDetallePage() {
             <Button variant="ghost" onClick={() => setPublishOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={publish} loading={busy} disabled={Boolean(override) && adjustReason.trim().length < 10}>
+            <Button onClick={publish} loading={busy}>
               Publicar
             </Button>
           </div>
@@ -567,14 +725,12 @@ export default function ConvocatoriaDetallePage() {
           <div className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
             Proyectados derivados: <strong>{offering.derivedProjected.count}</strong>. {offering.derivedProjected.detail}
           </div>
-          <Field htmlFor="p-override" label="Ajustar proyectados" hint="Dejalo vacio para usar el numero derivado.">
-            <Input id="p-override" type="number" min={0} value={override} onChange={(event) => setOverride(event.target.value)} />
-          </Field>
-          {override ? (
-            <Field htmlFor="p-reason" label="Justificacion del ajuste" required hint="Queda en la auditoria y visible en la convocatoria.">
-              <Input id="p-reason" value={adjustReason} onChange={(event) => setAdjustReason(event.target.value)} maxLength={500} />
-            </Field>
-          ) : null}
+          {/*
+            AQUI SOLO SE ENSENA lo que se va a congelar; corregirlo se hace despues, sobre la cifra
+            ya congelada (ver la nota de `ajusteOpen`). Publicar es una decision; corregir el
+            denominador es otra, y mezclarlas hacia que el motivo de la correccion —la evidencia que
+            lee el auditor— se escribiera antes de que hubiera nada que corregir.
+          */}
         </div>
       </Drawer>
 

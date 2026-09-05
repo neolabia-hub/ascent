@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api';
 import { readTypeConfig, type ActivityTypeConfig } from '@/lib/activity-type';
 import { listCatalog, listPickableUsers, type PickableUser } from '@/lib/admin-api';
 import { listActivities, type ActivityListItem, type Modality } from '@/lib/catalog-api';
-import { createOffering, type OfferingDetail } from '@/lib/delivery-api';
+import { addPlanItem, createOffering, listPlans, type OfferingDetail } from '@/lib/delivery-api';
 import { MONTHS } from '@/lib/format';
 import {
   cuerpoDeConvocatoria,
@@ -122,6 +122,17 @@ export interface NewOfferingDrawerProps {
    * quedar creada y sin entrar al plan porque alguien cerro la ventana.
    */
   askJustification?: boolean;
+  /**
+   * DESDE UNA PANTALLA QUE NO ES EL PLAN (el modulo de Convocatorias): si la formacion elegida es
+   * del plan y el plan del ano YA ESTA APROBADO, el cajon pide el motivo y mete el renglon por su
+   * cuenta.
+   *
+   * Existe porque programar tiene que significar lo mismo se entre por donde se entre. Con el plan
+   * en BORRADOR el renglon entra solo —lo hace el servidor, Decision #75— pero con el plan aprobado
+   * no, y la jornada quedaba fuera del plan: se dicta, la gente asiste, y no cuenta para el
+   * cumplimiento de nadie. El plan ya lo resolvia por su lado; las demas pantallas no.
+   */
+  autoPlan?: boolean;
   /** Se llama con la convocatoria ya creada. El mes viene null si no se pidio. */
   onCreated: (offering: OfferingDetail, plannedMonth: number | null, justification?: string) => Promise<void> | void;
 }
@@ -133,9 +144,12 @@ export function NewOfferingDrawer({
   askPlanMonth = false,
   defaultMonth,
   askJustification = false,
+  autoPlan = false,
   onCreated,
 }: NewOfferingDrawerProps) {
   const [justification, setJustification] = useState('');
+  /** El plan del ano si ya esta APROBADO. Solo se busca cuando `autoPlan`. */
+  const [planAprobado, setPlanAprobado] = useState<{ id: string; year: number } | null>(null);
   const [versions, setVersions] = useState<PublishedVersionOption[]>([]);
   const [people, setPeople] = useState<PickableUser[]>([]);
   const [catalogs, setCatalogs] = useState<OfferingFormCatalogs>({
@@ -179,6 +193,20 @@ export function NewOfferingDrawer({
     setActivityVersionId(lockedVersion?.id ?? '');
     setPlannedMonth(String(defaultMonth ?? new Date().getMonth() + 1));
     setMonthTouched(false);
+    // El plan del ano, si esta APROBADO: es el unico caso en que el renglon no entra solo.
+    if (autoPlan) {
+      void listPlans()
+        .then((filas) => {
+          const enCurso = new Date().getFullYear();
+          const vivos = filas.filter((row) => row.status !== 'CLOSED' && row.status !== 'DRAFT');
+          const elegido =
+            vivos.find((row) => row.year === enCurso) ??
+            vivos.filter((row) => row.year > enCurso).sort((a, b) => a.year - b.year)[0] ??
+            null;
+          setPlanAprobado(elegido ? { id: elegido.id, year: elegido.year } : null);
+        })
+        .catch(() => setPlanAprobado(null));
+    }
     void listActivities({ pageSize: 100 }).then((result) => setVersions(publishedVersions(result.items)));
     void listPickableUsers().then(setPeople).catch(() => undefined);
     void Promise.all([
@@ -237,19 +265,38 @@ export function NewOfferingDrawer({
    */
   const elegibles = askPlanMonth ? versions.filter((version) => version.config.participatesInPlan) : versions;
 
+  /*
+    ¿HAY QUE PEDIR EL MOTIVO DEL PLAN? Solo si esta pantalla lo gestiona (`autoPlan`), la formacion
+    elegida es del plan, y el plan del ano ya esta APROBADO. Con el plan en borrador el renglon
+    entra solo y pedir un motivo por cada jornada del ano seria ruido.
+  */
+  const entraAlPlanAprobado = autoPlan && planAprobado !== null && elegida?.config.participatesInPlan === true;
+  const pideMotivo = askJustification || entraAlPlanAprobado;
+
   const falta = loQueFaltaEnLaConvocatoria(form);
   const valid =
     Boolean(activityVersionId) &&
     falta.length === 0 &&
     // El servidor exige 10 caracteres; el boton se apaga aqui para no enterarse al enviar.
-    (!askJustification || justification.trim().length >= 10);
+    (!pideMotivo || justification.trim().length >= 10);
 
   const submit = async () => {
     setCreating(true);
     setFormError(null);
     try {
       const offering = await createOffering(cuerpoDeConvocatoria(form, activityVersionId));
-      await onCreated(offering, askPlanMonth ? Number(plannedMonth) : null, askJustification ? justification.trim() : undefined);
+      /*
+        EL RENGLON, cuando esta pantalla lo gestiona y el plan ya esta aprobado. Va ANTES de avisar
+        al padre para que "creada y agregada al plan" sea cierto cuando se diga.
+      */
+      if (entraAlPlanAprobado && planAprobado) {
+        await addPlanItem(planAprobado.id, {
+          offeringId: offering.id,
+          plannedMonth: Number(plannedMonth),
+          justification: justification.trim(),
+        });
+      }
+      await onCreated(offering, askPlanMonth ? Number(plannedMonth) : null, pideMotivo ? justification.trim() : undefined);
       onOpenChange(false);
     } catch (error) {
       setFormError(error instanceof ApiError ? error.message : 'No se pudo crear la convocatoria');
@@ -280,10 +327,14 @@ export function NewOfferingDrawer({
       }
     >
       <div className="space-y-4">
-        {askJustification ? (
+        {pideMotivo ? (
           <Field
             htmlFor="o-justification"
-            label="Por que se agrega al plan aprobado"
+            label={
+              planAprobado
+                ? `Por que se agrega al plan ${planAprobado.year}, que ya esta aprobado`
+                : 'Por que se agrega al plan aprobado'
+            }
             required
             hint="Queda en la auditoria junto al renglon. Ejemplo: se abrio la regional de Neiva en agosto."
           >
@@ -369,7 +420,13 @@ export function NewOfferingDrawer({
           </Field>
         ) : null}
 
-        <OfferingForm value={form} onChange={setForm} catalogs={catalogs} people={people} />
+        <OfferingForm
+          value={form}
+          onChange={setForm}
+          catalogs={catalogs}
+          people={people}
+          activityVersionId={activityVersionId || null}
+        />
 
         {falta.length > 0 ? (
           <ul className="space-y-1 rounded-md bg-warn-soft px-3 py-2">

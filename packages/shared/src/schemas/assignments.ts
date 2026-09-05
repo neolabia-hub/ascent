@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { employmentTypeSchema, roadActorSchema } from './users.js';
+import { fixedDateSchema } from './fixed-date.js';
 
 /**
  * Contratos de OBLIGACION (CLAUDE.md seccion 2, capa 4; negocio 6.6).
@@ -63,11 +64,41 @@ export const ruleTriggerSchema = z.enum(['ON_JOIN', 'ON_HIRE', 'SCHEDULED', 'PLA
  * `windowDays` es con cuanta antelacion nace la ronda siguiente, para que aparezca en los
  * pendientes con tiempo y no el mismo dia del vencimiento.
  */
+/**
+ * QUE PASA CUANDO LLEGA LA RONDA SIGUIENTE Y LA ANTERIOR NO SE HIZO.
+ *
+ * Tres formas, porque las empresas no lo resuelven igual y esto no se puede cablear:
+ *
+ *   CIERRA     la anterior se cierra como NO REALIZADA —queda en el historial como incumplimiento
+ *              de ese periodo— y la nueva nace para todos. Una sola obligacion viva a la vez. Es
+ *              como funciona el cumplimiento por CALENDARIO: cada campana es su periodo, y el
+ *              periodo cierra. Es lo que pregunta el auditor, ano por ano.
+ *   ACUMULA    la anterior sigue pendiente Y nace la nueva: la persona debe las dos. Para quien
+ *              exige ponerse al dia antes de seguir. A los tres anos debe tres.
+ *   ESPERA     no nace la siguiente hasta que haga la anterior. Era lo unico que habia, y tiene un
+ *              efecto que casi nadie quiere: quien nunca la hace desaparece del denominador de los
+ *              anos siguientes, asi que el peor incumplidor sale de la cuenta y la cobertura se ve
+ *              mejor de lo que es.
+ */
+export const onExpirySchema = z.enum(['CIERRA', 'ACUMULA', 'ESPERA']);
+export type OnExpiry = z.infer<typeof onExpirySchema>;
+
 export const recurrenceSchema = z
   .object({
     everyMonths: z.number().int().min(1).max(120).optional(),
-    fixedDate: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Fecha MM-DD').optional(),
+    fixedDate: fixedDateSchema.optional(),
     windowDays: z.number().int().min(0).max(365).default(60),
+    /**
+     * Por defecto ESPERA para no cambiarle el comportamiento a lo que ya existe. Los tipos que son
+     * campana anual lo traen puesto en `defaultOnExpiry` y llega aqui al crear el requisito.
+     */
+    onExpiry: onExpirySchema.default('ESPERA'),
+    /**
+     * No se le exige a quien ingreso hace menos de N meses. Viaja con la recurrencia —igual que
+     * `onExpiry`— porque es donde el motor la lee, pero la decide el TIPO
+     * (`exemptRecentHiresMonths`). `0` = no se excluye a nadie.
+     */
+    exemptRecentHiresMonths: z.number().int().min(0).max(24).default(0),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -158,11 +189,7 @@ export const setActivityRequirementSchema = z
      * con fecha fija, todos vencen el 31 de marzo, que es lo que el auditor pregunta ("¿hicieron
      * la reinduccion 2026?").
      */
-    fixedDate: z
-      .string()
-      .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Fecha MM-DD')
-      .nullable()
-      .default(null),
+    fixedDate: fixedDateSchema.nullable().default(null),
     /**
      * A QUIEN ALCANZA: `true` = solo a quien entre a la audiencia desde ahora; `false` (por
      * defecto) = tambien a los que ya estan.
@@ -197,8 +224,14 @@ export const toggleJobTitleMatrixSchema = z.object({
   jobTitleId: z.string().uuid(),
   activityId: z.string().uuid(),
   enabled: z.boolean(),
-  /** Solo al activar: dias respecto al ingreso (negativo = antes). */
-  dueDaysAfterTrigger: z.number().int().min(-365).max(3650).default(0),
+  /**
+   * Solo al activar: dias respecto al ingreso. Por defecto **-1**, no 0: D1072 art. 2.2.4.6.11
+   * exige que la induccion sea PREVIA al inicio de labores, y "el mismo dia" no es previa. Era 0,
+   * asi que la misma casilla vencia distinto segun se creara aqui o en la ficha.
+   */
+  dueDaysAfterTrigger: z.number().int().min(-365).max(0).default(-1),
+  /** La novedad, cuando se cambia una casilla que YA existia. La exige el servidor. */
+  reason: z.string().min(10).max(500).nullable().optional(),
 });
 export type ToggleJobTitleMatrixInput = z.infer<typeof toggleJobTitleMatrixSchema>;
 
@@ -213,6 +246,12 @@ export const assignmentStatusSchema = z.enum([
   /** El renglon del plan que la creo se cancelo. Ver `plans.service.updateItem`. */
   'WITHDRAWN_PLAN_ITEM_CANCELLED',
   'WAIVED',
+  /**
+   * Cerro el periodo y no la hizo. A diferencia de RETIRADA y EXIMIDA, esta **SI cuenta como
+   * incumplimiento** de ese periodo: es lo que permite que una campana anual pase de ano sin
+   * perder de vista a quien no la hizo. Ver `onExpirySchema`.
+   */
+  'EXPIRED_NOT_DONE',
 ]);
 
 /** Asignacion manual: a personas, o a todo un cargo / area / regional (se expande a personas). */

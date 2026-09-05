@@ -400,12 +400,37 @@ export class PlansService {
         projectedCount: true,
         audienceId: true,
         regionalId: true,
-        activityVersion: { select: { activityId: true, activity: { select: { name: true } } } },
+        activityVersion: {
+          select: {
+            activityId: true,
+            activity: { select: { name: true, activityType: { select: { name: true, config: true } } } },
+          },
+        },
       },
     });
     if (!offering) throw new NotFoundException({ code: 'OFFERING_NOT_FOUND' });
     if (offering.status === 'CANCELLED') {
       throw new ConflictException({ code: 'OFFERING_CANCELLED', message: 'Esa convocatoria esta cancelada.' });
+    }
+
+    /*
+      SOLO ENTRA AL PLAN LO QUE ES DEL PLAN (Decision #78, cerrada en el servidor el 2026-09-04).
+
+      La decision existia y la lista de "agregar convocatoria existente" ya filtraba por
+      `participatesInPlan`... **en la pantalla**. Por la API entraba cualquier cosa, y no es un
+      matiz teorico: el recorrido de punta a punta metio una induccion general en un plan de prueba
+      y los proyectados del plan pasaron de **22 a 819**, porque la induccion alcanza a la empresa
+      entera. Eso es mover el cumplimiento del plan con algo que por la regla de oro 2 no debe
+      tocarlo, y deja la cobertura del ano en un numero que no significa nada.
+
+      Un filtro que solo vive en la pantalla no es un filtro: es una sugerencia.
+    */
+    const configDelTipo = (offering.activityVersion.activity.activityType.config ?? {}) as Record<string, unknown>;
+    if (configDelTipo.participatesInPlan !== true) {
+      throw new ConflictException({
+        code: 'ACTIVITY_NOT_PLANNABLE',
+        message: `"${offering.activityVersion.activity.activityType.name}" no es una formacion del plan: engancharla moveria el cumplimiento del ano con algo que no le corresponde.`,
+      });
     }
 
 
@@ -844,10 +869,7 @@ export class PlansService {
     const dueAt = this.endOfMonth(planYear, item.plannedMonth);
 
     if (people.userIds.length === 0) {
-      await this.prisma.scoped.planItem.update({
-        where: { id: item.id },
-        data: { projectedSnapshot: item.offering.projectedCount ?? people.count },
-      });
+      await this.congelarProyectados(item.id);
       return 0;
     }
 
@@ -873,11 +895,6 @@ export class PlansService {
     const reparto = repartirObligaciones(item.id, people.userIds, suyas);
     const recipients = reparto.crear;
 
-    await this.prisma.scoped.planItem.update({
-      where: { id: item.id },
-      data: { projectedSnapshot: item.offering.projectedCount ?? people.count },
-    });
-
     // ADOPTAR: la obligacion es la misma, solo pasa a estar contada por este renglon. No se le
     // toca el vencimiento: a esa persona ya se le dijo una fecha, y moverla por detras es
     // exactamente lo que el plan no puede hacer.
@@ -895,7 +912,10 @@ export class PlansService {
 
     // A quien NO tenia ninguna se le crea, que es el caso de una jornada agregada a un plan vivo
     // para gente que todavia no estaba obligada.
-    if (recipients.length === 0) return adoptadas;
+    if (recipients.length === 0) {
+      await this.congelarProyectados(item.id);
+      return adoptadas;
+    }
 
     await this.prisma.scoped.assignment.createMany({
       data: recipients.map((userId) => ({
@@ -916,10 +936,37 @@ export class PlansService {
       titles.push(item.offering.activityVersion.activity.name);
       perUser.set(userId, titles);
     }
+    await this.congelarProyectados(item.id);
     // Solo se AVISA a quien recibe una obligacion NUEVA. A quien ya la tenia no se le manda nada:
     // "se te asigno X" seria falso —ya estaba asignada— y ademas un aviso repetido por algo que no
     // cambio para esa persona es como se ensena a ignorar la campana.
     return recipients.length + adoptadas;
+  }
+
+  /**
+   * CONGELAR LOS PROYECTADOS DEL RENGLON: la gente que ESTE renglon cuenta (2026-09-04).
+   *
+   * Antes se congelaba `offering.projectedCount`, que es lo que la jornada atenderia **en bruto**.
+   * Y despues `repartirObligaciones` le SALTA a quien ya cuenta otro renglon, asi que el renglon
+   * decia proyectar a trece y obligaba a cero.
+   *
+   * MEDIDO: dos jornadas de la misma capacitacion sin acotar, 13 obligados reales, y el plan
+   * proyectando **26**. La cobertura del ano no podia pasar del 50% aunque se capacitara a todo el
+   * mundo — que es exactamente el dano que describe la Decision #68, pero en el plan y no en la
+   * convocatoria.
+   *
+   * Ahora el denominador sale del MISMO sitio que el numerador: las obligaciones que este renglon
+   * cuenta. Sigue siendo un congelado (Decision #5) —se escribe una vez, al materializar, y no se
+   * recalcula despues— pero de un numero que significa algo: cuanta gente tiene que capacitar ESTE
+   * renglon, sin contar dos veces a nadie.
+   *
+   * Que un renglon quede en cero no es un error: es una segunda jornada de algo que ya cubria otra.
+   * Sigue contando para el CUMPLIMIENTO —la jornada se programo y se dicto— y no para la COBERTURA,
+   * que es de personas. Son dos indicadores distintos a proposito.
+   */
+  private async congelarProyectados(itemId: string): Promise<void> {
+    const cuenta = await this.prisma.scoped.assignment.count({ where: { planItemId: itemId } });
+    await this.prisma.scoped.planItem.update({ where: { id: itemId }, data: { projectedSnapshot: cuenta } });
   }
 
   /**

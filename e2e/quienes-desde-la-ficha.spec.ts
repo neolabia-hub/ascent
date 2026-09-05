@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { loginAsAdmin, unique } from './helpers';
+import { agregarEvaluacion, loginAsAdmin, unique } from './helpers';
 
 /**
  * A QUIEN SE LE EXIGE, dicho desde la formacion y sin salir de ella.
@@ -47,20 +47,38 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.getByRole('option', { name: /Director de Gestion Humana/ }).click();
     await page.keyboard.press('Escape');
 
-    // Y exige NOVEDAD: cambiar lo que se le exige a un cargo es algo que alguien tendra que
-    // explicar en una auditoria.
-    const guardar = page.getByRole('button', { name: 'Guardar a quien se le exige' });
-    await expect(guardar).toBeDisabled();
-    await page.locator('#q-novedad').fill('Se agrega por la matriz de competencia del cargo.');
+    /*
+      LA PRIMERA VEZ NO SE PIDE NOVEDAD (cambiado el 2026-09-03).
+
+      Esta prueba la exigia SIEMPRE, y desde entonces el criterio es otro: marcar por primera vez
+      una casilla que no existia es **escribir** la matriz de competencia, no modificarla, y pedir
+      un motivo en cada una convierte el control en un tramite que se rellena con "carga inicial"
+      cuarenta veces — un campo que siempre dice lo mismo deja de informar. La novedad se pide —y el
+      servidor la exige— cuando la casilla YA existe: se ajusta el plazo, cambia el alcance, o se
+      vuelve a exigir algo que se habia retirado.
+
+      Aqui la formacion acaba de crearse, asi que el boton tiene que estar VIVO sin escribir nada, y
+      el campo de novedad ni siquiera aparece.
+    */
+    const guardar = page.getByRole('button', { name: 'Exigirla' });
     await expect(guardar).toBeEnabled();
+    await expect(page.locator('#q-novedad')).toHaveCount(0);
     await guardar.click();
 
     // La regla queda dicha en una linea, con a cuanta gente alcanza.
     await expect(page.getByText(/alcanza a \d+ personas/).first()).toBeVisible({ timeout: 20_000 });
 
-    // Y lo que de verdad importa: hay FILAS de obligacion, nacidas de la regla y no a mano.
-    const obligaciones = page.locator('tbody tr').filter({ hasText: 'Requisito' });
-    await expect(obligaciones.first()).toBeVisible({ timeout: 20_000 });
+    /*
+      Y lo que de verdad importa: hay FILAS de obligacion, nacidas de la regla y no a mano.
+
+      Se buscaban por la palabra "Requisito", que era la columna de ORIGEN. La tabla se rehizo el
+      2026-09-03 y ya no la trae: ahora se titula "Quienes la tienen que hacer" y cuelga de la regla
+      que se acaba de guardar, asi que el origen es el encabezado y no una celda. Se ancla en el
+      ESTADO, que es lo que de verdad se quiere comprobar aqui y sobrevive al siguiente rediseno.
+    */
+    await expect(page.getByRole('heading', { name: 'Quienes la tienen que hacer' })).toBeVisible();
+    const pendientes = page.locator('tbody tr').filter({ hasText: 'PENDIENTE' });
+    await expect(pendientes.first()).toBeVisible({ timeout: 20_000 });
 
     // SE RETIRA AL TERMINAR, y no es limpieza cosmetica: mientras el requisito siga vigente
     // obliga a CADA persona que se cree despues con ese cargo, incluidas las de otras pruebas.
@@ -70,7 +88,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await expect(page.getByText('Todavia no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
     // La obligacion no se BORRA: queda RETIRADA. Un registro que el sistema borra solo es un
     // registro en el que no se puede confiar.
-    await expect(obligaciones.first()).toContainText('RETIRADA', { timeout: 20_000 });
+    await expect(page.locator('tbody tr').filter({ hasText: 'RETIRADA' }).first()).toBeVisible({ timeout: 20_000 });
   });
 
   test('la induccion general no deja marcar a nadie: es de toda la empresa', async ({ page }) => {
@@ -130,6 +148,9 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.locator('#c-lesson').selectOption(lessonValue as string);
     await page.getByRole('button', { name: 'Agregar', exact: true }).click();
     await expect(page.getByText('Contenido agregado')).toBeVisible({ timeout: 20_000 });
+
+    // El tipo de esta formacion pide evaluacion, y desde el 2026-09-04 publicar sin ella se rechaza.
+    await agregarEvaluacion(page, `Examen ${suffix}`);
 
     // PUBLICAR es el acto que la exige. Nadie pulsa nada mas.
     await page.getByRole('button', { name: /Publicar cambios/ }).click();
@@ -196,7 +217,7 @@ test('la capacitacion del plan solo pregunta a quienes: ni plazo, ni recurrencia
   await page.locator('#q-jobs').click();
   await page.getByRole('option', { name: /Director de Gestion Humana/ }).click();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Guardar a quien se le exige' }).click();
+  await page.getByRole('button', { name: 'Exigirla' }).click();
 
   // 2. Lo que de verdad importa: se guardo el alcance y NO nacio ninguna obligacion.
   await expect(page.getByText(/quedan en el alcance/)).toBeVisible({ timeout: 30_000 });

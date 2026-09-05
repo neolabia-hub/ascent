@@ -41,7 +41,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
     'bg-primary text-white border border-transparent shadow-btn hover:-translate-y-px hover:shadow-btn-hover hover:[filter:brightness(1.06)] active:translate-y-0 active:shadow-btn-active active:[filter:brightness(0.94)]',
-  ghost: 'bg-transparent text-ink-700 border border-transparent hover:bg-paper',
+  ghost: 'bg-transparent text-ink-700 border border-transparent hover:bg-primary-soft hover:text-ink-900',
   outline:
     'bg-surface text-ink-700 border border-line-strong shadow-btn-flat hover:-translate-y-px hover:border-line-strong hover:shadow-btn hover:bg-paper active:translate-y-0 active:shadow-none',
   danger:
@@ -85,6 +85,20 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         'focus-ring relative isolate inline-flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md font-medium transition-[transform,box-shadow,filter,background-color,border-color] duration-150 ease-pulse disabled:cursor-not-allowed',
         opening && 'animate-unlock',
         variantClasses[variant],
+        /*
+          DESHABILITADO SE VE DESHABILITADO (Decision #137).
+
+          Solo tenia `cursor-not-allowed`: el boton conservaba su relleno de marca y su texto
+          blanco, asi que se veia igual de pulsable que uno activo y solo se descubria pasando el
+          raton por encima —o pulsandolo y que no pasara nada—. En un formulario donde "Guardar" se
+          habilita al completar los campos, eso convierte una regla clara en un boton roto.
+
+          Va DESPUES de la variante para que `twMerge` deje ganar a esto sobre su relleno.
+
+          Y NO se aplica mientras carga, aunque `loading` tambien deshabilite: un boton con su
+          rueda girando esta trabajando, no apagado, y atenuarlo lo haria parecer averiado.
+        */
+        !loading && !locked && 'disabled:opacity-45 disabled:shadow-none disabled:hover:translate-y-0',
         // Va despues de la variante para que twMerge le quite su sombra gris de hover y de pulsado;
         // el halo de color las repone en .btn-glow.
         glow && !locked && 'btn-glow hover:shadow-none active:shadow-none',

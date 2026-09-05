@@ -75,12 +75,22 @@ export interface ApiErrorBody {
   code?: string;
   status?: number;
   retryAfter?: number;
+  /** Miembros de extension del Problem Details (RFC 9457 3.2). */
+  [key: string]: unknown;
 }
 
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly retryAfter?: number;
+  /**
+   * El cuerpo entero, para los errores que traen datos con los que se puede hacer algo.
+   *
+   * Un `code` solo alcanza para elegir la frase; no alcanza para escribirla. `CATALOG_IN_USE`
+   * viaja con cuantas filas lo usan y como se llaman, y sin esto habria que descartarlo y decir
+   * "esta en uso" —que es justo el mensaje que no ayuda a nadie—.
+   */
+  readonly body: ApiErrorBody;
 
   constructor(body: ApiErrorBody, status: number) {
     super(body.title ?? 'Error de la API');
@@ -88,6 +98,7 @@ export class ApiError extends Error {
     this.code = body.code ?? 'UNKNOWN_ERROR';
     this.status = body.status ?? status;
     this.retryAfter = body.retryAfter;
+    this.body = body;
   }
 }
 

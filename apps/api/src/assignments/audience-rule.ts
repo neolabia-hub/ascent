@@ -115,6 +115,20 @@ export function singleJobTitleOf(rule: AudienceRule): string | null {
 }
 
 /**
+ * Los cargos de una audiencia que SOLO habla de cargos — uno o varios. Vacio si mira algo mas.
+ *
+ * La matriz solo administra las de un cargo (`singleJobTitleOf`), pero tiene que PINTAR tambien
+ * las de varios: en "Quienes" se pueden marcar tres cargos de una vez, y eso crea UNA audiencia
+ * con los tres dentro. Reconocerla solo por la forma exacta de un cargo dejaba esa formacion sin
+ * ninguna casilla encendida — la matriz decia que no se le exigia a nadie mientras el sistema se
+ * la estaba exigiendo a tres cargos.
+ */
+export function jobTitlesOf(rule: AudienceRule): string[] {
+  const onlyFacet = facetsOf(rule).length === 1;
+  return onlyFacet && rule.jobTitleIds.length > 0 ? [...rule.jobTitleIds] : [];
+}
+
+/**
  * ¿Son la MISMA audiencia? Se compara la forma, no el nombre.
  *
  * Hace falta para que exigir una formacion "a los conductores" desde la ficha reutilice la

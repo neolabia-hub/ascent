@@ -5,6 +5,7 @@ import { PREGUNTAS_SATISFACCION } from '@neo-pulse/shared';
  * ESCENARIO DE PRUEBA DE LA ENCUESTA, listo para verlo en pantalla.
  *
  *   pnpm --filter @neo-pulse/api demo:encuesta [cedula]
+ *   pnpm --filter @neo-pulse/api demo:encuesta --limpiar    borra TODO lo que haya dejado
  *
  * Deja montado el camino completo: una encuesta activa, un tipo que la pide, una formacion de ese
  * tipo con una leccion y la encuesta enganchada, una convocatoria permanente para poder entrar sin
@@ -19,17 +20,93 @@ import { PREGUNTAS_SATISFACCION } from '@neo-pulse/shared';
  * Corre como DUENO de la base de datos (DIRECT_DATABASE_URL) porque el usuario de la aplicacion
  * esta sujeto a RLS y un script suelto no tiene `app.tenant_id` fijado: veria cero filas y diria
  * que no hay nada, que es el peor fallo posible — un filtro vacio y un conjunto vacio se ven igual.
+ *
+ * ─── POR QUE SE LIMPIA SOLO (2026-09-04) ───
+ *
+ * El escenario se montaba y no se recogia. El TIPO que crea aparece en Configuracion -> Tipos de
+ * formacion como uno mas, y ahi ya no se distingue de los seis reales: el cliente se topo con
+ * "Prueba de encuesta W6PWX" el 2026-09-01, intento borrarlo y no pudo —sus propias formaciones lo
+ * referencian— y ademas eligio ese tipo para una formacion suya, porque estaba en la lista.
+ *
+ * Un escenario de prueba que ensucia la CONFIGURACION del cliente no es gratis. `--limpiar` borra
+ * todos los que este script haya dejado (por el prefijo `PRUEBA_ENCUESTA_`), con lo que cuelga de
+ * ellos. No toca la encuesta: esa se reutiliza y puede ser la de verdad.
  */
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.DIRECT_DATABASE_URL } } });
 
 const SUFIJO = Date.now().toString(36).toUpperCase().slice(-5);
 
+/**
+ * Recoge TODO lo que este script haya dejado, de esta corrida y de las anteriores.
+ *
+ * Se busca por el prefijo del codigo del TIPO, no por el sufijo de una corrida: lo que estorba en
+ * la configuracion del cliente es la acumulacion, y quien limpia no sabe cuantas veces se corrio.
+ *
+ * Se borra de dentro hacia fuera porque las claves ajenas son RESTRICT a proposito (una formacion
+ * publicada no se borra por accidente). Arrastra tambien las formaciones que NO creo el script pero
+ * que alguien puso en ese tipo, que es el caso real: el tipo estaba en la lista y se eligio.
+ */
+async function limpiar(tenantId: string): Promise<void> {
+  const tipos = await prisma.activityType.findMany({
+    where: { tenantId, code: { startsWith: 'PRUEBA_ENCUESTA_' } },
+    select: { id: true, name: true },
+  });
+  if (tipos.length === 0) {
+    console.log('\nNo hay nada que limpiar: ningun tipo de prueba en la base.\n');
+    return;
+  }
+
+  const tipoIds = tipos.map((t) => t.id);
+  const actividades = await prisma.activity.findMany({
+    where: { activityTypeId: { in: tipoIds } },
+    select: { id: true, name: true },
+  });
+  const actIds = actividades.map((a) => a.id);
+  const versiones = await prisma.activityVersion.findMany({ where: { activityId: { in: actIds } }, select: { id: true } });
+  const verIds = versiones.map((v) => v.id);
+  const convocatorias = await prisma.offering.findMany({ where: { activityVersionId: { in: verIds } }, select: { id: true } });
+  const offIds = convocatorias.map((o) => o.id);
+  const inscripciones = await prisma.enrollment.findMany({
+    where: { OR: [{ offeringId: { in: offIds } }, { activityVersionId: { in: verIds } }] },
+    select: { id: true },
+  });
+  const enrIds = inscripciones.map((e) => e.id);
+
+  await prisma.$transaction([
+    prisma.learningEvent.deleteMany({ where: { enrollmentId: { in: enrIds } } }),
+    prisma.surveyResponse.deleteMany({ where: { enrollmentId: { in: enrIds } } }),
+    prisma.certificate.deleteMany({ where: { enrollmentId: { in: enrIds } } }),
+    prisma.efficacySchedule.deleteMany({ where: { enrollmentId: { in: enrIds } } }),
+    prisma.activityProgress.deleteMany({ where: { enrollmentId: { in: enrIds } } }),
+    prisma.attempt.deleteMany({ where: { enrollmentId: { in: enrIds } } }),
+    prisma.enrollment.deleteMany({ where: { id: { in: enrIds } } }),
+    prisma.attendanceRecord.deleteMany({ where: { offeringId: { in: offIds } } }),
+    prisma.sessionAct.deleteMany({ where: { offeringId: { in: offIds } } }),
+    prisma.planItem.deleteMany({ where: { offeringId: { in: offIds } } }),
+    prisma.offering.deleteMany({ where: { id: { in: offIds } } }),
+    prisma.assignment.deleteMany({ where: { targetId: { in: actIds } } }),
+    prisma.assignmentRule.deleteMany({ where: { targetId: { in: actIds } } }),
+    prisma.activityContent.deleteMany({ where: { activityVersionId: { in: verIds } } }),
+    prisma.activity.updateMany({ where: { id: { in: actIds } }, data: { currentVersionId: null } }),
+    prisma.activityVersion.deleteMany({ where: { id: { in: verIds } } }),
+    prisma.activity.deleteMany({ where: { id: { in: actIds } } }),
+    prisma.activityType.deleteMany({ where: { id: { in: tipoIds } } }),
+  ]);
+
+  console.log(`\nLimpiado: ${tipos.length} tipo(s) de prueba y ${actividades.length} formacion(es).`);
+  for (const a of actividades) console.log(`  - ${a.name}`);
+  console.log('');
+}
+
 async function main() {
-  const cedula = process.argv[2] ?? '1102886093';
+  const limpieza = process.argv.includes('--limpiar');
+  const cedula = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '1102886093';
 
   const tenant = await prisma.tenant.findFirst({ where: { slug: 'transprensa' }, select: { id: true } });
   if (!tenant) throw new Error('No existe el tenant transprensa.');
   const tenantId = tenant.id;
+
+  if (limpieza) return limpiar(tenantId);
 
   const persona = await prisma.user.findFirst({
     where: { tenantId, documentNumber: cedula, deletedAt: null },
@@ -186,7 +263,8 @@ async function main() {
   console.log('  3. Pasa las dos tarjetas');
   console.log('  4. La encuesta sale como ultima parte\n');
   console.log(`  Encuesta usada: ${encuesta.name}`);
-  console.log(`  Tipo creado:    Prueba de encuesta ${SUFIJO} (no toca los tipos reales)\n`);
+  console.log(`  Tipo creado:    Prueba de encuesta ${SUFIJO} (no toca los tipos reales)`);
+  console.log('  Para recogerlo: pnpm --filter @neo-pulse/api demo:encuesta --limpiar\n');
 }
 
 main()

@@ -49,14 +49,48 @@ async function main() {
       return;
     }
 
-    const { count } = await prisma.assignmentRule.updateMany({
+    /*
+      NO SE TOCA UNA REGLA DE UNA FORMACION PUBLICADA (2026-09-03).
+
+      El filtro por nombre no bastaba, y costo un rato entenderlo: `findOrCreate` REUTILIZA la
+      audiencia que ya tenga esa forma, asi que una induccion general publicada a mano puede acabar
+      colgando de "Toda la empresa <marca de tiempo>" —la que dejo una corrida anterior— sin que
+      nadie lo note. Este script la desactivaba junto con las de prueba, y la formacion real se
+      quedaba SIN regla: en pantalla, "Lo que se exige hoy" vacio con gente ya obligada debajo.
+      Reportado exactamente asi por el cliente sobre una induccion suya.
+
+      Ahora se salta cualquier regla cuya formacion tenga una version PUBLICADA. Eso deja alguna
+      regla de prueba viva —las corridas tambien publican— y esta bien: desde que el alta de
+      personas dejo de recorrer todas las reglas (0,4 s en vez de 9 s), unas cuantas de mas ya no
+      cuestan nada. Perder el trabajo de alguien si costaba.
+    */
+    const candidatas = await prisma.assignmentRule.findMany({
       where: { active: true, audienceId: { in: audiencias.map((a) => a.id) } },
-      data: { active: false },
+      select: { id: true, targetId: true },
     });
+
+    const publicadas = new Set(
+      (
+        await prisma.activityVersion.findMany({
+          where: { status: 'PUBLISHED', activityId: { in: candidatas.map((r) => r.targetId) } },
+          select: { activityId: true },
+        })
+      ).map((v) => v.activityId),
+    );
+
+    const aDesactivar = candidatas.filter((r) => !publicadas.has(r.targetId)).map((r) => r.id);
+    const respetadas = candidatas.length - aDesactivar.length;
+
+    const { count } = aDesactivar.length
+      ? await prisma.assignmentRule.updateMany({ where: { id: { in: aDesactivar } }, data: { active: false } })
+      : { count: 0 };
 
     const quedan = await prisma.assignmentRule.count({ where: { active: true } });
     console.log(`Desactivadas ${count} regla(s) de ${audiencias.length} audiencia(s) de prueba.`);
-    console.log(`Quedan ${quedan} regla(s) activa(s) — esas son las de verdad.`);
+    if (respetadas > 0) {
+      console.log(`Respetadas ${respetadas}: su formacion esta PUBLICADA, asi que no es basura de una corrida.`);
+    }
+    console.log(`Quedan ${quedan} regla(s) activa(s).`);
   } finally {
     await prisma.$disconnect();
   }

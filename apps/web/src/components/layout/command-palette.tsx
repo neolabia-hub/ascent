@@ -32,7 +32,7 @@ export interface Command {
  */
 export const LEARNER_COMMANDS: Command[] = [
   { id: 'nav-hoy', label: 'Inicio', href: '/hoy', icon: House, group: 'Ir a' },
-  { id: 'nav-mi', label: 'Mi formacion', href: '/mi-formacion', icon: GraduationCap, group: 'Ir a' },
+  { id: 'nav-mi', label: 'Mi aprendizaje', href: '/mi-formacion', icon: GraduationCap, group: 'Ir a' },
   { id: 'nav-repaso', label: 'Repaso de hoy', href: '/repaso', icon: Repeat2, group: 'Ir a' },
   { id: 'nav-perfil', label: 'Mi perfil', href: '/perfil', icon: CircleUser, group: 'Ir a' },
 ];

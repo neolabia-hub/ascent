@@ -205,6 +205,23 @@ export class MediaController {
     const pkg = await this.resolveServable(tenantId, storageKey);
     if (!pkg) throw new NotFoundException({ code: 'FILE_NOT_FOUND' });
 
+    /*
+      CON R2, LOS BYTES NO PASAN POR AQUI.
+
+      Servirlos desde el servidor haria que cada video viajara DOS veces —del bucket a la maquina y
+      de la maquina al telefono— y convertiria el ancho de banda del servidor en el techo de cuanta
+      gente puede ver una formacion a la vez. Es justo lo que R2 (egress cero) existe para evitar.
+
+      Lo que protege el acceso NO se relaja: la firma propia ya se comprobo arriba y el paquete ya
+      se resolvio contra la base. Solo despues de las dos cosas se emite una URL del bucket, que
+      ademas caduca en una hora. Y los rangos los resuelve R2 nativamente, que es lo que necesita el
+      reproductor para saltar en un video.
+    */
+    if (!this.storage.isLocal) {
+      res.redirect(302, await this.storage.getSignedUrl(storageKey, 3600));
+      return;
+    }
+
     const size = await this.storage.size(storageKey);
     if (size === null) throw new NotFoundException({ code: 'FILE_NOT_FOUND' });
 

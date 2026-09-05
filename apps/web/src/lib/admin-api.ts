@@ -335,6 +335,8 @@ export interface TenantSettings {
   notificationWeeklyCap: number;
   streakFreezesMax: number;
   efficacyDaysDefault: number;
+  /** Dias antes del cierre en que se recuerda el ciclo de desempeno. 0 = sin recordatorio. */
+  performanceReminderDays: number;
   labels: Record<string, string>;
   features: Record<string, boolean>;
   /** A quien acude quien no puede entrar. Se publica SIN sesion (Decision #97). */

@@ -78,6 +78,22 @@ export interface TemplatePayload {
   active: boolean;
 }
 
+/**
+ * LAS CONSTANCIAS DE OTRA PERSONA, para quien lleva el expediente formativo de la empresa.
+ *
+ * Existe porque la peticion real la hace la EMPRESA, no el aprendiz: "mandame el certificado de
+ * alturas de Juan" llega un viernes, y Juan puede estar en carretera o haberse ido. El servidor lo
+ * protege con `certificates:issue`, que es el permiso de quien administra el expediente.
+ */
+export function getCertificatesOf(userId: string): Promise<CertificateRow[]> {
+  return apiFetch(`/certificates?userId=${userId}`, { method: 'GET' });
+}
+
+/** Revocar exige motivo y NO borra: la fila se conserva, marcada. Es evidencia. */
+export function revokeCertificate(id: string, reason: string): Promise<{ ok: true }> {
+  return apiFetch(`/certificates/${id}/revoke`, { method: 'POST', body: { reason } });
+}
+
 export function getMyCertificates(): Promise<CertificateRow[]> {
   return apiFetch('/me/certificados', { method: 'GET' });
 }
@@ -113,11 +129,20 @@ export function deleteTemplate(id: string): Promise<{ ok: true }> {
  * navegadores antes de que empiece a escribirse el fichero.
  */
 export async function descargarPdf(ruta: string, nombreSugerido: string): Promise<void> {
+  return descargarArchivo(ruta, nombreSugerido, 'No se pudo generar el PDF');
+}
+
+/** Lo mismo para cualquier archivo con cabecera: el xlsx del seguimiento pasa por aqui. */
+export async function descargarArchivo(
+  ruta: string,
+  nombreSugerido: string,
+  mensajeDeError = 'No se pudo descargar el archivo',
+): Promise<void> {
   const respuesta = await fetch(`${API_URL}/v1${ruta}`, {
     credentials: 'include',
     headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
   });
-  if (!respuesta.ok) throw new Error('No se pudo generar el PDF');
+  if (!respuesta.ok) throw new Error(mensajeDeError);
 
   const blob = await respuesta.blob();
   const url = URL.createObjectURL(blob);

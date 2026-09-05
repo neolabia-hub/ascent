@@ -14,7 +14,30 @@ interface Section extends CatalogManagerProps {
 
 /** Los 8 catalogos parametrizables del tenant (CLAUDE.md 3.2), gobernados por configuracion. */
 const SECTIONS: Section[] = [
-  { catalogKey: 'areas', label: 'Areas', singular: 'area', feminine: true, description: 'Unidades organizacionales a las que pertenecen las personas.' },
+  {
+    catalogKey: 'areas',
+    label: 'Areas',
+    singular: 'area',
+    feminine: true,
+    description: 'Unidades organizacionales a las que pertenecen las personas.',
+    /*
+      QUIEN RESPONDE POR EL AREA. Faltaba, y no era cosmetico: el campo existia en la base desde el
+      Sprint 5 y NINGUNA pantalla lo dejaba rellenar, asi que dos funciones que dependen de el
+      llevaban meses apuntando a un vacio —la evaluacion de eficacia y el aviso de "alguien
+      reprobo"— sin dar error, porque no falla nada cuando no hay a quien avisar.
+
+      Con la evaluacion de desempeno dejo de ser invisible: sin responsable de area no hay quien
+      califique, y al abrir un ciclo salen TODAS las personas en la lista de "sin evaluador".
+    */
+    extraFields: [
+      {
+        key: 'responsibleUserId',
+        label: 'Responsable del area',
+        kind: 'user',
+        hint: 'Quien evalua el desempeno de su gente, responde la eficacia de sus formaciones y recibe el aviso cuando alguien reprueba. Es distinto del responsable de un PROCESO: aquel responde por un sistema de gestion, este por las personas.',
+      },
+    ],
+  },
   {
     catalogKey: 'processes',
     label: 'Procesos',

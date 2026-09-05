@@ -100,7 +100,7 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
 
     // 4. La obligacion: se asigna a toda el area del usuario de pruebas (Gestion Humana).
     await page.goto('/asignaciones');
-    await page.getByRole('button', { name: 'Obligaciones' }).click();
+    await page.getByRole('tab', { name: 'Obligaciones' }).click();
     await page.getByRole('button', { name: 'Asignar formacion' }).click();
     await page.locator('#m-target').selectOption({ label: pillName });
     await page.locator('#m-area').selectOption({ label: 'Gestion Humana' });

@@ -3,6 +3,14 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl as presignS3Url } from '@aws-sdk/s3-request-presigner';
 
 /**
  * Almacenamiento de medios con patron ADAPTER: el negocio nunca conoce el proveedor.
@@ -67,35 +75,101 @@ export class LocalStorageAdapter implements StorageAdapter {
 }
 
 /**
- * Produccion: Cloudflare R2. Pendiente de cablear al desplegar; se implementa con
- * @aws-sdk/client-s3 (PutObjectCommand/GetObjectCommand/DeleteObjectCommand) y
- * @aws-sdk/s3-request-presigner (getSignedUrl, expiracion 1 hora). Se deja explicito para que
- * el fallo sea evidente si alguien despliega sin completar este paso.
+ * PRODUCCION: CLOUDFLARE R2 (S3-compatible, egress cero).
+ *
+ * ─── LOS BYTES NO PASAN POR LA API ───
+ *
+ * Es la decision que hace que este adaptador valga la pena. En local, `/v1/media/file/:key` lee del
+ * disco y empuja el archivo por la respuesta; hacer lo mismo contra R2 significaria que cada video
+ * viaja DOS veces —de R2 al servidor y del servidor al telefono— y que el ancho de banda de la
+ * maquina es el techo de cuanta gente puede ver una formacion a la vez. Justo lo que se eligio R2
+ * para evitar.
+ *
+ * Asi que con R2 el controlador **redirige** a una URL prefirmada y el navegador descarga directo
+ * del bucket. La firma propia (`signPath`) sigue mandando: es la que se comprueba ANTES de emitir
+ * la de R2, asi que quien no tenga sesion valida nunca llega a ver una URL del bucket.
+ *
+ * Por eso `stream()` no esta implementado y falla con un mensaje explicito en vez de existir sin
+ * usarse: si algun dia hiciera falta servir por trozos desde aqui, hay que decidirlo a proposito.
+ *
+ * ─── POR QUE `auto` Y `forcePathStyle` ───
+ *
+ * R2 no tiene regiones al estilo de AWS: espera `auto`. Y sirve por RUTA
+ * (`<endpoint>/<bucket>/<clave>`) y no por subdominio de bucket; sin `forcePathStyle` el SDK
+ * fabrica un host que en R2 no resuelve, y el error que sale —un DNS que falla— no se parece en
+ * nada a la causa.
  */
 export class R2StorageAdapter implements StorageAdapter {
   readonly isLocal = false;
+  private readonly client: S3Client;
+  private readonly bucket: string;
 
-  private notImplemented(): never {
-    throw new Error('Adaptador R2 pendiente: se cablea al desplegar (ver docs/RUNBOOK.md).');
+  constructor(config: {
+    accountId: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    bucket: string;
+  }) {
+    this.bucket = config.bucket;
+    this.client = new S3Client({
+      region: 'auto',
+      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+    });
   }
 
-  put(): Promise<void> {
-    this.notImplemented();
+  async put(key: string, body: Buffer, mimeType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: body,
+        // El tipo se guarda EN EL OBJETO: cuando el navegador descarga directo del bucket, esta
+        // cabecera es la unica que hay. Sin ella, un mp4 llega como binario y no se reproduce.
+        ContentType: mimeType,
+      }),
+    );
   }
-  read(): Promise<Buffer> {
-    this.notImplemented();
+
+  async read(key: string): Promise<Buffer> {
+    const salida = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!salida.Body) throw new Error(`R2: objeto sin contenido (${key})`);
+    // `transformToByteArray` viene del SDK v3 y evita montar el troceado a mano. Solo se usa para
+    // lo que de verdad se procesa en el servidor —convertir una presentacion, leer un arte de
+    // fondo—, nunca para servir un video.
+    return Buffer.from(await salida.Body.transformToByteArray());
   }
-  size(): Promise<number | null> {
-    this.notImplemented();
+
+  async size(key: string): Promise<number | null> {
+    try {
+      const salida = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return salida.ContentLength ?? null;
+    } catch {
+      // Un objeto que no esta y un error de red se ven igual desde aqui, y los dos significan lo
+      // mismo para quien pregunta: no se puede servir. El detalle queda en el log del SDK.
+      return null;
+    }
   }
+
   stream(): ReadStream {
-    this.notImplemented();
+    throw new Error(
+      'Con R2 los bytes no pasan por la API: el controlador redirige a la URL prefirmada. ' +
+        'Si hace falta servir por trozos desde el servidor, es una decision a tomar, no un hueco que rellenar.',
+    );
   }
-  getSignedUrl(): Promise<string> {
-    this.notImplemented();
+
+  getSignedUrl(key: string, expiresInSeconds: number): Promise<string> {
+    return presignS3Url(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: expiresInSeconds,
+    });
   }
-  delete(): Promise<void> {
-    this.notImplemented();
+
+  async delete(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 }
 
@@ -111,13 +185,52 @@ export class StorageService {
     process.env.MEDIA_URL_SECRET ?? process.env.REFRESH_TOKEN_PEPPER ?? 'neo-pulse-dev-media-secret';
 
   constructor() {
-    if (process.env.R2_BUCKET_NAME && process.env.R2_ACCESS_KEY_ID) {
-      this.adapter = new R2StorageAdapter();
-      this.logger.log('Almacenamiento: Cloudflare R2');
+    // El nombre de la variable viaja con el valor: el mensaje de error tiene que poder decir
+    // R2_BUCKET_NAME, que es lo que se busca en el .env, y no "bucket".
+    const r2 = {
+      accountId: { env: 'R2_ACCOUNT_ID', valor: process.env.R2_ACCOUNT_ID ?? '' },
+      accessKeyId: { env: 'R2_ACCESS_KEY_ID', valor: process.env.R2_ACCESS_KEY_ID ?? '' },
+      secretAccessKey: { env: 'R2_SECRET_ACCESS_KEY', valor: process.env.R2_SECRET_ACCESS_KEY ?? '' },
+      bucket: { env: 'R2_BUCKET_NAME', valor: process.env.R2_BUCKET_NAME ?? '' },
+    };
+    /*
+      QUIEN DECIDE SI SE QUIERE R2 SON LAS CREDENCIALES, NO EL NOMBRE DEL BUCKET.
+
+      Primera version de esto: "o estan las cuatro variables o ninguna". Sonaba prudente y tumbo el
+      arranque en desarrollo, donde `R2_BUCKET_NAME` llevaba meses puesto —heredado de la plantilla—
+      sin credenciales al lado. Un nombre de bucket no es una intencion de usar R2: es un dato
+      inofensivo. Las CREDENCIALES si.
+
+      Asi que: si hay alguna credencial, se quiere R2 y entonces se exigen las cuatro y se dice cual
+      falta —con tres de cuatro, el fallo llegaria en la primera subida, en produccion y con alguien
+      esperando delante—. Si no hay ninguna, disco local, y se avisa del bucket huerfano en vez de
+      morir por el.
+    */
+    const credenciales = [r2.accountId, r2.accessKeyId, r2.secretAccessKey];
+    const seQuiereR2 = credenciales.some((campo) => campo.valor !== '');
+    const faltan = Object.values(r2).filter((campo) => campo.valor === '');
+
+    if (seQuiereR2 && faltan.length > 0) {
+      throw new Error(`Configuracion de R2 incompleta: falta ${faltan.map((c) => c.env).join(', ')}`);
+    }
+
+    if (faltan.length === 0) {
+      this.adapter = new R2StorageAdapter({
+        accountId: r2.accountId.valor,
+        accessKeyId: r2.accessKeyId.valor,
+        secretAccessKey: r2.secretAccessKey.valor,
+        bucket: r2.bucket.valor,
+      });
+      this.logger.log(`Almacenamiento: Cloudflare R2 (bucket ${r2.bucket.valor})`);
     } else {
       const root = process.env.LOCAL_STORAGE_DIR ?? './storage-dev';
       this.adapter = new LocalStorageAdapter(root);
       this.logger.log(`Almacenamiento: disco local (${resolve(root)})`);
+      if (r2.bucket.valor !== '') {
+        this.logger.warn(
+          `R2_BUCKET_NAME esta puesto ("${r2.bucket.valor}") pero no hay credenciales: se ignora y se usa disco local.`,
+        );
+      }
     }
   }
 

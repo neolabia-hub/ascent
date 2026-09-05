@@ -11,6 +11,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // La suite recoge lo que ensucia: ver e2e/global-teardown.ts.
+  globalTeardown: './e2e/global-teardown.ts',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false, // comparten la misma base de datos

@@ -220,28 +220,29 @@ export class VersioningService {
     }
 
     /**
-     * LO QUE EL TIPO EXIGE: se DICE y queda registrado, pero no se bloquea (Decision #74).
+     * LO QUE EL TIPO EXIGE: ahora es COMPUERTA, no aviso (Decision #74, cerrada el 2026-09-04).
      *
-     * `activity_types.config` trae `requiresAssessment` y `requiresSurvey` desde el Sprint 1 y no
-     * los leia NADIE: una "Capacitacion del plan" —que los tiene los dos en true— se publicaba con
-     * un video y nada mas, y ninguna pantalla decia una palabra. Es la misma familia que
-     * `participatesInPlan` y `defaultAssignmentMode`: config que la interfaz promete y el motor
-     * ignora. El precio se paga tarde: sin examen no hay nota que ensenarle a un auditor.
+     * ─── LO QUE DECIA ANTES, Y POR QUE CAMBIA ───
      *
-     * Y AUN ASI NO SE BLOQUEA, por dos razones concretas y no por prudencia:
+     * Esto avisaba y dejaba pasar, con dos razones escritas: que el tenant no podia cambiar el
+     * config desde la interfaz, y que ninguna prueba de punta a punta anadia evaluacion. Se cerraba
+     * con una condicion explicita: *"se convierte en compuerta el dia que el config del tipo se
+     * edite desde la interfaz"*.
      *
-     *   1. **El tenant todavia no puede cambiar ese config desde la interfaz** (esta pendiente).
-     *      Bloquear una regla que nadie puede ajustar deja encerrado a quien no la comparta, sin
-     *      salida y sin nadie a quien pedirsela.
-     *   2. **Ni una sola de las 19 pruebas de punta a punta anade evaluacion**, y ocho publican
-     *      tipos que la piden. Eso no es un descuido de las pruebas: es la senal de que la regla
-     *      no esta acordada con el cliente todavia. Convertirla en muro seria imponerla.
+     * Ese dia llego. El config se edita en Configuracion -> Tipos de formacion —el cliente ya lo
+     * usa— y los recorridos anaden evaluacion donde el tipo la pide. Las dos razones caducaron, y
+     * la que queda es la de siempre: **un registro de capacitacion sin nota no sirve para una
+     * auditoria**, y el momento de impedirlo es antes de publicar, no cuando el auditor pregunta.
      *
-     * Lo que SI estaba roto es el silencio, y eso se cierra: la pantalla lo dice antes de pulsar y
-     * aqui queda en la AUDITORIA. El dia que alguien pregunte por que esa capacitacion del plan no
-     * tiene examen, la respuesta existe con fecha y con nombre.
+     * ─── POR QUE NO HACE FALTA UNA SALIDA DE EMERGENCIA ───
      *
-     * Se convierte en compuerta el dia que el config del tipo se edite desde la interfaz.
+     * La salida ya existe y es la buena: **apagar "Se evalua" en el tipo**. Una empresa que no
+     * quiere evaluar sus pildoras —o sus extraordinarias— lo dice una vez, en su sitio, y queda
+     * dicho para todas. Anadir ademas un "publicar igualmente" por formacion volveria a dejar la
+     * regla en una sugerencia, y seria la tercera vez que este config no significa nada.
+     *
+     * Lo que NO cambia: el aviso sigue yendo a la auditoria cuando algo pasa, y el mensaje explica
+     * la consecuencia —"sin nota no hay nada que ensenarle a un auditor"— y no la regla.
      */
     const conTipo = await this.prisma.scoped.activityVersion.findUniqueOrThrow({
       where: { id: draft.id },
@@ -249,6 +250,13 @@ export class VersioningService {
     });
     const configDelTipo = (conTipo.activity.activityType.config ?? {}) as Record<string, unknown>;
     const avisosDelTipo = loQueExigeElTipo(configDelTipo, contents);
+    if (avisosDelTipo.length > 0) {
+      throw new ConflictException({
+        code: 'TYPE_REQUIREMENTS_MISSING',
+        message: avisosDelTipo[0],
+        items: avisosDelTipo,
+      });
+    }
 
     /*
       LA ENCUESTA SE ENGANCHA SOLA (Decision #116).
@@ -424,9 +432,8 @@ export class VersioningService {
         migrationPolicy: input.migrationPolicy,
         retiredVersionId: published.previousId,
         responsibleUserId: published.result.responsibleUserId,
-        // Lo que su tipo pedia y esta version no trae. Vacio casi siempre; cuando no lo esta, es
-        // la unica traza de que se publico sabiendolo (Decision #74).
-        ...(avisosDelTipo.length > 0 ? { publicadaSinLoQuePideElTipo: avisosDelTipo } : {}),
+        // Ya no hay nada que anotar aqui: desde el 2026-09-04 publicar sin lo que el tipo pide se
+        // RECHAZA mas arriba, asi que si se llego a este punto es que no faltaba nada.
       },
     });
 

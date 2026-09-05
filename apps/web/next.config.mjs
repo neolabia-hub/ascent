@@ -12,6 +12,20 @@
 const nextConfig = {
   reactStrictMode: true,
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
+  /*
+    SALIDA AUTOCONTENIDA, pero SOLO cuando se construye la imagen.
+
+    Next copia a `standalone/` unicamente lo que el servidor necesita, y con eso la imagen baja de
+    "todo node_modules" a unas decenas de MB: en una VM gratuita, la diferencia entre 1,5 GB y 200 MB
+    decide si el despliegue cabe.
+
+    Va detras de una variable porque en Windows ROMPE el build local: para armar esa carpeta, Next
+    crea enlaces simbolicos hacia el store de pnpm, y sin permisos de desarrollador el sistema los
+    deniega (EPERM) y la compilacion muere. Dentro del contenedor —Linux— no existe ese problema.
+    Costo verlo una vez: el build de `mirar.ps1` se cayo con un error que hablaba de React y no
+    tenia nada que ver con React.
+  */
+  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
 };
 
 export default nextConfig;

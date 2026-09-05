@@ -22,6 +22,15 @@ param([switch]$Dev)
 $ErrorActionPreference = 'Stop'
 $raiz = Split-Path -Parent $PSScriptRoot
 
+# SE COMPILA EN EL REPO, SE LLAME DESDE DONDE SE LLAME (2026-09-04).
+#
+# `Start-Process` ya recibia `-WorkingDirectory $raiz`, pero las tres compilaciones de abajo se
+# invocan directamente y corrian en la carpeta ACTUAL. Llamando al script desde `Documents` —que es
+# lo normal si uno escribe la ruta entera— pnpm se ponia a rastrear `Documents` entera y moria en
+# `EPERM: scandir 'Mi musica'`, un enlace del sistema. El mensaje que se veia era "Fallo la
+# compilacion de shared", que no se parece en nada a la causa.
+Set-Location $raiz
+
 # Lo que hubiera quedado vivo en esos puertos se para primero: dos servidores sobre el mismo puerto
 # dan un fallo que no se parece a nada —el segundo arranca, no escucha, y la pantalla dice que no
 # hay conexion—.

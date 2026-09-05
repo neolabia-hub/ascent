@@ -38,7 +38,7 @@ const ADMIN_COMMANDS: Command[] = [
   { id: 'a-usuarios', label: 'Usuarios', href: '/usuarios', icon: Users, group: 'Ir a' },
   { id: 'a-roles', label: 'Roles y permisos', href: '/configuracion/roles', icon: Settings, group: 'Ir a' },
   { id: 'a-aprobaciones', label: 'Aprobaciones', href: '/aprobaciones', icon: CheckSquare, group: 'Ir a' },
-  { id: 'a-reportes', label: 'Reportes', href: '/reportes', icon: ChartColumn, group: 'Ir a' },
+  { id: 'a-reportes', label: 'Seguimiento', href: '/reportes', icon: ChartColumn, group: 'Ir a' },
 ];
 
 /**
@@ -183,7 +183,7 @@ function NotificationsMenu() {
           'focus-ring group/bell relative flex h-10 w-10 items-center justify-center rounded-full border shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
           open ? 'border-transparent text-ink-900' : 'border-line text-ink-500 hover:border-line-strong hover:text-ink-900',
         )}
-        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+        style={{ backgroundColor: open ? 'var(--brand-primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
         <Bell
           className="h-[18px] w-[18px] origin-top transition-transform duration-300 ease-pulse group-hover/bell:-rotate-12"
@@ -294,7 +294,7 @@ function UserMenu({ userFullName, avatarKey }: { userFullName: string; avatarKey
           'group/av focus-ring flex h-10 items-center gap-2 rounded-full border p-1 pr-2.5 text-sm text-ink-700 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
           open ? 'border-transparent' : 'border-line hover:border-line-strong',
         )}
-        style={{ backgroundColor: open ? 'var(--primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+        style={{ backgroundColor: open ? 'var(--brand-primary-soft)' : 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
       >
         {/*
           SOLO LA CARA, y el nombre al pasar (Decision #108) — igual que en el aprendiz. Estaba

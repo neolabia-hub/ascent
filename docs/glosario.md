@@ -783,6 +783,36 @@ otro eje distinto —eso lo llevan las versiones—, y por eso no se contradicen
 La obligacion vuelve; lo que la persona ve cuando vuelve es **la version vigente ese dia**. Las dos
 cosas encajan sin pisarse.
 
+#### ¿Y si llega la ronda siguiente y no hizo la anterior?
+
+Lo pregunto el cliente (2026-09-04) y no tiene una sola respuesta buena, porque las empresas no lo
+resuelven igual. Es una **politica del tipo de formacion** (`config.defaultOnExpiry`), con tres
+valores:
+
+| | Que hace | Cuando se usa |
+|---|---|---|
+| **Espera** | No nace la siguiente hasta que haga la anterior | Era lo unico que habia. Casi nadie lo quiere: ver abajo |
+| **Acumula** | Nace la siguiente y la anterior sigue pendiente: debe las dos | Empresas que exigen ponerse al dia antes de seguir. A los tres anos debe tres |
+| **Cierra** | La anterior se cierra como **NO REALIZADA** y la siguiente nace para todos | Cumplimiento por CALENDARIO: cada campana es su periodo, y el periodo cierra. Transprensa la usa en la reinduccion |
+
+**Por que "espera" estaba mal como unica opcion:** quien nunca la hace **desaparece del denominador**
+de todos los anos siguientes. El peor incumplidor sale de la cuenta y la cobertura del ano que viene
+se ve mejor de lo que es. Un indicador que mejora cuando alguien incumple esta roto.
+
+### No realizada
+**Que es:** el estado de una obligacion cuyo **periodo cerro sin que la persona la hiciera**. La
+reinduccion de 2026 de quien no la hizo antes del 31 de marzo.
+
+**Como se llama:** en pantalla "NO REALIZADA"; en la base `EXPIRED_NOT_DONE`.
+
+**Que NO es:** no es "retirada" (cambio de cargo y dejo de aplicarle) ni "eximida" (alguien la
+excuso con motivo). Esas dos **no cuentan** como incumplimiento; esta **si**. Es toda la diferencia:
+sin un estado propio, cerrar una campana obligaba a elegir entre mentir —marcarla retirada— o
+dejarla pendiente para siempre.
+
+**Quien la pone:** el motor, y solo cuando la politica del tipo es "cierra". Nunca sobre algo
+cumplido, eximido o retirado: eso ya tiene su explicacion escrita.
+
 ### Certificacion y vigencia
 **Que es:** una acreditacion con **fecha de vencimiento**. No es el papel: es el estado de estar
 acreditado.

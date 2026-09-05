@@ -3,6 +3,12 @@
 Contexto: produccion NO comparte nada con el entorno de SAC-NEO (que es piloto/demo). NEO PULSE
 va a un VPS propio, con criterio de costo-beneficio: rapido y fluido, pero economico.
 
+> **Etapa actual (2026-09-01): entrega del piloto a costo cero.** Antes del VPS de pago hay una
+> entrega formal que tiene que estar en linea ya. El procedimiento —una sola maquina con
+> `docker compose`, portable a cualquier proveedor— esta en `docs/04-despliegue-piloto.md`. Lo de
+> abajo sigue siendo la decision para la etapa de pago, y mudarse alli no cambia codigo: cambia de
+> maquina.
+
 ## Lo que cambia el calculo: el VIDEO
 
 NEO PULSE sirve video, PDF e imagenes a cientos de usuarios. En este tipo de producto el costo
@@ -75,11 +81,15 @@ Un equivalente en AWS con el mismo trafico de video quedaria facilmente por enci
 
 ## Que falta cablear (pendiente del sprint de produccion)
 
-1. `R2StorageAdapter` en `apps/api/src/storage/storage.service.ts`: hoy lanza un error explicito
-   a proposito, para que sea imposible desplegar sin completarlo. Se implementa con
-   `@aws-sdk/client-s3` y `@aws-sdk/s3-request-presigner`.
-2. `docker-compose.prod.yml` con la aplicacion, Postgres, Redis y proxy inverso con TLS.
-3. Script de despliegue y de backup (mismo patron que SAC-NEO, que ya lo tiene resuelto).
+1. ~~`R2StorageAdapter`~~ **HECHO** (2026-09-01). Ademas de subir y borrar, la decision que
+   importa: con R2 los bytes **no pasan por la API**, el controlador de medios redirige a una URL
+   prefirmada. Servirlos desde el servidor haria viajar cada video dos veces y convertiria el ancho
+   de banda de la maquina en el techo de cuanta gente puede ver una formacion a la vez.
+2. ~~`docker-compose.prod.yml`~~ **HECHO** (2026-09-01): proxy Caddy con TLS, web, API, Postgres y
+   Redis, mas un servicio one-shot de migraciones. Ver `docs/04-despliegue-piloto.md`.
+3. ~~Script de despliegue y de backup~~ **HECHO**: `scripts/release.sh`, `scripts/backup.sh` y
+   `scripts/restaurar-prueba.sh` (este ultimo restaura de verdad en una base de usar y tirar: un
+   volcado que nunca se restauro no es una copia de seguridad).
 4. Dominio y DNS comodin para los subdominios por tenant.
 5. Sentry y monitoreo de disponibilidad (ver CLAUDE.md 10.5).
 

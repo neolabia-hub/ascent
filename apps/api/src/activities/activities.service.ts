@@ -257,11 +257,34 @@ export class ActivitiesService {
     const tenantId = this.prisma.currentTenantId;
     await this.versioning.assertDraft(versionId);
 
+    /*
+      LA ENCUESTA SE QUEDA LA ULTIMA (2026-09-03).
+
+      La encuesta de satisfaccion se anade sola al crear la version, ANTES de que exista ningun
+      contenido, y se le ponia `displayOrder: 999` con la intencion de dejarla al final. Pero el
+      contenido nuevo se numeraba con "el mayor + 1", y el mayor era justamente ese 999: la
+      leccion quedaba en 1000 y el examen en 1001, **por detras de la encuesta**. Resultado: la
+      formacion empezaba preguntando que te parecio algo que todavia no habias visto.
+
+      Se detecto con el recorrido de punta a punta (`scripts/recorridos/`): la version publicada
+      llegaba al aprendiz como SURVEY, LESSON, ASSESSMENT.
+
+      El arreglo es que el numero nuevo salga del ultimo contenido QUE NO SEA ENCUESTA, y que la
+      encuesta se empuje detras. Asi se sostiene sola por muchos contenidos que se anadan.
+    */
     const last = await this.prisma.scoped.activityContent.findFirst({
-      where: { activityVersionId: versionId },
+      where: { activityVersionId: versionId, type: { not: 'SURVEY' } },
       orderBy: { displayOrder: 'desc' },
       select: { displayOrder: true },
     });
+    const orden = (last?.displayOrder ?? -1) + 1;
+
+    if (input.type !== 'SURVEY') {
+      await this.prisma.scoped.activityContent.updateMany({
+        where: { activityVersionId: versionId, type: 'SURVEY' },
+        data: { displayOrder: orden + 1 },
+      });
+    }
 
     const content = await this.prisma.scoped.activityContent.create({
       data: {
@@ -270,7 +293,7 @@ export class ActivitiesService {
         type: input.type,
         title: input.title,
         description: input.description ?? null,
-        displayOrder: (last?.displayOrder ?? -1) + 1,
+        displayOrder: orden,
         isRequired: input.isRequired,
         config: input.config as Prisma.InputJsonValue,
         lessonId: input.lessonId ?? null,

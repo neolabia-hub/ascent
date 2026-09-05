@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { loginAsAdmin, unique } from './helpers';
+import { agregarEvaluacion, loginAsAdmin, unique } from './helpers';
 
 /**
  * E2E del Sprint 2 (Definition of Done del catalogo formativo):
@@ -103,6 +103,9 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await page.locator('#c-lesson').selectOption(lessonValue as string);
     await page.getByRole('button', { name: 'Agregar', exact: true }).click();
     await expect(page.getByText('Contenido agregado')).toBeVisible();
+
+    // El tipo de esta formacion pide evaluacion, y desde el 2026-09-04 publicar sin ella se rechaza.
+    await agregarEvaluacion(page, `Examen S2 ${suffix}`);
 
     // 4. Publicar: congela.
     await page.getByRole('button', { name: 'Publicar cambios' }).click();

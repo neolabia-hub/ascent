@@ -1,0 +1,713 @@
+<title>Los números de NEO PULSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    /* La paleta es la del producto (sistema Pulso): esta guía tiene que leerse como parte de él. */
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --warn: #b45309;
+    --danger: #b3261e;
+    --info: #0b5cad;
+
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee;
+      --ink-700: #c9d0d6;
+      --ink-500: #8b96a1;
+      --ink-300: #6a747e;
+      --paper: #0e1114;
+      --surface: #171b20;
+      --line: #262c33;
+      --line-strong: #333b44;
+      --navy: #7ea6d8;
+      --navy-soft: #182231;
+      --accent: #ef8a55;
+      --ok: #3ba76f;
+      --warn: #d98324;
+      --danger: #e05c52;
+      --info: #4d94d8;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee;
+    --ink-700: #c9d0d6;
+    --ink-500: #8b96a1;
+    --ink-300: #6a747e;
+    --paper: #0e1114;
+    --surface: #171b20;
+    --line: #262c33;
+    --line-strong: #333b44;
+    --navy: #7ea6d8;
+    --navy-soft: #182231;
+    --accent: #ef8a55;
+    --ok: #3ba76f;
+    --warn: #d98324;
+    --danger: #e05c52;
+    --info: #4d94d8;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink-700);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .marco {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  @media (min-width: 1100px) {
+    .marco { grid-template-columns: 210px minmax(0, 1fr); gap: 64px; padding-top: 72px; }
+    .indice { position: sticky; top: 40px; align-self: start; }
+  }
+
+  /* ── Índice ───────────────────────────────────────────────── */
+  .indice { font-size: 13.5px; }
+  .indice p {
+    margin: 0 0 12px;
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-300);
+  }
+  .indice ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .indice a {
+    display: block;
+    padding: 5px 10px;
+    border-radius: 7px;
+    color: var(--ink-500);
+    text-decoration: none;
+    transition: background-color .15s, color .15s;
+  }
+  .indice a:hover, .indice a:focus-visible { background: var(--surface); color: var(--ink-900); }
+
+  /* ── Cabecera ─────────────────────────────────────────────── */
+  header.portada { max-width: 68ch; }
+  .eyebrow {
+    display: inline-block;
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(34px, 5vw, 46px);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    color: var(--ink-900);
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); margin: 0; }
+
+  /* ── Secciones ────────────────────────────────────────────── */
+  section { max-width: 72ch; margin-top: 64px; scroll-margin-top: 32px; }
+  h2 {
+    font-family: var(--display);
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink-900);
+    margin: 0 0 8px;
+    padding-top: 20px;
+    border-top: 2px solid var(--ink-900);
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink-900);
+    margin: 34px 0 8px;
+  }
+  p { margin: 0 0 16px; }
+  section > p:first-of-type { margin-top: 14px; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  a { color: var(--navy); }
+
+  /* ── Fichas de estado ─────────────────────────────────────── */
+  .estados { display: flex; flex-direction: column; gap: 10px; margin: 22px 0 8px; }
+  .estado {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .franja { border-radius: 99px; }
+  .estado h4 {
+    font-family: var(--display);
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--ink-900);
+    margin: 0 0 4px;
+  }
+  .estado p { margin: 0; font-size: 14.5px; line-height: 1.55; }
+  .accion {
+    margin-top: 8px !important;
+    font-size: 13px !important;
+    color: var(--ink-500);
+  }
+  .accion b {
+    font-family: var(--display);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-300);
+    margin-right: 8px;
+  }
+
+  /* ── Tablas ───────────────────────────────────────────────── */
+  .tabla-envoltura { overflow-x: auto; margin: 22px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ── Bloque destacado ─────────────────────────────────────── */
+  .clave {
+    margin: 24px 0;
+    padding: 18px 22px;
+    background: var(--navy-soft);
+    border-left: 3px solid var(--navy);
+    border-radius: 0 10px 10px 0;
+  }
+  .clave p { margin: 0; font-size: 15px; }
+  .clave p + p { margin-top: 10px; }
+
+  /* ── Ejemplo de lectura cruzada ───────────────────────────── */
+  .lecturas { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; }
+  .lectura {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .cifras { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 12px; }
+  .cifra { display: flex; flex-direction: column; gap: 2px; }
+  .cifra span {
+    font-family: var(--display);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-300);
+  }
+  .cifra b {
+    font-family: var(--display);
+    font-size: 27px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--ink-900);
+    font-variant-numeric: tabular-nums;
+  }
+  .lectura p { margin: 0; font-size: 14.5px; }
+  .lectura p + p { margin-top: 8px; }
+  .veredicto { color: var(--ink-900); font-weight: 500; }
+
+  /* ── Barra de ejemplo ─────────────────────────────────────── */
+  .barra-demo {
+    display: flex;
+    height: 12px;
+    border-radius: 99px;
+    overflow: hidden;
+    background: var(--paper);
+    margin: 18px 0 10px;
+    gap: 2px;
+  }
+  .barra-demo span { display: block; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-500); margin-bottom: 4px; }
+  .leyenda span { display: inline-flex; align-items: center; gap: 7px; }
+  .punto { width: 9px; height: 9px; border-radius: 99px; flex: none; }
+
+  footer {
+    max-width: 72ch;
+    margin-top: 72px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+    color: var(--ink-300);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; }
+  }
+</style>
+
+<div class="marco">
+  <nav class="indice" aria-label="Contenido">
+    <p>Contenido</p>
+    <ol>
+      <li><a href="#pestanas">Las tres pestañas</a></li>
+      <li><a href="#estados">Los seis estados</a></li>
+      <li><a href="#avance">El avance</a></li>
+      <li><a href="#analitica">Analítica</a></li>
+      <li><a href="#vencimientos">Vencimientos</a></li>
+      <li><a href="#plan">El plan, aparte</a></li>
+      <li><a href="#excel">El Excel</a></li>
+      <li><a href="#palabras">Las palabras</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="portada">
+      <p class="eyebrow">NEO PULSE · Guía de lectura</p>
+      <h1>Los números de NEO PULSE</h1>
+      <p class="entradilla">
+        Qué significa exactamente cada cifra de Seguimiento y del plan anual, qué acción pide cada
+        una, y por qué a veces dos porcentajes sobre lo mismo no coinciden — que casi siempre es el
+        hallazgo, no un error.
+      </p>
+    </header>
+
+    <section id="pestanas">
+      <h2>Las tres pestañas de Seguimiento</h2>
+      <p>
+        No son tres filtros de la misma vista: son tres preguntas distintas, y normalmente las hace
+        gente distinta.
+      </p>
+      <div class="tabla-envoltura">
+        <table>
+          <thead>
+            <tr><th>Pestaña</th><th>Contesta</th><th>Se abre cuando</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Ejecución</td>
+              <td>¿Cómo va esta formación y quién la ha hecho?</td>
+              <td>Hay que ir detrás de alguien concreto</td>
+            </tr>
+            <tr>
+              <td>Analítica</td>
+              <td>¿Dónde está el problema?</td>
+              <td>Todavía no se sabe qué formación mirar</td>
+            </tr>
+            <tr>
+              <td>Vencimientos</td>
+              <td>¿Qué se viene encima?</td>
+              <td>Se está armando el plan o llega una auditoría</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="estados">
+      <h2>Los seis estados</h2>
+      <p>
+        Todo lo demás se construye sobre esto. Cada persona con una formación asignada está en uno
+        —y solo uno— de estos seis estados. El orden en que el sistema los decide importa: primero
+        mira el resultado y después el plazo, porque una formación aprobada en marzo no está
+        «atrasada» aunque su fecha límite haya pasado.
+      </p>
+
+      <div class="estados">
+        <div class="estado">
+          <span class="franja" style="background: #1a7f4e"></span>
+          <div>
+            <h4>Terminada</h4>
+            <p>La persona completó la formación y, si tenía examen, lo aprobó.</p>
+            <p class="accion"><b>Acción</b> Ninguna. Es lo que demuestra el cumplimiento.</p>
+          </div>
+        </div>
+
+        <div class="estado">
+          <span class="franja" style="background: #1f3a5f"></span>
+          <div>
+            <h4>En curso</h4>
+            <p>Empezó y todavía no ha terminado.</p>
+            <p class="accion"><b>Acción</b> Esperar. Si lleva semanas ahí, un recordatorio.</p>
+          </div>
+        </div>
+
+        <div class="estado">
+          <span class="franja" style="background: #aab3bd"></span>
+          <div>
+            <h4>Sin empezar</h4>
+            <p>Puede entrar —tiene la puerta abierta— y aún no ha entrado. La fecha límite no ha pasado.</p>
+            <p class="accion"><b>Acción</b> Ninguna todavía. Va dentro de plazo.</p>
+          </div>
+        </div>
+
+        <div class="estado">
+          <span class="franja" style="background: #b45309"></span>
+          <div>
+            <h4>Atrasada</h4>
+            <p>Pudo entrar, no entró, y la fecha límite ya pasó.</p>
+            <p class="accion"><b>Acción</b> Aquí sí hay a quién llamar.</p>
+          </div>
+        </div>
+
+        <div class="estado">
+          <span class="franja" style="background: #b3261e"></span>
+          <div>
+            <h4>Reprobada</h4>
+            <p>Presentó el examen y no alcanzó la nota mínima.</p>
+            <p class="accion"><b>Acción</b> Reprogramar. Es el único resultado adverso de verdad, y por eso el único en rojo.</p>
+          </div>
+        </div>
+
+        <div class="estado">
+          <span class="franja" style="background: #cdd3da"></span>
+          <div>
+            <h4>Esperando convocatoria</h4>
+            <p>La persona tiene la obligación, pero <strong>nadie le ha abierto la puerta</strong>: no hay
+            jornada programada ni inscripción abierta a la que pueda entrar.</p>
+            <p class="accion"><b>Acción</b> No es de la persona. Falta programar la jornada.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="clave">
+        <p>
+          <strong>La distinción que lo justifica todo.</strong> Dos empresas con la misma formación
+          marcan 62%. En la primera, el 38% restante está <em>atrasado</em>: pudieron entrar y no
+          entraron. En la segunda, está <em>esperando convocatoria</em>: nunca pudieron.
+        </p>
+        <p>
+          El indicador es idéntico y lo que hay que hacer es opuesto. En la primera se llama a la
+          gente; en la segunda, llamarla sería injusto y además inútil — lo que falta es convocar.
+          Por eso la barra apilada existe y por eso vale más que el porcentaje solo.
+        </p>
+      </div>
+    </section>
+
+    <section id="avance">
+      <h2>El avance, y qué entra en el denominador</h2>
+      <p>
+        El porcentaje grande es siempre el mismo cálculo: <strong>obligaciones terminadas dividido
+        entre todas las obligaciones</strong>. Nada más.
+      </p>
+
+      <h3>Lo que esperaba convocatoria sí cuenta abajo</h3>
+      <p>
+        Es la decisión incómoda. Sacarlas del denominador daría un número más bonito y falso: si de
+        cien personas cincuenta no han sido convocadas, el avance real de esa formación es 50%, no
+        100% sobre las cincuenta que sí. El número tiene que doler cuando la ejecución va mal; si no,
+        no sirve para decidir nada.
+      </p>
+
+      <h3>Cómo se lee la barra</h3>
+      <div class="leyenda">
+        <span><i class="punto" style="background:#1a7f4e"></i> Terminada 62</span>
+        <span><i class="punto" style="background:#b45309"></i> Atrasada 20</span>
+        <span><i class="punto" style="background:#cdd3da"></i> Esperando 12</span>
+        <span><i class="punto" style="background:#aab3bd"></i> Sin empezar 6</span>
+      </div>
+      <div class="barra-demo" role="img" aria-label="62 terminadas, 20 atrasadas, 12 esperando convocatoria y 6 sin empezar, de 100">
+        <span style="background:#1a7f4e; width:62%"></span>
+        <span style="background:#b45309; width:20%"></span>
+        <span style="background:#cdd3da; width:12%"></span>
+        <span style="background:#aab3bd; width:6%"></span>
+      </div>
+      <p>
+        Al pulsar un tramo, la lista de abajo deja solo las formaciones que tienen alguien en ese
+        estado; dentro de cada formación, el mismo tramo lleva a los nombres. Del número a la persona
+        en dos clics.
+      </p>
+      <p>
+        <strong>El número grande de cada tarjeta es siempre el avance</strong>, también con un filtro
+        puesto. El conteo del estado filtrado aparece al lado, más pequeño y con su color: así el
+        número grande significa lo mismo siempre y no hay que releer la tarjeta cada vez.
+      </p>
+    </section>
+
+    <section id="analitica">
+      <h2>Analítica: la misma ejecución, cortada</h2>
+      <p>
+        Los mismos datos agrupados por otra columna: área, cargo, regional, servicio, proceso, tipo
+        de formación y norma. Los siete se ven a la vez, para poder comparar «Logística va mal» con
+        «la regional Caribe va mal» de un vistazo — muchas veces es la misma gente vista de dos
+        formas, y ese es justo el hallazgo.
+      </p>
+
+      <h3>«Sin regional», «Sin área»</h3>
+      <p>
+        Las filas sin valor no se esconden. Aparecen en cursiva y agrupadas, porque
+        <strong>«23 personas sin regional» es un hallazgo</strong>: casi siempre significa que faltan
+        datos por cargar. Y si desaparecieran, el total dejaría de cuadrar con el de Ejecución.
+      </p>
+
+      <h3>Por qué las normas suman más que el total</h3>
+      <p>
+        Una formación puede responder a varias normas a la vez: trabajo en alturas cuenta para SST y
+        para BASC. Al agrupar por norma, esa obligación aparece en las dos, así que la suma de las
+        filas es mayor que el universo real. <strong>No es un error de conteo</strong>: la pregunta
+        «¿cómo vamos con BASC?» incluye todo lo que BASC exige, comparta o no con otra norma. La
+        pantalla lo advierte donde ocurre.
+      </p>
+    </section>
+
+    <section id="vencimientos">
+      <h2>Vencimientos: lo único que mira hacia adelante</h2>
+      <p>
+        De aquí sale el plan del año siguiente. Hay <strong>dos cosas que vencen y no se suman</strong>,
+        porque piden acciones opuestas:
+      </p>
+
+      <div class="tabla-envoltura">
+        <table>
+          <thead>
+            <tr><th>Qué</th><th>Significa</th><th>Qué se hace</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Certificación</td>
+              <td>El papel caduca en una fecha. La persona lo hizo bien y aun así deja de estar acreditada.</td>
+              <td><strong>Reprogramar</strong> la formación</td>
+            </tr>
+            <tr>
+              <td>Obligación</td>
+              <td>Una formación que se debe y todavía no se ha hecho, con su fecha límite.</td>
+              <td><strong>Perseguir</strong>: hay a quién llamar</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Las cuatro cifras de arriba</h3>
+      <p>
+        <strong>Ya vencido</strong> va primero y aparte: no es «lo que viene», es lo que ya se cayó, y
+        es lo único sobre lo que hay que actuar hoy. <strong>En 30 días</strong> y
+        <strong>en 90 días</strong> son acumulados: lo que vence en veinte días también está dentro de
+        los noventa. Se hizo así porque la pregunta real es «cuánto tengo que resolver este
+        trimestre», no «cuánto cae exactamente en el mes tres».
+      </p>
+
+      <h3>Los meses vacíos se dibujan</h3>
+      <p>
+        En el calendario, un mes sin nada aparece igual, con su cero. El hueco es información: es
+        donde se puede reprogramar lo que se amontona en el mes de al lado. Y al pulsar un mes, la
+        lista de abajo se recorta a esa gente — porque después de «en marzo hay cuarenta» siempre
+        viene «¿quiénes?».
+      </p>
+    </section>
+
+    <section id="plan">
+      <h2>El plan anual se mide aparte, y con tres números</h2>
+      <p>
+        Esta es la parte que más se presta a confusión, así que conviene leerla entera una vez. El
+        plan tiene <strong>tres indicadores que miden cosas distintas</strong>. Ninguno sobra y
+        ninguno sustituye a otro.
+      </p>
+
+      <div class="tabla-envoltura">
+        <table>
+          <thead>
+            <tr><th>Pregunta</th><th>Indicador</th><th>Cómo se calcula</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>¿Hicimos lo que dijimos?</td>
+              <td>Programa</td>
+              <td class="num">jornadas ejecutadas ÷ jornadas programadas</td>
+            </tr>
+            <tr>
+              <td>¿Llegó la gente que dijimos?</td>
+              <td>Cobertura</td>
+              <td class="num">capacitados ÷ proyectados</td>
+            </tr>
+            <tr>
+              <td>¿Quién la tiene hecha hoy?</td>
+              <td>Personas al día</td>
+              <td class="num">obligaciones cumplidas ÷ obligaciones del plan</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Lo que de verdad se mira es la diferencia entre ellos</h3>
+      <p>
+        Un porcentaje lo lee cualquiera. La contradicción entre dos porcentajes, no — y es donde está
+        la información:
+      </p>
+
+      <div class="lecturas">
+        <div class="lectura">
+          <div class="cifras">
+            <span class="cifra"><span>Programa</span><b>100%</b></span>
+            <span class="cifra"><span>Cobertura</span><b>60%</b></span>
+          </div>
+          <p class="veredicto">Las jornadas se hicieron y la gente no fue.</p>
+          <p>No hay que programar más: hay que convocar mejor y hacer que asistan. Programar otra
+          jornada sobre este cuadro solo repite el problema.</p>
+        </div>
+
+        <div class="lectura">
+          <div class="cifras">
+            <span class="cifra"><span>Programa</span><b>60%</b></span>
+            <span class="cifra"><span>Cobertura</span><b>95%</b></span>
+          </div>
+          <p class="veredicto">Se está capacitando por fuera del calendario previsto.</p>
+          <p>Llega la gente, pero no por donde el plan decía. Vale la pena revisar si el plan quedó
+          corto o si las jornadas se están moviendo sin registrarse.</p>
+        </div>
+
+        <div class="lectura">
+          <div class="cifras">
+            <span class="cifra"><span>Programa</span><b>80%</b></span>
+            <span class="cifra"><span>Personas al día</span><b>35%</b></span>
+          </div>
+          <p class="veredicto">Mirar cuántas están «esperando convocatoria».</p>
+          <p>Si esa cifra es alta, el plan va bien en papel y la gente está bloqueada. Perseguir
+          personas aquí es perder el tiempo.</p>
+        </div>
+      </div>
+
+      <h3>Proyectados frente a reales</h3>
+      <p>
+        Cada renglón del plan congela, al aprobarse, <strong>a cuánta gente se comprometió</strong>.
+        Si se pactaron 40 y hoy hay 25 personas asignadas, ese renglón puede marcar 100% y aun así no
+        cubrir lo prometido. Por eso los dos números aparecen juntos: el hueco solo se ve poniéndolos
+        al lado.
+      </p>
+
+      <h3>Lo que NO entra en los números del plan</h3>
+      <div class="clave">
+        <p>
+          El plan se mide <strong>solo con lo que nació del plan</strong>. Quien ingresó en agosto no
+          hace la jornada de marzo, y no aparece como incumplido: su formación nace de la regla de
+          ingreso y se mide aparte.
+        </p>
+        <p>
+          Tampoco cuentan las capacitaciones extraordinarias ni las píldoras. Es lo que permite que
+          el indicador del plan siga significando lo mismo en diciembre que en enero.
+        </p>
+      </div>
+
+      <h3>Dónde está el objetivo, el alcance y la meta</h3>
+      <p>
+        Detrás del botón <em>Objetivo, alcance y meta</em>. Es texto que se escribe una vez al año y
+        se consulta una vez al trimestre —casi siempre para una auditoría—, así que no ocupa sitio
+        fijo en la pantalla que se abre todos los días. La <strong>meta</strong> es el porcentaje de
+        <em>Programa</em> que la empresa se comprometió a alcanzar.
+      </p>
+    </section>
+
+    <section id="excel">
+      <h2>El Excel que se lleva el auditor</h2>
+      <p>
+        El botón <em>Exportar a Excel</em> baja lo que hay en pantalla, con el filtro que esté puesto
+        — y el filtro va <strong>escrito dentro del archivo</strong>, para que doce filas no se lean
+        nunca como el universo entero.
+      </p>
+      <div class="tabla-envoltura">
+        <table>
+          <thead>
+            <tr><th>Desde</th><th>Trae</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>La lista general</td>
+              <td>Una fila por formación, con el desglose de los seis estados y el avance</td>
+            </tr>
+            <tr>
+              <td>El detalle de una formación</td>
+              <td>Una fila por persona: cédula, área, cargo, estado, vencimiento, versión, intentos, mejor nota, encuesta y constancia</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Tres cosas que parecen formato y no lo son: la <strong>cédula va como texto</strong> (si Excel
+        la leyera como número, una cédula con ceros delante los perdería, y es el dato con el que se
+        cruza contra nómina); el <strong>avance va como número</strong>, así que la columna se puede
+        promediar y graficar; y a quien está <em>esperando convocatoria</em> no se le pone fecha
+        límite, igual que en pantalla.
+      </p>
+    </section>
+
+    <section id="palabras">
+      <h2>Las palabras</h2>
+      <div class="tabla-envoltura">
+        <table>
+          <thead>
+            <tr><th>Palabra</th><th>Qué es</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Obligación</td>
+              <td>Una persona debe una formación. Nace de una regla —el cargo, el ingreso, el plan— y no de que alguien la inscriba a mano.</td>
+            </tr>
+            <tr>
+              <td>Convocatoria</td>
+              <td>La jornada concreta: fecha, cupo, modalidad. Es la puerta por la que la persona entra a hacer la formación.</td>
+            </tr>
+            <tr>
+              <td>Versión</td>
+              <td>El contenido congelado con el que alguien se formó. Cambiar la formación crea una versión nueva y no reescribe lo que ya presentó.</td>
+            </tr>
+            <tr>
+              <td>Constancia</td>
+              <td>El certificado. No todas las formaciones acreditan: una píldora o una charla no dejan constancia, y eso es lo esperado.</td>
+            </tr>
+            <tr>
+              <td>Puntos</td>
+              <td>Los que gana quien aprende al completar formaciones. <strong>No</strong> tienen relación con el cumplimiento del plan.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      NEO PULSE · Guía de lectura de Seguimiento y del plan anual. Preparada para TRANSPRENSA.
+    </footer>
+  </main>
+</div>

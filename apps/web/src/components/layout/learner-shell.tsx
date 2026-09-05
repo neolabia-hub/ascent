@@ -2,6 +2,7 @@
 
 import {
   CircleUser,
+  ClipboardCheck,
   Flame,
   GraduationCap,
   House,
@@ -13,6 +14,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { misEvaluaciones, sobreMi } from '@/lib/performance-api';
 import { getMyProgress, type MyProgress } from '@/lib/learner-api';
 import { saludoDe } from '@/lib/greeting';
 import { cn } from '@/components/ui/cn';
@@ -38,14 +40,55 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/hoy', label: 'Inicio', icon: House },
-  { href: '/mi-formacion', label: 'Mi formacion', icon: GraduationCap },
+  { href: '/mi-formacion', label: 'Mi aprendizaje', icon: GraduationCap },
   { href: '/repaso', label: 'Repaso', icon: Repeat2 },
   { href: '/perfil', label: 'Perfil', icon: CircleUser },
 ];
 
+/**
+ * DESEMPENO: UN SOLO SITIO, y solo cuando hay algo (Decisiones #138 y #140).
+ *
+ * Calificar a la gente a cargo es una tarea con fecha limite y hay que poder encontrarla en el
+ * menu — un jefe de area normalmente no tiene acceso a administracion, asi que este es su unico
+ * camino. Y LO PROPIO va detras de la misma puerta desde el 2026-09-02: antes vivia en el perfil,
+ * entre las constancias, y nadie busca ahi su evaluacion de desempeno.
+ *
+ * Sigue sin ser fijo. Aparece cuando hay algo —que responder, o algo tuyo que leer— y desaparece
+ * cuando no queda nada: un item permanente que casi todo el ano no lleva a ninguna parte ensena a
+ * no pulsarlo. En movil la barra inferior pasa de cuatro a cinco items solo durante la campana.
+ */
+const ITEM_DESEMPENO: NavItem = { href: '/mi-desempeno', label: 'Desempeno', icon: ClipboardCheck };
+
 
 export function LearnerShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [hayDesempeno, setHayDesempeno] = useState(false);
+
+  /*
+    EL ITEM APARECE SI HAY ALGO, sea de las dos cosas (Decision #140).
+
+    Antes solo miraba lo que hay que CALIFICAR, asi que a quien no evalua a nadie —la mayoria— el
+    item no le salia nunca y su propia evaluacion quedaba escondida en el perfil. Ahora se pregunta
+    tambien por lo suyo: si le evaluaron, tiene sitio donde leerlo y firmarlo.
+
+    Se relee al cambiar de pantalla, como la racha: al entregar la ultima el item tiene que
+    desaparecer sin recargar. Si falla, no pasa nada — el item simplemente no aparece.
+  */
+  useEffect(() => {
+    let cancelado = false;
+    void Promise.all([misEvaluaciones().catch(() => []), sobreMi().catch(() => [])])
+      .then(([porCalificar, mias]) => {
+        if (!cancelado) {
+          setHayDesempeno(porCalificar.some((fila) => fila.status !== 'SUBMITTED') || mias.length > 0);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [pathname]);
+
+  const navItems = hayDesempeno ? [...NAV_ITEMS, ITEM_DESEMPENO] : NAV_ITEMS;
   /*
     "HOY" VA A SANGRE (Decision #89). El resto del modo aprendiz vive en una columna centrada de
     1100 px, que es lo correcto para leer; la biblioteca no, porque un heroe con margenes deja de
@@ -68,7 +111,19 @@ export function LearnerShell({ children }: { children: ReactNode }) {
   const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
 
   return (
-    <div className="learner-surface min-h-screen bg-paper lg:flex">
+    /*
+      EL QUE SE DESPLAZA ES EL CONTENIDO, NO LA VENTANA (Decision #133).
+
+      Asi la barra de arriba se queda quieta SIN necesitar fondo: no hay nada que le pase por
+      debajo. Antes se iba con el contenido y la persona perdia su avatar, sus avisos y el buscador
+      en cuanto bajaba un poco — en el telefono, un gesto largo y constante para recuperarlos.
+
+      `100dvh` y no `100vh`: en el movil, `vh` cuenta con la barra del navegador PLEGADA, asi que
+      la pantalla mide mas de lo que se ve y la barra inferior se queda por debajo del filo. El
+      precio conocido de desplazar por dentro es que la barra del navegador movil ya no se recoge
+      al bajar; se acepta porque la alternativa era perder la cabecera.
+    */
+    <div className="learner-surface h-[100dvh] overflow-hidden bg-paper lg:flex">
       {/* Carril lateral: solo escritorio. */}
       {/*
         UNA SOLA SUPERFICIE (Decision #89). La barra comparte fondo con el cuerpo y se separa por
@@ -106,7 +161,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         */}
 
         <nav aria-label="Navegacion principal" className="scroll-hidden min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
             return (
@@ -128,7 +183,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
                   <span
                     aria-hidden="true"
                     className="absolute inset-0 rounded-xl"
-                    style={{ backgroundColor: 'var(--primary-soft)' }}
+                    style={{ backgroundColor: 'var(--brand-primary-soft)' }}
                   />
                 ) : null}
                 <Icon
@@ -167,7 +222,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
         {/*
           "HOY" VA A SANGRE Y LA BARRA FLOTA ENCIMA (Decision #89).
 
@@ -188,7 +243,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         */}
         <LearnerTopbar greeting={saludoDe()} onSearch={() => setPaletteOpen(true)} wide={cine} />
 
-        <main className="flex-1 pb-24 lg:pb-10">
+        <main className="min-h-0 flex-1 overflow-y-auto pb-24 lg:pb-10">
           {cine ? (
             children
           ) : (
@@ -214,7 +269,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 rounded-2xl border border-line bg-surface/90 shadow-card-hover backdrop-blur-lg lg:hidden"
       >
         <ul className="mx-auto flex w-full items-stretch p-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
             return (
@@ -232,7 +287,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
                     <span
                       aria-hidden="true"
                       className="absolute inset-0 rounded-xl"
-                      style={{ backgroundColor: 'var(--primary-soft)' }}
+                      style={{ backgroundColor: 'var(--brand-primary-soft)' }}
                     />
                   ) : null}
                   <Icon

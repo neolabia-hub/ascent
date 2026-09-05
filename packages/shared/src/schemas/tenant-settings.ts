@@ -32,6 +32,18 @@ export const tenantSettingsSchema = z
     // Eficacia diferida (Kirkpatrick nivel 3).
     efficacyDaysDefault: z.number().int().min(1).max(180).default(30),
 
+    /**
+     * CUANTOS DIAS ANTES DEL CIERRE se le recuerda el ciclo de desempeno a quien no ha respondido.
+     *
+     * Estaba escrito en el codigo y no es una constante tecnica: en una empresa donde la campana
+     * dura seis semanas, tres dias de aviso llegan tarde; en una de dos semanas, avisar con diez
+     * es avisar el primer dia. Es la misma clase de decision que `efficacyDaysDefault`, y la toma
+     * quien conoce a su gente.
+     *
+     * 0 apaga el recordatorio: hay empresas que prefieren que lo lleve el jefe por su cuenta.
+     */
+    performanceReminderDays: z.number().int().min(0).max(30).default(3),
+
     // Rotulos de UI (Decision #31: fijos en F1; previstos aqui, sin UI de edicion todavia).
     labels: z
       .object({

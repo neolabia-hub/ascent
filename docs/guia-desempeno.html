@@ -1,0 +1,775 @@
+<title>Evaluación de desempeño, paso a paso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --warn: #b45309;
+    --info: #0b5cad;
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  :root:not([data-theme="light"]) { color-scheme: light; }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+      --paper: #0e1114; --surface: #171b20; --line: #262c33; --line-strong: #333b44;
+      --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+      --ok: #3ba76f; --warn: #d98324; --info: #4d94d8;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+    --paper: #0e1114; --surface: #171b20; --line: #262c33; --line-strong: #333b44;
+    --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+    --ok: #3ba76f; --warn: #d98324; --info: #4d94d8;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-700);
+    font-family: var(--body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .marco { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+  @media (min-width: 900px) { .marco { padding-top: 72px; } }
+
+  .eyebrow {
+    display: inline-block; font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(32px, 5vw, 44px); font-weight: 800;
+    line-height: 1.08; letter-spacing: -0.02em; color: var(--ink-900); margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); margin: 0; }
+
+  section { margin-top: 60px; scroll-margin-top: 24px; }
+  h2 {
+    font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--ink-900); margin: 0 0 10px; padding-top: 20px;
+    border-top: 2px solid var(--ink-900); text-wrap: balance;
+  }
+  h3 { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--ink-900); margin: 32px 0 8px; }
+  p { margin: 0 0 16px; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+
+  /* Pasos numerados: aquí SÍ son una secuencia real. */
+  .pasos { list-style: none; margin: 24px 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .paso {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 16px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+  }
+  .numero {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 99px;
+    background: var(--navy); color: #fff;
+    font-family: var(--display); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .paso h4 { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink-900); margin: 4px 0 6px; }
+  .paso p { margin: 0 0 10px; font-size: 15px; }
+  .paso p:last-child { margin-bottom: 0; }
+  .donde {
+    display: inline-block; font-size: 12px; color: var(--ink-500);
+    background: var(--paper); border-radius: 6px; padding: 2px 8px; margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabla-envoltura { overflow-x: auto; margin: 20px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-500); border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+
+  .clave {
+    margin: 22px 0; padding: 18px 22px; background: var(--navy-soft);
+    border-left: 3px solid var(--navy); border-radius: 0 10px 10px 0;
+  }
+  .clave p { margin: 0; font-size: 15px; }
+  .clave p + p { margin-top: 10px; }
+
+  .ejemplo {
+    margin: 22px 0; padding: 18px 20px; background: var(--surface);
+    border: 1px dashed var(--line-strong); border-radius: 12px;
+  }
+  .ejemplo p:first-child {
+    font-family: var(--display); font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-300); margin-bottom: 10px;
+  }
+  .ejemplo p:last-child { margin-bottom: 0; }
+
+  /* Muestra de escala, igual que en pantalla */
+  .escala { display: flex; gap: 8px; margin: 12px 0 6px; }
+  .escala span {
+    flex: 1; min-width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+    font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-700);
+  }
+  /* Marcado = relleno sólido, como en el producto desde el 2026-09-02. */
+  .escala span.marcado { border-color: var(--navy); background: var(--navy); color: #fff; }
+  .extremos { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-500); }
+
+  footer {
+    margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--line);
+    font-size: 13.5px; color: var(--ink-300);
+  }
+</style>
+
+<div class="marco">
+  <header>
+    <p class="eyebrow">NEO PULSE · Guía de uso</p>
+    <h1>Evaluación de desempeño, paso a paso</h1>
+    <p class="entradilla">
+      Qué es cada opción, en qué orden se hace todo, y qué ve cada persona. Los ejemplos usan
+      usuarios genéricos —«el usuario A», «la jefa del área»— porque el procedimiento es el mismo
+      sea quien sea.
+    </p>
+  </header>
+
+  <section>
+    <h2>Qué es esto, y qué no es</h2>
+    <p>
+      La evaluación de desempeño responde <strong>«¿cómo lo está haciendo esta persona en su
+      cargo?»</strong>. No tiene nada que ver con las capacitaciones, y en el sistema van
+      deliberadamente separadas: una nota baja de desempeño <strong>no</strong> afecta el
+      cumplimiento del plan de formación, ni al revés.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Se parece a</th><th>Pero</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Un examen</td>
+            <td>El examen se aprueba o se reprueba y lo responde uno mismo. Aquí <strong>califica otra persona</strong> y no hay respuesta correcta</td>
+          </tr>
+          <tr>
+            <td>Una encuesta</td>
+            <td>La encuesta es sobre una jornada y en la práctica anónima. Esto lleva <strong>nombre y apellido</strong>, se guarda años y se firma</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>El orden completo</h2>
+    <p>
+      Se hace una vez al año (o cada seis meses). Los tres primeros pasos son de Gestión Humana y se
+      hacen una sola vez; del cuarto en adelante participa todo el mundo.
+    </p>
+
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <span class="donde">Configuración → Áreas</span>
+          <h4>Asignar el responsable de cada área</h4>
+          <p>
+            <strong>Es el paso que todo el mundo olvida y sin el cual nada funciona.</strong> El
+            responsable del área es quien va a calificar a su gente. Si un área no lo tiene, sus
+            personas se quedan sin evaluador y el sistema lo dirá al abrir el ciclo — pero para
+            entonces ya hay que volver atrás.
+          </p>
+          <p>
+            Se edita el área y se elige la persona. Ojo: es distinto del responsable de un
+            <em>proceso</em> —aquel responde por un sistema de gestión, este por las personas—.
+          </p>
+        </div>
+      </li>
+
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <span class="donde">Desempeño → Qué se evalúa → Competencias</span>
+          <h4>Crear las competencias</h4>
+          <p>
+            Una competencia es <strong>una cosa que se evalúa</strong>: cumplimiento de seguridad,
+            comunicación, orden y aseo del puesto. Cada una lleva:
+          </p>
+          <ul>
+            <li><strong>Código</strong> — corto, en mayúsculas. No se puede cambiar después.</li>
+            <li><strong>Nombre</strong> — como lo va a leer quien califica.</li>
+            <li><strong>Qué se espera</strong> — la descripción. <em>Es lo que hace que dos jefes califiquen parecido</em>: aparece delante de quien está calificando, en ese momento.</li>
+            <li><strong>Escala</strong> — cómo se responde (ver la tabla de más abajo).</li>
+          </ul>
+          <p>
+            Si la empresa ya evalúa con un formato en papel o en Excel, <strong>ese formato es la
+            especificación</strong>: cada fila suya es una competencia aquí.
+          </p>
+        </div>
+      </li>
+
+      <li class="paso">
+        <span class="numero">3</span>
+        <div>
+          <span class="donde">Desempeño → Qué se evalúa → Formularios</span>
+          <h4>Armar el formulario</h4>
+          <p>
+            Un formulario es <strong>el conjunto de competencias que se preguntan juntas</strong>, y
+            es lo que un ciclo usa. Se marcan las competencias, se les da un <strong>peso</strong> y
+            se eligen los <strong>cargos</strong> a los que aplica.
+          </p>
+          <p>
+            El <strong>peso multiplica</strong>: una competencia con peso 3 arrastra el triple en la
+            nota final que una con peso 1. Los <strong>cargos</strong> permiten que a un conductor se
+            le pregunte otra cosa que a un analista, y son los que deciden el reparto cuando una
+            campaña lleva varios formularios. <strong>Si no se marca ninguno, el formulario es el
+            general</strong>: recoge a quien no encaje en ningún otro.
+          </p>
+          <p>
+            <strong>La vista previa está siempre a la derecha</strong> y muestra el formulario tal
+            como lo verá quien califique. Se marca una competencia y aparece ahí mismo.
+          </p>
+
+          <h4 style="margin-top:22px">Y el orden concreto, si hay competencias comunes</h4>
+          <p>
+            Casi siempre hay unas competencias que se le preguntan a <em>todo el mundo</em>
+            —seguridad, trabajo en equipo, los valores— y otras propias del cargo. No se repiten:
+            se escriben una vez y se heredan. El orden es:
+          </p>
+          <ol>
+            <li>
+              <strong>Primero, el formulario de comunes.</strong> Se crea uno —por ejemplo «Comunes
+              de la empresa»— con esas competencias, y en <em>«A quién se le hace»</em> se deja en
+              <strong>Toda la empresa</strong>.
+            </li>
+            <li>
+              <strong>Después, uno por cargo.</strong> En <em>«Competencias comunes»</em>, arriba del
+              todo, se elige <strong>«Heredar de: Comunes de la empresa»</strong>. Aparecen listadas
+              debajo, en gris, y ya no hay que marcarlas: se añaden solo las propias del cargo.
+            </li>
+            <li>
+              <strong>Se comprueba en la vista previa</strong>, que las muestra todas juntas y en
+              orden —las heredadas con la etiqueta <em>común</em>, primero, y después las del cargo—.
+              Es exactamente lo que verá quien califique.
+            </li>
+          </ol>
+          <p>
+            A partir del segundo cargo conviene usar <strong>Duplicar</strong>: se abre el formulario
+            parecido, se pulsa Duplicar, se le cambia el nombre, el cargo y las dos competencias que
+            difieran. Con veinte cargos, es la diferencia entre una tarde y una hora.
+          </p>
+        </div>
+      </li>
+
+      <li class="paso">
+        <span class="numero">4</span>
+        <div>
+          <span class="donde">Desempeño → Ciclos</span>
+          <h4>Crear el ciclo y abrirlo</h4>
+          <p>
+            El ciclo es <strong>la campaña</strong>: «Desempeño 2026», con sus fechas, sus tres
+            opciones (explicadas en la sección siguiente) y <strong>los formularios que lleva</strong>
+            — se marcan los que hagan falta, y cada persona responderá el de su cargo. Al crearlo
+            queda en <strong>borrador</strong>: todavía no existe ninguna evaluación y se puede
+            corregir o borrar.
+          </p>
+          <p>
+            <strong>Abrirlo es el momento que no se deshace.</strong> En ese instante el sistema
+            congela cada formulario —lo que se pregunta ya no cambia, aunque después alguien edite una
+            competencia—, genera una evaluación por cada persona y por cada quien la califica, y
+            avisa a cada evaluador.
+          </p>
+          <p>
+            Justo después aparece un resumen: cuántas se generaron y, si las hay,
+            <strong>cuántas personas se quedaron sin evaluador</strong> y <strong>a cuántas no las
+            alcanza ningún formulario</strong>, con el motivo de cada una. Es la última oportunidad de
+            arreglar los responsables de área o de añadir el formulario que falta.
+          </p>
+        </div>
+      </li>
+
+      <li class="paso">
+        <span class="numero">5</span>
+        <div>
+          <span class="donde">Menú → Desempeño</span>
+          <h4>Cada quien responde lo suyo</h4>
+          <p>
+            <strong>Aquí entra todo el mundo, no solo Gestión Humana.</strong> Un jefe de área
+            normalmente no tiene acceso al panel de administración, así que sus evaluaciones aparecen
+            en <strong>su propio menú</strong>, en «Desempeño». Es el <em>único</em> sitio donde se
+            califica: la pestaña «Evaluar» del panel de administración se quitó, porque eran las
+            mismas evaluaciones en dos sitios y eso solo obliga a recordar por dónde se entró la vez
+            pasada.
+          </p>
+          <p>
+            La pantalla tiene dos partes: <strong>arriba lo tuyo</strong> —tu evaluación, para leerla
+            y firmarla— y <strong>debajo tu lista</strong>, con cuántas llevas de cuántas y hasta
+            cuándo hay tiempo. Si no calificas a nadie, solo verás lo tuyo.
+          </p>
+          <p>
+            <strong>Ese ítem del menú solo aparece cuando hay algo</strong> —algo que responder o
+            algo tuyo que leer— y desaparece cuando no queda nada.
+          </p>
+          <p>
+            Se abre una, se marca cada competencia, se puede comentar, y se entrega.
+            <strong>Tu autoevaluación es una más de esa lista</strong>: sale con tu propio nombre y te
+            calificas desde el mismo sitio.
+          </p>
+          <p>
+            <strong>No hay autoguardado y no se entrega a medias.</strong> Calificar a una persona es
+            algo que se piensa y se corrige mientras se escribe; se entrega entera cuando está lista.
+            Antes de entregar, el sistema avisa de que <strong>no se podrá corregir</strong>: es lo que
+            la otra persona va a leer.
+          </p>
+        </div>
+      </li>
+
+      <li class="paso">
+        <span class="numero">6</span>
+        <div>
+          <span class="donde">Menú → Desempeño → «Lo tuyo»</span>
+          <h4>La persona lee lo suyo y firma</h4>
+          <p>
+            Si el ciclo lo permite, cada quien ve la evaluación de su jefe y su propia
+            autoevaluación, <strong>una al lado de la otra</strong>. Ahí es donde está el valor: donde
+            las dos coinciden no hace falta conversación, y donde no coinciden sí.
+          </p>
+          <p>
+            Está <strong>en la misma pantalla</strong> que la lista de a quién calificas, arriba del
+            todo y con otro color para que no se confundan: lo tuyo es para leer, lo de abajo es
+            trabajo con fecha límite. Antes vivía en el Perfil, y nadie buscaba ahí su evaluación.
+          </p>
+        </div>
+      </li>
+
+      <li class="paso">
+        <span class="numero">7</span>
+        <div>
+          <span class="donde">Desempeño → Ciclos → Ver cómo va</span>
+          <h4>Seguir el avance y cerrar</h4>
+          <p>
+            Muestra cuántas se entregaron, cuántas se firmaron, el promedio y la lista persona por
+            persona. Al terminar la campaña se cierra el ciclo. <strong>Cerrar no borra lo que quedó
+            sin responder</strong>: queda como estaba, y eso también es información sobre cómo fue la
+            campaña.
+          </p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Las tres opciones del ciclo</h2>
+    <p>Se eligen al crear el ciclo y no se pueden cambiar después de abrirlo.</p>
+
+    <h3>«La persona también se autoevalúa»</h3>
+    <p>
+      <strong>Activada:</strong> se generan <strong>dos</strong> evaluaciones por persona — la suya y
+      la de su jefe. Cada una es independiente: nadie ve la del otro mientras la escribe.<br>
+      <strong>Desactivada:</strong> solo califica el jefe.
+    </p>
+    <div class="ejemplo">
+      <p>Ejemplo</p>
+      <p>
+        El usuario A se pone <strong>5 de 5</strong> en comunicación. Su jefa le pone
+        <strong>3 de 5</strong>. Ninguno de los dos está «equivocado»: esa diferencia de dos puntos
+        <em>es</em> la conversación que hay que tener, y sin la autoevaluación no existiría.
+      </p>
+    </div>
+
+    <h3>«La persona ve el resultado de su jefe»</h3>
+    <p>
+      <strong>Activada:</strong> cuando el jefe entrega, la persona puede leerla en Desempeño (y
+      recibe un aviso).<br>
+      <strong>Desactivada:</strong> la evaluación existe y cuenta en el consolidado, pero la persona
+      no la ve. Su propia autoevaluación sí la ve siempre.
+    </p>
+
+    <h3>«La persona firma»</h3>
+    <p>Ver la sección siguiente, que es la que más se malinterpreta.</p>
+  </section>
+
+  <section>
+    <h2>Qué es firmar, exactamente</h2>
+
+    <div class="clave">
+      <p>
+        <strong>Firmar no es estar de acuerdo.</strong> Es dejar constancia de que la persona
+        <em>leyó</em> su evaluación y de que la conversación ocurrió. Por eso no hay botón de
+        rechazar: no se está aceptando una nota, se está reconociendo un hecho.
+      </p>
+      <p>
+        Si alguien cree que firmar significa aceptar algo que le parece injusto, no firma — y
+        entonces la empresa se queda sin el único documento que demuestra que la evaluación se
+        entregó y se habló. De ahí que la pantalla lo diga con esas palabras.
+      </p>
+    </div>
+
+    <h3>Cómo se firma</h3>
+    <ol>
+      <li>La persona entra a <strong>Desempeño</strong>, en su menú, y abre la evaluación de su jefe en «Lo tuyo».</li>
+      <li>Lee las competencias, los comentarios y el resumen.</li>
+      <li>Pulsa <strong>Firmar</strong>.</li>
+    </ol>
+    <p>
+      Queda registrada <strong>la fecha, la hora y desde qué dirección se hizo</strong>. Solo se firma
+      la evaluación del jefe: firmar la propia autoevaluación no significaría nada. Y solo se puede
+      firmar una vez.
+    </p>
+    <p>
+      Esto es firma electrónica en el mismo sentido que ya usa el resto del sistema: la persona entró
+      con su usuario y su contraseña, y esa sesión es lo que la identifica.
+    </p>
+
+    <h3>«No me sale el botón de firmar»</h3>
+    <p>Casi siempre es una de estas tres, y ninguna es un fallo:</p>
+    <ul>
+      <li><strong>Tu jefe todavía no la ha entregado.</strong> Hasta ese momento no hay nada que leer ni que firmar.</li>
+      <li><strong>Nadie te evaluó.</strong> Si eres el responsable de tu propia área, el sistema no se inventa un evaluador para ti: sales en la lista de «sin evaluador» con el motivo «dirige su propia área». Ves tu autoevaluación y nada más.</li>
+      <li><strong>El ciclo se creó sin firma</strong>, o sin que la persona vea el resultado.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Quién entra por dónde</h2>
+    <p>
+      Es la confusión más común, porque <strong>los jefes no suelen tener acceso al panel de
+      administración</strong>: entran por la aplicación normal, como todo el mundo.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Quién</th><th>Dónde</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Todo el mundo</strong></td>
+            <td>Menú → <strong>Desempeño</strong></td>
+            <td>Lo tuyo arriba (leerlo y firmarlo) y, si calificas a alguien, tu lista debajo. <strong>Es el único sitio donde se califica</strong></td>
+          </tr>
+          <tr>
+            <td>Gestión Humana</td>
+            <td>Administración → <strong>Desempeño</strong></td>
+            <td>Solo lo que <em>es</em> administración: las campañas y el catálogo de lo que se pregunta. También el consolidado</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="clave">
+      <p>
+        <strong>Una sola puerta, a propósito.</strong> Antes había tres —administración para
+        configurar, «Evaluaciones» para calificar y «Perfil» para leer lo tuyo— y cuál te tocaba
+        dependía de quién eras. Calificar a tu equipo <em>no</em> es administrar la plataforma: lo
+        hace también quien no administra nada.
+      </p>
+      <p>
+        El ítem <strong>solo aparece mientras haya algo</strong> —que responder, o algo tuyo que
+        leer— y se va cuando no queda nada.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Las escalas, y cuál elegir</h2>
+
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Escala</th><th>Para qué sirve</th></tr></thead>
+        <tbody>
+          <tr><td>1 a 5</td><td>La de siempre. Suficiente para casi todo</td></tr>
+          <tr><td>1 a 10</td><td>Cuando se quiere más matiz. Ojo: más matiz también es más discusión sobre si es un 7 o un 8</td></tr>
+          <tr><td>Cumple / no cumple</td><td>Para lo que no admite término medio: usar el equipo de protección, firmar la planilla</td></tr>
+          <tr><td>Solo texto</td><td>No da nota. Para «logros del año» o «plan de mejora», que no se califican con un número</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Así se ve una escala de 1 a 5 en pantalla, con el 4 marcado:</p>
+    <div class="escala" role="img" aria-label="Escala del 1 al 5 con el 4 marcado">
+      <span>1</span><span>2</span><span>3</span><span class="marcado">4</span><span>5</span>
+    </div>
+    <div class="extremos"><span>Muy por debajo</span><span>Sobresaliente</span></div>
+
+    <p style="margin-top:20px">
+      <strong>Los extremos van escritos a propósito.</strong> Un «4» solo no dice nada; «4, donde 5 es
+      sobresaliente» sí. Y se usan números y no caritas: para medir satisfacción las caras funcionan,
+      pero calificar el desempeño de una persona con un emoticono convierte un juicio profesional en
+      otra cosa — y quien lo lea dentro de un año merece «4 de 5».
+    </p>
+  </section>
+
+  <section>
+    <h2>Cada cuánto, y cuántos ciclos</h2>
+    <p>
+      Lo habitual es <strong>un ciclo al año para toda la empresa</strong>: una campaña abierta unas
+      semanas —cuatro a seis suele bastar— con <strong>formularios distintos según el cargo</strong>
+      dentro de la misma campaña. Semestral solo donde hay mucha rotación o donde el negocio cambia
+      rápido.
+    </p>
+    <p>
+      Un ciclo por área es la excepción, y solo tiene sentido cuando los calendarios de verdad
+      difieren —por ejemplo, si operaciones se evalúa en otro momento del año que administración—.
+      Partir la campaña sin necesidad complica comparar.
+    </p>
+    <div class="clave">
+      <p>
+        <strong>Una campaña, varios formularios.</strong> El de conductores y el de analistas caben
+        en el mismo ciclo: al crearlo se marcan los que haga falta, y <em>cada persona responde el
+        de su cargo</em>. No hay que elegir uno por uno — eso lo dice el cargo.
+      </p>
+      <p>
+        El formulario que <em>no</em> declara ningún cargo es el <strong>general</strong>: recoge a
+        quien no encaje en ningún otro. Si no hay general, quien tenga un cargo que ningún
+        formulario cubre se queda fuera de la campaña, y al abrirla <em>se dice cuántos son</em>.
+      </p>
+      <p>
+        Y el consolidado ya no se parte: se lee entero y también formulario a formulario, con su
+        promedio cada uno.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Las dos capas: lo común y lo del cargo</h2>
+    <p>
+      Casi todas las empresas evalúan <strong>dos cosas a la vez</strong>: unas competencias que se
+      le piden a todo el mundo —seguridad, trabajo en equipo, los valores— y otras propias del
+      cargo. En el sistema eso se arma <strong>heredando</strong>.
+    </p>
+    <ol class="pasos">
+      <li class="paso">
+        <span class="numero">1</span>
+        <div>
+          <h4>Un formulario con las comunes</h4>
+          <p>
+            Se crea uno —«Comunes de la empresa»— con las competencias que se le preguntan a todos.
+            Se escriben <strong>una sola vez</strong>.
+          </p>
+        </div>
+      </li>
+      <li class="paso">
+        <span class="numero">2</span>
+        <div>
+          <h4>Cada formulario de cargo hereda de él</h4>
+          <p>
+            Al armar el de conductores se elige <em>«Competencias comunes: heredar de Comunes de la
+            empresa»</em> y se añaden solo las suyas. Las heredadas aparecen en una lista aparte, y
+            la vista previa las muestra <strong>juntas y en orden</strong>: primero las de la
+            empresa, después las del cargo.
+          </p>
+        </div>
+      </li>
+    </ol>
+    <div class="clave">
+      <p>
+        <strong>Para quien califica no cambia nada:</strong> abre una sola evaluación, con todas las
+        competencias seguidas y una sola nota. Las dos capas son cosa de quien configura.
+      </p>
+      <p>
+        <strong>Y cambiar una competencia común se hace en un sitio.</strong> Se edita el formulario
+        de comunes y el próximo ciclo la usa en todos los que la heredan. Los ciclos ya abiertos
+        <em>no</em> cambian: cada campaña guarda su copia congelada.
+      </p>
+    </div>
+    <p>
+      Dos límites, a propósito: <strong>no se encadena</strong> (un formulario que hereda no puede
+      servir de base a otro; una cadena de plantillas no hay quien la lea) y <strong>no se repite
+      una competencia que ya viene de las comunes</strong>, porque se preguntaría dos veces y
+      contaría doble en la nota.
+    </p>
+    <p>
+      Puede haber <strong>más de un formulario de comunes</strong> si hace falta —por ejemplo unas
+      para el personal operativo y otras para el administrativo—: cada formulario de cargo hereda
+      del que le corresponda.
+    </p>
+  </section>
+
+  <section>
+    <h2>¿Por cargo o por área?</h2>
+    <p>
+      Es la pregunta que más se repite al configurar, y la respuesta corta es: <strong>el formulario
+      va por cargo, y el área ya tiene su papel</strong>. Son dos ejes distintos y cada uno decide
+      una cosa.
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Eje</th><th>Qué decide</th><th>Por qué ese</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Cargo</strong></td>
+            <td><strong>QUÉ</strong> se pregunta</td>
+            <td>Se evalúa cómo hace alguien <em>su trabajo</em>: a un conductor se le mide conducción segura, ruta y cuidado del vehículo; a un analista, calidad y plazos</td>
+          </tr>
+          <tr>
+            <td><strong>Área</strong></td>
+            <td><strong>QUIÉN</strong> califica, y cómo se lee el resultado</td>
+            <td>El evaluador es el responsable del área, y el consolidado se corta por área. Ahí el área es insustituible</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <strong>Por qué no al revés.</strong> Dentro de un área conviven cargos muy distintos —en
+      bodega hay auxiliares, un supervisor y un coordinador— y preguntarles lo mismo obliga a
+      escribir competencias tan genéricas («compromiso», «actitud») que dejan de medir nada. El
+      área, en cambio, sí es homogénea en otra cosa: en quién manda.
+    </p>
+    <div class="clave">
+      <p>
+        <strong>Así lo hacen las plataformas del sector</strong> —SuccessFactors, Cornerstone,
+        Workday—: el modelo de competencias va atado al puesto, y la estructura de la empresa se usa
+        para la jerarquía de evaluación y para los cortes del reporte. El patrón habitual son
+        <strong>dos capas</strong>: competencias <em>organizacionales</em> iguales para todos
+        (seguridad, trabajo en equipo, los valores) y competencias <em>del cargo</em>.
+      </p>
+      <p>
+        Eso se puede hacer hoy tal cual: el formulario <strong>general</strong> lleva las
+        organizacionales y recoge a todo el mundo; los de cargo llevan las específicas. Con una
+        salvedad: <em>cada persona responde un solo formulario</em>, así que quien quiera las dos
+        capas a la vez repite las organizacionales dentro de cada formulario de cargo. Con cinco
+        cargos es razonable; con cuarenta habría que cambiarlo.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cómo se calcula la nota</h2>
+    <p>
+      Es un <strong>promedio ponderado, llevado a porcentaje</strong>. Cada respuesta se convierte
+      primero en su porcentaje de la escala, y después se promedia según el peso.
+    </p>
+
+    <div class="ejemplo">
+      <p>Ejemplo con números</p>
+      <p>
+        Un formulario con tres competencias: <em>seguridad</em> (1 a 5, peso 3),
+        <em>comunicación</em> (1 a 5, peso 1) y <em>logros del año</em> (solo texto).
+      </p>
+      <p>
+        La jefa califica <strong>5</strong> en seguridad y <strong>3</strong> en comunicación, y
+        escribe un párrafo en logros.
+      </p>
+      <p>
+        5 de 5 son <strong>100%</strong>; 3 de 5 son <strong>60%</strong>. Logros no da nota porque es
+        solo texto. Entonces: (100 × 3 + 60 × 1) ÷ 4 = <strong>90%</strong>.
+      </p>
+    </div>
+
+    <p>Dos reglas que evitan malentendidos:</p>
+    <ul>
+      <li>
+        <strong>Lo que no se respondió no cuenta como cero.</strong> Un cero es una calificación
+        pésima; no contestar es no contestar. Se saca del promedio.
+      </li>
+      <li>
+        <strong>Un formulario de solo texto no tiene nota</strong>, y eso no es un 0. Aparece un «—».
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Cosas que el sistema no deja hacer, y por qué</h2>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Si intentas…</th><th>Pasa esto, porque…</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Cambiar la escala de una competencia ya respondida</td>
+            <td>No deja. Un «4 sobre 5» y un «4 sobre 10» son notas distintas: cambiarla reescribiría en silencio lo que significan las respuestas guardadas</td>
+          </tr>
+          <tr>
+            <td>Editar un formulario que ya usó un ciclo</td>
+            <td>Se abre, explica por qué no se puede cambiar y ofrece <strong>Duplicar y editar</strong>: se crea una copia y el original no se toca. Si se pudiera editar, el ciclo del año pasado y el del que viene se llamarían igual y no serían lo mismo</td>
+          </tr>
+          <tr>
+            <td>Corregir una evaluación ya entregada</td>
+            <td>No deja. Es lo que la otra persona va a leer y firmar; corregirla después, sin que se note, convertiría la evidencia en algo que no se puede citar</td>
+          </tr>
+          <tr>
+            <td>Abrir dos veces el mismo ciclo</td>
+            <td>No deja. Se generarían evaluaciones duplicadas para la misma gente</td>
+          </tr>
+          <tr>
+            <td>Poner en la misma campaña dos formularios que se reparten el mismo cargo</td>
+            <td>No deja, y dice cuál es el cargo. A quién le tocaría cuál lo decidiría el azar. Lo mismo con dos formularios generales: solo puede haber uno</td>
+          </tr>
+          <tr>
+            <td>Abrir una campaña que no genera ninguna evaluación</td>
+            <td>No deja. Abrir es irreversible, y una campaña vacía —porque ningún cargo encaja, o porque nadie tiene responsable de área— ya no se corrige</td>
+          </tr>
+          <tr>
+            <td>Leer la evaluación de otra persona</td>
+            <td>No deja, salvo que sea tuya, que tú la escribas, o que tengas el permiso de consolidado. Lo que un jefe escribe sobre alguien no lo lee cualquiera</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Y después: qué se hace con el resultado</h2>
+    <p>
+      La evaluación <strong>no crea capacitaciones sola</strong>, y es deliberado: decidir a quién se
+      forma es una decisión de personas, no un disparo automático. Lo que hace es <em>mostrar</em> qué
+      hay que reforzar. A partir de ahí hay dos caminos:
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Si la necesidad es…</th><th>Va a…</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Estructural</strong> — «todo el equipo salió bajo en atención al cliente»</td>
+            <td>Un renglón del <strong>plan anual</strong> del año siguiente</td>
+          </tr>
+          <tr>
+            <td><strong>Puntual</strong> — «este usuario necesita reforzar ahora»</td>
+            <td>Una <strong>capacitación extraordinaria</strong>, ya, sin esperar al plan</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      La capacitación extraordinaria cuenta como evidencia igual que cualquier otra —aparece en
+      Seguimiento, en el expediente y en las constancias— pero <strong>no mueve el cumplimiento del
+      plan</strong>. Es a propósito: el plan mide lo que se prometió en diciembre, y si cada reacción
+      del año entrara ahí, el indicador dejaría de poder compararse entre años.
+    </p>
+    <p>
+      Por eso, al crear una competencia se puede indicar <strong>qué formación la fortalece</strong>:
+      cuando llegue el momento de armar el plan, esa relación ya está escrita.
+    </p>
+  </section>
+
+  <section>
+    <h2>Lo que todavía no hace</h2>
+    <p>Dicho para que nadie lo busque:</p>
+    <ul>
+      <li><strong>Evaluación 360°</strong> — que además evalúen los compañeros o los reportes. Hoy solo el jefe y la propia persona.</li>
+      <li><strong>Calibración</strong> — la reunión donde los jefes ajustan notas entre áreas.</li>
+      <li><strong>Objetivos individuales</strong> — metas medibles por persona.</li>
+      <li><strong>Matriz de talento (9-box)</strong> — desempeño contra potencial.</li>
+    </ul>
+    <p>
+      Ninguna se descartó por difícil: se dejaron fuera porque multiplican la complejidad y nadie las
+      ha pedido todavía. El modelo deja sitio para las cuatro.
+    </p>
+  </section>
+
+  <footer>
+    NEO PULSE · Guía de uso de la evaluación de desempeño. Preparada para TRANSPRENSA.
+  </footer>
+</div>

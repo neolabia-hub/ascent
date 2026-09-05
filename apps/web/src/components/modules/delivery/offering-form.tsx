@@ -6,12 +6,14 @@ import type { CatalogRow, PickableUser } from '@/lib/admin-api';
 import type { Modality } from '@/lib/catalog-api';
 import {
   EMPTY_RULE,
-  previewAudience,
+  previewProjected,
   type AudienceRule,
   type ExecutedBy,
+  type FacetCount,
   type OfferingBody,
   type OfferingDetail,
   type OfferingKind,
+  type ProjectedPreview,
 } from '@/lib/delivery-api';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -212,6 +214,8 @@ export function OfferingForm({
   suggestedAreaId = null,
   /** Publicada: solo se corrige la logistica. La fecha y la tajada mueven indicadores. */
   soloLogistica = false,
+  /** La version que se va a convocar: sin ella no se pueden previsualizar los proyectados. */
+  activityVersionId = null,
 }: {
   value: OfferingFormValue;
   onChange: (value: OfferingFormValue) => void;
@@ -219,37 +223,73 @@ export function OfferingForm({
   people: PickableUser[];
   suggestedAreaId?: string | null;
   soloLogistica?: boolean;
+  activityVersionId?: string | null;
 }) {
   /** La tajada arranca plegada: en la mayoria de las jornadas no se toca. */
   const [tajadaAbierta, setTajadaAbierta] = useState(tieneFacetas(value.scope));
   /**
-   * A CUANTA GENTE ALCANZA EL ALCANCE, mientras se marca.
+   * A CUANTOS OBLIGADOS ALCANZA EL CORTE, mientras se marca.
    *
    * Los selectores decian a QUE se acota —"Conductores de Antioquia"— y no a CUANTOS, que es
    * la pregunta que se hace quien esta partiendo el reparto: si esta jornada atiende a 8 o a
    * 80 decide si cabe en una sesion. Enterarse despues de publicar, cuando el numero ya quedo
    * congelado, es la peor forma de descubrir que el corte estaba mal.
    *
+   * ANTES CONTABA LO QUE NO ERA (2026-09-03). Preguntaba a cuanta gente DE LA EMPRESA encajaba
+   * con las facetas, asi que con los campos vacios —el caso normal— decia la plantilla entera:
+   * "cubre a 773 personas" en una formacion que obliga a nueve. Lo que se congela al publicar son
+   * los OBLIGADOS que caen dentro, y eso es lo que se pregunta ahora, al mismo servicio que
+   * congela. La frase de debajo ya lo decia bien; el numero de arriba la desmentia.
+   *
    * Es una CONSULTA, no una decision: no crea ninguna obligacion ni toca nada.
    */
-  const [alcance, setAlcance] = useState<number | null>(null);
+  const [proyectados, setProyectados] = useState<ProjectedPreview | null>(null);
   useEffect(() => {
+    if (!activityVersionId) {
+      setProyectados(null);
+      return;
+    }
     let cancelado = false;
     // Se espera un momento: marcar tres cargos seguidos no puede ser tres consultas.
     const timer = setTimeout(() => {
-      void previewAudience(value.scope)
+      void previewProjected({
+        activityVersionId,
+        scope: value.scope,
+        regionalId: value.regionalId || null,
+      })
         .then((preview) => {
-          if (!cancelado) setAlcance(preview.count);
+          if (!cancelado) setProyectados(preview);
         })
         .catch(() => {
-          if (!cancelado) setAlcance(null);
+          if (!cancelado) setProyectados(null);
         });
     }, 250);
     return () => {
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [value.scope]);
+  }, [value.scope, value.regionalId, activityVersionId]);
+
+  /**
+   * LOS SELECTORES, ACOTADOS A LO QUE HAY DENTRO.
+   *
+   * Ofrecer los cuarenta cargos del catalogo en una formacion que obliga a tres invita a cortar
+   * por uno que da cero, y ese error solo se ve despues de publicar. Se ensena lo que existe
+   * ENTRE LOS OBLIGADOS, con cuantos hay de cada uno.
+   *
+   * Si todavia no hay ningun obligado —o no se sabe que version es— se ensena el catalogo
+   * entero: acotar antes de que nazcan las obligaciones es legitimo, y una lista vacia seria un
+   * callejon sin salida.
+   */
+  const opcionesDe = (filas: CatalogRow[], presentes: FacetCount[] | undefined) => {
+    if (!presentes || presentes.length === 0) {
+      return filas.map((fila) => ({ id: fila.id, label: fila.name }));
+    }
+    const cuantos = new Map(presentes.map((faceta) => [faceta.id, faceta.count]));
+    return filas
+      .filter((fila) => cuantos.has(fila.id))
+      .map((fila) => ({ id: fila.id, label: fila.name, hint: `${cuantos.get(fila.id)} obligados` }));
+  };
   const set = (parcial: Partial<OfferingFormValue>) => onChange({ ...value, ...parcial });
   const conFecha = value.kind !== 'PERMANENT';
   const permanente = value.kind !== 'EVENT';
@@ -482,12 +522,8 @@ export function OfferingForm({
           <div className="min-w-0">
             <p className="text-sm font-medium text-ink-900">Alcance especifico</p>
             <p className="mt-0.5 text-sm text-ink-500">{resumenDeTajada(value.scope, catalogs)}</p>
-            {alcance !== null ? (
-              <p className="mt-0.5 text-xs text-ink-500">
-                Cubre a <span className="font-medium text-ink-700">{alcance}</span>
-                {alcance === 1 ? ' persona' : ' personas'} de la empresa. Los proyectados de esta jornada seran los
-                obligados a la formacion que esten dentro.
-              </p>
+            {proyectados !== null ? (
+              <p className="mt-0.5 text-xs text-ink-500">{loQueProyecta(proyectados)}</p>
             ) : null}
           </div>
           {!soloLogistica ? (
@@ -508,7 +544,7 @@ export function OfferingForm({
               id="o-scope-jobs"
               placeholder="Todos"
               disabled={soloLogistica}
-              options={catalogs.jobTitles.map((row) => ({ id: row.id, label: row.name, hint: row.jobTitleType?.name }))}
+              options={opcionesDe(catalogs.jobTitles, proyectados?.facets.jobTitles)}
               value={value.scope.jobTitleIds}
               onChange={(jobTitleIds) => set({ scope: { ...value.scope, jobTitleIds } })}
             />
@@ -518,7 +554,7 @@ export function OfferingForm({
               id="o-scope-areas"
               placeholder="Todas"
               disabled={soloLogistica}
-              options={catalogs.areas.map((row) => ({ id: row.id, label: row.name }))}
+              options={opcionesDe(catalogs.areas, proyectados?.facets.areas)}
               value={value.scope.areaIds}
               onChange={(areaIds) => set({ scope: { ...value.scope, areaIds } })}
             />
@@ -528,7 +564,7 @@ export function OfferingForm({
               id="o-scope-regionals"
               placeholder="Todas"
               disabled={soloLogistica}
-              options={catalogs.regionals.map((row) => ({ id: row.id, label: row.name }))}
+              options={opcionesDe(catalogs.regionals, proyectados?.facets.regionals)}
               value={value.scope.regionalIds}
               onChange={(regionalIds) => set({ scope: { ...value.scope, regionalIds } })}
             />
@@ -543,7 +579,7 @@ export function OfferingForm({
               id="o-scope-services"
               placeholder="Todos"
               disabled={soloLogistica}
-              options={catalogs.services.map((row) => ({ id: row.id, label: row.name }))}
+              options={opcionesDe(catalogs.services, proyectados?.facets.services)}
               value={value.scope.serviceIds}
               onChange={(serviceIds) => set({ scope: { ...value.scope, serviceIds } })}
             />
@@ -563,6 +599,24 @@ export function OfferingForm({
       </Field>
     </div>
   );
+}
+
+/**
+ * EL NUMERO QUE SE VA A CONGELAR, dicho contra que se lee.
+ *
+ * "Cubre a 12" no informa: doce ¿de cuantos? Doce de doce es la jornada entera; doce de doscientos
+ * es un corte que hay que revisar. Por eso se dicen los dos, y cuando no hay corte se dice el
+ * total una sola vez, que es lo mismo sin la aritmetica.
+ */
+function loQueProyecta(preview: ProjectedPreview): string {
+  if (preview.source === 'NONE') {
+    return 'Nadie esta obligado a esta formacion todavia: se exige en "Quienes". Al publicar habra que ajustar los proyectados con justificacion.';
+  }
+  const gente = (n: number) => `${n} ${n === 1 ? 'persona obligada' : 'personas obligadas'}`;
+  const origen =
+    preview.source === 'RULES' ? ' (por ahora, las que alcanzan los requisitos: aun no han nacido las obligaciones)' : '';
+  if (preview.count === preview.total) return `Proyecta ${gente(preview.total)}${origen}.`;
+  return `Proyecta ${preview.count} de las ${gente(preview.total)}${origen}.`;
 }
 
 /** Lo que hace la tajada AHORA, en una linea, para no tener que abrirla para saberlo. */

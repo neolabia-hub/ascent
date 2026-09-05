@@ -99,6 +99,13 @@ export default function ProfilePage() {
       */}
       <MisConstancias />
 
+      {/*
+        SU DESEMPENO YA NO VIVE AQUI (Decision #140). Estaba debajo de las constancias, y era el
+        sitio equivocado por dos motivos: nadie busca su evaluacion en el perfil, y el mismo asunto
+        tenia dos entradas segun si calificas o no. Ahora todo esta en "Desempeno", que aparece en
+        el menu cuando hay algo — lo tuyo o lo de tu gente.
+      */}
+
       <p className="text-center text-sm text-ink-500">
         Tu racha es privada: nadie mas la ve.
       </p>

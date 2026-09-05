@@ -12,6 +12,8 @@ import {
   listOfferings,
   publishOffering,
   updateOffering,
+  listPlans,
+  addPlanItem,
   type OfferingDetail,
   type OfferingKind,
   type OfferingListItem,
@@ -29,6 +31,8 @@ import {
   type OfferingFormValue,
 } from '@/components/modules/delivery/offering-form';
 import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
+import { Textarea } from '@/components/ui/textarea';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
@@ -87,6 +91,37 @@ export function ActivityScheduleTab({
   /** La convocatoria que se esta corrigiendo. `null` = se esta creando una nueva. */
   const [editing, setEditing] = useState<OfferingDetail | null>(null);
   const [form, setForm] = useState<OfferingFormValue>(() => nuevaConvocatoria(typeConfig, activityModality));
+
+  /*
+    PROGRAMAR AQUI ENTRA AL PLAN, TAMBIEN CON EL PLAN APROBADO (2026-09-04).
+
+    La Decision #75 ya metia la jornada en el plan del ano al programarla... pero solo si ese plan
+    estaba en BORRADOR. Con el plan aprobado la jornada quedaba fuera: se dicta, la gente asiste, y
+    no cuenta para el cumplimiento de nadie. Eso obligaba a tener un SEGUNDO boton en la ficha —el
+    de la tarjeta del plan— que si sabia pedir el motivo, y a que el usuario adivinara cual usar.
+
+    Ahora hay un solo camino. Con el plan vivo se pide la novedad aqui mismo, que es lo que exige la
+    Decision #55, y el renglon entra por la misma via.
+  */
+  const [planDelAno, setPlanDelAno] = useState<{ id: string; year: number; status: string } | null>(null);
+  const [motivoDelPlan, setMotivoDelPlan] = useState('');
+  /** VIVO = ya aprobado. Es el unico caso en que el renglon no entra solo y hay que dar un motivo. */
+  const planVivo = planDelAno && planDelAno.status !== 'DRAFT' ? planDelAno : null;
+
+  useEffect(() => {
+    if (!typeConfig.participatesInPlan) return;
+    void listPlans()
+      .then((filas) => {
+        const enCurso = new Date().getFullYear();
+        const abiertos = filas.filter((row) => row.status !== 'CLOSED');
+        const elegido =
+          abiertos.find((row) => row.year === enCurso) ??
+          abiertos.filter((row) => row.year > enCurso).sort((a, b) => a.year - b.year)[0] ??
+          null;
+        setPlanDelAno(elegido ? { id: elegido.id, year: elegido.year, status: elegido.status } : null);
+      })
+      .catch(() => setPlanDelAno(null));
+  }, [typeConfig.participatesInPlan]);
 
   const load = useCallback(async () => {
     try {
@@ -154,10 +189,26 @@ export function ActivityScheduleTab({
         await updateOffering(editing.id, cuerpoDeConvocatoria(form));
         showToast({ kind: 'success', title: 'Convocatoria corregida' });
       } else {
-        await createOffering(cuerpoDeConvocatoria(form, versionId));
+        const creada = await createOffering(cuerpoDeConvocatoria(form, versionId));
+        /*
+          CON EL PLAN VIVO, el servidor no mete el renglon solo (Decision #55: hay que decir por
+          que). Se hace aqui, con el motivo que se acaba de pedir, para que programar signifique lo
+          mismo con el plan en borrador y con el plan aprobado.
+
+          El mes sale de la fecha de la jornada, igual que lo deduce el servidor cuando entra sola.
+        */
+        let entroAlPlan = false;
+        if (planVivo && form.scheduledDate) {
+          await addPlanItem(planVivo.id, {
+            offeringId: creada.id,
+            plannedMonth: Number(form.scheduledDate.slice(5, 7)),
+            justification: motivoDelPlan.trim(),
+          });
+          entroAlPlan = true;
+        }
         showToast({
           kind: 'success',
-          title: 'Convocatoria creada en borrador',
+          title: entroAlPlan ? `Convocatoria creada y agregada al plan ${planVivo?.year}` : 'Convocatoria creada en borrador',
           description: 'Al publicarla se congelan sus proyectados.',
         });
       }
@@ -235,8 +286,49 @@ export function ActivityScheduleTab({
    * Una formacion sin convocatoria PUBLICADA no la puede hacer nadie. Los borradores no cuentan:
    * dejan el candado igual.
    */
-  const sinAbrir = rows !== null && !rows.some((row) => row.status === 'PUBLISHED' || row.status === 'IN_PROGRESS');
+  /*
+    "TODAVIA NADIE PUEDE HACERLA" SOLO APLICA SI EL CONTENIDO YA ESTA PUBLICADO (2026-09-03).
+
+    Le faltaba esa mitad: con el contenido en borrador salian los DOS avisos a la vez, y el segundo
+    decia "el contenido esta publicado" justo debajo del que decia que no lo estaba. Dos frases que
+    se contradicen en la misma pantalla, y una de las dos mintiendo.
+
+    Con el contenido en borrador no falta la convocatoria: falta publicar. Eso ya lo dice el aviso
+    de arriba.
+  */
+  const sinAbrir =
+    !sinPublicar && rows !== null && !rows.some((row) => row.status === 'PUBLISHED' || row.status === 'IN_PROGRESS');
+  /*
+    Y CUAL DE LOS TRES CASOS ES (2026-09-04).
+
+    "Sin convocatoria nadie puede empezarla · programa la jornada" se ensenaba igual en los tres, y
+    en dos de ellos es falso: la convocatoria existe. Lo reporto el cliente viendola en borrador.
+
+      ninguna    -> falta programarla, que es lo que decia
+      BORRADOR   -> ya esta programada; lo que falta es PUBLICARLA
+      CANCELADA  -> la que habia se cancelo; hace falta otra
+
+    Mandar a "programar" a quien ya programo es mandarlo a crear una segunda convocatoria para el
+    mismo contenido, que es justo el estado que deja `409 OFFERING_NOT_OPEN` (ver RUNBOOK).
+  */
+  const enBorrador = (rows ?? []).filter((row) => row.status === 'DRAFT');
+  const soloCanceladas = (rows ?? []).length > 0 && (rows ?? []).every((row) => row.status === 'CANCELLED');
   const esPermanente = typeConfig.defaultOfferingKind === 'PERMANENT';
+
+  /*
+    Y EN UNA CAPACITACION DEL PLAN FALTA UN PASO MAS (2026-09-04).
+
+    Publicar la convocatoria no basta: las obligaciones de una capacitacion del plan nacen al
+    APROBAR EL PLAN (Decision #76). Antes de eso nadie esta obligado, nadie la ve en sus pendientes
+    y no hay a quien convocar — la formacion existe, la jornada existe, y no le llega a nadie.
+
+    Es un estado que el aviso de arriba no cubria, porque ahi la convocatoria SI esta publicada:
+    todo se ve correcto y no pasa nada. Lo pregunto el cliente con estas palabras: "programar le
+    sale al aprendiz pero no hasta que este aprobado".
+  */
+  const hayPublicada = (rows ?? []).some((row) => row.status === 'PUBLISHED' || row.status === 'IN_PROGRESS');
+  const faltaAprobarElPlan =
+    typeConfig.participatesInPlan && !sinPublicar && hayPublicada && planDelAno !== null && planDelAno.status === 'DRAFT';
 
   return (
     <div className="space-y-6">
@@ -264,8 +356,8 @@ export function ActivityScheduleTab({
           <Info size={15} className="mt-0.5 shrink-0 text-ink-500" strokeWidth={2} />
           <span>
             El contenido todavia esta en borrador. Puedes dejar la convocatoria <strong>programada</strong> —queda
-            apartada en el calendario y entra al plan— pero no se podra <strong>publicar</strong> hasta que publiques
-            el contenido: nadie puede cursar algo que aun puede cambiar.
+            apartada en el calendario— pero no se podra <strong>publicar</strong> hasta que publiques el contenido:
+            nadie puede cursar algo que aun puede cambiar.
           </span>
         </p>
       ) : null}
@@ -281,18 +373,78 @@ export function ActivityScheduleTab({
         <section className="card border-warn bg-warn-soft p-5">
           <h3 className="font-display text-base font-semibold text-warn">Todavia nadie puede hacerla</h3>
           <p className="mt-1 text-sm text-ink-700">
-            El contenido esta publicado, pero sin convocatoria nadie puede empezarla: a quien la tenga
-            exigida le sale con candado.
-            {esPermanente
-              ? ' Esta formacion es de autoservicio, asi que solo necesita quedar disponible.'
-              : ' Programa la jornada con su fecha, lugar e instructor.'}
+            El contenido esta publicado, pero a quien la tenga exigida le sale con{' '}
+            <strong>candado</strong>.{' '}
+            {enBorrador.length > 0 ? (
+              <>
+                La convocatoria <strong>{enBorrador[0]?.code}</strong> esta en borrador: ya esta programada, lo que
+                falta es <strong>publicarla</strong>. Abrela abajo y publicala — no hace falta crear otra.
+              </>
+            ) : soloCanceladas ? (
+              <>
+                La convocatoria que habia se <strong>cancelo</strong>, asi que hace falta{' '}
+                {esPermanente ? 'volver a dejarla disponible' : 'programar otra jornada'}.
+              </>
+            ) : esPermanente ? (
+              'Esta formacion es de autoservicio, asi que solo necesita quedar disponible.'
+            ) : (
+              'Programa la jornada con su fecha, lugar e instructor.'
+            )}
+            {/*
+              Y en una del plan, publicar la convocatoria TAMPOCO basta. Se dice aqui para que no
+              se descubra despues, cuando ya se dio todo por hecho.
+            */}
+            {typeConfig.participatesInPlan && planDelAno?.status === 'DRAFT' ? (
+              <>
+                {' '}
+                Y despues hay que <strong>aprobar el plan de {planDelAno.year}</strong>: las obligaciones de una
+                capacitacion del plan nacen ahi, no al publicar.
+              </>
+            ) : null}
           </p>
-          {esPermanente ? (
+          {/* Con una en borrador el atajo seria un error: crearia una SEGUNDA para lo mismo. */}
+          {esPermanente && enBorrador.length === 0 ? (
             <Button className="mt-4" onClick={() => void abrirParaTodos()} loading={busy}>
               <CalendarPlus size={16} />
               Dejarla disponible
             </Button>
           ) : null}
+          {enBorrador.length > 0 ? (
+            <Link
+              href={`/convocatorias/${enBorrador[0]?.id}?desde=formacion`}
+              className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium text-white"
+              style={{ backgroundColor: 'var(--brand-primary)' }}
+            >
+              <CalendarPlus size={16} />
+              Abrir {enBorrador[0]?.code} para publicarla
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/*
+        EL ESTADO QUE NO CUBRIA NINGUN AVISO: todo publicado y el plan sin aprobar.
+
+        Aqui `sinAbrir` es falso —la convocatoria ESTA publicada— asi que la pantalla no decia nada,
+        y sin embargo no le llega a nadie: las obligaciones de una capacitacion del plan nacen al
+        aprobar el plan. Todo se ve bien y no pasa nada, que es la peor forma de estar roto.
+      */}
+      {faltaAprobarElPlan && planDelAno ? (
+        <section className="card border-warn bg-warn-soft p-5">
+          <h3 className="font-display text-base font-semibold text-warn">Falta aprobar el plan</h3>
+          <p className="mt-1 text-sm text-ink-700">
+            La jornada esta publicada, pero <strong>todavia no le llega a nadie</strong>: las obligaciones de una
+            capacitacion del plan nacen al <strong>aprobar el plan de {planDelAno.year}</strong>. Hasta entonces nadie
+            la tiene en sus pendientes y no hay a quien convocar.
+          </p>
+          <Link
+            href={`/plan/${planDelAno.id}`}
+            className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium text-white"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+          >
+            <CalendarPlus size={16} />
+            Abrir el plan de {planDelAno.year}
+          </Link>
         </section>
       ) : null}
 
@@ -314,6 +466,7 @@ export function ActivityScheduleTab({
             people={people}
             suggestedAreaId={null}
             soloLogistica={editing !== null && editing.status !== 'DRAFT'}
+            activityVersionId={versionId}
           />
 
           {falta.length > 0 ? (
@@ -326,15 +479,44 @@ export function ActivityScheduleTab({
             </ul>
           ) : null}
 
+          {/*
+            LA NOVEDAD DEL PLAN, aqui y no en otra pantalla. Solo al CREAR y solo con el plan vivo:
+            en borrador el renglon entra solo y pedir un motivo por cada jornada del ano seria ruido.
+          */}
+          {planVivo && !editing ? (
+            <div className="mt-4">
+              <Field
+                htmlFor="prog-motivo"
+                label={`Por que entra al plan ${planVivo.year}`}
+                required
+                hint="El plan ya esta aprobado: una jornada nueva obliga a gente real y queda en el registro."
+              >
+                <Textarea
+                  id="prog-motivo"
+                  rows={2}
+                  maxLength={500}
+                  value={motivoDelPlan}
+                  onChange={(event) => setMotivoDelPlan(event.target.value)}
+                  placeholder="Minimo 10 caracteres"
+                />
+              </Field>
+            </div>
+          ) : null}
+
           <p className="mt-4 rounded-md bg-info-soft px-3 py-2 text-sm text-info">
             Los proyectados NO se escriben a mano: se derivan de a quienes atiende y se congelan al publicar.
+            {planVivo && !editing ? ` Al crearla entra en el plan ${planVivo.year}.` : ''}
           </p>
 
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" onClick={cerrarFormulario} disabled={busy}>
               Cancelar
             </Button>
-            <Button onClick={() => void submit()} loading={busy} disabled={falta.length > 0}>
+            <Button
+              onClick={() => void submit()}
+              loading={busy}
+              disabled={falta.length > 0 || (planVivo !== null && !editing && motivoDelPlan.trim().length < 10)}
+            >
               {editing ? 'Guardar cambios' : 'Crear convocatoria'}
             </Button>
           </div>
@@ -361,7 +543,7 @@ export function ActivityScheduleTab({
         <ul className="space-y-2">
           {rows.map((offering) => (
             <li key={offering.id} className="flex items-stretch gap-2">
-              <Link href={`/convocatorias/${offering.id}`} className="focus-ring card card-hover flex flex-1 items-center gap-4 p-4">
+              <Link href={`/convocatorias/${offering.id}?desde=formacion`} className="focus-ring card card-hover flex flex-1 items-center gap-4 p-4">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-ink-900">
                     {offering.code} · {kindLabel(offering.kind)}

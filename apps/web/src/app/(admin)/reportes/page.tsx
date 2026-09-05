@@ -1,9 +1,12 @@
 'use client';
 
-import { ArrowLeft, Award, Download, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Activity, ArrowLeft, Award, CalendarClock, Download, PieChart, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ESTADOS,
+  descargarEjecucionDeActividadXlsx,
+  descargarEjecucionGeneralXlsx,
   getEjecucionDeActividad,
   getEjecucionGeneral,
   type EstadoEjecucion,
@@ -20,6 +23,10 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
+import { useToast } from '@/components/ui/toast';
+import { useCan } from '@/components/providers/session-provider';
+import { Analitica } from '@/components/modules/admin/analitica';
+import { Vencimientos } from '@/components/modules/admin/vencimientos';
 
 /**
  * SEGUIMIENTO DE LA EJECUCION (Decision #122).
@@ -46,18 +53,145 @@ import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
  * Confundirlas hace perseguir a gente que no hizo nada mal, y deja sin hacer lo unico que habria
  * arreglado el numero.
  */
+/**
+ * TRES PREGUNTAS, TRES PESTANAS.
+ *
+ *   EJECUCION     "¿como va esta formacion y quien la ha hecho?"  -> para ir detras de alguien.
+ *   ANALITICA     "¿donde esta el problema?"                       -> para decidir donde mirar.
+ *   VENCIMIENTOS  "¿que se me viene encima?"                       -> para programar el ano.
+ *
+ * Son tres publicos y tres momentos distintos, y por eso son pestanas y no filtros de una misma
+ * pantalla: quien entra a decidir no quiere pasar antes por una lista de doscientas formaciones.
+ */
+type Pestana = 'ejecucion' | 'analitica' | 'vencimientos';
+
 export default function ReportesPage() {
+  const [pestana, setPestana] = useState<Pestana>('ejecucion');
+
+  return (
+    <div>
+      <h1 className="font-display text-[28px] font-semibold text-ink-900">Seguimiento</h1>
+      <p className="mt-1 text-sm leading-relaxed text-ink-500">
+        Como va la ejecucion, donde esta el problema y que se vence.
+      </p>
+
+      <div className="mt-5 mb-5 inline-flex gap-1 rounded-full bg-paper p-1">
+        <TabSeguimiento id="ejecucion" activa={pestana} onSelect={setPestana} icon={Activity} label="Ejecucion" />
+        <TabSeguimiento id="analitica" activa={pestana} onSelect={setPestana} icon={PieChart} label="Analitica" />
+        <TabSeguimiento
+          id="vencimientos"
+          activa={pestana}
+          onSelect={setPestana}
+          icon={CalendarClock}
+          label="Vencimientos"
+        />
+      </div>
+
+      {pestana === 'ejecucion' ? <VistaEjecucion /> : null}
+      {pestana === 'analitica' ? <Analitica /> : null}
+      {pestana === 'vencimientos' ? <Vencimientos /> : null}
+    </div>
+  );
+}
+
+function TabSeguimiento({
+  id,
+  activa,
+  onSelect,
+  label,
+  icon: Icon,
+}: {
+  id: Pestana;
+  activa: Pestana;
+  onSelect: (id: Pestana) => void;
+  label: string;
+  icon: typeof Activity;
+}) {
+  const seleccionada = activa === id;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      aria-pressed={seleccionada}
+      className={cn(
+        'focus-ring flex h-9 items-center gap-2 rounded-full px-4 text-sm transition-all duration-150 ease-pulse',
+        // La activa lleva el color de la empresa: una pastilla blanca sobre carril gris claro se
+        // distinguia solo por una sombra de un pixel, y en una pantalla clara eso no se ve.
+        seleccionada ? 'font-medium text-white shadow-btn-flat' : 'text-ink-500 hover:bg-surface hover:text-ink-900',
+      )}
+      style={seleccionada ? { backgroundColor: 'var(--brand-primary)' } : undefined}
+    >
+      <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
+      {label}
+    </button>
+  );
+}
+
+function VistaEjecucion() {
+  const router = useRouter();
+  const search = useSearchParams();
+  const { showToast } = useToast();
+  // El boton solo para quien puede exportar: el servidor lo exige, y un boton que siempre responde
+  // 403 es peor que no tenerlo.
+  const puedeExportar = useCan()('reports:export');
+  /** El plan enlaza una formacion concreta: `/reportes?formacion=<id>`. */
+  const formacionPedida = search.get('formacion');
+
   const [datos, setDatos] = useState<{ items: FilaGeneral[]; resumen: ResumenEjecucion } | null>(null);
   const [abierta, setAbierta] = useState<FilaGeneral | null>(null);
   const [busqueda, setBusqueda] = useState('');
   /** El estado por el que se esta mirando. `null` = todas. */
   const [filtro, setFiltro] = useState<EstadoEjecucion | null>(null);
+  const [bajando, setBajando] = useState(false);
+
+  /*
+    LO QUE SE DESCARGA ES LO QUE SE ESTA MIRANDO —el mismo filtro de estado—, pero NO la busqueda
+    por texto: esa es una forma de encontrar algo en pantalla, no un criterio del informe. Un
+    archivo con las tres formaciones que contienen "altura" no es un informe de nada.
+  */
+  const exportar = async () => {
+    setBajando(true);
+    try {
+      await descargarEjecucionGeneralXlsx(filtro);
+    } catch {
+      showToast({ kind: 'danger', title: 'No se pudo generar el archivo' });
+    } finally {
+      setBajando(false);
+    }
+  };
 
   useEffect(() => {
     void getEjecucionGeneral()
       .then(setDatos)
       .catch(() => setDatos({ items: [], resumen: vacio() }));
   }, []);
+
+  /*
+    EL ENLACE DEL PLAN ABRE LA FORMACION, no la lista entera.
+
+    Llegar desde "Como va" con `?formacion=<id>` y tener que buscarla a mano entre doscientas es el
+    enlace incumpliendo lo que promete. Se aplica UNA sola vez —de ahi el ref— para que cerrar el
+    detalle devuelva a la lista en lugar de reabrirlo, y el parametro se retira de la URL para que
+    recargar no resucite lo que se acaba de cerrar.
+
+    Si la formacion no esta en la lista NO se abre nada y se dice por que: sin obligaciones vivas no
+    hay ejecucion que seguir, y dejar la lista entera sin explicacion se lee como un enlace roto.
+  */
+  const enlaceAplicado = useRef(false);
+  useEffect(() => {
+    if (enlaceAplicado.current || !formacionPedida || !datos) return;
+    enlaceAplicado.current = true;
+    const fila = datos.items.find((f) => f.activityId === formacionPedida);
+    if (fila) setAbierta(fila);
+    else {
+      showToast({
+        kind: 'info',
+        title: 'Esa formacion todavia no tiene seguimiento',
+        description: 'Nadie la tiene asignada aun, asi que no hay ejecucion que mostrar.',
+      });
+    }
+    router.replace('/reportes', { scroll: false });
+  }, [formacionPedida, datos, router, showToast]);
 
   const filtradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -105,10 +239,18 @@ export default function ReportesPage() {
 
   return (
     <div>
-      <h1 className="font-display text-[28px] font-semibold text-ink-900">Seguimiento</h1>
-      <p className="mt-1 text-sm leading-relaxed text-ink-500">
-        Como va la ejecucion de cada formacion, y quien la ha hecho.
-      </p>
+      {/*
+        EL EXCEL ES LO QUE SE LLEVA EL AUDITOR. Va arriba y no escondido en un menu: es la accion por
+        la que se abre esta pantalla el dia de la auditoria.
+      */}
+      {puedeExportar ? (
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={exportar} loading={bajando}>
+            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            Exportar a Excel
+          </Button>
+        </div>
+      ) : null}
 
       {/*
         EL RESUMEN DE TODO, arriba. Es la respuesta a "¿como vamos?" antes de mirar nada mas, y la
@@ -118,13 +260,16 @@ export default function ReportesPage() {
       <section className="card mt-6 p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Avance general</p>
+            {/* Que universo es: no es el del plan, que tiene sus propios indicadores. */}
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+              Obligaciones cumplidas
+            </p>
             <p className="mt-1 font-display text-[32px] font-bold leading-none tabular-nums text-ink-900">
               {datos.resumen.avancePct}%
             </p>
           </div>
           <p className="text-sm text-ink-500">
-            {datos.resumen.terminadas} de {datos.resumen.total} obligaciones cumplidas
+            {datos.resumen.terminadas} de {datos.resumen.total} en toda la formacion viva
           </p>
         </div>
         <div className="mt-4">
@@ -184,29 +329,30 @@ export default function ReportesPage() {
                 </div>
               <div className="shrink-0 text-right">
                   {/*
-                    CON UN FILTRO PUESTO, el numero grande es el del estado filtrado y no el avance:
-                    quien pulsó "atrasadas" viene a ver CUANTAS atrasadas, no que tan bien va.
+                    EL NUMERO GRANDE ES SIEMPRE EL AVANCE, tambien con un filtro puesto.
+
+                    Antes cambiaba de significado —con "Atrasadas" pasaba a ser cuantas atrasadas— y
+                    eso obliga a releer la tarjeta cada vez para saber que se esta mirando: el mismo
+                    sitio, el mismo tamano y dos magnitudes distintas. El % queda de ancla estable y
+                    el conteo del estado va al lado, mas pequeno y con su color, que es donde el ojo
+                    lo busca cuando ya sabe que filtro puso.
                   */}
-                  {filtro ? (
-                    <>
-                      <p
-                        className="font-display text-lg font-bold leading-none tabular-nums"
+                  <div className="flex items-baseline justify-end gap-2">
+                    {filtro ? (
+                      <span
+                        className="whitespace-nowrap text-sm font-semibold tabular-nums"
                         style={{ color: ESTADOS[filtro].punto }}
                       >
-                        {conteoPorEstado(fila.resumen)[filtro]}
-                      </p>
-                      <p className="mt-0.5 text-xs text-ink-500">{ESTADOS[filtro].label.toLowerCase()}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-display text-lg font-bold leading-none tabular-nums text-ink-900">
-                        {fila.resumen.avancePct}%
-                      </p>
-                      <p className="mt-0.5 text-xs text-ink-500">
-                        {fila.resumen.terminadas}/{fila.resumen.total}
-                      </p>
-                    </>
-                  )}
+                        {conteoPorEstado(fila.resumen)[filtro]} {ESTADOS[filtro].label.toLowerCase()}
+                      </span>
+                    ) : null}
+                    <p className="font-display text-lg font-bold leading-none tabular-nums text-ink-900">
+                      {fila.resumen.avancePct}%
+                    </p>
+                  </div>
+                  <p className="mt-0.5 text-xs text-ink-500">
+                    {fila.resumen.terminadas}/{fila.resumen.total}
+                  </p>
                 </div>
               </div>
               <div className="mt-3">
@@ -229,9 +375,23 @@ function DetalleFormacion({
   inicial: EstadoEjecucion | null;
   onCerrar: () => void;
 }) {
+  const { showToast } = useToast();
+  const puedeExportar = useCan()('reports:export');
   const [datos, setDatos] = useState<{ items: FilaPersona[]; resumen: ResumenEjecucion } | null>(null);
   const [filtro, setFiltro] = useState<EstadoEjecucion | null>(inicial);
   const [busqueda, setBusqueda] = useState('');
+  const [bajando, setBajando] = useState(false);
+
+  const exportar = async () => {
+    setBajando(true);
+    try {
+      await descargarEjecucionDeActividadXlsx(fila.activityId, fila.activityName, filtro);
+    } catch {
+      showToast({ kind: 'danger', title: 'No se pudo generar el archivo' });
+    } finally {
+      setBajando(false);
+    }
+  };
 
   useEffect(() => {
     void getEjecucionDeActividad(fila.activityId)
@@ -259,8 +419,19 @@ function DetalleFormacion({
         Seguimiento
       </button>
 
-      <h1 className="font-display text-[26px] font-semibold text-ink-900">{fila.activityName}</h1>
-      <p className="mt-1 text-sm text-ink-500">{[fila.typeName, fila.processName].filter(Boolean).join(' · ')}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-[26px] font-semibold text-ink-900">{fila.activityName}</h1>
+          <p className="mt-1 text-sm text-ink-500">{[fila.typeName, fila.processName].filter(Boolean).join(' · ')}</p>
+        </div>
+        {/* La lista nominal: cedula, area, estado, nota y constancia. Es la evidencia de la carpeta. */}
+        {puedeExportar ? (
+          <Button variant="ghost" onClick={exportar} loading={bajando}>
+            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            Exportar a Excel
+          </Button>
+        ) : null}
+      </div>
 
       {!datos ? (
         <Skeleton className="mt-6 h-64 w-full rounded-xl" />
@@ -407,5 +578,8 @@ function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
 }
 
 function vacio(): ResumenEjecucion {
-  return { total: 0, terminadas: 0, enCurso: 0, sinEmpezar: 0, atrasadas: 0, reprobadas: 0, esperando: 0, avancePct: 0 };
+  return {
+    total: 0, terminadas: 0, enCurso: 0, sinEmpezar: 0, atrasadas: 0,
+    reprobadas: 0, esperando: 0, noRealizadas: 0, eximidas: 0, avancePct: 0,
+  };
 }

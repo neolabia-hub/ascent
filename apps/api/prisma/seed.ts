@@ -420,6 +420,68 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
       },
     },
     {
+      /*
+        RECERTIFICACION: la competencia del puesto que CADUCA (2026-09-05).
+
+        ─── POR QUE UN TIPO Y NO UNA INDUCCION ESPECIFICA QUE SE REPITE ───
+
+        Las dos cuelgan del CARGO y las dos usan el mismo motor, asi que tecnicamente bastaba con
+        poner "cada N meses" en una especifica. Pero entonces el tipo MIENTE, y el tipo es lo que
+        lee el auditor: "Induccion especifica: Montacargas" que vence cada ano no es una induccion.
+
+        Y son dos preguntas distintas:
+
+          Induccion especifica  ->  "¿le hicieron la induccion del puesto cuando llego?"
+                                     Un hecho del pasado, con su fecha. No vuelve.
+          Recertificacion       ->  "¿esta VIGENTE hoy su habilitacion?"
+                                     Un estado de hoy. Vence, y hay que renovarla.
+
+        La Decision #8 puso los tipos en una TABLA por tenant justamente para esto, y nombraba
+        "RECERTIFICACION" como el ejemplo. No cuesta codigo: es una fila.
+
+        ─── POR QUE ESTE CONFIG Y NO OTRO ───
+
+        `defaultRecurrenceMonths: 12` y no fecha fija: un certificado vence el dia de CADA PERSONA.
+        Si se hiciera por campana, quien se certifico en agosto estaria "al dia" hasta marzo con la
+        habilitacion vencida desde agosto — y el indicador mentiria en el peor momento.
+
+        `participatesInPlan: false` y es OBLIGATORIO que lo sea: el servidor le fuerza recurrencia
+        nula a todo lo que participa del plan (la del ano que viene es otro plan, no otra ronda).
+        Ponerlo en `true` mataria el aniversario, que es lo unico que hace util a este tipo.
+
+        `defaultOnExpiry: ESPERA` —el defecto— y aqui SI es lo correcto, al reves que en la
+        reinduccion: una habilitacion vencida **sigue siendo la que hay que renovar**. No hay
+        "periodo 2026 cerrado" del que pasar pagina; se queda ATRASADA, que cuenta como
+        incumplimiento, hasta que la renueve. Abrir una segunda seria decir que la primera ya no
+        importa.
+
+        `defaultOfferingKind: EVENT`: se dicta en jornada, con practica y evaluador. Y `executedBy`
+        admite externo, que es el caso normal —lo certifica la ARL o un tercero— sin que cambie de
+        quien es el registro ni quien vigila el vencimiento.
+      */
+      code: 'RECERTIFICACION',
+      name: 'Recertificacion',
+      colorHex: '#65a30d',
+      config: {
+        requiresAssessment: true,
+        /*
+          LA ENCUESTA NO SE SIEMBRA, igual que en los otros cinco tipos: pedirla exige elegir CUAL,
+          y esa es de la empresa. Si se sembrara `requiresSurvey: true` sin encuesta elegida, este
+          tipo no se podria publicar hasta que alguien descubriera por que — y el aviso, aunque lo
+          explica bien, llega tarde. El cliente la enciende y elige la suya en Configuracion.
+        */
+        // La constancia no es un extra: ES el certificado, y es lo que se enseña cuando preguntan.
+        issuesCertificate: true,
+        defaultAssignmentMode: 'BY_JOB_TITLE',
+        defaultOfferingKind: 'EVENT',
+        participatesInPlan: false,
+        isMicro: false,
+        defaultRecurrenceMonths: 12,
+        // Quien entra tiene que certificarse ya: no hay meses de gracia en una habilitacion.
+        exemptRecentHiresMonths: 0,
+      },
+    },
+    {
       code: 'REINDUCCION',
       name: 'Reinduccion',
       colorHex: '#6d28d9',
@@ -431,11 +493,21 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
         // quedaba dependiendo de que alguien se acordara de marcarla.
         defaultAssignmentMode: 'ON_HIRE',
         defaultOfferingKind: 'PERMANENT',
+        // QUE PASA SI NO LA HIZO Y LLEGA LA DEL ANO SIGUIENTE: la de este ano se cierra como NO
+        // REALIZADA —que cuenta como incumplimiento de ese periodo— y la nueva nace para todos. Es
+        // como funciona una campana de calendario, y evita que quien nunca la hace desaparezca del
+        // denominador de los anos siguientes.
+        defaultOnExpiry: 'CIERRA',
         // CAMPANA ANUAL, no aniversario por persona: la reinduccion es una obligacion de
         // calendario que cae sobre todos el mismo dia. Anclarla a "12 meses desde que cada quien
         // la hizo" deja sin fecha a quien nunca hizo la induccion, y no es lo que pregunta el
         // auditor: pregunta si se hizo LA REINDUCCION DE 2026.
         defaultAnnualDate: '03-31',
+        // QUIEN ENTRO HACE MENOS DE SEIS MESES NO ENTRA A LA CAMPANA: su induccion ES su
+        // actualizacion de ese ano, y encimarle la reinduccion sobre una induccion a medio hacer es
+        // pedirle dos veces lo mismo. Sin esto habia que eximir a mano a cada ingreso reciente
+        // —unos cincuenta al ano— escribiendo cincuenta veces el mismo motivo.
+        exemptRecentHiresMonths: 6,
         participatesInPlan: false,
         isMicro: false,
       },
@@ -480,12 +552,31 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
   ];
 
   for (const [index, item] of ACTIVITY_TYPES.entries()) {
+    /*
+      RESEMBRAR NO PUEDE PISAR LO QUE EL TENANT PARAMETRIZO (2026-09-04).
+
+      El `update` mandaba `config: item.config` entero, asi que cada `pnpm db:seed` borraba lo que
+      la empresa hubiera configurado en sus tipos. Paso de verdad en esta sesion: resembrar tras
+      una migracion **borro la encuesta de satisfaccion** de induccion general, especifica,
+      reinduccion y extraordinaria, y esas formaciones pasaron a publicarse sin encuesta sin que
+      nadie dijera nada. En produccion seria la parametrizacion del cliente.
+
+      La semilla aporta DEFECTOS, no verdades: se anaden las claves que no existan —asi una clave
+      nueva llega a los tenants que ya existen— y se respeta cualquier valor ya puesto.
+    */
+    const existente = await prisma.activityType.findUnique({
+      where: { tenantId_code: { tenantId, code: item.code } },
+      select: { config: true },
+    });
+    const configActual = (existente?.config ?? {}) as Record<string, unknown>;
+    const configMezclada = { ...item.config, ...configActual };
+
     await prisma.activityType.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
       update: {
         name: item.name,
         colorHex: item.colorHex,
-        config: item.config,
+        config: configMezclada,
         isSystem: true,
         active: true,
         displayOrder: index,

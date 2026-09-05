@@ -312,19 +312,41 @@ export class AudiencesService {
     });
     const openByAudience = new Map(open.map((m) => [m.audienceId, m.id]));
 
-    const totals: AudienceSyncResult = { joined: 0, left: 0 };
+    /*
+      SE DECIDE EN MEMORIA Y SE ESCRIBE DE UNA VEZ (2026-09-03).
+
+      Antes esto hacia un INSERT por cada audiencia a la que la persona entraba. Con 184 audiencias
+      y una persona que encaja en 133 —el caso real, medido—, eran 133 viajes a la base uno detras
+      de otro: **el alta de una persona tardaba 9 segundos**, y empeoraba a medida que crecia el
+      tenant. Quien da de alta a alguien miraba una pantalla congelada.
+
+      Ahora la decision se toma en memoria —que ya era asi— y las escrituras van en DOS consultas:
+      `createMany` para las entradas y `updateMany` para las salidas. Es EXACTAMENTE lo que ya hacia
+      `reevaluate` para el camino por lote; lo unico que pasaba es que este otro camino no se habia
+      alineado.
+
+      El resultado es identico: mismas filas, mismo `joined_at` por defecto, mismos contadores. No
+      cambia ninguna regla, solo cuantas veces se cruza la red.
+    */
+    const entran: string[] = [];
+    const salen: string[] = [];
     for (const audience of audiences) {
       const belongs = eligible && personMatchesRule(profile, this.parseRule(audience.rule));
       const memberId = openByAudience.get(audience.id);
-      if (belongs && !memberId) {
-        await db.audienceMember.create({ data: { tenantId, audienceId: audience.id, userId } });
-        totals.joined += 1;
-      } else if (!belongs && memberId) {
-        await db.audienceMember.update({ where: { id: memberId }, data: { leftAt: new Date() } });
-        totals.left += 1;
-      }
+      if (belongs && !memberId) entran.push(audience.id);
+      else if (!belongs && memberId) salen.push(memberId);
     }
-    return totals;
+
+    if (entran.length > 0) {
+      await db.audienceMember.createMany({
+        data: entran.map((audienceId) => ({ tenantId, audienceId, userId })),
+      });
+    }
+    if (salen.length > 0) {
+      await db.audienceMember.updateMany({ where: { id: { in: salen } }, data: { leftAt: new Date() } });
+    }
+
+    return { joined: entran.length, left: salen.length };
   }
 
   /** La regla vive como JSON: se valida al leer para que un dato viejo no rompa el motor. */

@@ -1,0 +1,14 @@
+-- CERRO EL PERIODO Y NO LA HIZO.
+--
+-- Estado terminal nuevo para que una CAMPANA anual pueda pasar de ano sin perder de vista a quien
+-- no la hizo: la reinduccion de 2026 se cierra, quien no la hizo queda en NO REALIZADA —y eso SI
+-- cuenta como incumplimiento de ese periodo, a diferencia de RETIRADA o EXIMIDA— y la de 2027 nace
+-- para todos.
+--
+-- Antes el motor solo abria la ronda siguiente si la anterior estaba CUMPLIDA, asi que quien nunca
+-- la hacia desaparecia del denominador de todos los anos siguientes: el peor incumplidor salia de
+-- la cuenta y la cobertura se veia mejor de lo que era.
+--
+-- No hay nada que rellenar: ninguna obligacion existente pasa a este estado. Lo aplica el motor
+-- cuando la politica del tipo es CIERRA (`config.defaultOnExpiry`), que por defecto NO lo es.
+ALTER TYPE "AssignmentStatus" ADD VALUE IF NOT EXISTS 'EXPIRED_NOT_DONE';

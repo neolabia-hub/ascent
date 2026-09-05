@@ -29,7 +29,7 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: 'Mi repaso de hoy', short_name: 'Repaso', url: '/repaso' },
-      { name: 'Mi formacion', short_name: 'Formacion', url: '/mi-formacion' },
+      { name: 'Mi aprendizaje', short_name: 'Aprendizaje', url: '/mi-formacion' },
     ],
   };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardCheck, Grid3x3, Plus, Search, Target, Users } from 'lucide-react';
+import { ClipboardCheck, Grid3x3, Plus, ShieldOff, ShieldX, Target, Users } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import { listCatalog, type CatalogRow } from '@/lib/admin-api';
 import { listActivities, type ActivityListItem } from '@/lib/catalog-api';
@@ -15,7 +15,6 @@ import {
   listAssignments,
   listAudiences,
   previewAudience,
-  toggleJobTitleMatrix,
   updateAssignmentRule,
   waiveAssignment,
   type AssignmentRow,
@@ -26,6 +25,10 @@ import {
   type RuleTrigger,
 } from '@/lib/delivery-api';
 import { describeDueOffset, formatDate } from '@/lib/format';
+import { EximirObligacion } from '@/components/modules/admin/eximir-obligacion';
+import { MatrizDeInducciones } from '@/components/modules/admin/matriz-de-inducciones';
+import { ViewTabs, type ViewTab } from '@/components/ui/view-tabs';
+import { FilterPill, ListFilter } from '@/components/ui/list-filter';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -40,7 +43,7 @@ import { cn } from '@/components/ui/cn';
 
 type Tab = 'requisitos' | 'matriz' | 'audiencias' | 'obligaciones';
 
-const TABS: Array<{ key: Tab; label: string; icon: typeof Target }> = [
+const TABS: ReadonlyArray<ViewTab<Tab>> = [
   { key: 'requisitos', label: 'Requisitos', icon: Target },
   { key: 'matriz', label: 'Matriz por cargo', icon: Grid3x3 },
   { key: 'audiencias', label: 'Audiencias', icon: Users },
@@ -65,6 +68,9 @@ const ASSIGNMENT_STATUS: Record<AssignmentStatus, { kind: StatusPillKind; label:
   // hace la persona —"me asignaron esto y ya no esta"—, y aqui la respuesta existe y es concreta.
   WITHDRAWN_PLAN_ITEM_CANCELLED: { kind: 'neutral', label: 'RENGLON CANCELADO' },
   WAIVED: { kind: 'neutral', label: 'EXIMIDA' },
+  // En rojo y no en gris: retirada y eximida NO cuentan como incumplimiento, y esta SI. Pintarlas
+  // igual haria que la campana de un ano cerrado se leyera como si no hubiera pasado nada.
+  EXPIRED_NOT_DONE: { kind: 'danger', label: 'NO REALIZADA' },
 };
 
 export default function AsignacionesPage() {
@@ -82,6 +88,20 @@ export default function AsignacionesPage() {
   const [matrix, setMatrix] = useState<JobTitleMatrix | null>(null);
   const [assignments, setAssignments] = useState<AssignmentRow[] | null>(null);
   const [assignmentQuery, setAssignmentQuery] = useState({ q: '', status: '' });
+  /*
+    FILTROS DE LAS DOS LISTAS QUE NO LOS TENIAN.
+
+    Requisitos y Audiencias se cargan enteras, y en cuanto el tenant lleva unos meses son cientos de
+    filas —muchas RETIRADAS o inactivas—, que es ruido puro cuando lo que se busca es "¿que se le
+    exige hoy a los conductores?". Se filtra en el navegador porque las dos listas ya vienen
+    completas: pedirle al servidor un filtro que se resuelve aqui anadiria latencia a cada tecla sin
+    ganar nada. Obligaciones NO: esa se pagina en el servidor y su buscador ya viaja en la consulta.
+
+    Por defecto se ensena SOLO LO VIGENTE. Un requisito retirado no obliga a nadie, y verlo mezclado
+    con los vivos hace contar mal de un vistazo, que es justo lo que se viene a hacer aqui.
+  */
+  const [rulesQuery, setRulesQuery] = useState({ q: '', soloVigentes: true });
+  const [audienceQuery, setAudienceQuery] = useState({ q: '', soloActivas: true });
 
   const [busy, setBusy] = useState(false);
   const [ruleOpen, setRuleOpen] = useState(false);
@@ -241,18 +261,8 @@ export default function AsignacionesPage() {
     }
   };
 
-  // ── Matriz ──
-  const toggleCell = async (jobTitleId: string, activityId: string, enabled: boolean) => {
-    setBusy(true);
-    try {
-      await toggleJobTitleMatrix({ jobTitleId, activityId, enabled, dueDaysAfterTrigger: 0 });
-      await loadTab();
-    } catch {
-      showToast({ kind: 'danger', title: 'No se pudo cambiar la casilla' });
-    } finally {
-      setBusy(false);
-    }
-  };
+  // La matriz vive en `MatrizDeInducciones`: encender y apagar una casilla lo hace ella, que es
+  // donde estan la confirmacion y la novedad que ese cambio pide.
 
   // ── Asignacion manual ──
   const assignManually = async () => {
@@ -279,14 +289,16 @@ export default function AsignacionesPage() {
     }
   };
 
-  const waive = async (assignment: AssignmentRow) => {
-    const reason = window.prompt('Motivo para eximir a esta persona (queda registrado):');
-    if (!reason || reason.trim().length < 10) {
-      showToast({ kind: 'warning', title: 'El motivo debe tener al menos 10 caracteres' });
-      return;
-    }
+  /*
+    EXIMIR. La ventana vive en `EximirObligacion` y es la MISMA que usa la ficha de la formacion:
+    el motivo va al registro de auditoria, y dos formularios para escribir la misma evidencia
+    acaban pidiendo cosas distintas.
+  */
+  const [eximiendo, setEximiendo] = useState<AssignmentRow | null>(null);
+  const waive = async (reason: string) => {
+    if (!eximiendo) return;
     try {
-      await waiveAssignment(assignment.id, reason.trim());
+      await waiveAssignment(eximiendo.id, reason);
       showToast({ kind: 'success', title: 'Obligacion eximida' });
       await loadTab();
     } catch {
@@ -294,7 +306,22 @@ export default function AsignacionesPage() {
     }
   };
 
-  const cellMap = new Set((matrix?.cells ?? []).map((cell) => `${cell.jobTitleId}:${cell.activityId}`));
+  // Lo que queda a la vista en cada lista. Se busca por lo que uno recuerda: el nombre de la
+  // formacion o el del grupo, no por el identificador.
+  const buscaReglas = rulesQuery.q.trim().toLowerCase();
+  const reglasVisibles = (rules ?? []).filter(
+    (rule) =>
+      (!rulesQuery.soloVigentes || rule.active) &&
+      (buscaReglas === '' ||
+        (rule.targetName ?? '').toLowerCase().includes(buscaReglas) ||
+        rule.audience.name.toLowerCase().includes(buscaReglas)),
+  );
+  const buscaAudiencias = audienceQuery.q.trim().toLowerCase();
+  const audienciasVisibles = (audiences ?? []).filter(
+    (audience) =>
+      (!audienceQuery.soloActivas || audience.active) &&
+      (buscaAudiencias === '' || audience.name.toLowerCase().includes(buscaAudiencias)),
+  );
 
   return (
     <div>
@@ -327,25 +354,34 @@ export default function AsignacionesPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-1 border-b border-line">
-        {TABS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setTab(item.key)}
-              className={cn(
-                'focus-ring -mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm transition-colors duration-150',
-                tab === item.key ? 'border-ink-900 font-medium text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-900',
-              )}
-            >
-              <Icon size={15} strokeWidth={1.75} />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
+      {/*
+        La misma pastilla que el plan y Seguimiento, y con el color de la empresa. Antes era un
+        subrayado gris tinta: otra forma de contestar la misma pregunta, y sin la marca.
+      */}
+      <ViewTabs tabs={TABS} value={tab} onChange={setTab} className="mb-4" />
+
+      {tab === 'requisitos' && rules && rules.length > 0 ? (
+        <ListFilter
+          value={rulesQuery.q}
+          onChange={(q) => setRulesQuery({ ...rulesQuery, q })}
+          placeholder="Buscar por formacion o grupo"
+          shown={reglasVisibles.length}
+          total={rules.length}
+        >
+          <FilterPill
+            active={rulesQuery.soloVigentes}
+            onClick={() => setRulesQuery({ ...rulesQuery, soloVigentes: true })}
+          >
+            Vigentes
+          </FilterPill>
+          <FilterPill
+            active={!rulesQuery.soloVigentes}
+            onClick={() => setRulesQuery({ ...rulesQuery, soloVigentes: false })}
+          >
+            Todos
+          </FilterPill>
+        </ListFilter>
+      ) : null}
 
       {tab === 'requisitos' ? (
         !rules ? (
@@ -377,11 +413,11 @@ export default function AsignacionesPage() {
                     <Th>Repite</Th>
                     <Th className="text-right">Obligaciones</Th>
                     <Th>Estado</Th>
-                    <Th className="w-24 text-right">Accion</Th>
+                    <Th className="w-24 text-right">Acciones</Th>
                   </Tr>
                 </THead>
                 <TBody>
-                  {rules.map((rule) => (
+                  {reglasVisibles.map((rule) => (
                     <Tr key={rule.id}>
                       <Td className="font-medium text-ink-900">{rule.targetName ?? 'Actividad'}</Td>
                       <Td className="text-ink-700">{rule.audience.name}</Td>
@@ -401,6 +437,7 @@ export default function AsignacionesPage() {
                       <Td className="text-right">
                         {rule.active ? (
                           <Button variant="ghost" size="sm" onClick={() => retireRule(rule)} disabled={busy}>
+                            <ShieldX size={15} />
                             Retirar
                           </Button>
                         ) : null}
@@ -410,74 +447,42 @@ export default function AsignacionesPage() {
                 </TBody>
               </Table>
             </div>
+            {/* Filtrar hasta dejarlo vacio no es un error, pero hay que decirlo. */}
+            {reglasVisibles.length === 0 ? (
+              <p className="px-5 py-6 text-center text-sm text-ink-500">
+                Ninguno coincide con el filtro.
+                {rulesQuery.soloVigentes ? ' Prueba con "Todos": puede estar retirado.' : ''}
+              </p>
+            ) : null}
           </div>
         )
       ) : null}
 
       {tab === 'matriz' ? (
-        !matrix ? (
-          <Skeleton className="h-80 w-full" />
-        ) : matrix.jobTitles.length === 0 || matrix.activities.length === 0 ? (
-          <div className="card">
-            <EmptyState
-              icon={Grid3x3}
-              title="Faltan cargos o actividades"
-              description="La matriz cruza los cargos del catalogo con las actividades formativas. Crea al menos uno de cada uno."
-            />
-          </div>
-        ) : (
-          <div className="card overflow-hidden">
-            <div className="px-5 py-4">
-              <h2 className="font-display text-base font-semibold text-ink-900">Que debe hacer cada cargo</h2>
-              <p className="mt-1 text-sm text-ink-500">
-                Marcar una casilla crea el requisito de ingreso para ese cargo. Al contratar a alguien con ese cargo, la formacion
-                le nace sola.
-                {matrix.broaderRules > 0
-                  ? ` Ademas hay ${matrix.broaderRules} requisitos definidos sobre audiencias mas amplias, que no se administran aqui.`
-                  : ''}
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <THead>
-                  <Tr>
-                    <Th className="sticky left-0 bg-paper">Cargo</Th>
-                    {matrix.activities.map((activity) => (
-                      <Th key={activity.id} className="min-w-[7rem] text-center">
-                        {activity.name}
-                      </Th>
-                    ))}
-                  </Tr>
-                </THead>
-                <TBody>
-                  {matrix.jobTitles.map((jobTitle) => (
-                    <Tr key={jobTitle.id}>
-                      <Td className="sticky left-0 bg-surface">
-                        <div className="font-medium text-ink-900">{jobTitle.name}</div>
-                        <div className="text-xs text-ink-500">{jobTitle.jobTitleType.name}</div>
-                      </Td>
-                      {matrix.activities.map((activity) => {
-                        const checked = cellMap.has(`${jobTitle.id}:${activity.id}`);
-                        return (
-                          <Td key={activity.id} className="text-center">
-                            <input
-                              type="checkbox"
-                              className="focus-ring h-4 w-4 rounded border-line-strong"
-                              checked={checked}
-                              disabled={busy}
-                              aria-label={`${jobTitle.name} debe hacer ${activity.name}`}
-                              onChange={(event) => void toggleCell(jobTitle.id, activity.id, event.target.checked)}
-                            />
-                          </Td>
-                        );
-                      })}
-                    </Tr>
-                  ))}
-                </TBody>
-              </Table>
-            </div>
-          </div>
-        )
+        !matrix ? <Skeleton className="h-80 w-full" /> : <MatrizDeInducciones matrix={matrix} onChanged={loadTab} />
+      ) : null}
+
+      {tab === 'audiencias' && audiences && audiences.length > 0 ? (
+        <ListFilter
+          value={audienceQuery.q}
+          onChange={(q) => setAudienceQuery({ ...audienceQuery, q })}
+          placeholder="Buscar una audiencia"
+          shown={audienciasVisibles.length}
+          total={audiences.length}
+        >
+          <FilterPill
+            active={audienceQuery.soloActivas}
+            onClick={() => setAudienceQuery({ ...audienceQuery, soloActivas: true })}
+          >
+            Activas
+          </FilterPill>
+          <FilterPill
+            active={!audienceQuery.soloActivas}
+            onClick={() => setAudienceQuery({ ...audienceQuery, soloActivas: false })}
+          >
+            Todas
+          </FilterPill>
+        </ListFilter>
       ) : null}
 
       {tab === 'audiencias' ? (
@@ -511,7 +516,7 @@ export default function AsignacionesPage() {
                   </Tr>
                 </THead>
                 <TBody>
-                  {audiences.map((audience) => (
+                  {audienciasVisibles.map((audience) => (
                     <Tr key={audience.id}>
                       <Td className="font-medium text-ink-900">{audience.name}</Td>
                       <Td className="text-right tabular-nums text-ink-700">{audience.memberCount}</Td>
@@ -525,36 +530,70 @@ export default function AsignacionesPage() {
                 </TBody>
               </Table>
             </div>
+            {audienciasVisibles.length === 0 ? (
+              <p className="px-5 py-6 text-center text-sm text-ink-500">
+                Ninguna coincide con el filtro.
+                {audienceQuery.soloActivas ? ' Prueba con "Todas": puede estar inactiva.' : ''}
+              </p>
+            ) : null}
           </div>
         )
       ) : null}
 
       {tab === 'obligaciones' ? (
         <>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <div className="relative">
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-300" />
-              <Input
-                value={assignmentQuery.q}
-                onChange={(event) => setAssignmentQuery({ ...assignmentQuery, q: event.target.value })}
-                placeholder="Buscar por nombre o documento"
-                className="w-72 pl-9"
-              />
-            </div>
+          {/*
+            La misma barra que las otras dos pestanas. Aqui el buscador SI viaja al servidor —esta
+            lista se pagina— pero se escribe en el mismo sitio y con la misma pinta: cambiar de
+            pestana no puede obligar a buscar donde esta el buscador.
+
+            Los tres estados de todos los dias van en pastillas, y el resto —retiradas, eximidas, con
+            el renglon cancelado— se quedan en el desplegable: son de consulta puntual y sacarlos a
+            la barra pondria seis pastillas donde de verdad se usan tres.
+          */}
+          <ListFilter
+            value={assignmentQuery.q}
+            onChange={(q) => setAssignmentQuery({ ...assignmentQuery, q })}
+            placeholder="Buscar por nombre o documento"
+          >
+            <FilterPill
+              active={assignmentQuery.status === ''}
+              onClick={() => setAssignmentQuery({ ...assignmentQuery, status: '' })}
+            >
+              Todas
+            </FilterPill>
+            <FilterPill
+              active={assignmentQuery.status === 'PENDING'}
+              onClick={() => setAssignmentQuery({ ...assignmentQuery, status: 'PENDING' })}
+            >
+              Pendientes
+            </FilterPill>
+            <FilterPill
+              active={assignmentQuery.status === 'OVERDUE'}
+              onClick={() => setAssignmentQuery({ ...assignmentQuery, status: 'OVERDUE' })}
+            >
+              Vencidas
+            </FilterPill>
+            <FilterPill
+              active={assignmentQuery.status === 'COMPLETED'}
+              onClick={() => setAssignmentQuery({ ...assignmentQuery, status: 'COMPLETED' })}
+            >
+              Cumplidas
+            </FilterPill>
             <Select
-              value={assignmentQuery.status}
+              aria-label="Otros estados"
+              value={
+                ['', 'PENDING', 'OVERDUE', 'COMPLETED'].includes(assignmentQuery.status) ? '' : assignmentQuery.status
+              }
               onChange={(event) => setAssignmentQuery({ ...assignmentQuery, status: event.target.value })}
               className="w-52"
             >
-              <option value="">Todos los estados</option>
-              <option value="PENDING">Pendientes</option>
-              <option value="OVERDUE">Vencidas</option>
-              <option value="COMPLETED">Cumplidas</option>
+              <option value="">Otros estados…</option>
               <option value="WITHDRAWN_LEFT_AUDIENCE">Retiradas</option>
               <option value="WITHDRAWN_PLAN_ITEM_CANCELLED">Con el renglon cancelado</option>
               <option value="WAIVED">Eximidas</option>
             </Select>
-          </div>
+          </ListFilter>
           {!assignments ? (
             <Skeleton className="h-80 w-full" />
           ) : assignments.length === 0 ? (
@@ -577,7 +616,7 @@ export default function AsignacionesPage() {
                       <Th>Ronda</Th>
                       <Th>Vence</Th>
                       <Th>Estado</Th>
-                      <Th className="w-24 text-right">Accion</Th>
+                      <Th className="w-24 text-right">Acciones</Th>
                     </Tr>
                   </THead>
                   <TBody>
@@ -607,7 +646,8 @@ export default function AsignacionesPage() {
                         </Td>
                         <Td className="text-right">
                           {assignment.status === 'PENDING' || assignment.status === 'OVERDUE' ? (
-                            <Button variant="ghost" size="sm" onClick={() => void waive(assignment)}>
+                            <Button variant="ghost" size="sm" onClick={() => setEximiendo(assignment)}>
+                              <ShieldOff size={15} style={{ color: 'var(--brand-primary)' }} />
                               Eximir
                             </Button>
                           ) : null}
@@ -837,6 +877,16 @@ export default function AsignacionesPage() {
           </Field>
         </div>
       </Drawer>
+
+      <EximirObligacion
+        open={eximiendo !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setEximiendo(null);
+        }}
+        personName={eximiendo?.user.fullName ?? ''}
+        activityName={eximiendo?.targetName ?? null}
+        onConfirm={waive}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   CalendarX2,
   CheckCircle2,
   ClipboardList,
+  FileText,
   Layers,
   Link2,
   Pencil,
@@ -42,6 +43,7 @@ import {
   type PlanDetail,
   type PlanItemRow,
   type PlanItemStatus,
+  type PlanMetrics,
   type PlanStatus,
 } from '@/lib/delivery-api';
 import { readTypeConfig, type ActivityTypeConfig } from '@/lib/activity-type';
@@ -61,6 +63,9 @@ import { Combo } from '@/components/ui/combo';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { getEjecucionDelPlan, type FilaPlan } from '@/lib/reports-api';
+import { MedicionDelPlan } from '@/components/modules/admin/medicion-del-plan';
+import { Modal } from '@/components/ui/modal';
+import { Analitica } from '@/components/modules/admin/analitica';
 import { BarraEjecucion } from '@/components/modules/admin/barra-ejecucion';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
@@ -203,6 +208,8 @@ export default function PlanDetallePage() {
   /** Cabecera y borrado: dos cajones porque son dos decisiones de distinto peso. */
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({ year: '', name: '', objective: '', goalPct: '', scope: '', justification: '' });
+  /** La ficha del plan —objetivo, alcance y meta— se lee cuando hace falta, no todos los dias. */
+  const [fichaAbierta, setFichaAbierta] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   /** Reabrir el ano cerrado. Pide motivo siempre: el auditor va a preguntar por que se movio. */
@@ -425,12 +432,24 @@ export default function PlanDetallePage() {
       showToast({ kind: 'success', title: 'Renglon agregado' });
       setAttachOpen(false);
     } catch (error) {
+      /*
+        EL SERVIDOR YA ESCRIBIO LA FRASE, y no se tira (2026-09-04).
+
+        Esto decia "No se pudo agregar el renglon" para todo lo que no fuera
+        `OFFERING_ALREADY_IN_PLAN`. Con `ACTIVITY_NOT_PLANNABLE` —una induccion que alguien intenta
+        meter al plan— el usuario se quedaba sin saber POR QUE, y el servidor manda un mensaje que
+        lo dice exactamente. Descartarlo para poner uno generico es tirar la unica parte util de la
+        respuesta.
+      */
+      const esConocido = error instanceof ApiError && error.code === 'OFFERING_ALREADY_IN_PLAN';
+      // El `message` del servidor viaja como `title` (RFC 9457). Los que NO lo traen se quedan con
+      // el nombre de la excepcion de Nest —"Conflict Exception"— y eso no se le ensena a nadie.
+      const delServidor = error instanceof ApiError ? error.body.title : undefined;
+      const util = delServidor && !delServidor.endsWith('Exception') ? delServidor : undefined;
       showToast({
         kind: 'danger',
-        title:
-          error instanceof ApiError && error.code === 'OFFERING_ALREADY_IN_PLAN'
-            ? 'Esa convocatoria ya esta en un plan'
-            : 'No se pudo agregar el renglon',
+        title: esConocido ? 'Esa convocatoria ya esta en un plan' : 'No se pudo agregar el renglon',
+        description: esConocido ? undefined : util,
       });
     } finally {
       setBusy(false);
@@ -771,12 +790,19 @@ export default function PlanDetallePage() {
           hint={
             // La frase de siempre —"N ejecutadas de M programadas"— NO se toca: es la que da
             // sentido al numero y la que comprueba el e2e. La meta se ANADE detras, no sustituye.
+            /*
+              NO SE DICE "FALTAN N PUNTOS".
+
+              En este producto los PUNTOS son otra cosa —los que gana el aprendiz al completar
+              formaciones— y la misma palabra con dos significados en la misma pantalla se lee
+              siempre por el lado equivocado. La meta sola basta: la resta la hace el ojo.
+            */
             `${metrics.executed} ejecutadas de ${metrics.programmed} programadas` +
             (plan.goalPct === null
               ? ' · sin meta definida'
               : metrics.compliancePct >= plan.goalPct
                 ? ` · meta del ${plan.goalPct}% cumplida`
-                : ` · meta ${plan.goalPct}%, faltan ${(plan.goalPct - metrics.compliancePct).toFixed(1)} puntos`)
+                : ` · meta del ${plan.goalPct}%`)
           }
         />
         <Stat label="Cobertura" value={`${metrics.coveragePct}%`} hint={`${metrics.trained} capacitados de ${metrics.projected} proyectados`} />
@@ -784,12 +810,93 @@ export default function PlanDetallePage() {
         <Stat label="Inscritos" value={metrics.enrolled} hint="Obligaciones que llegaron a inscripcion" />
       </div>
 
-      {plan.objective ? (
-        <div className="card mb-6 p-5">
-          <h2 className="font-display text-base font-semibold text-ink-900">Objetivo</h2>
-          <p className="mt-2 whitespace-pre-line text-sm text-ink-700">{plan.objective}</p>
-        </div>
+      {/*
+        EL OBJETIVO Y EL ALCANCE, DETRAS DE UN BOTON (Decision #131).
+
+        Ocupaban una tarjeta fija en una pantalla que se abre todos los dias para mirar como va el
+        plan — y son un texto que se escribe una vez al ano y se lee una vez al trimestre, casi
+        siempre para una auditoria. Empujaban hacia abajo lo que si se consulta a diario.
+
+        Se abre en VENTANA CENTRADA y no en el cajon lateral: el cajon es para editar, y aqui no hay
+        nada que rellenar. Ademas el alcance no se veia en ninguna parte aunque se pudiera escribir:
+        estaba guardado y nunca se ensenaba.
+      */}
+      {plan.objective || plan.scope || plan.goalPct !== null ? (
+        <button
+          type="button"
+          onClick={() => setFichaAbierta(true)}
+          className="focus-ring mb-6 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-700 transition-colors duration-150 hover:border-line-strong hover:text-ink-900"
+        >
+          <FileText size={15} strokeWidth={1.75} aria-hidden="true" />
+          Objetivo, alcance y meta
+        </button>
       ) : null}
+
+      <Modal
+        open={fichaAbierta}
+        onOpenChange={setFichaAbierta}
+        title={`Plan ${plan.year}`}
+        description="Lo que la empresa se comprometio a hacer este ano"
+        actions={
+          /*
+            EDITAR VA ARRIBA, JUNTO A CERRAR, y no en un pie.
+
+            Un pie entero para un solo boton gasta una franja de ventana en algo que no cierra
+            ninguna tarea: aqui no se esta rellenando nada, se esta leyendo. Arriba es ademas donde
+            ya esta la otra accion sobre la ventana misma.
+
+            En reposo es solo el lapiz; al pasar por encima se despliega la palabra hacia el lado.
+            La rejilla de una columna que pasa de 0fr a 1fr anima el ANCHO sin saltos, que es lo que
+            no se consigue con `width: auto`.
+
+            Y no duplica el formulario: abre el MISMO editor de cabecera. Dos formularios sobre los
+            mismos datos siempre acaban divergiendo, y nadie se entera hasta que alguien guarda
+            desde el equivocado.
+          */
+          <button
+            type="button"
+            onClick={() => {
+              setFichaAbierta(false);
+              openEdit();
+            }}
+            aria-label="Editar el plan"
+            className="focus-ring group/ed flex shrink-0 items-center gap-1 rounded-md p-1.5 text-ink-500 transition-colors duration-150 hover:bg-surface hover:text-ink-900"
+          >
+            <Pencil className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <span className="grid grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-hover/ed:grid-cols-[1fr] group-focus-visible/ed:grid-cols-[1fr]">
+              <span className="min-w-0 overflow-hidden whitespace-nowrap pr-0.5 text-sm">Editar</span>
+            </span>
+          </button>
+        }
+      >
+        <dl className="space-y-5">
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Meta de cumplimiento</dt>
+            <dd className="mt-1 text-sm text-ink-700">
+              {plan.goalPct === null ? (
+                <span className="italic text-ink-500">Sin meta acordada todavia.</span>
+              ) : (
+                <>
+                  <span className="font-display text-lg font-bold tabular-nums text-ink-900">{plan.goalPct}%</span>
+                  {' '}de las jornadas programadas, ejecutadas.
+                </>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Objetivo</dt>
+            <dd className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-700">
+              {plan.objective ?? <span className="italic text-ink-500">Sin objetivo escrito.</span>}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Alcance</dt>
+            <dd className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-700">
+              {plan.scope ?? <span className="italic text-ink-500">Sin alcance escrito.</span>}
+            </dd>
+          </div>
+        </dl>
+      </Modal>
 
       {/* Tres vistas del MISMO plan: no son tres pantallas, es una pregunta distinta cada vez. */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -911,7 +1018,7 @@ export default function PlanDetallePage() {
       ) : view === 'tabla' ? (
         <FlatTable items={filtered} canRemove={isDraft} busy={busy} onRemove={removeItem} onCancel={openCancel} onAdjust={openAdjust} />
       ) : view === 'ejecucion' ? (
-        <EjecucionDelPlan planId={params.id} />
+        <EjecucionDelPlan planId={params.id} metrics={metrics} goalPct={plan.goalPct} />
       ) : (
         <ProcessTable plan={plan} />
       )}
@@ -1206,7 +1313,7 @@ export default function PlanDetallePage() {
         que. El ANO no: ancla el vencimiento de cada renglon al ultimo dia de su mes, y moverlo
         despues de aprobar cambiaria la fecha limite de gente que ya tiene la obligacion encima.
       */}
-      <Drawer
+      <Modal
         open={editOpen}
         onOpenChange={setEditOpen}
         title="Editar el plan"
@@ -1314,7 +1421,7 @@ export default function PlanDetallePage() {
             </Field>
           ) : null}
         </div>
-      </Drawer>
+      </Modal>
 
       {/*
         BORRAR. La consecuencia se dice ANTES y en castellano, con la cifra: "se van a revocar 34
@@ -1409,8 +1516,11 @@ function ViewTab({
       aria-pressed={selected}
       className={cn(
         'focus-ring flex h-9 items-center gap-2 rounded-full px-4 text-sm transition-all duration-150 ease-pulse',
-        selected ? 'bg-surface font-medium text-ink-900 shadow-card' : 'text-ink-500 hover:text-ink-900',
+        // Mismo criterio que en Seguimiento: la vista activa se pinta con el color de la empresa.
+        // Blanco sobre gris claro no dice donde estas.
+        selected ? 'font-medium text-white shadow-btn-flat' : 'text-ink-500 hover:bg-surface hover:text-ink-900',
       )}
+      style={selected ? { backgroundColor: 'var(--brand-primary)' } : undefined}
     >
       <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
       {label}
@@ -1962,7 +2072,15 @@ function ProjectedCell({ item, onAdjust }: { item: PlanItemRow; onAdjust: (item:
  * Se ordenan por mes, como el resto del plan: aqui la pregunta es "¿vamos al dia con el
  * calendario?", y para eso el orden del calendario es el que sirve.
  */
-function EjecucionDelPlan({ planId }: { planId: string }) {
+function EjecucionDelPlan({
+  planId,
+  metrics,
+  goalPct,
+}: {
+  planId: string;
+  metrics: PlanMetrics;
+  goalPct: number | null;
+}) {
   const [filas, setFilas] = useState<FilaPlan[] | null>(null);
 
   useEffect(() => {
@@ -1981,22 +2099,37 @@ function EjecucionDelPlan({ planId }: { planId: string }) {
     );
   }
 
-  const total = filas.reduce((suma, fila) => suma + fila.resumen.total, 0);
-  const hechas = filas.reduce((suma, fila) => suma + fila.resumen.terminadas, 0);
+  /*
+    EL RESUMEN DE ESTE PLAN, sumando sus renglones. Se calcula aqui y no se pide otra vez al
+    servidor: son las mismas filas que ya estan en pantalla, y pedirlo aparte abriria la puerta a
+    que el total de arriba y el detalle de abajo dejaran de cuadrar.
+  */
+  const ejecucion = filas.reduce(
+    (acumulado, fila) => ({
+      total: acumulado.total + fila.resumen.total,
+      terminadas: acumulado.terminadas + fila.resumen.terminadas,
+      enCurso: acumulado.enCurso + fila.resumen.enCurso,
+      sinEmpezar: acumulado.sinEmpezar + fila.resumen.sinEmpezar,
+      atrasadas: acumulado.atrasadas + fila.resumen.atrasadas,
+      reprobadas: acumulado.reprobadas + fila.resumen.reprobadas,
+      esperando: acumulado.esperando + fila.resumen.esperando,
+      noRealizadas: acumulado.noRealizadas + fila.resumen.noRealizadas,
+      eximidas: acumulado.eximidas + fila.resumen.eximidas,
+      avancePct: 0,
+    }),
+    {
+      total: 0, terminadas: 0, enCurso: 0, sinEmpezar: 0, atrasadas: 0,
+      reprobadas: 0, esperando: 0, noRealizadas: 0, eximidas: 0, avancePct: 0,
+    },
+  );
+  // Mismo denominador que el servidor (`resumirEjecucion`): las eximidas salen, porque a esa
+  // persona ya nadie le pide la formacion y dejarlas dentro pondria un techo al indicador.
+  const exigibles = ejecucion.total - ejecucion.eximidas;
+  ejecucion.avancePct = exigibles <= 0 ? 0 : Math.round((ejecucion.terminadas / exigibles) * 100);
 
   return (
     <div>
-      <section className="card mb-4 flex flex-wrap items-end justify-between gap-4 p-5">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Avance del plan</p>
-          <p className="mt-1 font-display text-[32px] font-bold leading-none tabular-nums text-ink-900">
-            {total === 0 ? 0 : Math.round((hechas / total) * 100)}%
-          </p>
-        </div>
-        <p className="text-sm text-ink-500">
-          {hechas} de {total} obligaciones cumplidas en {filas.length} {filas.length === 1 ? 'renglon' : 'renglones'}
-        </p>
-      </section>
+      <MedicionDelPlan metrics={metrics} ejecucion={ejecucion} goalPct={goalPct} />
 
       <div className="space-y-2">
         {/*
@@ -2052,6 +2185,22 @@ function EjecucionDelPlan({ planId }: { planId: string }) {
       </div>
 
       <p className="mt-4 text-center text-xs text-ink-500">Abre un renglon para ver persona por persona.</p>
+
+      {/*
+        LOS CORTES, ACOTADOS A ESTE PLAN.
+
+        Es el mismo motor de la analitica general, pero midiendo SOLO lo que nacio de este plan
+        (regla de oro 2): quien ingreso en agosto no hace la jornada de marzo y no puede contar como
+        incumplimiento suyo. Sin esto, para saber que area va peor DENTRO del plan habia que salir a
+        otra pantalla y aceptar que ahi tambien contaban las pildoras y las extraordinarias.
+      */}
+      <div className="mt-8">
+        <h3 className="font-display text-base font-semibold text-ink-900">Donde esta el problema, dentro del plan</h3>
+        <p className="mb-4 mt-1 text-sm text-ink-500">
+          Solo obligaciones nacidas de este plan: no cuentan las pildoras ni las extraordinarias.
+        </p>
+        <Analitica planId={planId} />
+      </div>
     </div>
   );
 }

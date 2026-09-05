@@ -228,9 +228,17 @@ export default function ConvocatoriasPage() {
         crea la jornada sin salir a esta pantalla. Duplicarlo garantizaba que los dos se
         separaran en cuanto alguien tocara uno.
       */}
+      {/*
+        `autoPlan`: programar aqui significa lo mismo que programar desde la ficha. Si es una
+        capacitacion del plan y el plan del ano ya esta APROBADO, el cajon pide el motivo y mete el
+        renglon; con el plan en borrador lo hace el servidor solo (Decision #75). Sin esto, una
+        jornada creada desde aqui con el plan vivo quedaba fuera del plan: se dicta, la gente
+        asiste, y no cuenta para el cumplimiento de nadie.
+      */}
       <NewOfferingDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+        autoPlan
         onCreated={(offering) => {
           showToast({ kind: 'success', title: 'Convocatoria creada', description: `Quedo en borrador con el numero ${offering.code}.` });
           router.push(`/convocatorias/${offering.id}`);

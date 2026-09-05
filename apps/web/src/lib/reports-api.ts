@@ -1,6 +1,17 @@
 import { apiFetch } from './api';
+import { descargarArchivo } from './certificates-api';
 
-export type EstadoEjecucion = 'ESPERANDO' | 'SIN_EMPEZAR' | 'EN_CURSO' | 'REPROBADA' | 'TERMINADA' | 'ATRASADA';
+export type EstadoEjecucion =
+  | 'ESPERANDO'
+  | 'SIN_EMPEZAR'
+  | 'EN_CURSO'
+  | 'REPROBADA'
+  | 'TERMINADA'
+  | 'ATRASADA'
+  /** Cerro el periodo sin hacerla (Decision #142). Es incumplimiento, y hay que verlo. */
+  | 'NO_REALIZADA'
+  /** Eximida con motivo: ni cumplimiento ni incumplimiento. Fuera del porcentaje. */
+  | 'EXIMIDA';
 
 export interface ResumenEjecucion {
   total: number;
@@ -10,7 +21,12 @@ export interface ResumenEjecucion {
   atrasadas: number;
   reprobadas: number;
   esperando: number;
-  /** Terminadas sobre el total. Las que esperan convocatoria CUENTAN en el denominador. */
+  noRealizadas: number;
+  eximidas: number;
+  /**
+   * Terminadas sobre el total MENOS las eximidas. Las que esperan convocatoria CUENTAN en el
+   * denominador; las eximidas no, porque a esa persona ya nadie le pide la formacion.
+   */
   avancePct: number;
 }
 
@@ -71,6 +87,37 @@ export function getEjecucionDelPlan(planId: string): Promise<{ items: FilaPlan[]
   return apiFetch(`/reportes/planes/${planId}/ejecucion`, { method: 'GET' });
 }
 
+/** Un dia en el nombre del archivo: con tres descargas en la misma carpeta, sin el no se sabe cual es cual. */
+function hoyEnElNombre(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * EL ARCHIVO SALE CON EL FILTRO QUE ESTE PUESTO.
+ *
+ * Exportar siempre el universo entero obligaria a repetir en Excel el recorte que se acaba de hacer
+ * en pantalla. Y al reves —exportar solo lo filtrado sin decirlo— convierte doce filas en "todo lo
+ * que hay": por eso el filtro tambien viaja escrito DENTRO del archivo.
+ */
+export function descargarEjecucionGeneralXlsx(estado: EstadoEjecucion | null): Promise<void> {
+  const query = estado ? `?estado=${estado}` : '';
+  return descargarArchivo(`/reportes/ejecucion/xlsx${query}`, `seguimiento-${hoyEnElNombre()}.xlsx`);
+}
+
+export function descargarEjecucionDeActividadXlsx(
+  activityId: string,
+  nombreFormacion: string,
+  estado: EstadoEjecucion | null,
+): Promise<void> {
+  const query = estado ? `?estado=${estado}` : '';
+  // El nombre de la formacion en el archivo, sin lo que Windows no admite en un nombre de fichero.
+  const limpio = nombreFormacion.replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 60) || 'formacion';
+  return descargarArchivo(
+    `/reportes/actividades/${activityId}/ejecucion/xlsx${query}`,
+    `seguimiento-${limpio}-${hoyEnElNombre()}.xlsx`,
+  );
+}
+
 /**
  * COMO SE PINTA CADA ESTADO, en un solo sitio.
  *
@@ -89,16 +136,24 @@ export const ESTADOS: Record<EstadoEjecucion, { label: string; chip: string; pun
   ATRASADA: { label: 'Atrasada', chip: 'bg-warn-soft text-warn', punto: 'var(--warn)' },
   REPROBADA: { label: 'Reprobada', chip: 'bg-danger-soft text-danger', punto: 'var(--danger)' },
   ESPERANDO: { label: 'Esperando convocatoria', chip: 'bg-paper text-ink-500', punto: 'var(--line-strong)' },
+  // NO REALIZADA va en rojo con REPROBADA: las dos son resultados adversos cerrados, y esta ademas
+  // ya no se puede arreglar — el periodo paso. Distinguirla de "atrasada" (ambar, todavia se hace)
+  // es justo lo que la Decision #142 existe para poder decir.
+  NO_REALIZADA: { label: 'No realizada', chip: 'bg-danger-soft text-danger', punto: 'var(--danger)' },
+  EXIMIDA: { label: 'Eximida', chip: 'bg-paper text-ink-500', punto: 'var(--line-strong)' },
 };
 
 /** El orden en que se listan: primero lo que hay que mirar. */
 export const ORDEN_ESTADOS: EstadoEjecucion[] = [
   'ATRASADA',
+  'NO_REALIZADA',
   'REPROBADA',
   'ESPERANDO',
   'EN_CURSO',
   'SIN_EMPEZAR',
   'TERMINADA',
+  // La ultima a proposito: no hay nada que hacer con ella, solo consta.
+  'EXIMIDA',
 ];
 
 /** Cuantos hay de cada estado en un resumen, para pintar la barra y los chips. */
@@ -110,5 +165,7 @@ export function conteoPorEstado(resumen: ResumenEjecucion): Record<EstadoEjecuci
     EN_CURSO: resumen.enCurso,
     SIN_EMPEZAR: resumen.sinEmpezar,
     TERMINADA: resumen.terminadas,
+    NO_REALIZADA: resumen.noRealizadas,
+    EXIMIDA: resumen.eximidas,
   };
 }

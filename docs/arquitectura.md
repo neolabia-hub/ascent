@@ -164,13 +164,13 @@ IP y navegador.
 Va a Sprint 6 (endurecimiento). Ninguna de estas es una brecha con el despliegue actual —una sola
 instancia, sin balanceador—, pero las cuatro lo serian en produccion:
 
-1. **Leer la IP real del proxy** (`X-Forwarded-For` + `trust proxy`). Sin eso, detras de un
-   balanceador todas las peticiones parecen venir del proxy y el limite se aplicaria a todo el
-   mundo junto. **Es lo primero de esta lista** desde que existe "No puedo entrar" (3.06): su
-   limite es de 3 cada 5 minutos, asi que detras de un proxy sin esto, el tercer aviso del dia
-   dejaria a toda la empresa sin poder pedir ayuda. El freno por CUENTA (uno cada 6 h) sigue
-   protegiendo la bandeja aunque el de IP se relaje, que es lo que permite vivir con ello hasta
-   entonces.
+1. ~~**Leer la IP real del proxy**~~ **HECHO** (2026-09-01). `TRUSTED_PROXY_HOPS` dice cuantos
+   proxies propios hay delante (Cloudflare + proxy inverso = 2) y Express toma de `X-Forwarded-For`
+   el que escribio el proxy propio. Se declara un NUMERO y no `trust proxy: true` a proposito: con
+   `true`, Express cree el primer valor de la cabecera —que lo escribe el cliente— y cualquiera se
+   inventa una IP por peticion para saltarse el limite. Por defecto 0: en desarrollo no hay proxy y
+   la cabecera, si llega, es mentira. **Ponerlo mal duele en los dos sentidos:** de menos, la
+   empresa entera comparte limite; de mas, el limite deja de existir.
 2. **Almacen compartido para el limite.** El contador vive en la memoria del proceso: con varias
    instancias, cada una lleva el suyo y el limite efectivo se multiplica. Redis ya esta en el
    compose.
@@ -1007,7 +1007,7 @@ Honesta y priorizada:
 | Deuda | Impacto | Cuando resolverla |
 |---|---|---|
 | **El aprendiz no ve NADA de la jornada a la que lo convocan** | Alta para el uso real: se le inscribe en la sesion del 12 de marzo a las 8 a. m. en el Auditorio Norte, y en su tarjeta solo aparece el titulo y la fecha limite. Ni fecha de sesion, ni hora, ni lugar, ni instructor —tampoco en el correo de inscripcion, que solo lleva el codigo de la convocatoria—. Para una formacion presencial eso significa que la persona no sabe cuando ni donde presentarse | Con la asistencia (Sprint 5): son los mismos datos que hay que ensenar para que alguien se presente y firme |
-| Adaptador de almacenamiento en la nube | Bloquea el despliegue (a proposito) | Sprint de produccion |
+| ~~Adaptador de almacenamiento en la nube~~ | **Hecho el 2026-09-01.** R2 cableado con @aws-sdk/client-s3. Con R2 los bytes NO pasan por la API: el controlador de medios redirige a una URL prefirmada, que es lo que evita que cada video viaje dos veces y que el ancho de banda del servidor sea el techo de cuanta gente ve una formacion a la vez | — |
 | El despachador de correo recorre todas las empresas cada 30 segundos | Irrelevante con una empresa; con decenas conviene una cola real | Cuando haya varias empresas |
 | La integracion continua nunca se ha ejecutado de verdad (no hay repositorio remoto) | El flujo esta escrito pero no probado | Al publicar el repositorio |
 | Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo y el motor de obligaciones usan tareas programadas en proceso | Cuando el volumen lo pida |

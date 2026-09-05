@@ -201,3 +201,23 @@ export const migrateOfferingVersionSchema = z.object({
   confirm: z.literal(true),
 });
 export type MigrateOfferingVersionInput = z.infer<typeof migrateOfferingVersionSchema>;
+
+/**
+ * PREVISUALIZAR LOS PROYECTADOS mientras se arma la convocatoria, antes de que exista.
+ *
+ * Existe porque la tarjeta de la tajada preguntaba lo que no era: contaba a cuanta gente DE LA
+ * EMPRESA encajaba con las facetas —con los campos vacios, la plantilla entera— cuando lo que se
+ * congela al publicar es otra cosa, los OBLIGADOS que caen dentro. El numero que se veia al
+ * cortar no era el numero que se guardaba.
+ *
+ * Se responde con el mismo servicio que congela (`ProjectedAudienceService`), no con una consulta
+ * parecida: si fueran dos caminos, volverian a separarse.
+ */
+export const previewProjectedSchema = z.object({
+  activityVersionId: z.string().uuid(),
+  /** La tajada que se esta marcando. Sin facetas = toda la formacion. */
+  scope: audienceRuleSchema,
+  /** La sede, que acota solo cuando no hay tajada declarada. */
+  regionalId: z.string().uuid().nullable().default(null),
+});
+export type PreviewProjectedInput = z.infer<typeof previewProjectedSchema>;

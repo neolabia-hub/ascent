@@ -2,6 +2,9 @@ node_modules/
 .env
 .env.*
 !.env.example
+# La plantilla de produccion SI se versiona: es documentacion de que hay que rellenar. El .env.prod
+# de verdad no, y por eso la regla de arriba lo tapa.
+!.env.prod.example
 dist/
 .next/
 .turbo/

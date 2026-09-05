@@ -167,7 +167,7 @@ function Escala({
               )}
               style={
                 elegido || relleno
-                  ? { backgroundColor: 'var(--primary-soft)', borderColor: 'var(--brand-primary)' }
+                  ? { backgroundColor: 'var(--brand-primary-soft)', borderColor: 'var(--brand-primary)' }
                   : undefined
               }
             >
@@ -271,7 +271,7 @@ function Boton({
         ancho ? 'w-full justify-start text-left' : 'flex-1',
         elegido ? 'border-transparent' : 'border-line bg-paper text-ink-700 hover:border-line-strong',
       )}
-      style={elegido ? { backgroundColor: 'var(--primary-soft)', borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' } : undefined}
+      style={elegido ? { backgroundColor: 'var(--brand-primary-soft)', borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' } : undefined}
     >
       {children}
     </button>

@@ -33,6 +33,18 @@
   --info: #0b5cad;
   --info-soft: #e8f1fa;
 
+  /*
+    Series de GRAFICO. Son categorias —"que clase de cosa es"—, no estados, asi que no reusan los
+    semanticos: el ambar de "atrasado" significa algo concreto en este producto y prestarlo a una
+    serie lo vaciaria de sentido.
+
+    Estos dos pasan los seis chequeos de color (banda de luminosidad, croma, separacion para
+    daltonismo y contraste sobre el fondo) en claro Y en oscuro, por eso son los mismos en los dos
+    temas en vez de subir un paso como los semanticos.
+  */
+  --serie-1: #4a86c8;
+  --serie-2: #dd6b3d;
+
   /* Geometria y elevacion */
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -60,9 +72,21 @@
   /* Tenant — sobreescritas en runtime por TenantProvider con el branding real */
   --brand-primary: #1f3a5f;
   --brand-accent: #e8734a;
-  --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 10%, white);
+  /*
+    LOS "SOFT" SE MEZCLAN CON LA SUPERFICIE, NO CON BLANCO (2026-09-02).
+
+    Con `white` fijo pasaban dos cosas malas. En claro, un 10% de un azul oscuro sobre blanco da un
+    gris azulado tan palido que el item activo de la barra lateral no se distinguia del resto — que
+    es justo lo que tiene que hacer. Y en la superficie OSCURA del aprendiz el resultado era un
+    bloque casi blanco sobre fondo negro: lo contrario de un resaltado suave.
+
+    Mezclando con `--surface` la formula sirve en los dos temas, y el porcentaje sube a 14 en claro
+    porque 10 no alcanzaba. En oscuro se sube mucho mas (abajo): sobre negro hace falta mas color
+    para que se lea lo mismo.
+  */
+  --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 14%, var(--surface));
   --brand-primary-strong: color-mix(in srgb, var(--brand-primary) 92%, black);
-  --brand-accent-soft: color-mix(in srgb, var(--brand-accent) 10%, white);
+  --brand-accent-soft: color-mix(in srgb, var(--brand-accent) 14%, var(--surface));
 }
 
 /*
@@ -96,6 +120,10 @@
     --danger-soft: #2b1614;
     --info: #4d94d8;
     --info-soft: #12212f;
+
+    /* Sobre negro hace falta mas color de marca para que un resaltado se lea como resaltado. */
+    --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 34%, var(--surface));
+    --brand-accent-soft: color-mix(in srgb, var(--brand-accent) 34%, var(--surface));
   }
 }
 
@@ -477,6 +505,22 @@
   box-shadow:
     inset 0 2px 4px rgb(16 20 24 / 0.24),
     0 2px 6px color-mix(in srgb, var(--glow-color) 28%, transparent);
+}
+
+/*
+  DESPLAZAMIENTO SIN RAIL VISIBLE.
+
+  Para zonas que SI se desplazan pero donde la barra del navegador estorba: dentro de la tarjeta
+  redondeada del menu, el rail gris pegado al borde parece un desperfecto. Se oculta el adorno, no
+  la funcion — rueda, teclado, gesto y lectores de pantalla siguen igual.
+
+  No se usa en zonas de lectura larga: ahi la barra tambien informa de cuanto queda.
+*/
+.sin-rail {
+  scrollbar-width: none;
+}
+.sin-rail::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,6 +1,17 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Header, Param, Query, StreamableFile } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators.js';
+import { ESTADOS_EJECUCION, type EstadoEjecucion } from './execution-state.js';
 import { ReportsService } from './reports.service.js';
+
+/**
+ * El filtro llega por query y puede venir de cualquiera: si no es un estado conocido se ignora.
+ *
+ * Ignorar y no fallar es lo correcto aqui: un parametro raro en una descarga no debe romperla, y el
+ * archivo sale igualmente completo —que es mas de lo pedido, nunca menos—.
+ */
+function leerEstado(valor?: string): EstadoEjecucion | null {
+  return valor && (ESTADOS_EJECUCION as readonly string[]).includes(valor) ? (valor as EstadoEjecucion) : null;
+}
 
 /**
  * SEGUIMIENTO DE LA EJECUCION (Decision #117).
@@ -28,6 +39,74 @@ export class ReportsController {
   @RequirePermissions('reports:read_scope')
   ejecucionDeActividad(@Param('activityId') activityId: string) {
     return this.reports.ejecucionDeActividad(activityId);
+  }
+
+  /**
+   * LA ANALITICA, POR TODAS LAS DIMENSIONES A LA VEZ (Decision #125).
+   *
+   * Quien decide no entra preguntando por una formacion: entra preguntando "¿como vamos?" y, acto
+   * seguido, "¿donde esta el problema?". Por eso se devuelven los siete cortes juntos y no uno por
+   * peticion: comparar "el area X va mal" con "la regional Y va mal" es el gesto entero, y partirlo
+   * en siete viajes que traen los mismos hechos solo lo hace mas lento.
+   *
+   * `plan` acota a lo que NACIO del plan (regla de oro 2): quien ingreso en agosto no hace la
+   * jornada de marzo y no puede contar como incumplimiento de ese plan.
+   */
+  @Get('analitica')
+  @RequirePermissions('reports:read_scope')
+  analitica(@Query('plan') planId?: string) {
+    return this.reports.analiticaCompleta(planId ?? null);
+  }
+
+  /**
+   * LO QUE SE VENCE, mirando hacia adelante (Decision #126).
+   *
+   * Es de donde sale el plan del ano siguiente, y la segunda pregunta del auditor: la primera es
+   * "¿quien lo hizo?" y la segunda "¿sigue vigente?".
+   */
+  @Get('vencimientos')
+  @RequirePermissions('reports:read_scope')
+  vencimientos(@Query('meses') meses?: string) {
+    /*
+      El horizonte se acota entre 1 y 24 meses. Menos de un mes no es un horizonte, y mas de dos
+      anos no se planea: seria traer miles de filas que nadie va a mirar para que la pantalla tarde.
+    */
+    const pedidos = Number(meses);
+    const horizonte = Number.isFinite(pedidos) ? Math.min(24, Math.max(1, Math.trunc(pedidos))) : 12;
+    return this.reports.vencimientos(horizonte);
+  }
+
+  /*
+    LAS DESCARGAS VAN BAJO `reports:export` Y NO BAJO `reports:read_scope`.
+
+    Mirar la pantalla y llevarse el archivo no son el mismo acto: lo segundo saca de la plataforma
+    una lista nominal —cedulas, areas, notas— que ya vive fuera de aqui. El permiso existe desde el
+    Sprint 1 justamente para esto y hasta hoy no lo usaba ningun endpoint.
+
+    El alcance por proceso del analista sigue aplicando: las filas las arma el mismo servicio.
+  */
+
+  /** Resumen por formacion, en Excel. */
+  @Get('ejecucion/xlsx')
+  @RequirePermissions('reports:export')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="seguimiento.xlsx"')
+  async ejecucionGeneralXlsx(@Query('estado') estado?: string): Promise<StreamableFile> {
+    // StreamableFile y no el Buffer pelado: devolver un Buffer hace que Nest lo serialice como
+    // JSON y el archivo llega corrupto.
+    return new StreamableFile(await this.reports.ejecucionGeneralXlsx(leerEstado(estado)));
+  }
+
+  /** Persona por persona de una formacion, en Excel. Es la evidencia nominal. */
+  @Get('actividades/:activityId/ejecucion/xlsx')
+  @RequirePermissions('reports:export')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header('Content-Disposition', 'attachment; filename="seguimiento-formacion.xlsx"')
+  async ejecucionDeActividadXlsx(
+    @Param('activityId') activityId: string,
+    @Query('estado') estado?: string,
+  ): Promise<StreamableFile> {
+    return new StreamableFile(await this.reports.ejecucionDeActividadXlsx(activityId, leerEstado(estado)));
   }
 
   /** Renglon por renglon, como va un plan. Es la entrada al detalle de arriba. */
