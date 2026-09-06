@@ -14,6 +14,7 @@ import { readPresentation } from '@/components/assessments/presentation';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { motivoDelError } from '@/lib/api';
 
 /**
  * EXAMEN. Una pregunta por pantalla, sin la respuesta correcta a la vista (el servidor no la
@@ -89,10 +90,10 @@ export default function AttemptPage() {
         .filter((row): row is { attemptQuestionId: string; answer: AnswerInput } => stageHasAnswer(row.answer ?? null));
       await submitAttempt(params.attemptId, payload);
       router.push(`/aprender/${params.enrollmentId}/examen/${params.attemptId}/resultado`);
-    } catch {
+    } catch (error) {
       submitted.current = false;
       setSending(false);
-      showToast({ kind: 'danger', title: 'No se pudo entregar el examen. Intenta de nuevo.' });
+      showToast({ kind: 'danger', title: 'No se pudo entregar el examen. Intenta de nuevo.', description: motivoDelError(error) });
     }
   }, [answers, params.attemptId, params.enrollmentId, router, showToast, view]);
 

@@ -1000,6 +1000,20 @@ model Offering {
   instructorCredentialKey String?    @map("instructor_credential_key") // idoneidad adjuntable
   executedBy              ExecutedBy @default(PROPIOS) @map("executed_by")
   executedByOther         String?    @map("executed_by_other")
+  /// ¿ESTA JORNADA SE CIERRA CON LISTA DE ASISTENCIA? `null` = lo que diga su modalidad.
+  ///
+  /// Existe porque la regla derivada cambio DOS VECES en dos dias, las dos por un caso real que la
+  /// anterior no cubria: primero se ato al `kind` (falso: una capacitacion del plan puede ser EVENT
+  /// y virtual con contenido) y despues a la MODALIDAD (tambien falso: la que dicta la ARL por
+  /// videollamada es virtual y SI tiene lista de quien se conecto).
+  ///
+  /// La leccion no era que faltara una tercera regla mejor: **la respuesta depende de como se dicto
+  /// esa sesion concreta**, y eso solo lo sabe quien la programa. Cualquier regla que la deduzca
+  /// acierta para unos tenants y falla para otros.
+  ///
+  /// El defecto —presencial e hibrida si, virtual no— acierta casi siempre; esto se pone explicito
+  /// para lo que no encaja. Mismo idioma que `activities.tracksExternalCertificate`.
+  closesByAttendance      Boolean?   @map("closes_by_attendance")
   /// EL ACTA ESCANEADA de la jornada: UN documento para todos los que asistieron, no uno por
   /// persona. Es como se hace de verdad —una hoja que circula y se firma— y pedirla por cabeza
   /// obligaria a subir veinte veces el mismo escaneo.

@@ -170,11 +170,11 @@ function MiFoto({
     onChange(clave);
     try {
       await setMyAvatar(clave);
-    } catch {
+    } catch (error) {
       // Se devuelve lo que habia: dejar la foto nueva puesta despues de un fallo haria creer que
       // se guardo, y al recargar habria desaparecido sin explicacion.
       onChange(previo);
-      showToast({ kind: 'danger', title: 'No se pudo guardar la foto' });
+      showToast({ kind: 'danger', title: 'No se pudo guardar la foto', description: motivoDelError(error) });
     }
   }
 

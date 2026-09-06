@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createSurvey,
   deleteSurvey,
@@ -60,14 +60,19 @@ export default function EncuestasPage() {
   }
 
   async function crear(kind: SurveyKind) {
+    // El motivo se guarda al vuelo: `.catch(() => null)` lo perdia una linea antes del aviso.
+    let fallo: unknown = null;
     // Sin `questions`: el servidor siembra las de manual segun la clase. Una encuesta que nace
     // vacia produce encuestas de una sola pregunta, que no miden nada.
     const creada = await createSurvey({
       name: kind === 'EFFICACY' ? 'Eficacia de la formacion' : 'Satisfaccion de la formacion',
       kind,
-    }).catch(() => null);
+    }).catch((e: unknown) => {
+      fallo = e;
+      return null;
+    });
     if (!creada) {
-      showToast({ kind: 'danger', title: 'No se pudo crear' });
+      showToast({ kind: 'danger', title: 'No se pudo crear', description: motivoDelError(fallo) });
       return;
     }
     await recargar();

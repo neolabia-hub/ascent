@@ -28,6 +28,19 @@ const offeringBaseSchema = z.object({
   kind: offeringKindSchema,
   modality: modalitySchema,
 
+  /**
+   * ¿ESTA JORNADA SE CIERRA CON LISTA DE ASISTENCIA? `null` = lo que diga su modalidad.
+   *
+   * Se pregunta en vez de deducirse porque la regla derivada cambio dos veces en dos dias, las dos
+   * por un caso real: una capacitacion del plan con fecha pero virtual y con contenido (no lleva
+   * lista) y una que dicta la ARL por videollamada en vivo (si la lleva, y es virtual). La respuesta
+   * depende de como se dicto ESA sesion, y eso solo lo sabe quien la programa.
+   *
+   * El defecto acierta casi siempre —presencial e hibrida si, virtual no— y esto es para lo que no
+   * encaja. Ver `cierre-de-la-jornada.ts`.
+   */
+  closesByAttendance: z.boolean().nullable().optional(),
+
   scheduledDate: dateOnly.nullable().optional(),
   startTime: timeOfDay.nullable().optional(),
   endTime: timeOfDay.nullable().optional(),

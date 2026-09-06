@@ -101,12 +101,21 @@ export function ActivityInfoTab({
       .then(([processes, types, norms, services, regionals, jobTitles]) =>
         setCatalogs({ processes, types, norms, services, regionals, jobTitles }),
       )
-      .catch(() => showToast({ kind: 'danger', title: 'No se pudieron cargar los catalogos' }));
+      .catch((error: unknown) => showToast({ kind: 'danger', title: 'No se pudieron cargar los catalogos', description: motivoDelError(error) }));
 
     // `listUsers({ pageSize: 200 })` devolvia 422 SIEMPRE (el servidor topa en 100) y el catch
     // vacio lo escondia: el desplegable salia sin nadie dentro y parecia que no habia personas.
     void listPickableUsers().then(setPeople).catch(() => undefined);
   }, [showToast]);
+
+  /**
+   * LO QUE DICE SU TIPO, para poder enseñarlo en la opcion por defecto en vez de mandar a mirarlo.
+   * Se lee del tipo ELEGIDO en el formulario y no del que tiene guardado: si alguien esta cambiando
+   * el tipo, lo que importa es el que va a quedar.
+   */
+  const heredadoDelTipo =
+    (catalogs?.types.find((t) => t.id === form.activityTypeId)?.config as Record<string, unknown> | undefined)
+      ?.tracksExternalCertificate === true;
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -256,7 +265,18 @@ export function ActivityInfoTab({
                   value={form.tracksExternalCertificate}
                   onChange={(event) => setForm({ ...form, tracksExternalCertificate: event.target.value })}
                 >
-                  <option value="">Lo que diga su tipo</option>
+                  {/*
+                    QUE "LO QUE DIGA SU TIPO" DIGA LO QUE DICE (2026-09-06).
+
+                    Lo cazo el cliente: *"en la ficha dice «lo que diga su tipo» pero en el tipo no
+                    dice nada"*. Era una referencia circular — se manda a mirar a otro sitio donde
+                    solo hay una casilla marcada, sin el valor a la vista. Ahora se resuelve aqui y
+                    se enseña entre parentesis, que es lo unico que convierte el defecto en
+                    informacion.
+                  */}
+                  <option value="">
+                    Lo que diga su tipo ({heredadoDelTipo ? 'si la acredita un tercero' : 'no'})
+                  </option>
                   <option value="true">Si, la acredita un tercero</option>
                   <option value="false">No</option>
                 </Select>

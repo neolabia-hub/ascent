@@ -34,7 +34,7 @@ export default function PreferenciasPage() {
   const [savingBranding, setSavingBranding] = useState(false);
 
   useEffect(() => {
-    void getTenantSettings().then((r) => setSettings(r.settings)).catch(() => showToast({ kind: 'danger', title: 'No se pudieron cargar las preferencias' }));
+    void getTenantSettings().then((r) => setSettings(r.settings)).catch((error: unknown) => showToast({ kind: 'danger', title: 'No se pudieron cargar las preferencias', description: motivoDelError(error) }));
     void getTenantBranding().then((r) => setBranding(r.branding)).catch(() => undefined);
   }, [showToast]);
 

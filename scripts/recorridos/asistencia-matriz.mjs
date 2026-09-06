@@ -132,12 +132,17 @@ async function montarFormacion(tipo, indice, modality) {
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 
 /*
-  LA MODALIDAD ROTA A PROPOSITO.
+  LA MODALIDAD ROTA A PROPOSITO, Y LA VIRTUAL LLEVA LA CASILLA PUESTA.
 
-  El sistema cierra por asistencia segun el `kind` de la jornada y NO segun como se dicte, y eso es
-  una afirmacion que hay que medir en vez de creerse: si alguien ata la asistencia a PRESENCIAL
-  algun dia, el webinar en vivo de la ARL —que es cada vez mas comun— deja de poder cerrarse y nadie
-  se entera hasta que un cliente lo reporta.
+  Como se cierra una jornada NO se deduce: se pregunta, con un defecto que acierta casi siempre
+  —presencial e hibrida por lista, virtual por plataforma— y una casilla para lo que no encaja
+  (`cierre-de-la-jornada.ts`). La regla derivada cambio dos veces en dos dias, las dos por un caso
+  real, y por eso dejo de haber regla.
+
+  Aqui se rota la modalidad para ejercer las tres, y en la VIRTUAL se marca `closesByAttendance` —
+  que es exactamente el caso de la capacitacion que dicta la ARL por videollamada en vivo: es
+  virtual y SI tiene lista de quien se conecto. Si eso dejara de funcionar, ese cliente se queda sin
+  poder cerrar nada y nadie se entera hasta que lo reporta.
 */
 const MODALIDADES = ['PRESENCIAL', 'VIRTUAL', 'HIBRIDA'];
 const fecha = new Date().toISOString().slice(0, 10);
@@ -160,6 +165,8 @@ for (const tipo of tipos) {
     activityVersionId: versionId,
     kind: 'EVENT',
     modality,
+    // La virtual necesita decirlo: es el caso de la videollamada en vivo con lista.
+    ...(modality === 'VIRTUAL' ? { closesByAttendance: true } : {}),
     scheduledDate: fecha,
     startTime: '08:00',
     endTime: '10:00',
@@ -171,6 +178,14 @@ for (const tipo of tipos) {
     intensityPracticeHours: 1,
   });
   comprobar(jornada.ok, `jornada EVENT ${modality} programada`, `jornada: ${jornada.estado} ${JSON.stringify(jornada.cuerpo).slice(0, 200)}`);
+  if (jornada.ok) {
+    const detalleCierre = (await admin.get(`/offerings/${jornada.cuerpo.id}`)).cuerpo;
+    comprobar(
+      detalleCierre?.admiteAsistencia === true,
+      `y admite lista siendo ${modality}${modality === 'VIRTUAL' ? ' porque se marco a mano' : ' por su modalidad'}`,
+      `admiteAsistencia=${detalleCierre?.admiteAsistencia} con modalidad ${modality}`,
+    );
+  }
   if (!jornada.ok) continue;
   const offeringId = jornada.cuerpo.id;
   const pub = await admin.post(`/offerings/${offeringId}/publish`, { confirm: true });

@@ -1056,7 +1056,7 @@ function EditarCompetencia({
             ? 'No se puede cambiar la escala: ya hay evaluaciones respondidas con ella, y un 4 sobre 5 no significa lo mismo que un 4 sobre 10.'
             : 'No se pudo guardar.',
       );
-      showToast({ kind: 'danger', title: 'No se pudo guardar' });
+      showToast({ kind: 'danger', title: 'No se pudo guardar', description: motivoDelError(error) });
     } finally {
       setGuardando(false);
     }

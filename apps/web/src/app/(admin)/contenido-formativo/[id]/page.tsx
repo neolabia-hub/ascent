@@ -212,7 +212,7 @@ export default function ActividadDetallePage() {
       .then(setVersion)
       // Se avisa en vez de tragarselo: un fallo silencioso aqui dejaba la pestana de contenido
       // cargando para siempre y sin explicacion.
-      .catch(() => showToast({ kind: 'danger', title: 'No se pudo cargar el contenido de esta version' }));
+      .catch((error: unknown) => showToast({ kind: 'danger', title: 'No se pudo cargar el contenido de esta version', description: motivoDelError(error) }));
   }, [selectedVersionId, showToast]);
 
   useEffect(() => {

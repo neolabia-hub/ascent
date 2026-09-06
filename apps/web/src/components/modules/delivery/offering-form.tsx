@@ -44,6 +44,12 @@ import { Textarea } from '@/components/ui/textarea';
 export interface OfferingFormValue {
   kind: OfferingKind;
   modality: Modality;
+  /**
+   * Como se cierra la jornada: '' = lo que diga su modalidad (el caso normal), 'true' por lista,
+   * 'false' por la plataforma. Texto porque es lo que devuelve un `<select>`; se convierte al
+   * guardar, en un solo sitio.
+   */
+  closesByAttendance: string;
   scheduledDate: string;
   startTime: string;
   endTime: string;
@@ -92,6 +98,7 @@ export function nuevaConvocatoria(config: ActivityTypeConfig, modality: Modality
   return {
     kind: config.defaultOfferingKind,
     modality,
+    closesByAttendance: '',
     scheduledDate: '',
     startTime: conFecha ? '08:00' : '',
     endTime: conFecha ? '12:00' : '',
@@ -117,6 +124,10 @@ export function convocatoriaExistente(offering: OfferingDetail): OfferingFormVal
   return {
     kind: offering.kind,
     modality: offering.modality,
+    closesByAttendance:
+      offering.closesByAttendance === null || offering.closesByAttendance === undefined
+        ? ''
+        : String(offering.closesByAttendance),
     scheduledDate: fecha(offering.scheduledDate),
     startTime: offering.startTime ?? '',
     endTime: offering.endTime ?? '',
@@ -146,6 +157,7 @@ export function cuerpoDeConvocatoria(value: OfferingFormValue, activityVersionId
     ...(activityVersionId ? { activityVersionId } : {}),
     kind: value.kind,
     modality: value.modality,
+    closesByAttendance: value.closesByAttendance === '' ? null : value.closesByAttendance === 'true',
     scheduledDate: conFecha && value.scheduledDate ? value.scheduledDate : null,
     startTime: conFecha && value.startTime ? value.startTime : null,
     endTime: conFecha && value.endTime ? value.endTime : null,
@@ -331,6 +343,42 @@ export function OfferingForm({
           </Select>
         </Field>
       </div>
+
+      {/*
+        COMO SE CIERRA ESTA JORNADA — SE PREGUNTA, NO SE ADIVINA (2026-09-06).
+
+        La regla derivada cambio dos veces en dos dias, las dos por un caso real que la anterior no
+        cubria: una capacitacion del plan con fecha pero virtual y con contenido (no lleva lista) y
+        una que dicta la ARL por videollamada en vivo (si la lleva, y es virtual). La respuesta
+        depende de como se dicto ESA sesion, y eso solo lo sabe quien la esta programando.
+
+        No sale en las PERMANENTES: ahi no hay sesion a la que asistir, y ofrecer la opcion invita a
+        marcarla para que despues no haga nada.
+      */}
+      {value.kind !== 'PERMANENT' ? (
+        <Field
+          htmlFor="o-cierre"
+          label="Como se acredita"
+          hint={
+            value.closesByAttendance === ''
+              ? value.modality === 'VIRTUAL'
+                ? 'Por defecto, al ser virtual: con lo que cada persona complete en la plataforma.'
+                : 'Por defecto, al haber sesion: con la lista de asistencia.'
+              : 'Elegido a mano para esta jornada, por encima de lo que diria su modalidad.'
+          }
+        >
+          <Select
+            id="o-cierre"
+            disabled={soloLogistica}
+            value={value.closesByAttendance}
+            onChange={(event) => set({ closesByAttendance: event.target.value })}
+          >
+            <option value="">Lo que diga su modalidad</option>
+            <option value="true">Con lista de asistencia</option>
+            <option value="false">Con lo que hagan en la plataforma</option>
+          </Select>
+        </Field>
+      ) : null}
 
       {conFecha ? (
         <>

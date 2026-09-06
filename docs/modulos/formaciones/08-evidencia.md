@@ -43,47 +43,66 @@ Las tres cierran **la misma obligación** y valen lo mismo para el indicador. Y 
 empresa la contesta distinto según la formación. Atarlo al tipo habría dejado fuera la mitad de los
 casos reales.
 
-## 3. La asistencia va con el `kind`, no con la modalidad
+## 3. Cómo se cierra una jornada: se pregunta, no se adivina
 
-Es la pregunta que más se piensa mal, y merece las dos definiciones separadas porque suenan
-parecido y no lo son:
+Esta sección es la que más ha cambiado del documento, y merece contarse con las dos versiones
+anteriores a la vista — porque la lección no está en la regla final sino en por qué dejó de haber
+regla.
 
-| | Qué contesta | Valores |
+| Versión | La regla | El caso real que la rompió |
 |---|---|---|
-| **`kind`** de la convocatoria | **cómo se entra** | `EVENT` (fecha, cupo, alguien convoca) · `PERMANENT` (autoservicio: la persona entra cuando puede) · `HYBRID` |
-| **`modality`** | **cómo se dicta** | `PRESENCIAL` · `VIRTUAL` · `HIBRIDA` |
+| 1 (05-09) | por el `kind`: toda jornada `EVENT` lleva lista | una **capacitación del plan con fecha, virtual y con contenido**: se convoca, sí, pero la persona hace el temario en la plataforma |
+| 2 (06-09) | por la **modalidad**: presencial e híbrida llevan lista | una **capacitación que dicta la ARL por videollamada en vivo**: es virtual y sí tiene lista de quién se conectó |
 
-Son **ortogonales**: existen las cuatro combinaciones, y la que decide cómo se cierra es la
-primera.
+**La respuesta depende de cómo se dictó esa sesión concreta, y eso solo lo sabe quien la programa.**
+Cualquier regla que lo deduzca acierta para unos tenants y falla para otros — y este producto es
+multi-tenant: una empresa de logística dicta casi todo en salón y una consultora casi todo en la
+plataforma, con la misma configuración.
 
-| | Se cierra por | Por qué |
+### Lo que sí se puede deducir: el defecto
+
+No preguntar nada obliga a adivinar; preguntarlo todo cansa y se rellena mal. Así que se pregunta
+con un defecto que acierta en la inmensa mayoría:
+
+| Modalidad | Por defecto | Por qué |
 |---|---|---|
-| `EVENT` | **asistencia** | hay una lista de quién estuvo, y no queda contenido completado en la plataforma |
-| `PERMANENT` | **la plataforma** | la persona entra sola cuando puede; la evidencia es lo que el sistema registró |
+| `PRESENCIAL` | **lista** | hay salón y hoja firmada; en la plataforma no queda nada |
+| `HIBRIDA` | **lista** | hay sesión y además contenido (CLAUDE.md §3.7) |
+| `VIRTUAL` | **plataforma** | cada quien entra y hace el temario, y el sistema lo anota |
 
-Atarlo a `PRESENCIAL` habría dejado fuera el **webinar en vivo de la ARL**, que es cada vez más
-común: es `VIRTUAL` y tampoco deja rastro en el reproductor. Y al revés, un contenido presencial
-que la gente ve cuando quiere no existe — si es presencial, hay una fecha.
+`offerings.closes_by_attendance` se pone explícito solo para lo que no encaja: la videollamada en
+vivo con lista, o el taller presencial que en realidad se acredita con lo que cada quien haga
+después.
 
-Una convocatoria permanente rechaza la lista con **409 `OFFERING_NOT_ATTENDABLE`**.
+### Y la condición que no se negocia
+
+Una convocatoria **PERMANENTE** no lleva lista, se marque lo que se marque: es autoservicio, la
+persona entra cuando puede y no hay ninguna sesión a la que asistir. Una permanente con la casilla
+puesta es un dato mal capturado, no un caso de uso, y dejarlo pasar convertiría el error de alguien
+en asistencias inventadas.
+
+La lógica vive en `cierre-de-la-jornada.ts` —pura, sin base de datos, 11 unitarias— y **la pantalla
+no la reimplementa**: el detalle de la jornada trae `admiteAsistencia` ya resuelto. Una condición
+que ya cambió dos veces es justo la que no puede vivir en dos sitios.
+
+### La lección de método
+
+Cuando una regla derivada se rompe dos veces seguidas, el problema no es la regla: es que se está
+deduciendo algo que hay que preguntar. **La señal de alarma es tener que justificarla con un caso
+inventado** — la versión 1 se defendió con «el webinar en vivo», que este cliente no tenía, y ese
+mismo caso inventado acabó siendo el que rompió la versión 2.
 
 ### Y entonces, ¿qué pasa con una inducción específica presencial?
 
-Es la pregunta del cliente, y la respuesta tiene dos partes.
-
-**La modalidad de la FICHA es solo el valor por defecto de sus convocatorias.** Marcar una
-inducción como `PRESENCIAL` no decide nada por sí solo: lo decide la convocatoria que se le cree.
-
-**Y ese tipo abre una convocatoria PERMANENTE sola al publicar** (`defaultOfferingKind: PERMANENT`),
-pero eso no impide programarle además una jornada `EVENT` y tomar asistencia. Las dos conviven, y
-es el camino normal: la gente que puede la hace online, y a quien no, se le da en salón.
+Es la pregunta que arrancó todo esto, y ahora tiene respuesta simple. La modalidad de la **ficha**
+es solo el valor por defecto de sus convocatorias; lo que decide es la convocatoria. Ese tipo abre
+una convocatoria PERMANENTE sola al publicar, pero puedes programarle **además** una jornada
+presencial: la permanente se cierra por la plataforma y la jornada por lista, y las dos conviven.
 
 Lo que sí obliga eso es a que **una persona no acabe con dos ejecuciones vivas de la misma
 formación**. Convocar a una jornada a quien ya estaba en la permanente **retira** aquella
-(`WITHDRAWN`, con su rastro) y crea la de la jornada — porque reutilizarla dejaría a esa persona
-fuera de la lista a la que se le está convocando. Medido en `permanente-y-jornada.mjs`; antes del
-2026-09-06 se quedaban las dos, y la de la permanente viva para siempre.
-
+(`WITHDRAWN`, con su rastro) y crea la de la jornada — reutilizarla dejaría a esa persona fuera de
+la lista a la que se le está convocando. Medido en `permanente-y-jornada.mjs`.
 ## 4. Cerrar por asistencia no pasa por `evaluate`, y eso hay que registrarlo
 
 `evaluate` recalcula desde los hechos guardados en la plataforma: contenidos vistos y exámenes
@@ -227,6 +246,18 @@ en una charla de quince minutos llena el expediente de campos vacíos y enseña 
 
 La compuerta la aplica el **servidor** (409 `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`), no solo la
 pantalla: un control que solo vive en el navegador no es un control.
+
+### Si la dicta la empresa, no hay tercero que certifique
+
+Un certificado **externo** es por definición el de alguien de fuera. Con `executedBy: PROPIOS` no
+hay fuera, así que la lista no pide su número — un campo que no se puede llenar se aprende a
+saltar. Se decide por **jornada**, porque es la jornada la que sabe quién la dictó: la misma
+habilitación la puede dar la ARL en marzo y un instructor propio en septiembre.
+
+**Pero es un defecto de pantalla, no una compuerta**, y la diferencia importa: la API sigue
+aceptando el papel si la formación lo lleva. Hay tenants —un centro de entrenamiento acreditado—
+para los que «propios» y «certificado oficial» conviven, y poner ahí un rechazo sería convertir una
+suposición nuestra sobre cómo trabajan las empresas en una regla del producto.
 
 ### Y el emisor no se teclea
 

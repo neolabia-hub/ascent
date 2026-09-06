@@ -200,6 +200,9 @@ comprobar(publicaTestigo.ok, 'la testigo se publica', `publicar testigo: ${publi
 const jornada2 = await admin.post('/offerings', {
   activityVersionId: versionSinPapel, kind: 'EVENT', modality: 'PRESENCIAL',
   scheduledDate: fecha, startTime: '09:00', endTime: '10:00', location: `Sala ${SUFIJO}`, capacity: 10,
+  // LA DICTA UN TERCERO a proposito: desde el 2026-09-06, una jornada de la empresa no pide papel
+  // externo aunque su formacion lo lleve, asi que con PROPIOS este testigo no probaria la cascada.
+  executedBy: 'ARL', executedByOther: 'ARL testigo',
 });
 comprobar(jornada2.ok, 'jornada testigo programada', `jornada testigo: ${jornada2.estado} ${JSON.stringify(jornada2.cuerpo).slice(0, 250)}`);
 const pubJornada2 = await admin.post(`/offerings/${jornada2.cuerpo?.id}/publish`, { confirm: true });
@@ -585,7 +588,120 @@ comprobar(
   `registraCertificadoExterno=${detalleVuelto?.registraCertificadoExterno}`,
 );
 
-await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 18 });
+paso(18, 'COMO SE CIERRA LA JORNADA: se pregunta, no se adivina');
+/*
+  ─── LOS DOS CASOS QUE ROMPIERON LAS DOS REGLAS ANTERIORES ───
+
+  La regla derivada cambio dos veces en dos dias:
+
+    1. Atada al `kind`: toda jornada EVENT se cerraba por lista. La rompio la capacitacion del plan
+       con fecha pero VIRTUAL y con contenido — se convoca, si, pero la persona hace el temario en
+       la plataforma y ahi pedir lista es pedir la evidencia equivocada.
+    2. Atada a la MODALIDAD: presencial e hibrida por lista. La rompio la capacitacion que dicta la
+       ARL por VIDEOLLAMADA EN VIVO — es virtual y si tiene lista de quien se conecto.
+
+  La leccion no era que faltara una tercera regla mejor: la respuesta depende de como se dicto ESA
+  sesion, y eso solo lo sabe quien la programa. Se comprueban los dos casos y el defecto.
+*/
+const cierreDe = async (offId) => (await admin.get(`/offerings/${offId}`)).cuerpo?.admiteAsistencia;
+
+// (a) El defecto presencial: sin decir nada, se cierra por lista.
+const porDefectoPresencial = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+  scheduledDate: fecha, startTime: '06:00', endTime: '07:00', location: `Defecto presencial ${SUFIJO}`, capacity: 5,
+});
+comprobar(
+  porDefectoPresencial.ok && (await cierreDe(porDefectoPresencial.cuerpo?.id)) === true,
+  'una presencial se cierra por LISTA sin que nadie diga nada',
+  `admiteAsistencia=${await cierreDe(porDefectoPresencial.cuerpo?.id)}`,
+);
+
+// (b) El caso que rompio la regla del `kind`: EVENT + VIRTUAL con contenido.
+const planVirtual = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'VIRTUAL',
+  scheduledDate: fecha, startTime: '06:00', endTime: '07:00', capacity: 5,
+});
+comprobar(
+  planVirtual.ok && (await cierreDe(planVirtual.cuerpo?.id)) === false,
+  'una jornada con fecha pero VIRTUAL se cierra por la PLATAFORMA, no por lista',
+  `admiteAsistencia=${await cierreDe(planVirtual.cuerpo?.id)} y con contenido deberia ser false`,
+);
+await admin.post(`/offerings/${planVirtual.cuerpo?.id}/publish`, { confirm: true });
+const rechazoVirtual = await admin.post(`/offerings/${planVirtual.cuerpo?.id}/attendance`, {
+  items: [{ enrollmentId: lista3[0]?.id, estado: 'PRESENT' }],
+});
+comprobar(
+  rechazoVirtual.estado === 409 && rechazoVirtual.cuerpo?.code === 'OFFERING_NOT_ATTENDABLE',
+  'y el servidor la rechaza, explicando que se marca en la convocatoria si hubo sesion',
+  `esperaba 409 OFFERING_NOT_ATTENDABLE y vino ${rechazoVirtual.estado}`,
+);
+
+// (c) El caso que rompio la regla de la modalidad: la ARL por videollamada en vivo.
+const porVideollamada = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'VIRTUAL',
+  closesByAttendance: true,
+  scheduledDate: fecha, startTime: '06:30', endTime: '07:30',
+  executedBy: 'ARL', executedByOther: 'ARL Sura', capacity: 5,
+});
+comprobar(
+  porVideollamada.ok && (await cierreDe(porVideollamada.cuerpo?.id)) === true,
+  'y una VIRTUAL marcada a mano SI se cierra por lista: es la videollamada en vivo de la ARL',
+  `admiteAsistencia=${await cierreDe(porVideollamada.cuerpo?.id)} con closesByAttendance en true`,
+);
+await admin.post(`/offerings/${porVideollamada.cuerpo?.id}/publish`, { confirm: true });
+const cuartaPersona = await alta(5);
+creado.personas.push(cuartaPersona.id);
+await admin.post(`/offerings/${porVideollamada.cuerpo?.id}/enroll`, { userIds: [cuartaPersona.id] });
+const listaVideo = (await admin.get(`/offerings/${porVideollamada.cuerpo?.id}/roster`)).cuerpo?.items ?? [];
+const cierreVideo = await admin.post(`/offerings/${porVideollamada.cuerpo?.id}/attendance`, {
+  heldOn: fecha, items: [{ enrollmentId: listaVideo[0]?.id, estado: 'PRESENT' }],
+});
+comprobar(
+  cierreVideo.ok && cierreVideo.cuerpo?.cerradas === 1,
+  'y se le puede tomar asistencia de verdad, no solo enseñar el boton',
+  `${cierreVideo.estado} cerradas=${cierreVideo.cuerpo?.cerradas}`,
+);
+
+// (d) Y una PERMANENTE no se cierra por lista aunque se marque: no hay sesion a la que asistir.
+const permanenteMarcada = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'PERMANENT', modality: 'VIRTUAL',
+  closesByAttendance: true,
+});
+comprobar(
+  permanenteMarcada.ok && (await cierreDe(permanenteMarcada.cuerpo?.id)) === false,
+  'una PERMANENTE no se cierra por lista ni marcandola: es autoservicio y no hay sesion',
+  `admiteAsistencia=${await cierreDe(permanenteMarcada.cuerpo?.id)} en una permanente marcada a mano`,
+);
+
+paso(19, 'Y SI LA DICTA LA EMPRESA, NO SE PIDE PAPEL DE UN TERCERO');
+/*
+  Lo cazo el cliente: *"esto ejecuta propios y TRANSPRENSA no da certificaciones oficiales"*. Un
+  certificado EXTERNO es por definicion el de alguien de fuera; con `executedBy: PROPIOS` no hay
+  fuera, y un campo que no se puede llenar se aprende a saltar.
+
+  Es un DEFECTO de pantalla, no una compuerta: la API sigue aceptandolo si la formacion lo lleva,
+  porque hay tenants —un centro de entrenamiento acreditado— para los que "propios" y "certificado
+  oficial" conviven. Convertir nuestra suposicion en un rechazo seria decidir por ellos.
+*/
+const propia = await admin.post('/offerings', {
+  activityVersionId: creado.versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+  scheduledDate: fecha, startTime: '05:00', endTime: '06:00', location: `Propia ${SUFIJO}`,
+  executedBy: 'PROPIOS', capacity: 5,
+});
+const detallePropia = (await admin.get(`/offerings/${propia.cuerpo?.id}`)).cuerpo;
+comprobar(
+  detallePropia?.registraCertificadoExterno === false,
+  'la jornada que dicta la empresa NO pide papel de tercero, aunque su formacion lo lleve',
+  `registraCertificadoExterno=${detallePropia?.registraCertificadoExterno} con executedBy PROPIOS`,
+);
+const detalleArl = (await admin.get(`/offerings/${porVideollamada.cuerpo?.id}`)).cuerpo;
+comprobar(
+  detalleArl?.registraCertificadoExterno === true,
+  'y la que dicta la ARL si lo pide: lo decide QUIEN la dicta, no la formacion sola',
+  `registraCertificadoExterno=${detalleArl?.registraCertificadoExterno} con executedBy ARL`,
+);
+
+await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 20 });
 
 console.log(`\nCREADO PARA LIMPIAR: actividades=${creado.activityId},${conTipoSinPapel.cuerpo?.id} personas=${creado.personas.join(',')} sufijo=${SUFIJO}`);
 process.exit(resumen() === 0 ? 0 : 1);

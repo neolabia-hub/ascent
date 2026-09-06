@@ -63,9 +63,14 @@ export default function ConstanciasPage() {
   }
 
   async function abrir(id: string) {
-    const detalle = await getTemplate(id).catch(() => null);
+    // El motivo se guarda al vuelo: `.catch(() => null)` lo perdia una linea antes del aviso.
+    let fallo: unknown = null;
+    const detalle = await getTemplate(id).catch((e: unknown) => {
+      fallo = e;
+      return null;
+    });
     if (!detalle) {
-      showToast({ kind: 'danger', title: 'No se pudo abrir la plantilla' });
+      showToast({ kind: 'danger', title: 'No se pudo abrir la plantilla', description: motivoDelError(fallo) });
       return;
     }
     // Una plantilla creada antes de que existiera la colocacion trae `{}`: se rellena con la de
@@ -78,6 +83,8 @@ export default function ConstanciasPage() {
   }
 
   async function crear() {
+    // El motivo se guarda al vuelo: `.catch(() => null)` lo perdia una linea antes del aviso.
+    let falloAlCrear: unknown = null;
     const creada = await createTemplate({
       name: 'Constancia de formacion',
       backgroundKey: null,
@@ -85,9 +92,12 @@ export default function ConstanciasPage() {
       fields: CAMPOS_POR_DEFECTO,
       signers: [],
       active: false,
-    }).catch(() => null);
+    }).catch((e: unknown) => {
+      falloAlCrear = e;
+      return null;
+    });
     if (!creada) {
-      showToast({ kind: 'danger', title: 'No se pudo crear' });
+      showToast({ kind: 'danger', title: 'No se pudo crear', description: motivoDelError(falloAlCrear) });
       return;
     }
     await recargar();

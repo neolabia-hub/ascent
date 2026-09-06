@@ -20,6 +20,65 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-06 (noche) — La regla cambio dos veces en dos dias, asi que dejo de haber regla
+
+El cliente lo puso en una frase que ordena todo lo demas: *"hay que crear el software
+parametrizable, no por como lo hace un cliente"*.
+
+### Lo que se rompio dos veces
+
+Como se cierra una jornada —por lista o por lo que cada quien haga en la plataforma— se dedujo dos
+veces, y las dos se rompio con un caso real:
+
+| Version | La regla | El caso que la rompio |
+|---|---|---|
+| 1 (05-09) | por el `kind`: toda jornada EVENT lleva lista | una **capacitacion del plan con fecha pero VIRTUAL y con contenido** |
+| 2 (06-09) | por la MODALIDAD: presencial e hibrida | una **capacitacion que dicta la ARL por videollamada en vivo** |
+
+**La respuesta depende de como se dicto ESA sesion, y eso solo lo sabe quien la programa.**
+`offerings.closes_by_attendance`, con `NULL` = lo que diga su modalidad. El defecto acierta casi
+siempre y la casilla existe para lo que no encaja. Logica pura en `cierre-de-la-jornada.ts` (11
+unitarias) y la pantalla no la reimplementa: `admiteAsistencia` viaja resuelto.
+
+**La leccion de metodo:** cuando una regla derivada se rompe dos veces seguidas, el problema no es
+la regla — es que se esta deduciendo algo que hay que preguntar. La senal es tener que
+justificarla con un caso INVENTADO: la version 1 se defendio con "el webinar en vivo", que este
+cliente no tenia, y ese mismo caso acabo rompiendo la version 2.
+
+### Lo demas que cazo el cliente, y todo era cierto
+
+- **Si la jornada la dicta la empresa, no se pide papel de un tercero.** No hay tercero. Pero es un
+  DEFECTO de pantalla y no una compuerta: la API lo sigue aceptando si la formacion lo lleva,
+  porque hay tenants —un centro de entrenamiento acreditado— para los que "propios" y "certificado
+  oficial" conviven.
+- **"Lo que diga su tipo" no decia lo que decia su tipo.** Referencia circular: se mandaba a mirar
+  a otro sitio donde solo habia una casilla. Ahora la ficha resuelve y enseña lo heredado, y el
+  interruptor del tipo se llama "Normalmente la acredita un tercero" y dice que es un punto de
+  partida.
+- **La fecha de vencimiento no tenia marcado rapido.** Es individual en el modelo pero la misma
+  para toda la jornada en la practica: **"Todos vencen el"** y se reparte.
+- **Quedaban 10 avisos que no explicaban nada**, y tres eran peores de lo que parecian: usaban
+  `.catch(() => null)` y el error se perdia una linea antes del aviso. Cero pendientes.
+
+### El barrido
+
+```
+15 recorridos           TODO BIEN
+401 pruebas unitarias   pasan         (390 + 11 del cierre de la jornada)
+21 e2e                  pasan
+build - lint - types    limpios
+```
+
+### Lo que sigue abierto
+
+1. **El archivo no se sube todavia**: PDF del certificado y acta escaneada.
+2. **Los mecanismos 2 y 3 de la asistencia**: QR de sesion y firma en pantalla.
+3. **La segunda puerta** para el papel que llega tarde, desde la ficha de la persona.
+4. **El informe de Vencimientos**: fuente vacia y eje equivocado.
+5. **Repaso / volver a verlo**, y **el aviso interno** al jefe o a SST.
+
+---
+
 ## 2026-09-06 (tarde) — Cuatro observaciones del cliente sobre la pantalla, y dos fallos detras
 
 Sesion corta de revision que acabo destapando dos cosas que no eran de la pantalla.

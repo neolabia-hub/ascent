@@ -736,7 +736,7 @@ export default function EvaluacionEditorPage() {
                   */
                   const detalle = await getQuestion(pregunta.id).catch(() => null);
                   if (!detalle) {
-                    showToast({ kind: 'danger', title: 'No se pudo traer la pregunta' });
+                    showToast({ kind: 'danger', title: 'No se pudo traer la pregunta', description: motivoDelError(error) });
                     return;
                   }
                   tocar(

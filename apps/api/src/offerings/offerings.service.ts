@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { ruleReachesEveryone } from '../assignments/audience-rule.js';
 import { AudiencesService } from '../assignments/audiences.service.js';
 import { decidirCertificadoExterno } from '../certificates/certificate-policy.js';
+import { cierraPorLista } from './cierre-de-la-jornada.js';
 import { CompletionService } from '../learning/completion.service.js';
 import { ProjectedAudienceService } from './projected-audience.service.js';
 import { planVersionMigration, type MigrationPolicy } from './version-migration.js';
@@ -90,14 +91,29 @@ export class OfferingsService {
   /**
    * MARCAR LA ASISTENCIA DE UNA JORNADA (Decision #157).
    *
-   * ─── LA ASISTENCIA VA CON EL `kind`, NO CON LA MODALIDAD ───
+   * ─── LA REGLA: HAY SALON O NO LO HAY (corregido el 2026-09-06) ───
    *
-   * Es la pregunta que parece obvia y no lo es. Una jornada `EVENT` —tiene fecha, cupo y alguien
-   * que convoca— se cierra por asistencia LA DICTE COMO LA DICTE: presencial en un salon o virtual
-   * en vivo por videollamada. En las dos hay una lista de quien estuvo y en ninguna queda contenido
-   * completado en la plataforma. Una `PERMANENT` no: ahi la persona entra sola cuando puede y la
-   * evidencia es justamente lo que la plataforma registro. Atarlo a `PRESENCIAL` dejaria fuera el
-   * webinar de la ARL, que es cada vez mas comun.
+   * La primera version la ato al `kind`: toda jornada `EVENT` se cerraba por asistencia. Lo cazo
+   * el cliente y tenia razon: **una capacitacion del plan puede ser EVENT y VIRTUAL con contenido**
+   * —tiene fecha, se convoca, y aun asi la persona entra a la plataforma y hace el temario—, y ahi
+   * pedir asistencia es pedir la evidencia equivocada.
+   *
+   * El argumento con el que se defendio el `kind` era el webinar en vivo: un caso que el cliente NO
+   * tiene y que se invento para justificar la regla. Su realidad es la contraria — las inducciones
+   * especificas son TODAS presenciales, y el plan es casi todo virtual con contenido.
+   *
+   * Lo que de verdad decide es si **queda rastro en la plataforma**, y eso lo dice la MODALIDAD:
+   *
+   *   PRESENCIAL  hay salon y lista firmada; en la plataforma no queda nada   -> ASISTENCIA
+   *   HIBRIDA     hay sesion Y contenido: se exigen las dos (CLAUDE.md 3.7)   -> ASISTENCIA
+   *   VIRTUAL     la persona entra y hace el temario, y el sistema lo registra -> PLATAFORMA
+   *
+   * Y sigue haciendo falta que **no sea de autoservicio**: una PERMANENTE se acredita sola por
+   * definicion —nadie convoca a un salon permanente— y una PERMANENTE marcada PRESENCIAL es un dato
+   * mal puesto, no un caso de uso.
+   *
+   * Un webinar en vivo del que se quiera lista se programa PRESENCIAL o HIBRIDA. Se dice aqui en vez
+   * de forzarlo con una regla: el sitio donde se decide es la convocatoria.
    *
    * ─── LOS TRES ESTADOS, Y EL CUARTO QUE ES NO MANDAR LA FILA ───
    *
@@ -119,14 +135,30 @@ export class OfferingsService {
           'Esta convocatoria es de autoservicio: se acredita completando el contenido, no con una lista de asistencia.',
       });
     }
+    if (!cierraPorLista(offering)) {
+      throw new ConflictException({
+        code: 'OFFERING_NOT_ATTENDABLE',
+        message:
+          'Esta jornada no se cierra con lista: se acredita con lo que cada persona complete en la plataforma. Si hubo una sesion con lista —una videollamada en vivo, por ejemplo— marcalo en la convocatoria.',
+      });
+    }
     if (offering.status === 'DRAFT' || offering.status === 'CANCELLED') {
       throw new ConflictException({ code: 'OFFERING_NOT_ATTENDABLE', status: offering.status });
     }
 
     const tenantId = this.prisma.currentTenantId;
     const conCertificado = input.items.filter((fila) => fila.certificate);
-    const { registraCertificado, quienLaDicto } = await this.contextoDeLaJornada(offeringId);
-    if (conCertificado.length > 0 && !registraCertificado) {
+    const { quienLaDicto } = await this.contextoDeLaJornada(offeringId);
+    /*
+      LA COMPUERTA MIRA LA FORMACION, NO QUIEN DICTA.
+
+      `registraCertificado` es lo que la PANTALLA usa para decidir que campos enseñar, y ahi si pesa
+      quien dicta la jornada. Rechazar por eso convertiria una suposicion —"si la dicta la empresa no
+      hay papel"— en una regla del producto, y hay tenants para los que es falsa. La compuerta se
+      queda donde la empresa lo declara: en la formacion, con su tipo de respaldo.
+    */
+    const laFormacionLoLleva = await this.laFormacionLlevaPapel(offeringId);
+    if (conCertificado.length > 0 && !laFormacionLoLleva) {
       /*
         LA COMPUERTA VIVE EN EL SERVIDOR, no solo en la pantalla.
 
@@ -275,6 +307,30 @@ export class OfferingsService {
    * escrito ("ARL Sura") y `executedBy` la clase (ARL, EPS, TEMPORALES...); se prefiere el primero
    * porque es lo que va a leer quien audite, y el segundo es el respaldo.
    */
+  /**
+   * ¿LA FORMACION lleva papel de un tercero? Es la compuerta, y mira solo la formacion con su tipo
+   * de respaldo — no quien dicta la jornada, que es un DEFECTO de pantalla y no una regla.
+   */
+  private async laFormacionLlevaPapel(offeringId: string): Promise<boolean> {
+    const fila = await this.prisma.scoped.offering.findUnique({
+      where: { id: offeringId },
+      select: {
+        activityVersion: {
+          select: {
+            activity: {
+              select: { tracksExternalCertificate: true, activityType: { select: { config: true } } },
+            },
+          },
+        },
+      },
+    });
+    const actividad = fila?.activityVersion.activity ?? null;
+    if (!actividad) return false;
+    return decidirCertificadoExterno(actividad.activityType ?? null, {
+      tracksExternalCertificate: actividad.tracksExternalCertificate,
+    });
+  }
+
   private async contextoDeLaJornada(
     offeringId: string,
   ): Promise<{ registraCertificado: boolean; quienLaDicto: string }> {
@@ -294,10 +350,37 @@ export class OfferingsService {
     });
     const actividad = fila?.activityVersion.activity ?? null;
     const tipo = actividad?.activityType ?? null;
+    /*
+      SI LA DICTA LA EMPRESA, NO HAY TERCERO QUE CERTIFIQUE (2026-09-06).
+
+      Lo cazo el cliente mirando un ejemplo: *"esto ejecuta propios y TRANSPRENSA no da
+      certificaciones oficiales"*. Y es mas fuerte que una preferencia suya: un certificado
+      **externo** es por definicion el de alguien de fuera. Con `executedBy: PROPIOS` no hay fuera,
+      asi que pedir su numero es pedir un dato que no existe — y un campo que no se puede llenar se
+      aprende a saltar.
+
+      Se decide por JORNADA y no por formacion porque es la jornada la que sabe quien la dicto: una
+      habilitacion la puede dar la ARL en marzo y un instructor propio en septiembre; la primera trae
+      papel y la segunda no, y la formacion es la misma.
+
+      ─── PERO NO ES UNA COMPUERTA, Y LA DIFERENCIA IMPORTA ───
+
+      Esto decide QUE CAMPOS PIDE la pantalla, no que se pueda guardar. La compuerta sigue siendo la
+      de la formacion (409 `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`), porque es ahi donde la empresa dice
+      si esta clase de formacion se acredita con papel de fuera. Un tenant que sea un centro de
+      entrenamiento acreditado, o cualquier caso que no se nos ocurra hoy, puede seguir registrando
+      el papel por la API sin que este defecto se lo impida. Poner aqui un rechazo seria convertir
+      una suposicion nuestra sobre como trabajan las empresas en una regla del producto.
+
+      Lo que la empresa emite por su cuenta es su CONSTANCIA, que es otra cosa y la decide
+      `issuesCertificate` (Decision #111).
+    */
+    const laDictaUnTercero = (fila?.executedBy ?? 'PROPIOS') !== 'PROPIOS';
     return {
-      registraCertificado: actividad
-        ? decidirCertificadoExterno(tipo, { tracksExternalCertificate: actividad.tracksExternalCertificate })
-        : false,
+      registraCertificado:
+        actividad && laDictaUnTercero
+          ? decidirCertificadoExterno(tipo, { tracksExternalCertificate: actividad.tracksExternalCertificate })
+          : false,
       quienLaDicto: (fila?.executedByOther ?? '').trim() || (fila?.executedBy ?? 'PROPIOS'),
     };
   }
@@ -420,6 +503,12 @@ export class OfferingsService {
       derivedProjected: derived,
       registraCertificadoExterno: contexto.registraCertificado,
       quienLaDicto: contexto.quienLaDicto,
+      /*
+        ¿SE CIERRA POR LISTA? La regla vive en el servidor y viaja resuelta, para que la pantalla no
+        la reimplemente: dos implementaciones de la misma condicion acaban discrepando, y esta ya
+        cambio una vez —era el `kind` y es la MODALIDAD—. Ver `marcarAsistencia`.
+      */
+      admiteAsistencia: cierraPorLista(offering),
       versionUpgrade: await this.versionUpgrade(offering.id),
     };
   }
@@ -1578,6 +1667,9 @@ export class OfferingsService {
     return {
       kind: input.kind,
       modality: input.modality,
+      // `undefined` = no vino y la columna no se toca; `null` = "lo que diga su modalidad", que es
+      // un valor con significado y hay que poder volver a el (ver `cierre-de-la-jornada.ts`).
+      closesByAttendance: input.closesByAttendance,
       scheduledDate: this.toDate(input.scheduledDate),
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,

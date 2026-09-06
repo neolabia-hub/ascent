@@ -3131,3 +3131,78 @@ convocatoria.
 La alternativa —quitarlo del tipo— se descarto por lo mismo que la Decision #111: una
 recertificacion SIEMPRE la acredita alguien de fuera, y encenderlo formacion por formacion es lo
 que se olvida y se descubre el dia de la auditoria.
+
+### 2026-09-06 (noche) — La regla cambio dos veces en dos dias, asi que dejo de haber regla
+
+Como se cierra una jornada —por lista de asistencia o por lo que cada quien haga en la
+plataforma— se dedujo dos veces, y las dos se rompio con un caso real del cliente:
+
+| Version | La regla | El caso que la rompio |
+|---|---|---|
+| 1 (05-09) | por el `kind`: toda jornada EVENT lleva lista | una **capacitacion del plan con fecha pero VIRTUAL y con contenido**: se convoca, si, pero la persona hace el temario en la plataforma |
+| 2 (06-09) | por la MODALIDAD: presencial e hibrida llevan lista | una **capacitacion que dicta la ARL por videollamada en vivo**: es virtual y SI tiene lista de quien se conecto |
+
+La leccion no era que faltara una tercera regla mejor. Es que **la respuesta depende de como se
+dicto ESA sesion**, y eso solo lo sabe quien la programa. Cualquier regla que lo deduzca acierta
+para unos tenants y falla para otros — y el cliente lo dijo con todas las letras: *"hay que crear
+el software parametrizable, no por como lo hace un cliente"*.
+
+**`offerings.closes_by_attendance`**, con `NULL` = lo que diga su modalidad. El defecto acierta
+casi siempre (presencial e hibrida si, virtual no) y la casilla existe para lo que no encaja. La
+logica vive aparte y sin tocar la base (`cierre-de-la-jornada.ts`, 11 unitarias) como
+`next-cycle.ts` y `due-date.ts`, y **la pantalla no la reimplementa**: el detalle de la jornada
+trae `admiteAsistencia` ya resuelto. Una condicion que ha cambiado dos veces es justo la que no
+puede vivir en dos sitios.
+
+Lo unico que no se negocia: una **PERMANENTE** no lleva lista aunque se marque. Es autoservicio y
+no hay sesion a la que asistir; dejarlo pasar convertiria un error de captura en asistencias
+inventadas.
+
+**Y la leccion de metodo, que vale mas que el caso:** cuando una regla derivada se rompe dos veces
+seguidas, el problema no es la regla — es que se esta deduciendo algo que hay que preguntar. La
+senal es tener que justificarla con un caso inventado: la version 1 se defendio con "el webinar en
+vivo", que este cliente no tiene, y ese mismo caso inventado acabo siendo el que rompio la
+version 2.
+
+### 2026-09-06 (noche) — Si la dicta la empresa, no hay tercero que certifique
+
+Lo cazo el cliente mirando un ejemplo: *"esto ejecuta propios y TRANSPRENSA no da certificaciones
+oficiales"*. Un certificado **externo** es por definicion el de alguien de fuera; con
+`executedBy: PROPIOS` no hay fuera, y un campo que no se puede llenar se aprende a saltar.
+
+Se decide por JORNADA porque es la jornada la que sabe quien la dicto: la misma habilitacion la
+puede dar la ARL en marzo y un instructor propio en septiembre.
+
+**Pero es un defecto de pantalla, no una compuerta**, y la diferencia importa: la API sigue
+aceptando el papel si la FORMACION lo lleva. Hay tenants —un centro de entrenamiento acreditado—
+para los que "propios" y "certificado oficial" conviven, y poner ahi un rechazo seria convertir una
+suposicion nuestra sobre como trabajan las empresas en una regla del producto. La compuerta se
+queda donde la empresa lo declara.
+
+### 2026-09-06 (noche) — "Lo que diga su tipo" no decia lo que decia su tipo
+
+Lo cazo el cliente: *"en la ficha dice «lo que diga su tipo» pero en el tipo no dice nada"*. Era una
+referencia circular — se manda a mirar a otro sitio donde solo hay una casilla marcada, sin el
+valor a la vista.
+
+Dos arreglos, y ninguno es quitar el interruptor:
+
+1. La ficha **resuelve y enseña** lo heredado: *"Lo que diga su tipo (sí la acredita un tercero)"*.
+   Un defecto que no se puede leer no es un defecto, es un misterio.
+2. El interruptor del tipo pasa a llamarse **"Normalmente la acredita un tercero"** y su detalle
+   dice lo que hace: poner el valor de partida de sus formaciones. Antes prometia configurar algo.
+
+Se descarto quitarlo por lo mismo que la Decision #111: una recertificacion SIEMPRE la acredita
+alguien de fuera, y encenderlo formacion por formacion es lo que se olvida.
+
+### 2026-09-06 (noche) — Los diez avisos que el codemod no cazo
+
+Del barrido de la tarde quedaban **10 sitios** que seguian diciendo "No se pudo guardar" y nada
+mas. Casi todos eran `.catch(() => ...)` en una flecha, que no tiene la forma `} catch {`.
+
+Y **tres eran peores de lo que parecian**: usaban `.catch(() => null)` y comprobaban el nulo
+despues, asi que el error se perdia *una linea antes* del aviso — ponerle `motivoDelError(error)`
+ni siquiera compilaba, porque no habia ningun `error`. Se captura al vuelo.
+
+Quedan cero avisos de accion sin explicacion. Los que siguen siendo genericos son de CARGA
+("no se pudieron cargar los catalogos"), y ahi tambien llevan ya el motivo del servidor.

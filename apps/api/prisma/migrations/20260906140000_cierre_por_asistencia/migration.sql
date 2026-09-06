@@ -1,0 +1,21 @@
+-- COMO SE CIERRA ESTA JORNADA: SE PREGUNTA, NO SE ADIVINA.
+--
+-- Esta columna existe porque la regla derivada cambio DOS VECES en dos dias, y las dos veces por un
+-- caso real que la anterior no cubria:
+--
+--   1. Se ato al `kind`: toda jornada EVENT se cerraba por lista. Falso — una capacitacion del plan
+--      puede ser EVENT y virtual con contenido, y ahi la evidencia es la plataforma.
+--   2. Se ato a la MODALIDAD: presencial o hibrida cierran por lista. Tambien falso — una
+--      capacitacion que dicta la ARL por videollamada en vivo es virtual y SI tiene lista de quien
+--      se conecto.
+--
+-- La leccion no es que faltara una tercera regla mejor: es que **la respuesta depende de como se
+-- dicto esa sesion concreta**, y eso solo lo sabe quien la programa. Cualquier regla que la deduzca
+-- estara acertando para unos clientes y fallando para otros — y este producto es multi-tenant.
+--
+-- `NULL` = lo que diga su modalidad, que es el defecto y acierta casi siempre (presencial e hibrida
+-- si, virtual no). Se pone explicita solo cuando la sesion no encaja: la videollamada en vivo con
+-- lista, o el taller presencial que en realidad se acredita con lo que cada quien haga despues en
+-- la plataforma. Es el mismo idioma que ya usa `activities.tracks_external_certificate` y sus
+-- hermanas: el defecto vive arriba y la fila concreta puede desviarse.
+ALTER TABLE "offerings" ADD COLUMN IF NOT EXISTS "closes_by_attendance" BOOLEAN;

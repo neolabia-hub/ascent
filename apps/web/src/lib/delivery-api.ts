@@ -110,6 +110,13 @@ export interface OfferingDetail extends Omit<OfferingListItem, '_count'> {
   registraCertificadoExterno: boolean;
   /** Quien dicta la jornada ("ARL Sura", "PROPIOS"): es el emisor por defecto del certificado. */
   quienLaDicto: string;
+  /**
+   * ¿Se cierra con lista de asistencia? Viene RESUELTO del servidor —presencial o hibrida, y que no
+   * sea de autoservicio—. La pantalla no repite la condicion: ya cambio una vez.
+   */
+  admiteAsistencia: boolean;
+  /** 'Como se acredita' puesto a mano en esta jornada. `null` = lo que diga su modalidad. */
+  closesByAttendance: boolean | null;
   planItems: Array<{ id: string; plannedMonth: number; status: string; plan: { id: string; name: string; year: number; status: string } }>;
   /** La TAJADA: a que parte de los obligados atiende esta jornada (Decision #68). */
   audience: { id: string; name: string; rule: AudienceRule } | null;
@@ -121,6 +128,8 @@ export interface OfferingBody {
   activityVersionId?: string;
   kind: OfferingKind;
   modality: Modality;
+  /** Como se acredita esta jornada. `null` = lo que diga su modalidad, que es el caso normal. */
+  closesByAttendance?: boolean | null;
   scheduledDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;

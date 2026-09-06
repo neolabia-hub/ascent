@@ -27,11 +27,12 @@ import { useToast } from '@/components/ui/toast';
  * contenido que completar: queda una hoja firmada. Sin esta pantalla, todo lo dictado
  * presencialmente contaba como incumplido, y el indicador enseñaba cero de lo que si se hizo.
  *
- * ─── SOLO EN LAS JORNADAS `EVENT`, Y NO POR LA MODALIDAD ───
+ * ─── DONDE APARECE: LO DECIDE LA JORNADA, Y NO SE ADIVINA ───
  *
- * Una jornada con fecha y cupo se cierra por asistencia la dicte como la dicte: presencial o
- * virtual en vivo. En las dos hay una lista de quien estuvo. En una convocatoria PERMANENTE no:
- * ahi la persona entra sola y la evidencia es lo que la plataforma registro.
+ * `admiteAsistencia` viene RESUELTO del servidor (`cierre-de-la-jornada.ts`) y esta pantalla no
+ * repite la condicion. La regla derivada cambio DOS veces en dos dias —primero el `kind`, despues
+ * la modalidad— y las dos por un caso real que la anterior no cubria, asi que ahora hay una casilla
+ * en la convocatoria con un defecto sensato: presencial e hibrida por lista, virtual por plataforma.
  *
  * ─── LOS TRES ESTADOS, Y EL CUARTO QUE ES NO HABER MIRADO ───
  *
@@ -104,6 +105,28 @@ export function ListaDeAsistencia({
   /** Marcar la lista entera de una vez: la jornada que fue como debia, o la que no se dicto. */
   function todos(estado: AsistenciaEstado) {
     setEstados(Object.fromEntries(porRevisar.map((fila) => [fila.id, estado])));
+  }
+
+  /*
+    LA MISMA FECHA DE VENCIMIENTO PARA TODOS (2026-09-06).
+
+    Lo pidio el cliente: *"Vence sale sin marcar y no ayuda de marcado rapido, o esta es
+    individual"*. Es individual en el modelo —cada certificado es de una persona— pero **en la
+    practica es la misma para toda la jornada**: los veinte se certificaron el mismo dia, en el
+    mismo curso, con la misma entidad. Escribirla veinte veces es teclear veinte veces el mismo
+    dato, y a la decima alguien pone otro ano.
+
+    Se deja individual por si acaso —hay cursos donde el papel de alguien vence antes— pero el
+    camino normal es ponerla una vez y repartirla.
+  */
+  const [vencePorLote, setVencePorLote] = useState('');
+  function repartirVencimiento() {
+    if (!vencePorLote) return;
+    setPapeles((previos) =>
+      Object.fromEntries(
+        porRevisar.map((fila) => [fila.id, { ...(previos[fila.id] ?? { number: '' }), validUntil: vencePorLote }]),
+      ),
+    );
   }
 
   /** Una justificacion sin motivo no justifica nada, y es lo que el auditor va a leer. */
@@ -206,16 +229,36 @@ export function ListaDeAsistencia({
           </p>
 
           {pideCertificado ? (
-            <p className="flex items-start gap-2 border-t border-line px-5 py-3 text-sm text-ink-500">
-              <ClipboardList size={15} className="mt-0.5 shrink-0" strokeWidth={2} />
-              <span>
-                El certificado lo expide <strong className="font-medium text-ink-700">{quienLaDicto}</strong>, que es
-                quien dicta esta jornada — no hay que escribirlo por persona. Solo su{' '}
-                <strong className="font-medium text-ink-700">numero</strong>, y el vencimiento si lo trae:{' '}
-                <strong className="font-medium text-ink-700">esa fecha manda</strong> sobre la que calcularia el sistema.
-                Si el papel todavia no ha llegado, deja el numero en blanco y añadelo despues.
-              </span>
-            </p>
+            <div className="border-t border-line px-5 py-3">
+              <p className="flex items-start gap-2 text-sm text-ink-500">
+                <ClipboardList size={15} className="mt-0.5 shrink-0" strokeWidth={2} />
+                <span>
+                  El certificado lo expide <strong className="font-medium text-ink-700">{quienLaDicto}</strong>, que es
+                  quien dicta esta jornada — no hay que escribirlo por persona. Solo su{' '}
+                  <strong className="font-medium text-ink-700">numero</strong>, y el vencimiento si lo trae:{' '}
+                  <strong className="font-medium text-ink-700">esa fecha manda</strong> sobre la que calcularia el
+                  sistema. Si el papel todavia no ha llegado, deja el numero en blanco y añadelo despues.
+                </span>
+              </p>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <Field
+                  htmlFor="asist-vence-lote"
+                  label="Todos vencen el"
+                  hint="Lo normal: se certificaron el mismo dia, en el mismo curso."
+                >
+                  <Input
+                    id="asist-vence-lote"
+                    type="date"
+                    className="max-w-[11rem]"
+                    value={vencePorLote}
+                    onChange={(e) => setVencePorLote(e.target.value)}
+                  />
+                </Field>
+                <Button variant="ghost" onClick={repartirVencimiento} disabled={!vencePorLote}>
+                  Ponerla a todos
+                </Button>
+              </div>
+            </div>
           ) : null}
 
           <div className="overflow-x-auto">

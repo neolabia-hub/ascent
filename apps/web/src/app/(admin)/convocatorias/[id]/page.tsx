@@ -619,13 +619,15 @@ export default function ConvocatoriaDetallePage() {
       </div>
 
       {/*
-        LA LISTA DE ASISTENCIA, SOLO EN LAS JORNADAS CON FECHA (Decision #157).
+        LA LISTA DE ASISTENCIA (Decision #157), donde hay salon.
 
-        Va con el `kind` y no con la modalidad, y no es un detalle: una jornada EVENT se cierra por
-        asistencia la dicte como la dicte —presencial en un salon o virtual en vivo—, porque en las
-        dos hay una lista de quien estuvo y en ninguna queda contenido completado en la plataforma.
-        Una PERMANENTE no: ahi la persona entra sola y la evidencia es lo que registro el sistema.
-        Atarlo a PRESENCIAL dejaria fuera el webinar de la ARL.
+        `admiteAsistencia` viene RESUELTO del servidor —presencial o hibrida, y que no sea de
+        autoservicio— y la pantalla no repite la condicion. Ya cambio una vez: la primera version la
+        ato al `kind`, y una capacitacion del plan puede ser EVENT y VIRTUAL con contenido, donde
+        pedir asistencia es pedir la evidencia equivocada.
+
+        Y NO en una jornada que no se dicto: aparecia "Tomar asistencia" en una CANCELADA. El
+        servidor ya lo rechazaba, pero un boton que solo falla al pulsarlo no es una compuerta.
       */}
       {/*
         Y NO EN UNA JORNADA QUE NO SE DICTO (2026-09-06). Lo cazo el cliente: aparecia "Tomar
@@ -633,7 +635,7 @@ export default function ConvocatoriaDetallePage() {
         boton que solo falla al pulsarlo no es una compuerta: es una trampa. En BORRADOR tampoco —
         todavia no se ha citado a nadie.
       */}
-      {!esAutoservicio && (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED') ? (
+      {offering.admiteAsistencia && (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED') ? (
         <ListaDeAsistencia
           offeringId={offering.id}
           roster={roster}

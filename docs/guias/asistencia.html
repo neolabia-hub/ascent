@@ -205,19 +205,26 @@
   </div>
 
   <div class="aviso">
-    <span class="etiqueta">Solo aparece en las jornadas con fecha</span>
-    <p>Hay dos cosas distintas que suenan parecido, y solo una decide esto:</p>
+    <span class="etiqueta">Dónde aparece la lista, y cómo se decide</span>
+    <p>Al programar una convocatoria hay un campo <strong>«Cómo se acredita»</strong> con tres
+      opciones. Viene puesto en <em>«Lo que diga su modalidad»</em>, que acierta casi siempre:</p>
     <div class="tabla-envuelve"><table>
-      <thead><tr><th></th><th>Qué contesta</th><th>Dónde se elige</th></tr></thead>
+      <thead><tr><th>Si la jornada es…</th><th>Por defecto se cierra…</th></tr></thead>
       <tbody>
-        <tr><td><strong>Cómo se entra</strong></td><td><em>Jornada con fecha</em> (alguien convoca) o <em>permanente</em> (la persona entra cuando puede)</td><td>al crear la convocatoria</td></tr>
-        <tr><td><strong>Cómo se dicta</strong></td><td>Presencial, virtual o híbrida</td><td>en la ficha y en cada convocatoria</td></tr>
+        <tr><td>Presencial</td><td>con la <strong>lista de asistencia</strong></td></tr>
+        <tr><td>Híbrida</td><td>con la <strong>lista</strong>, y además el contenido</td></tr>
+        <tr><td>Virtual</td><td>con lo que <strong>cada persona complete en la plataforma</strong></td></tr>
       </tbody>
     </table></div>
-    <p>La lista de asistencia aparece en las <strong>jornadas con fecha</strong>, se dicten como se
-      dicten. Un webinar en vivo también tiene lista de quién estuvo, y tampoco deja rastro en la
-      plataforma. En una convocatoria <strong>permanente</strong> no aparece, y es correcto: ahí la
-      evidencia es lo que el sistema registró cuando la persona entró sola.</p>
+    <p>Y se cambia a mano cuando no encaja, que es justo lo que pasa en dos casos reales:</p>
+    <ul>
+      <li>Una capacitación que <strong>dicta la ARL por videollamada en vivo</strong>: es virtual y sí
+        tiene lista de quién se conectó → ponle <em>«Con lista de asistencia»</em>.</li>
+      <li>Un taller presencial que en realidad <strong>se acredita con lo que hagan después</strong> en
+        la plataforma → ponle <em>«Con lo que hagan en la plataforma»</em>.</li>
+    </ul>
+    <p>En las convocatorias <strong>permanentes</strong> el campo no aparece: no hay sesión a la que
+      asistir.</p>
   </div>
 
   <div class="aviso bien">
@@ -260,7 +267,15 @@
 
   <h3>Cuando el certificado lo emite un tercero</h3>
   <p>Alturas, espacios confinados, montacargas, manipulación de alimentos: la norma exige el papel de un organismo acreditado. NEO PULSE no lo emite —no puede— pero sí <strong>lleva su control</strong>, que es lo que la empresa necesita.</p>
-  <p>Si la formación lo lleva, la lista pide además el <b>número</b> del certificado de cada persona y su
+  <div class="aviso">
+    <span class="etiqueta">Si la jornada la dicta la empresa, no se pide</span>
+    <p>Un certificado <em>de un tercero</em> es, por definición, el de alguien de fuera. Si la
+      convocatoria dice <strong>«Ejecutada por: propios»</strong>, la lista no pide ningún número —
+      no hay tercero que lo expida. Lo que la empresa emite por su cuenta es su <strong>constancia</strong>,
+      que sale sola y es otra cosa.</p>
+  </div>
+
+  <p>Si la formación lo lleva <em>y</em> la dicta un tercero, la lista pide el <b>número</b> del certificado de cada persona y su
     <b>fecha de vencimiento</b>. La <b>entidad no se escribe</b>: sale sola de quien dicta la jornada, que ya
     está en la convocatoria. Teclearla cuarenta veces sería copiar a mano un dato que el sistema ya tiene
     —y la fila veintitrés acabaría diciendo «ARL sura».</p>
