@@ -9,6 +9,7 @@ Que va en cada documento, para no duplicar:
 | Documento | Responde |
 |---|---|
 | **Este** | En que iba, que quedo a medias y con que continuar |
+| `docs/PENDIENTES.md` | **Que falta HOY, todo junto.** Se corrige: lo hecho se borra de ahi |
 | `docs/RUNBOOK.md` | Como se opera y que se aprendio rompiendo algo. Solo se anade |
 | `docs/arquitectura.md` | Como funciona el sistema HOY. Se corrige |
 | `docs/glosario.md` | Que significa cada palabra del negocio |
@@ -17,6 +18,92 @@ Que va en cada documento, para no duplicar:
 
 Regla: si algo de aqui deja de ser cierto, no se corrige — se escribe la sesion siguiente. Esto es
 un diario, no una referencia.
+
+**Para retomar sin leerse el diario entero: `docs/PENDIENTES.md`.** Nacio el 2026-09-06 porque lo
+abierto estaba repartido en siete documentos y saber que faltaba obligaba a leerlos todos.
+
+---
+
+## 2026-09-06 (cierre) — Lo que queda de la pantalla de asistencia, con el detalle para retomar
+
+La funcionalidad esta cerrada y probada (15 recorridos, 401 unitarias, 21 e2e). Lo que sigue es
+**trabajo de interfaz**, y esta sesion se corta aqui con la lista de lo que el cliente pidio y no
+se alcanzo a hacer. Todo lo de abajo salio de mirar la pantalla con el, asi que son observaciones
+reales y no ideas nuestras.
+
+### Lo que SI quedo hecho hoy
+
+- Una sola tabla de Inscritos con dos modos, sin perder ninguna columna (#157).
+- La constancia interna la decide el TIPO: el papel de un tercero ya no la suprime (#159).
+- Como se cierra una jornada se PREGUNTA, con defecto por modalidad (#158).
+- El emisor sale de la jornada; el ejecutor se hereda de la anterior sin bloquear el campo.
+- "En el plan anual" pasa a un renglon cuando no aplica; la columna Motivo solo si hace falta.
+- Los 55 `catch` que se tragaban la explicacion del servidor.
+
+> **Todo lo abierto —de esta sesion y de las anteriores— esta junto en `docs/PENDIENTES.md`.** Lo
+> de abajo es el detalle de lo que salio HOY; el resto (el informe de Vencimientos, el repaso, los
+> mecanismos 2 y 3 de la asistencia, el remoto de git) esta alli con su referencia.
+
+### PENDIENTE 1 — La UI de la lista de asistencia
+
+Por orden de lo que mas molesta al usarla:
+
+1. **Hay una columna de mas, sin nombre, en modo "tomar asistencia".** Contado en el codigo, las
+   cabeceras y las celdas cuadran (3 fijas + `hayJustificadas` + 2 de `pideCertificado`), asi que
+   **hay que mirarlo en el navegador**, no en el fuente: puede venir del componente `Table` o de un
+   `Td` vacio que ocupa. Es lo primero que hay que reproducir.
+2. **Los selectores de asistencia y las fechas siguen sin mejorar.** Se cambio el ancho y nada mas.
+   Un `<select>` por fila en una lista de cuarenta es lento de leer y de usar: la forma correcta es
+   un **control segmentado de tres botones** (Asistio / No asistio / Justificada) que se ve de un
+   vistazo y se marca de un clic. Las fechas necesitan el mismo repaso.
+3. **Los ya marcados como "asistio" tienen que poder corregirse.** Hoy salen fuera de la lista
+   editable. Ojo con la trampa: cambiar a AUSENTE a alguien **ya cumplido no reabre su formacion**
+   —esta medido y es a proposito, su constancia ya se emitio—, asi que la pantalla no puede
+   sugerir que si. La forma honesta: dejarlos en la lista con su estado como texto y **los campos
+   del certificado editables** (que es la correccion real: llego el papel, o el numero estaba mal),
+   diciendo que lo cumplido no se deshace desde aqui. Deshacerlo de verdad es "anular", y es otra
+   cosa que todavia no existe.
+4. **Y si se quedan en la lista, los que faltan por revisar van PRIMERO.** Con veinte ya cerrados
+   arriba, encontrar a los tres que faltan es el trabajo.
+5. **Filtros para buscar rapido**: por nombre y por estado (pendientes / asistieron / no vinieron).
+   Con cuarenta personas, ir a buscar a una a ojo es lo que hace que se marque mal.
+
+### PENDIENTE 2 — Las descripciones largas, en TODA la aplicacion
+
+El cliente lo pidio como regla general, no para un campo: **nada de textos largos a la vista**. Los
+`hint` de varios campos ocupan tres lineas y empujan el formulario.
+
+La salida acordada: un **icono de informacion** al lado de la etiqueta que despliega la explicacion
+al pulsarlo. Hace falta un componente reutilizable (`<Ayuda>` o similar, con `popover`) y despues
+pasar por los sitios peores — la lista de asistencia, la ficha de la formacion, los tipos de
+formacion y la convocatoria.
+
+Es un cambio del sistema de diseño, no de una pantalla: conviene hacerlo una vez y bien.
+
+### PENDIENTE 3 — El campo "La acredita un tercero" en la ficha
+
+Hoy tiene tres opciones y la primera confunde: *"Lo que diga su tipo (si/no)"*. El cliente propone
+**dos opciones, Si y No**, ya resueltas desde el tipo.
+
+Se puede hacer sin perder la herencia, y merece hacerse asi: enseñar dos opciones con el valor
+resuelto del tipo, y **no mandar el campo al guardar mientras nadie lo toque** (queda `null` =
+hereda). El dia que alguien lo cambia, se guarda explicito. La pantalla se simplifica y el modelo
+no pierde nada.
+
+### PENDIENTE 4 — El ancho de "Datos de la jornada"
+
+Al quitar la tarjeta "En el plan anual" cuando no aplica, la de datos se quedo con el ancho de
+antes (dos tercios) y media pantalla vacia al lado. **Cuando no hay tarjeta de plan tiene que
+ocupar el ancho completo.** Y los datos van SIEMPRE arriba de "Faltan por convocar".
+
+### Y una pregunta del cliente que conviene tener contestada por escrito
+
+*"¿El numero de la constancia interna debe ser el mismo que el del certificado externo?"* **No, y no
+debe poder serlo.** Son dos documentos de dos emisores: el nuestro lleva su consecutivo
+`CERT-2026-000123` con su codigo verificable, y el del tercero el que le puso la ARL. Compartirlos
+romperia las dos cosas — y sobre todo, **la constancia interna se emite el dia que se cierra la
+formacion y el papel del tercero puede llegar quince dias despues**: si el numero fuera el mismo,
+la constancia no podria existir hasta que llegara el otro, que es justo el caso que hoy funciona.
 
 ---
 

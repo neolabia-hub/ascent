@@ -333,6 +333,23 @@ Arreglado con `inscripcionDeCadaRonda` (`execution-state.ts`), que usa los enlac
 en las dos direcciones desde el Sprint 3 (Decisión #2). **Medido: el mismo escenario pasó de 80% de
 avance a 40%**, que es el real.
 
+## 9 bis. Dos documentos, dos numeraciones — y por qué nunca se comparten
+
+Lo preguntó el cliente: *«¿el número de la constancia interna debe ser el mismo que el del
+certificado externo?»*. **No, y no debe poder serlo.**
+
+| | Quién lo emite | Su número |
+|---|---|---|
+| **Constancia** | la empresa, desde la plataforma | consecutivo propio `CERT-2026-000123`, con código verificable por QR |
+| **Certificado externo** | la ARL o el centro acreditado | el que le puso quien lo expidió |
+
+Compartirlos rompería las dos cosas —el consecutivo deja de ser consecutivo y el código deja de
+verificar nada— pero el argumento decisivo es de tiempo: **la constancia se emite el día que se
+cierra la formación y el papel del tercero puede llegar quince días después**. Si el número
+fuera el mismo, la constancia no podría existir hasta que llegara el otro, que es exactamente el
+caso que hoy funciona: se marca la asistencia, se emite la constancia, y el certificado se añade
+cuando llega.
+
 ## 10. Lo que falta
 
 1. **El archivo escaneado no se sube todavía.** Las columnas están (`ext_cert_file_key`,

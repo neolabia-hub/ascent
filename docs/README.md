@@ -55,6 +55,7 @@ cambie algo, y está bien.
 |---|---|
 | [`sprints/`](sprints/README.md) | Un documento por sprint: qué se propuso, qué se construyó, qué se decidió y qué quedó fuera |
 | [`HANDOFF.md`](HANDOFF.md) | En qué iba, qué quedó a medias y con qué continuar. Diario de sesiones |
+| [`PENDIENTES.md`](PENDIENTES.md) | **Qué falta HOY, todo junto y con dónde está el detalle.** Se corrige: lo hecho se borra de ahí |
 
 ---
 

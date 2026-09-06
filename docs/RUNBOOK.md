@@ -3256,3 +3256,44 @@ se HEREDA de la ultima jornada de esa formacion.
 
 Se rellena, **no se bloquea**: el campo sigue editable, que es como lo pidio. Heredar y bloquear
 son cosas distintas, y bloquear seria convertir "lo normal" en "lo unico".
+
+### 2026-09-06 (cierre) — Lo que queda de interfaz en la lista de asistencia
+
+La funcionalidad esta cerrada; lo que sigue es UI, y sale de mirar la pantalla con el cliente.
+Se anota aqui con el detalle para que se pueda retomar sin volver a descubrirlo.
+
+**1. Una columna de mas, sin nombre, en modo "tomar asistencia".** Contadas en el fuente, las
+cabeceras y las celdas cuadran: tres fijas (Persona, Cargo y area, Asistencia) mas `hayJustificadas`
+mas las dos de `pideCertificado`, y cada `Th` condicional tiene su `Td` con la misma condicion. Asi
+que **hay que reproducirlo en el navegador**, no leyendo el codigo: apunta a algo del componente
+`Table` o a una celda vacia que ocupa. Es lo primero que hay que ver.
+
+**2. Los selectores siguen sin mejorar, y es lo que mas se nota al usarlo.** Solo se cambio el
+ancho. Un `<select>` por fila en una lista de cuarenta obliga a abrir, leer tres opciones y elegir,
+cuarenta veces. Lo correcto es un **control segmentado de tres botones** —se ve el estado de un
+vistazo y se cambia de un clic— y el mismo repaso a los campos de fecha.
+
+**3. Corregir a los que ya se marcaron, con una trampa que hay que respetar.** Hoy salen de la
+lista editable. Se pueden dejar, pero **cambiar a AUSENTE a alguien ya cumplido NO reabre su
+formacion** —esta medido en `asistencia-matriz.mjs` y es a proposito: su constancia ya se emitio— y
+la pantalla no puede sugerir lo contrario. La forma honesta es dejarlos con su estado como TEXTO y
+los campos del certificado editables, que es la correccion real (llego el papel, el numero estaba
+mal). Deshacer un cumplimiento de verdad es "anular", y eso no existe todavia.
+
+**4. Orden y filtros.** Si los cerrados se quedan en la lista, los que faltan por revisar van
+PRIMERO —con veinte cerrados arriba, encontrar los tres que faltan es el trabajo— y hacen falta
+filtros por nombre y por estado.
+
+**5. Las descripciones largas, en TODA la aplicacion.** El cliente lo pidio como regla general:
+nada de textos de tres lineas a la vista. La salida acordada es un **icono de informacion** que
+despliegue la explicacion. Hace falta un componente reutilizable y despues pasar por los sitios
+peores. Es un cambio del sistema de diseño, no de una pantalla.
+
+**6. "Datos de la jornada" se quedo estrecho.** Al quitar la tarjeta del plan cuando no aplica, la
+de datos conservo el ancho de dos tercios y deja media pantalla vacia. Cuando no hay tarjeta de
+plan tiene que ocupar el ancho completo, y los datos van siempre arriba de "Faltan por convocar".
+
+**7. "La acredita un tercero" en la ficha, con dos opciones en vez de tres.** *"Lo que diga su
+tipo"* confunde. Se puede simplificar SIN perder la herencia: enseñar Si/No con el valor resuelto
+del tipo y **no mandar el campo mientras nadie lo toque** (queda `null` = hereda). El dia que
+alguien lo cambia, se guarda explicito.
