@@ -4,10 +4,14 @@
 // lo que pidio el cliente —*"no veo una que pueda probar el boton, deja una publicada para ver los
 // cambios"*— y para que las tres formas de la lista se vean una al lado de la otra:
 //
-//   1. PROPIA          la dicta la empresa. La lista solo pregunta quien vino.
-//   2. DE UN TERCERO   la dicta la ARL y la formacion lleva certificado: pide numero y vencimiento,
-//                      y la ENTIDAD sale sola de la jornada.
-//   3. QUE CERTIFICA   emite constancia propia al cerrar por asistencia (no lleva papel externo).
+//   1. PRESENCIAL PROPIA  la dicta la empresa en salon. La lista solo pregunta quien vino.
+//   2. DE UN TERCERO      la dicta la ARL y la formacion lleva certificado: pide numero y
+//                         vencimiento, y la ENTIDAD sale sola de la jornada.
+//   3. VIRTUAL CON FECHA  tiene fecha y se convoca, pero se hace en la plataforma: **no sale la
+//                         lista**, y es el caso que rompio la primera regla del cierre (#158).
+//
+// Las tres emiten su constancia propia si su tipo la promete: que haya papel de un tercero no la
+// suprime (#159). El tercer ejemplo existe para poder VER que el boton no aparece cuando no toca.
 //
 // Se borra con el mismo procedimiento que el resto de lo de prueba (ver el RUNBOOK): por prefijo.
 //
@@ -94,9 +98,9 @@ async function montar({ tipo, nombre, indice, papelDeTercero }) {
 }
 
 /** Jornada publicada con tres personas dentro, lista para tomar asistencia. */
-async function jornadaConGente({ versionId, nombre, quienLaDicta, hora }) {
+async function jornadaConGente({ versionId, nombre, quienLaDicta, hora, modality = 'PRESENCIAL' }) {
   const j = await admin.post('/offerings', {
-    activityVersionId: versionId, kind: 'EVENT', modality: 'PRESENCIAL',
+    activityVersionId: versionId, kind: 'EVENT', modality,
     scheduledDate: fecha, startTime: hora, endTime: '17:00',
     location: `Sala de formacion ${SUFIJO}`,
     ...(quienLaDicta ? { executedBy: 'ARL', executedByOther: quienLaDicta } : { executedBy: 'PROPIOS' }),
@@ -115,14 +119,14 @@ async function jornadaConGente({ versionId, nombre, quienLaDicta, hora }) {
 
 const enlaces = [];
 
-paso(1, 'PROPIA — la dicta la empresa: la lista solo pregunta quien vino');
+paso(1, 'PRESENCIAL PROPIA — la dicta la empresa: la lista solo pregunta quien vino');
 const propia = await montar({
   tipo: tipos.find((t) => t.code === 'CAPACITACION_EXTRAORDINARIA') ?? tipos[0],
-  nombre: 'Charla de seguridad vial (propia)', indice: 1, papelDeTercero: false,
+  nombre: 'Charla de seguridad vial (presencial propia)', indice: 1, papelDeTercero: false,
 });
 if (propia) {
   const id = await jornadaConGente({ versionId: propia.versionId, nombre: 'propia', quienLaDicta: null, hora: '08:00' });
-  if (id) { ok('jornada PROPIA publicada con 3 personas'); enlaces.push(['Propia (sin papel de tercero)', id]); }
+  if (id) { ok('jornada PRESENCIAL PROPIA publicada con 3 personas'); enlaces.push(['Presencial propia (lista, sin papel de tercero)', id]); }
 }
 
 paso(2, 'DE UN TERCERO — la dicta la ARL y la formacion lleva certificado');
@@ -135,14 +139,19 @@ if (externa) {
   if (id) { ok('jornada de UN TERCERO publicada: pedira numero y vencimiento, y la entidad saldra sola'); enlaces.push(['De un tercero (ARL Sura)', id]); }
 }
 
-paso(3, 'QUE CERTIFICA — emite constancia propia al cerrar por asistencia');
-const certifica = await montar({
+paso(3, 'VIRTUAL CON FECHA — se convoca, pero NO sale la lista: se hace en la plataforma');
+const virtual = await montar({
   tipo: tipos.find((t) => t.code === 'CAPACITACION_DEL_PLAN') ?? tipos[0],
-  nombre: 'Manejo defensivo (con constancia)', indice: 3, papelDeTercero: false,
+  nombre: 'Manejo defensivo (virtual con contenido)', indice: 3, papelDeTercero: false,
 });
-if (certifica) {
-  const id = await jornadaConGente({ versionId: certifica.versionId, nombre: 'certifica', quienLaDicta: null, hora: '14:00' });
-  if (id) { ok('jornada QUE CERTIFICA publicada: al marcar asistencia emite la constancia'); enlaces.push(['Que certifica (constancia propia)', id]); }
+if (virtual) {
+  const id = await jornadaConGente({
+    versionId: virtual.versionId, nombre: 'virtual', quienLaDicta: null, hora: '14:00', modality: 'VIRTUAL',
+  });
+  if (id) {
+    ok('jornada VIRTUAL publicada: tiene fecha y gente convocada, y aun asi NO ofrece tomar asistencia');
+    enlaces.push(['Virtual con fecha (sin lista: se hace en la plataforma)', id]);
+  }
 }
 
 console.log('\n─────────────────────────────────────────────────────────────');

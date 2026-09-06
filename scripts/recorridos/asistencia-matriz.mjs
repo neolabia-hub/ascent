@@ -270,12 +270,14 @@ for (const tipo of tipos) {
   }
 
   /*
-    LA CONSTANCIA, QUE ES LA PARTE QUE SE PIENSA MAL.
+    LA CONSTANCIA LA DECIDE EL TIPO, Y NADA MAS (corregido el 2026-09-06).
 
-    Con papel de un TERCERO no se emite la propia: dos documentos con dos numeros para un mismo
-    hecho es peor, en auditoria, que ninguno. Sin papel, si se emite — si su tipo la promete.
+    Aqui se esperaba que el papel de un TERCERO suprimiera la propia. Era una regla inventada y el
+    cliente la cazo: *"que un externo genere certificacion no quiere decir que no deba generarse la
+    interna"*. No son el mismo hecho —una dice "asistio el dia X" y la otra "esta habilitada hasta
+    Y"— y si una empresa no quiere las dos ya tiene donde decirlo.
   */
-  const debeHaberConstancia = contrato.constancia && !contrato.papelDeTercero;
+  const debeHaberConstancia = contrato.constancia;
   const aprendiz = crearCliente();
   let entro = false;
   try { await aprendiz.entrar(gente[0].doc, gente[0].clave); entro = true; } catch { entro = false; }
@@ -287,9 +289,7 @@ for (const tipo of tipos) {
       debeHaberConstancia ? !!suya : !suya,
       debeHaberConstancia
         ? 'y se emite la constancia propia, que es lo que promete su tipo'
-        : contrato.papelDeTercero
-          ? 'y NO se emite constancia propia: el papel que vale es el del tercero'
-          : 'y NO se emite constancia, que es lo que dice su tipo',
+        : 'y NO se emite constancia, que es lo que dice su tipo',
       debeHaberConstancia
         ? `su tipo emite constancia y no aparece ninguna (${items.length ?? 0} en total)`
         : 'se emitio una constancia que no deberia existir',

@@ -1,6 +1,6 @@
 'use client';
 
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
   marcarAsistencia,
@@ -9,61 +9,55 @@ import {
   type RosterRow,
 } from '@/lib/delivery-api';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { StatusPill } from '@/components/ui/status-pill';
+import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 
 /**
- * LA LISTA DE ASISTENCIA (Decision #157).
+ * LOS INSCRITOS, Y TOMAR SU ASISTENCIA — UNA SOLA TABLA CON DOS MODOS (Decision #157).
  *
- * ─── POR QUE HACIA FALTA ───
+ * ─── POR QUE UNA Y NO DOS ───
  *
- * Hasta aqui una formacion solo se podia dar por cumplida de UNA forma: la persona entrando a la
- * plataforma y completando el contenido. En una empresa bajo SG-SST la mayor parte del plan anual
- * se dicta en salon —charlas de seguridad vial, brigadas, lo que trae la ARL— y de eso no queda
- * contenido que completar: queda una hoja firmada. Sin esta pantalla, todo lo dictado
- * presencialmente contaba como incumplido, y el indicador enseñaba cero de lo que si se hizo.
+ * Habia dos tarjetas con la MISMA gente: "Inscritos" y, al pulsar el boton, otra lista casi igual
+ * debajo. Lo noto el cliente —*"¿no es redundante?"*— y tenia razon a medias: la informacion no era
+ * la misma (una decia el origen y el estado, la otra pedia la marca), pero **la gente si**, y dos
+ * tablas de las mismas personas obligan a mirar dos veces para responder una pregunta.
  *
- * ─── DONDE APARECE: LO DECIDE LA JORNADA, Y NO SE ADIVINA ───
+ * MIRAR ensena quien esta y como consta lo suyo; TOMAR ASISTENCIA, las mismas filas con lo que hay
+ * que marcar. **No se pierde ni una columna de las que habia** —persona, cargo, area, origen y
+ * estado siguen todas— porque eso era justo lo que no se podia sacrificar al juntarlas.
+ *
+ * ─── POR QUE HACIA FALTA TOMAR ASISTENCIA ───
+ *
+ * Hasta el 2026-09-05 una formacion solo se daba por cumplida de UNA forma: la persona entrando a
+ * la plataforma y completando el contenido. En una empresa bajo SG-SST buena parte del plan se
+ * dicta en salon, y de eso no queda contenido que completar: queda una hoja firmada.
+ *
+ * ─── DONDE APARECE ───
  *
  * `admiteAsistencia` viene RESUELTO del servidor (`cierre-de-la-jornada.ts`) y esta pantalla no
- * repite la condicion. La regla derivada cambio DOS veces en dos dias —primero el `kind`, despues
- * la modalidad— y las dos por un caso real que la anterior no cubria, asi que ahora hay una casilla
- * en la convocatoria con un defecto sensato: presencial e hibrida por lista, virtual por plataforma.
- *
- * ─── LOS TRES ESTADOS, Y EL CUARTO QUE ES NO HABER MIRADO ───
- *
- * PRESENT / ABSENT / JUSTIFIED son los del diseno (CLAUDE.md 3.7) y se guardan en
- * `attendance_records`. El cuarto estado es `null`: todavia sin revisar, que NO es lo mismo que
- * ausente — la primera es trabajo pendiente y la segunda es evidencia.
- *
- * **JUSTIFIED no exime la formacion**: explica por que no vino a ESA jornada, no que ya no tenga
- * que formarse. La sigue debiendo y va a la siguiente.
+ * repite la condicion. Cambio dos veces en dos dias, y una condicion que ya cambio dos veces es
+ * justo la que no puede vivir en dos sitios.
  *
  * ─── LO QUE SE DECIDIO PARA QUE NO SEA UN TRABAJO DE CHINOS ───
  *
- * Lo pidio el cliente —*"por si son muchos... como se puede ayudar a ser mas automatico"*— y son
- * cuatro cosas, todas sobre lo mismo: **que una jornada normal se cierre sin tocar la lista**.
- *
- *   1. Todos empiezan como PRESENTE. Lo normal es que quien fue convocado asista, asi que en una
- *      lista de cuarenta hay que cambiar tres, no marcar treinta y siete.
- *   2. La fecha viene de la JORNADA, no de hoy. Se toma asistencia al dia siguiente mas veces de
- *      las que se toma en el salon, y poner "hoy" hace que el cumplimiento quede fechado mal.
- *   3. **Todos asistieron / Nadie asistio**, para el caso raro en que se cancelo de hecho.
- *   4. El EMISOR del certificado no se teclea: sale de quien dicta la jornada. Escribirlo cuarenta
- *      veces es copiar un dato que el sistema ya tiene, y garantizar que en la fila 23 alguien
- *      ponga "ARL sura". Lo unico propio de cada persona es su NUMERO.
- *
- * **El papel del tercero solo se pide si la FORMACION lo lleva.** La decision viene resuelta del
- * servidor (`registraCertificadoExterno`), porque sale de la formacion con su tipo de respaldo y
- * dos implementaciones de la misma cascada acaban discrepando.
+ *   1. Todos empiezan como PRESENTE: en una lista de cuarenta se cambian tres, no se marcan 37.
+ *   2. La fecha viene de la JORNADA, no de hoy: se toma asistencia al dia siguiente muchas veces.
+ *   3. **Todos asistieron / Nadie asistio** para la lista entera.
+ *   4. El EMISOR del certificado sale de quien dicta la jornada; lo unico propio de cada persona es
+ *      su NUMERO. Y el vencimiento se pone una vez y se reparte.
+ *   5. La columna **Motivo solo sale si hay alguna falta justificada**: una columna de guiones en
+ *      todas las filas hace que nadie lea la unica que si dice algo.
  */
 export function ListaDeAsistencia({
   offeringId,
   roster,
+  admiteAsistencia,
+  puedeInscribir,
   pideCertificado,
   quienLaDicto,
   fechaDeLaJornada,
@@ -71,55 +65,50 @@ export function ListaDeAsistencia({
 }: {
   offeringId: string;
   roster: RosterRow[];
-  /** Resuelto por el servidor: la formacion manda y su tipo es el punto de partida. */
+  /** Resuelto por el servidor: si esta jornada se cierra con lista o con la plataforma. */
+  admiteAsistencia: boolean;
+  /** Para el mensaje de la lista vacia: si ya se puede convocar o todavia hay que publicar. */
+  puedeInscribir: boolean;
   pideCertificado: boolean;
-  /** Quien la dicta ("ARL Sura", "PROPIOS"): el emisor por defecto, para no teclearlo por cabeza. */
+  /** Quien la dicta ("ARL Sura"): el emisor por defecto, para no teclearlo por cabeza. */
   quienLaDicto: string;
   fechaDeLaJornada: string | null;
   onHecho: () => void;
 }) {
   const { showToast } = useToast();
-  const [abierta, setAbierta] = useState(false);
+  const [tomando, setTomando] = useState(false);
   const [busy, setBusy] = useState(false);
   // La fecha de la JORNADA, no la de hoy: se toma asistencia al dia siguiente mas veces de las que
-  // se toma en el salon, y fechar el cumplimiento en el dia que se teclea es fecharlo mal.
-  const [heldOn, setHeldOn] = useState(
-    () => (fechaDeLaJornada ?? new Date().toISOString()).slice(0, 10),
-  );
+  // se toma en el salon, y fechar el cumplimiento el dia que se teclea es fecharlo mal.
+  const [heldOn, setHeldOn] = useState(() => (fechaDeLaJornada ?? new Date().toISOString()).slice(0, 10));
 
-  /**
-   * Quien ya tiene su formacion cerrada no entra en la lista: no hay nada que marcarle, y dejarlo
-   * invita a "revisar" a alguien cuya evidencia ya esta escrita.
-   */
+  /** Quien ya tiene su formacion cerrada no entra a marcarse: no hay nada que hacerle. */
   const porRevisar = useMemo(() => roster.filter((fila) => !fila.completedAt), [roster]);
-  const yaRevisados = roster.length - porRevisar.length;
 
   const [estados, setEstados] = useState<Record<string, AsistenciaEstado>>({});
   const [motivos, setMotivos] = useState<Record<string, string>>({});
   const [papeles, setPapeles] = useState<Record<string, CertificadoExterno>>({});
+  const [vencePorLote, setVencePorLote] = useState('');
 
   const estadoDe = (id: string): AsistenciaEstado => estados[id] ?? 'PRESENT';
   const papel = (id: string) => papeles[id] ?? { number: '' };
-  const cuentaPresentes = porRevisar.filter((fila) => estadoDe(fila.id) === 'PRESENT').length;
+  const presentes = porRevisar.filter((fila) => estadoDe(fila.id) === 'PRESENT').length;
 
-  /** Marcar la lista entera de una vez: la jornada que fue como debia, o la que no se dicto. */
+  /** La columna de motivo, solo cuando hay algo que justificar. Ver la nota de la cabecera. */
+  const hayJustificadas = porRevisar.some((fila) => estadoDe(fila.id) === 'JUSTIFIED');
+  const faltaMotivo = porRevisar.some(
+    (fila) => estadoDe(fila.id) === 'JUSTIFIED' && (motivos[fila.id] ?? '').trim().length < 5,
+  );
+
   function todos(estado: AsistenciaEstado) {
     setEstados(Object.fromEntries(porRevisar.map((fila) => [fila.id, estado])));
   }
 
-  /*
-    LA MISMA FECHA DE VENCIMIENTO PARA TODOS (2026-09-06).
-
-    Lo pidio el cliente: *"Vence sale sin marcar y no ayuda de marcado rapido, o esta es
-    individual"*. Es individual en el modelo —cada certificado es de una persona— pero **en la
-    practica es la misma para toda la jornada**: los veinte se certificaron el mismo dia, en el
-    mismo curso, con la misma entidad. Escribirla veinte veces es teclear veinte veces el mismo
-    dato, y a la decima alguien pone otro ano.
-
-    Se deja individual por si acaso —hay cursos donde el papel de alguien vence antes— pero el
-    camino normal es ponerla una vez y repartirla.
-  */
-  const [vencePorLote, setVencePorLote] = useState('');
+  /**
+   * La misma fecha de vencimiento para todos: es individual en el modelo —cada certificado es de una
+   * persona— pero en la practica es la misma para toda la jornada. Escribirla veinte veces es
+   * teclear veinte veces el mismo dato, y a la decima alguien pone otro ano.
+   */
   function repartirVencimiento() {
     if (!vencePorLote) return;
     setPapeles((previos) =>
@@ -129,11 +118,6 @@ export function ListaDeAsistencia({
     );
   }
 
-  /** Una justificacion sin motivo no justifica nada, y es lo que el auditor va a leer. */
-  const faltaMotivo = porRevisar.some(
-    (fila) => estadoDe(fila.id) === 'JUSTIFIED' && (motivos[fila.id] ?? '').trim().length < 5,
-  );
-
   async function guardar() {
     setBusy(true);
     try {
@@ -142,19 +126,13 @@ export function ListaDeAsistencia({
         items: porRevisar.map((fila) => {
           const estado = estadoDe(fila.id);
           const p = papel(fila.id);
-          // El emisor lo pone el servidor desde la jornada; aqui solo viaja lo propio de la persona.
           const tienePapel = pideCertificado && estado === 'PRESENT' && p.number.trim();
           return {
             enrollmentId: fila.id,
             estado,
             ...(estado === 'JUSTIFIED' ? { motivo: (motivos[fila.id] ?? '').trim() } : {}),
             ...(tienePapel
-              ? {
-                  certificate: {
-                    number: p.number.trim(),
-                    ...(p.validUntil ? { validUntil: p.validUntil } : {}),
-                  },
-                }
+              ? { certificate: { number: p.number.trim(), ...(p.validUntil ? { validUntil: p.validUntil } : {}) } }
               : {}),
           };
         }),
@@ -167,7 +145,7 @@ export function ListaDeAsistencia({
             ? `${resultado.ausentes} no asistieron (${resultado.justificados} con justificacion) y la siguen debiendo.`
             : 'Asistieron todos los convocados.',
       });
-      setAbierta(false);
+      setTomando(false);
       onHecho();
     } catch (error) {
       showToast({
@@ -180,39 +158,60 @@ export function ListaDeAsistencia({
     }
   }
 
-  if (roster.length === 0) return null;
+  /** COMO CONSTA lo suyo, que dice mas que "completada": por asistencia o por la plataforma. */
+  const comoConsta = (fila: RosterRow): { kind: StatusPillKind; label: string } => {
+    if (fila.completedAt) {
+      return { kind: 'ok', label: fila.attendanceStatus === 'PRESENT' ? 'ASISTIO' : 'EN PLATAFORMA' };
+    }
+    if (fila.attendanceStatus === 'JUSTIFIED') return { kind: 'info', label: 'FALTA JUSTIFICADA' };
+    if (fila.attendanceStatus === 'ABSENT') return { kind: 'warn', label: 'NO ASISTIO' };
+    return { kind: 'neutral', label: 'INSCRITO' };
+  };
 
   return (
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div>
-          <h2 className="font-display text-base font-semibold text-ink-900">Lista de asistencia</h2>
+          <h2 className="font-display text-base font-semibold text-ink-900">Inscritos</h2>
           <p className="mt-0.5 text-sm text-ink-500">
-            {porRevisar.length === 0
-              ? 'Todos los inscritos ya tienen su formacion cerrada.'
-              : `${porRevisar.length} por revisar${yaRevisados > 0 ? ` · ${yaRevisados} ya cerrada(s)` : ''}`}
+            {roster.length} persona{roster.length === 1 ? '' : 's'}
+            {admiteAsistencia && porRevisar.length > 0 ? ` · ${porRevisar.length} por revisar` : ''}
+            {admiteAsistencia && porRevisar.length === 0 && roster.length > 0 ? ' · asistencia tomada' : ''}
           </p>
         </div>
-        {porRevisar.length > 0 ? (
-          <Button variant={abierta ? 'ghost' : 'primary'} onClick={() => setAbierta(!abierta)}>
-            {abierta ? 'Cancelar' : 'Tomar asistencia'}
+        {admiteAsistencia && porRevisar.length > 0 ? (
+          <Button variant={tomando ? 'ghost' : 'primary'} onClick={() => setTomando(!tomando)}>
+            {tomando ? 'Cancelar' : 'Tomar asistencia'}
           </Button>
         ) : null}
       </div>
 
-      {abierta && porRevisar.length > 0 ? (
+      {roster.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="Nadie inscrito todavia"
+          description={
+            puedeInscribir
+              ? 'Inscribe a quienes ya tienen la obligacion de esta actividad en la sede de la convocatoria.'
+              : 'Publica la convocatoria para poder inscribir personas.'
+          }
+        />
+      ) : null}
+
+      {/* ── MODO TOMAR ASISTENCIA ─────────────────────────────────────────────────────────────── */}
+      {tomando && porRevisar.length > 0 ? (
         <div className="border-t border-line">
-          <div className="flex flex-wrap items-end gap-4 px-5 py-4">
-            <Field htmlFor="asist-fecha" label="Se dicto el" hint="Es la fecha que queda como cumplimiento.">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 px-5 py-4">
+            <Field htmlFor="asist-fecha" label="Se dicto el" hint="El dia de la sesion: queda como fecha de cumplimiento.">
               <Input
                 id="asist-fecha"
                 type="date"
-                className="max-w-[11rem]"
+                className="w-[11rem]"
                 value={heldOn}
                 onChange={(e) => setHeldOn(e.target.value)}
               />
             </Field>
-            <div className="flex flex-wrap items-center gap-2 pb-1">
+            <div className="flex items-center gap-2 pb-1">
               <Button variant="ghost" onClick={() => todos('PRESENT')}>
                 Todos asistieron
               </Button>
@@ -220,54 +219,51 @@ export function ListaDeAsistencia({
                 Nadie asistio
               </Button>
             </div>
+            <p className="pb-2 text-sm text-ink-500">
+              <strong className="font-medium text-ink-900">{presentes}</strong> de {porRevisar.length} asistieron
+            </p>
           </div>
 
-          <p className="px-5 pb-3 text-sm text-ink-500">
-            <strong className="font-medium text-ink-900">{cuentaPresentes}</strong> de {porRevisar.length} asistieron.
-            Quien no vino <strong className="font-medium text-ink-700">sigue debiendo</strong> la formacion, aunque la
-            falta este justificada.
-          </p>
-
           {pideCertificado ? (
-            <div className="border-t border-line px-5 py-3">
+            <div className="border-t border-line bg-paper px-5 py-4">
               <p className="flex items-start gap-2 text-sm text-ink-500">
                 <ClipboardList size={15} className="mt-0.5 shrink-0" strokeWidth={2} />
                 <span>
-                  El certificado lo expide <strong className="font-medium text-ink-700">{quienLaDicto}</strong>, que es
-                  quien dicta esta jornada — no hay que escribirlo por persona. Solo su{' '}
-                  <strong className="font-medium text-ink-700">numero</strong>, y el vencimiento si lo trae:{' '}
-                  <strong className="font-medium text-ink-700">esa fecha manda</strong> sobre la que calcularia el
-                  sistema. Si el papel todavia no ha llegado, deja el numero en blanco y añadelo despues.
+                  El certificado lo expide <strong className="font-medium text-ink-700">{quienLaDicto}</strong>, que
+                  dicta esta jornada: no hay que escribirlo por persona, solo su{' '}
+                  <strong className="font-medium text-ink-700">numero</strong>. Si todavia no ha llegado, dejalo en
+                  blanco y añadelo despues.
                 </span>
               </p>
               <div className="mt-3 flex flex-wrap items-end gap-3">
                 <Field
                   htmlFor="asist-vence-lote"
-                  label="Todos vencen el"
-                  hint="Lo normal: se certificaron el mismo dia, en el mismo curso."
+                  label="El certificado vence el"
+                  hint="Lo que dice el papel — puede ser dentro de anos, no el dia de la sesion. Esa fecha manda sobre la que calcularia el sistema."
                 >
                   <Input
                     id="asist-vence-lote"
                     type="date"
-                    className="max-w-[11rem]"
+                    className="w-[11rem]"
                     value={vencePorLote}
                     onChange={(e) => setVencePorLote(e.target.value)}
                   />
                 </Field>
                 <Button variant="ghost" onClick={repartirVencimiento} disabled={!vencePorLote}>
-                  Ponerla a todos
+                  Ponerselo a todos
                 </Button>
               </div>
             </div>
           ) : null}
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border-t border-line">
             <Table>
               <THead>
                 <Tr>
                   <Th>Persona</Th>
+                  <Th>Cargo y area</Th>
                   <Th>Asistencia</Th>
-                  <Th>Motivo</Th>
+                  {hayJustificadas ? <Th>Motivo de la falta</Th> : null}
                   {pideCertificado ? <Th>No. de certificado</Th> : null}
                   {pideCertificado ? <Th>Vence</Th> : null}
                 </Tr>
@@ -282,11 +278,14 @@ export function ListaDeAsistencia({
                           {fila.user.fullName}
                         </div>
                         <div className="font-mono text-xs text-ink-500">{fila.user.documentNumber}</div>
-                        <div className="text-xs text-ink-500">{fila.user.jobTitle.name}</div>
+                      </Td>
+                      <Td className="text-sm text-ink-700">
+                        {fila.user.jobTitle.name}
+                        <div className="text-xs text-ink-500">{fila.user.area.name}</div>
                       </Td>
                       <Td>
                         <Select
-                          className="max-w-[9.5rem]"
+                          className="w-[10.5rem]"
                           aria-label={`Asistencia de ${fila.user.fullName}`}
                           value={estado}
                           onChange={(e) => setEstados({ ...estados, [fila.id]: e.target.value as AsistenciaEstado })}
@@ -296,24 +295,24 @@ export function ListaDeAsistencia({
                           <option value="JUSTIFIED">Falta justificada</option>
                         </Select>
                       </Td>
-                      <Td>
-                        {estado === 'JUSTIFIED' ? (
-                          <Input
-                            className="max-w-[14rem]"
-                            placeholder="Incapacidad, vacaciones..."
-                            aria-label={`Motivo de la falta de ${fila.user.fullName}`}
-                            value={motivos[fila.id] ?? ''}
-                            onChange={(e) => setMotivos({ ...motivos, [fila.id]: e.target.value })}
-                          />
-                        ) : (
-                          <span className="text-sm text-ink-500">—</span>
-                        )}
-                      </Td>
+                      {hayJustificadas ? (
+                        <Td>
+                          {estado === 'JUSTIFIED' ? (
+                            <Input
+                              className="w-[15rem]"
+                              placeholder="Incapacidad, vacaciones..."
+                              aria-label={`Motivo de la falta de ${fila.user.fullName}`}
+                              value={motivos[fila.id] ?? ''}
+                              onChange={(e) => setMotivos({ ...motivos, [fila.id]: e.target.value })}
+                            />
+                          ) : null}
+                        </Td>
+                      ) : null}
                       {pideCertificado ? (
                         <Td>
                           {estado === 'PRESENT' ? (
                             <Input
-                              className="max-w-[10rem]"
+                              className="w-[10rem]"
                               placeholder="Opcional"
                               aria-label={`Numero de certificado de ${fila.user.fullName}`}
                               value={papel(fila.id).number}
@@ -321,9 +320,7 @@ export function ListaDeAsistencia({
                                 setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), number: e.target.value } })
                               }
                             />
-                          ) : (
-                            <span className="text-sm text-ink-500">—</span>
-                          )}
+                          ) : null}
                         </Td>
                       ) : null}
                       {pideCertificado ? (
@@ -331,16 +328,14 @@ export function ListaDeAsistencia({
                           {estado === 'PRESENT' ? (
                             <Input
                               type="date"
-                              className="max-w-[9.5rem]"
+                              className="w-[10.5rem]"
                               aria-label={`Vence el certificado de ${fila.user.fullName}`}
                               value={papel(fila.id).validUntil ?? ''}
                               onChange={(e) =>
                                 setPapeles({ ...papeles, [fila.id]: { ...papel(fila.id), validUntil: e.target.value } })
                               }
                             />
-                          ) : (
-                            <span className="text-sm text-ink-500">—</span>
-                          )}
+                          ) : null}
                         </Td>
                       ) : null}
                     </Tr>
@@ -350,59 +345,73 @@ export function ListaDeAsistencia({
             </Table>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
-            <Button variant="ghost" onClick={() => setAbierta(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={guardar} loading={busy} disabled={faltaMotivo}>
-              {faltaMotivo ? 'Falta el motivo de la justificacion' : `Dar por cumplida a ${cuentaPresentes}`}
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4">
+            <p className="text-sm text-ink-500">
+              Quien no vino <strong className="font-medium text-ink-700">sigue debiendo</strong> la formacion, aunque la
+              falta este justificada.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setTomando(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={guardar} loading={busy} disabled={faltaMotivo}>
+                {faltaMotivo ? 'Falta el motivo' : `Dar por cumplida a ${presentes}`}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {!abierta && roster.some((fila) => fila.attendanceStatus || fila.completedAt) ? (
+      {/* ── MODO MIRAR: todo lo que ensenaba "Inscritos", mas como consta ─────────────────────── */}
+      {!tomando && roster.length > 0 ? (
         <div className="overflow-x-auto border-t border-line">
           <Table>
             <THead>
               <Tr>
                 <Th>Persona</Th>
+                <Th>Cargo</Th>
+                <Th>Area</Th>
+                <Th>Origen</Th>
                 <Th>Como consta</Th>
-                <Th>Certificado</Th>
-                <Th>Vence</Th>
+                {pideCertificado ? <Th>Certificado</Th> : null}
               </Tr>
             </THead>
             <TBody>
-              {roster
-                .filter((fila) => fila.attendanceStatus || fila.completedAt)
-                .map((fila) => (
+              {roster.map((fila) => {
+                const pill = comoConsta(fila);
+                return (
                   <Tr key={fila.id}>
-                    <Td className="font-medium text-ink-900">{fila.user.fullName}</Td>
                     <Td>
-                      <StatusPill
-                        kind={fila.completedAt ? 'ok' : fila.attendanceStatus === 'JUSTIFIED' ? 'info' : 'warn'}
-                        label={
-                          fila.attendanceStatus === 'PRESENT'
-                            ? 'ASISTIO'
-                            : fila.attendanceStatus === 'JUSTIFIED'
-                              ? 'FALTA JUSTIFICADA'
-                              : fila.attendanceStatus === 'ABSENT'
-                                ? 'NO ASISTIO'
-                                : 'EN PLATAFORMA'
-                        }
-                      />
+                      <div className="font-medium text-ink-900">{fila.user.fullName}</div>
+                      <div className="font-mono text-xs text-ink-500">{fila.user.documentNumber}</div>
+                    </Td>
+                    <Td className="text-ink-700">{fila.user.jobTitle.name}</Td>
+                    <Td className="text-ink-500">{fila.user.area.name}</Td>
+                    <Td className="text-ink-500">{fila.assignmentId ? 'Obligacion' : 'Inscripcion directa'}</Td>
+                    <Td>
+                      <StatusPill kind={pill.kind} label={pill.label} />
                       {fila.attendanceNote ? (
                         <div className="mt-0.5 text-xs text-ink-500">{fila.attendanceNote}</div>
                       ) : null}
                     </Td>
-                    <Td className="text-ink-700">
-                      {fila.extCertNumber ? `${fila.extCertIssuer} · ${fila.extCertNumber}` : '—'}
-                    </Td>
-                    <Td className="text-ink-700">
-                      {fila.extCertValidUntil ? fila.extCertValidUntil.slice(0, 10) : '—'}
-                    </Td>
+                    {pideCertificado ? (
+                      <Td className="text-ink-700">
+                        {fila.extCertNumber ? (
+                          <>
+                            <div>{fila.extCertNumber}</div>
+                            <div className="text-xs text-ink-500">
+                              {fila.extCertIssuer}
+                              {fila.extCertValidUntil ? ` · vence ${fila.extCertValidUntil.slice(0, 10)}` : ''}
+                            </div>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </Td>
+                    ) : null}
                   </Tr>
-                ))}
+                );
+              })}
             </TBody>
           </Table>
         </div>

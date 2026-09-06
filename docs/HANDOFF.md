@@ -20,6 +20,77 @@ un diario, no una referencia.
 
 ---
 
+## 2026-09-06 (noche, 2) — Una regla que invente, y la pantalla mirada por el cliente
+
+### 1. La constancia interna la decide el TIPO, y nada mas
+
+Al cerrar por asistencia, con papel de un tercero **no se emitia la constancia propia**. La razon
+sonaba bien —*"dos documentos con dos numeros para un mismo hecho confunden en una auditoria"*— y
+era mia. El cliente la cazo: *"que un externo genere certificacion no quiere decir que no deba
+generarse la interna"*.
+
+Dos motivos, y el segundo pesa mas:
+
+1. **No son el mismo hecho.** La constancia de la empresa dice "asistio a esta formacion el dia X"
+   —es SU registro—; el papel de la ARL dice "esta habilitada hasta Y". Un auditor puede pedir
+   cualquiera de los dos.
+2. **Era una excepcion cableada que le quitaba la decision al tenant.** Si una empresa no quiere
+   las dos, ya tiene donde decirlo: `issuesCertificate`, con su cascada de tipo y ficha (#111).
+
+**La leccion, que es la de todo el dia:** lo que dependa de como trabaja una empresa se configura;
+lo que no, se deduce del modelo. Una regla que suena razonable y no se puede apagar es una decision
+tomada por el equipo en nombre de un cliente que no la pidio.
+
+### 2. La pantalla de la convocatoria, mirada por el cliente
+
+- **Dos tablas con la misma gente.** Ahora es UNA con dos modos, y **sin perder ninguna columna**:
+  el cliente lo advirtio expresamente —*"Inscritos tiene informacion importante, no se puede
+  sacrificar"*— asi que persona, cargo, area, origen y estado siguen todas.
+- **"En el plan anual" ocupaba media pantalla para decir que no aplica**, en los seis tipos que no
+  participan. Ahora es un renglon dentro de los datos de la jornada cuando no aplica, y sigue
+  siendo tarjeta cuando si.
+- **Faltaba informacion en los datos de la jornada**: modalidad, intensidad desglosada (que el PESV
+  exige y solo estaba en el formulario) y **como se acredita**, que es la pregunta que llega justo
+  despues de "¿por que no me sale el boton?".
+- **La columna Motivo salia siempre**, con un guion en cada fila. Ahora solo si hay alguna falta
+  justificada.
+- **"Se dicto el" y "vence" se confundian.** El primero es el dia de la sesion y queda como fecha
+  de cumplimiento; el segundo es lo que dice el papel del tercero y puede ser dentro de anos.
+- **La descripcion del interruptor del tipo era muy larga** y partia la fila en tres lineas.
+
+### 3. Quien dicto la anterior, heredado
+
+Pasa que la misma formacion la de una ARL en marzo y otra en septiembre —al cambiar de ARL, al
+dictarla en dos ciudades— pero es minoria. Por eso el dato sigue en la CONVOCATORIA, que es donde
+cambia, y se hereda de la ultima jornada de esa formacion. **Se rellena, no se bloquea**: heredar y
+bloquear son cosas distintas, y bloquear seria convertir "lo normal" en "lo unico".
+
+### Y una aclaracion de concepto que valia la pena
+
+El cliente pregunto si **Recertificacion** es solo para lo que acredita un tercero. No: es la
+competencia del puesto **que caduca**. Lo que la define es que vence y hay que renovarla; quien
+emite el papel es otro eje y va aparte. Una empresa con instructor propio que certifica internamente
+sigue usando Recertificacion y apaga "la acredita un tercero" en su ficha.
+
+### El barrido
+
+```
+15 recorridos           TODO BIEN
+401 pruebas unitarias   pasan
+21 e2e                  pasan
+build - lint - types    limpios       (1 aviso de lint, ninguno nuevo)
+```
+
+### Lo que sigue abierto
+
+1. **El archivo no se sube todavia**: PDF del certificado y acta escaneada.
+2. **Los mecanismos 2 y 3 de la asistencia**: QR de sesion y firma en pantalla.
+3. **La segunda puerta** para el papel que llega tarde, desde la ficha de la persona.
+4. **El informe de Vencimientos**: fuente vacia y eje equivocado.
+5. **Repaso / volver a verlo**, y **el aviso interno** al jefe o a SST.
+
+---
+
 ## 2026-09-06 (noche) — La regla cambio dos veces en dos dias, asi que dejo de haber regla
 
 El cliente lo puso en una frase que ordena todo lo demas: *"hay que crear el software

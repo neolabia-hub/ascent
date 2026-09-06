@@ -157,8 +157,10 @@ const REGLAS = [
       de una jornada a otra. La misma habilitacion la puede dictar la ARL en marzo y un centro de
       entrenamiento en septiembre.
     */
-    detalle:
-      'Es el punto de partida de sus formaciones: cada una puede decir otra cosa desde su ficha. Cuando aplica, la lista de asistencia pide el numero del certificado y su vencimiento — y esa fecha manda sobre la que calcula la recurrencia. QUIEN lo expide sale de la convocatoria.',
+    // Corto a proposito: la fila del tipo tiene el mismo alto que las otras cuatro y el detalle
+    // largo la partia en tres lineas. Lo que hace falta saber para decidir cabe en una frase; el
+    // resto vive en la ficha, que es donde de verdad se elige.
+    detalle: 'Punto de partida de sus formaciones. Cada una puede decir otra cosa desde su ficha.',
   },
 ];
 

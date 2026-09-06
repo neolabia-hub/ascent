@@ -40,6 +40,10 @@ const OFFERING_LIST_SELECT = {
   windowStart: true,
   windowEnd: true,
   location: true,
+  // QUIEN LA DICTO, para que la siguiente jornada de la misma formacion no lo pida otra vez: lo
+  // normal es que la dicte el mismo (2026-09-06).
+  executedBy: true,
+  executedByOther: true,
   projectedCount: true,
   projectedFrozenAt: true,
   regional: { select: { id: true, name: true } },

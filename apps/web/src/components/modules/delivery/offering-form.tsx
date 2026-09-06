@@ -93,7 +93,33 @@ function ejemploDe(executedBy: ExecutedBy): string {
 }
 
 /** Valores iniciales de una convocatoria nueva: los que el TIPO propone. */
-export function nuevaConvocatoria(config: ActivityTypeConfig, modality: Modality): OfferingFormValue {
+/**
+ * QUIEN LA DICTO LA VEZ ANTERIOR, para no volver a teclearlo.
+ *
+ * Lo pregunto el cliente —*"¿de verdad pasa que la misma formacion la de una ARL en marzo y otra en
+ * septiembre?"*— y la respuesta honesta es que pasa, pero es minoria: al cambiar de ARL, al
+ * dictarla en dos ciudades con centros distintos, o cuando una sesion la cubre un instructor propio.
+ *
+ * Por eso el dato sigue viviendo en la CONVOCATORIA y no en la formacion —cuando cambia, cambia ahi—
+ * pero se hereda de la ultima: lo normal es repetirlo, y escribirlo cada vez es teclear un dato que
+ * el sistema ya tiene tres lineas mas arriba.
+ */
+export function quienDictoLaAnterior(
+  previas: { scheduledDate: string | null; executedBy?: string; executedByOther?: string | null }[],
+): { executedBy: string; executedByOther: string } | null {
+  const conEjecutor = previas.filter((o) => o.executedBy);
+  if (conEjecutor.length === 0) return null;
+  // La mas reciente por fecha; las que no tienen fecha van al final.
+  const ultima = [...conEjecutor].sort((a, b) => (b.scheduledDate ?? '').localeCompare(a.scheduledDate ?? ''))[0];
+  if (!ultima?.executedBy) return null;
+  return { executedBy: ultima.executedBy, executedByOther: ultima.executedByOther ?? '' };
+}
+
+export function nuevaConvocatoria(
+  config: ActivityTypeConfig,
+  modality: Modality,
+  heredado?: { executedBy: string; executedByOther: string } | null,
+): OfferingFormValue {
   const conFecha = esJornada(config);
   return {
     kind: config.defaultOfferingKind,
@@ -108,8 +134,9 @@ export function nuevaConvocatoria(config: ActivityTypeConfig, modality: Modality
     intensityPracticeHours: '',
     instructorUserId: '',
     instructorExternalName: '',
-    executedBy: 'PROPIOS',
-    executedByOther: '',
+    // Se hereda de la jornada anterior de esta formacion; 'PROPIOS' solo cuando no hay ninguna.
+    executedBy: (heredado?.executedBy as ExecutedBy) ?? 'PROPIOS',
+    executedByOther: heredado?.executedByOther ?? '',
     location: '',
     regionalId: '',
     capacity: '',

@@ -17,8 +17,8 @@
 //   1. La asistencia va con el `kind` (EVENT) y NO con la modalidad: una PERMANENTE la rechaza.
 //   2. Quien asistio queda CUMPLIDO sin tocar el contenido — que es el punto entero.
 //   3. Quien NO asistio la sigue debiendo: no se cierra ni se retira nada.
-//   4. Con papel de un tercero NO se emite constancia propia: dos papeles para un hecho es peor
-//      que ninguno.
+//   4. La constancia propia la decide el TIPO: el papel de un tercero NO la suprime — no son el
+//      mismo hecho (una dice "asistio el dia X" y la otra "esta habilitada hasta Y").
 //   5. EL PAPEL MANDA: su fecha se copia a la obligacion y es la que decide cuando vuelve.
 //   6. Y el certificado externo solo se acepta si el TIPO lo lleva (`tracksExternalCertificate`),
 //      comprobado contra el SERVIDOR y no solo en la pantalla.
@@ -303,7 +303,7 @@ comprobar(viva.length === 1, 'sigue con su obligacion viva: no se cerro y no se 
 const filaFalta = listaTras.find((f) => f.user.id === elQueFalta.id);
 comprobar(filaFalta?.attendanceStatus === 'ABSENT', 'y en la lista consta que se le convoco y no asistio', 'quedo marcado como asistente');
 
-paso(10, 'CON PAPEL DE UN TERCERO NO SE EMITE CONSTANCIA PROPIA');
+paso(10, 'LA CONSTANCIA PROPIA SE EMITE AUNQUE HAYA PAPEL DE UN TERCERO');
 /*
   Dos papeles con dos numeros para un mismo hecho es peor, en una auditoria, que no tener ninguno.
   El documento que vale es el del organismo acreditado. Al reves —una charla presencial que NO
@@ -317,9 +317,9 @@ if (entro) {
   const items = cert?.items ?? cert ?? [];
   const suya = (items.find?.((c) => c.activityName?.includes(SUFIJO) || c.activity?.id === creado.activityId)) ?? null;
   comprobar(
-    !suya,
-    'no se emite constancia propia: el papel que vale es el de la ARL',
-    'se emitio una constancia propia encima del certificado del tercero',
+    !!suya,
+    'se emite la constancia propia ADEMAS del papel de la ARL: son dos hechos distintos',
+    `su tipo emite constancia y no aparece ninguna (${items.length ?? 0} en total)`,
   );
 }
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, SlidersHorizontal, UserPlus, Users, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, SlidersHorizontal, UserPlus, XCircle } from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import {
   adjustProjected,
@@ -25,12 +25,10 @@ import { formatDate } from '@/lib/format';
 import { ListaDeAsistencia } from '@/components/modules/delivery/lista-de-asistencia';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
-import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 
 const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string }> = {
@@ -550,6 +548,12 @@ export default function ConvocatoriaDetallePage() {
               </dd>
             </div>
             <div>
+              <dt className="text-xs text-ink-500">Modalidad</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.modality === 'PRESENCIAL' ? 'Presencial' : offering.modality === 'VIRTUAL' ? 'Virtual' : 'Hibrida'}
+              </dd>
+            </div>
+            <div>
               <dt className="text-xs text-ink-500">Lugar</dt>
               <dd className="text-sm text-ink-900">{offering.location ?? 'Virtual'}</dd>
             </div>
@@ -562,13 +566,60 @@ export default function ConvocatoriaDetallePage() {
               <dd className="text-sm text-ink-900">{offering.instructor?.fullName ?? offering.instructorExternalName ?? 'Sin asignar'}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink-500">Cupo</dt>
-              <dd className="text-sm text-ink-900">{offering.capacity ?? 'Sin limite'}</dd>
-            </div>
-            <div>
               <dt className="text-xs text-ink-500">Ejecutada por</dt>
               <dd className="text-sm text-ink-900">{offering.executedByOther ?? offering.executedBy}</dd>
             </div>
+            <div>
+              <dt className="text-xs text-ink-500">Cupo</dt>
+              <dd className="text-sm text-ink-900">{offering.capacity ?? 'Sin limite'}</dd>
+            </div>
+            {/*
+              LA INTENSIDAD, DESGLOSADA (Decision #30): el PESV la exige separada y BPM suma las
+              10 h/ano. Estaba en el formulario y no se veia en la ficha, que es donde la busca
+              quien prepara una auditoria.
+            */}
+            <div>
+              <dt className="text-xs text-ink-500">Intensidad</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.intensityTheoryHours !== null || offering.intensityPracticeHours !== null
+                  ? `${offering.intensityTheoryHours ?? 0} h teoricas · ${offering.intensityPracticeHours ?? 0} h practicas`
+                  : 'Sin registrar'}
+              </dd>
+            </div>
+            {/*
+              COMO SE ACREDITA, que es lo que decide si sale la lista de asistencia. Viene resuelto
+              del servidor y se enseña aqui porque es la pregunta que llega justo despues de "¿por
+              que no me sale el boton?".
+            */}
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-ink-500">Como se acredita</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.admiteAsistencia
+                  ? 'Con la lista de asistencia de la sesion'
+                  : 'Con lo que cada persona complete en la plataforma'}
+                {offering.closesByAttendance !== null ? (
+                  <span className="ml-2 text-xs text-ink-500">(elegido para esta jornada)</span>
+                ) : null}
+              </dd>
+            </div>
+            {/*
+              LO DEL PLAN, EN UNA LINEA CUANDO NO APLICA (2026-09-06).
+
+              Tenia una tarjeta entera para decir que no entraba a ningun plan, y ocupaba media
+              pantalla en las seis formaciones de los siete tipos que no pueden entrar. Lo noto el
+              cliente. No desaparece —"¿donde esta lo del plan?" sigue siendo una pregunta legitima
+              cuando la tarjeta si sale en las de al lado— pero pasa a ser un renglon.
+            */}
+            {!entraAlPlan ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-ink-500">Plan anual</dt>
+                <dd className="text-sm text-ink-700">
+                  No aplica: una{' '}
+                  <span className="font-medium text-ink-900">{offering.activityVersion.activity.activityType.name}</span>{' '}
+                  no entra al plan. El cumplimiento del ano solo lo mueve lo que estaba planeado.
+                </dd>
+              </div>
+            ) : null}
           </dl>
           {offering.projectedAdjustReason ? (
             <p className="mt-4 rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
@@ -581,127 +632,60 @@ export default function ConvocatoriaDetallePage() {
         </div>
 
         {/*
-          LA TARJETA DEL PLAN DICE LA VERDAD SEGUN EL TIPO (2026-09-04).
+          LA TARJETA DEL PLAN, SOLO CUANDO PUEDE ENTRAR A UNO.
 
-          Decia "no pertenece a ningun plan — agregala desde el plan si debe contar para el programa
-          anual" tambien en las CINCO formaciones que, por su tipo, **no pueden** entrar a ninguno:
-          era pedirle a alguien que hiciera algo que el servidor rechaza con un 409. Lo noto el
-          cliente.
-
-          De los seis tipos solo la capacitacion del plan participa (`participatesInPlan`, Decision
-          #78). En el resto la tarjeta no desaparece —"¿donde esta lo del plan?" es una pregunta
-          legitima cuando esa tarjeta si sale en las de al lado— sino que dice que no entra y por que.
+          Antes salia siempre, y en los seis tipos que no participan solo servia para decir que no.
+          Eso ahora es un renglon dentro de los datos de la jornada, arriba: la informacion se
+          queda y el espacio se devuelve.
         */}
-        <div className="card p-5">
-          <h2 className="font-display text-base font-semibold text-ink-900">En el plan anual</h2>
-          {!entraAlPlan ? (
-            <p className="mt-2 text-sm text-ink-500">
-              Una <span className="font-medium text-ink-700">{offering.activityVersion.activity.activityType.name}</span> no
-              entra al plan anual: el cumplimiento del ano solo lo mueve lo que estaba planeado.
-            </p>
-          ) : offering.planItems.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-500">
-              Esta convocatoria no pertenece a ningun plan. Agregala desde el plan si debe contar para el programa anual.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {offering.planItems.map((item) => (
-                <li key={item.id} className="text-sm">
-                  <Link href={`/plan/${item.plan.id}`} className="focus-ring font-medium text-ink-900 hover:underline">
-                    {item.plan.name} ({item.plan.year})
-                  </Link>
-                  <span className="ml-2 text-xs text-ink-500">mes {item.plannedMonth}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/*
-        LA LISTA DE ASISTENCIA (Decision #157), donde hay salon.
-
-        `admiteAsistencia` viene RESUELTO del servidor —presencial o hibrida, y que no sea de
-        autoservicio— y la pantalla no repite la condicion. Ya cambio una vez: la primera version la
-        ato al `kind`, y una capacitacion del plan puede ser EVENT y VIRTUAL con contenido, donde
-        pedir asistencia es pedir la evidencia equivocada.
-
-        Y NO en una jornada que no se dicto: aparecia "Tomar asistencia" en una CANCELADA. El
-        servidor ya lo rechazaba, pero un boton que solo falla al pulsarlo no es una compuerta.
-      */}
-      {/*
-        Y NO EN UNA JORNADA QUE NO SE DICTO (2026-09-06). Lo cazo el cliente: aparecia "Tomar
-        asistencia" en una convocatoria **CANCELADA**. El servidor ya lo rechazaba con 409, pero un
-        boton que solo falla al pulsarlo no es una compuerta: es una trampa. En BORRADOR tampoco —
-        todavia no se ha citado a nadie.
-      */}
-      {offering.admiteAsistencia && (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED') ? (
-        <ListaDeAsistencia
-          offeringId={offering.id}
-          roster={roster}
-          pideCertificado={offering.registraCertificadoExterno}
-          quienLaDicto={offering.quienLaDicto}
-          fechaDeLaJornada={offering.scheduledDate ?? null}
-          onHecho={() => void load()}
-        />
-      ) : null}
-
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4">
-          <h2 className="font-display text-base font-semibold text-ink-900">Inscritos</h2>
-          <span className="text-sm text-ink-500">{roster.length} personas</span>
-        </div>
-        {roster.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="Nadie inscrito todavia"
-            description={
-              isOpen
-                ? 'Inscribe a quienes ya tienen la obligacion de esta actividad en la sede de la convocatoria.'
-                : 'Publica la convocatoria para poder inscribir personas.'
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <THead>
-                <Tr>
-                  <Th>Persona</Th>
-                  <Th>Cargo</Th>
-                  <Th>Area</Th>
-                  <Th>Origen</Th>
-                  <Th>Estado</Th>
-                </Tr>
-              </THead>
-              <TBody>
-                {roster.map((row) => (
-                  <Tr key={row.id}>
-                    <Td>
-                      <div className="font-medium text-ink-900">{row.user.fullName}</div>
-                      <div className="font-mono text-xs text-ink-500">{row.user.documentNumber}</div>
-                    </Td>
-                    <Td className="text-ink-700">{row.user.jobTitle.name}</Td>
-                    <Td className="text-ink-500">{row.user.area.name}</Td>
-                    <Td className="text-ink-500">{row.assignmentId ? 'Obligacion' : 'Inscripcion directa'}</Td>
-                    <Td>
-                      {/*
-                        COMO CONSTA, no solo si consta (Decision #157). Una formacion cerrada por
-                        ASISTENCIA y una cerrada por la plataforma valen lo mismo para el indicador
-                        y NO son la misma evidencia: la primera la respalda una hoja firmada y la
-                        segunda el registro del sistema. Quien audita pregunta por cual de las dos.
-                      */}
-                      <StatusPill
-                        kind={row.completedAt ? 'ok' : 'neutral'}
-                        label={row.completedAt ? (row.attendedAt ? 'ASISTIO' : 'COMPLETADA') : 'INSCRITO'}
-                      />
-                    </Td>
-                  </Tr>
+        {entraAlPlan ? (
+          <div className="card p-5">
+            <h2 className="font-display text-base font-semibold text-ink-900">En el plan anual</h2>
+            {offering.planItems.length === 0 ? (
+              <p className="mt-2 text-sm text-ink-500">
+                Esta convocatoria no pertenece a ningun plan. Agregala desde el plan si debe contar para el programa anual.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {offering.planItems.map((item) => (
+                  <li key={item.id} className="text-sm">
+                    <Link href={`/plan/${item.plan.id}`} className="focus-ring font-medium text-ink-900 hover:underline">
+                      {item.plan.name} ({item.plan.year})
+                    </Link>
+                    <span className="ml-2 text-xs text-ink-500">mes {item.plannedMonth}</span>
+                  </li>
                 ))}
-              </TBody>
-            </Table>
+              </ul>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
+
+      {/*
+        LOS INSCRITOS Y SU ASISTENCIA, EN UNA SOLA TARJETA (2026-09-06).
+
+        Habia dos tablas con la MISMA gente: esta y la de tomar asistencia debajo. Lo noto el
+        cliente. Ahora es una con dos modos, y no se perdio ninguna columna de las que habia.
+
+        `admiteAsistencia` viene RESUELTO del servidor (`cierre-de-la-jornada.ts`): la condicion
+        cambio dos veces en dos dias, asi que es justo la que no puede vivir tambien aqui.
+
+        Y el boton no sale en una jornada que no se dicto —CANCELADA o en BORRADOR—: el servidor ya
+        lo rechazaba, pero un boton que solo falla al pulsarlo no es una compuerta, es una trampa.
+      */}
+      <ListaDeAsistencia
+        offeringId={offering.id}
+        roster={roster}
+        admiteAsistencia={
+          offering.admiteAsistencia &&
+          (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED')
+        }
+        puedeInscribir={isOpen}
+        pideCertificado={offering.registraCertificadoExterno}
+        quienLaDicto={offering.quienLaDicto}
+        fechaDeLaJornada={offering.scheduledDate ?? null}
+        onHecho={() => void load()}
+      />
 
       <Drawer
         open={ajusteOpen}

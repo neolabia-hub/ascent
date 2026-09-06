@@ -26,6 +26,7 @@ import {
   cuerpoDeConvocatoria,
   loQueFaltaEnLaConvocatoria,
   nuevaConvocatoria,
+  quienDictoLaAnterior,
   OfferingForm,
   type OfferingFormCatalogs,
   type OfferingFormValue,
@@ -91,6 +92,11 @@ export function ActivityScheduleTab({
   /** La convocatoria que se esta corrigiendo. `null` = se esta creando una nueva. */
   const [editing, setEditing] = useState<OfferingDetail | null>(null);
   const [form, setForm] = useState<OfferingFormValue>(() => nuevaConvocatoria(typeConfig, activityModality));
+  /**
+   * Quien dicto la jornada anterior de ESTA formacion. Lo normal es que la siguiente la de el mismo,
+   * y escribirlo cada vez es teclear un dato que ya esta tres lineas mas arriba en la pantalla.
+   */
+  const heredaEjecutor = () => quienDictoLaAnterior(rows ?? []);
 
   /*
     PROGRAMAR AQUI ENTRA AL PLAN, TAMBIEN CON EL PLAN APROBADO (2026-09-04).
@@ -159,7 +165,7 @@ export function ActivityScheduleTab({
   const cerrarFormulario = () => {
     setCreating(false);
     setEditing(null);
-    setForm(nuevaConvocatoria(typeConfig, activityModality));
+    setForm(nuevaConvocatoria(typeConfig, activityModality, heredaEjecutor()));
   };
 
   /**

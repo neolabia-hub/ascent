@@ -168,13 +168,12 @@ export class CompletionService {
    * trasera para dar por cumplido lo que no se hizo. Esta funcion solo CIERRA; la evidencia de la
    * asistencia la escribe quien toma la lista.
    *
-   * ─── Y LA CONSTANCIA, QUE ES LA PARTE QUE SE PIENSA MAL ───
+   * ─── Y LA CONSTANCIA, QUE LA DECIDE EL TIPO Y NADA MAS ───
    *
-   * Si hay papel de un TERCERO, no se emite constancia propia: el documento que vale es el suyo, y
-   * emitir otro encima produce dos papeles con dos numeros para un mismo hecho — que en una
-   * auditoria es peor que no tener ninguno. Si no lo hay (la charla de seguridad vial que dicta la
-   * ARL y que no certifica nada), la constancia propia SI se emite: es la unica evidencia que le
-   * queda a la persona.
+   * Cerrar por asistencia emite exactamente lo que emitiria cerrar por contenido: lo que diga
+   * `issuesCertificate` con su cascada de tipo y ficha (Decision #111). Aqui hubo una excepcion
+   * —con papel de un tercero no se emitia la propia— que era una regla inventada y que el cliente
+   * cazo: no son el mismo hecho, y ademas le quitaba al tenant una decision que ya podia tomar.
    */
   async cerrarPorAsistencia(
     db: TenantPrisma,
@@ -243,9 +242,27 @@ export class CompletionService {
       });
     }
 
-    // Sin papel de un tercero, la constancia propia es la unica evidencia que le queda a la
-    // persona. Con papel, emitirla seria duplicar el mismo hecho con dos numeros distintos.
-    if (!yaCerrada && !cert) {
+    /*
+      LA CONSTANCIA PROPIA SE EMITE SIEMPRE QUE SU FORMACION LA PROMETA (corregido el 2026-09-06).
+
+      Aqui habia una regla mia: "con papel de un tercero no se emite la propia, porque dos
+      documentos con dos numeros para un mismo hecho confunden en una auditoria". Suena bien y
+      estaba mal por dos motivos, y el cliente lo cazo: *"la constancia interna siempre debe darse"*.
+
+      **No son el mismo hecho.** La constancia de la empresa dice "esta persona asistio a esta
+      formacion el dia X" — es SU registro. El papel de la ARL dice "esta persona esta habilitada
+      hasta Y" — es la habilitacion legal. Un auditor puede pedir cualquiera de los dos, y no tener
+      el propio deja un hueco en el expediente que no tapa el ajeno.
+
+      **Y sobre todo: era una regla que yo invente y que nadie podia cambiar.** Si una empresa no
+      quiere las dos, ya tiene donde decirlo —`issuesCertificate`, con su cascada de tipo y ficha
+      (Decision #111)— y meter aqui una excepcion cableada le quitaba esa decision. Todo lo que
+      dependa de como trabaja una empresa se configura; lo que no, se deduce del modelo.
+
+      Asi que esto solo pregunta si se esta cerrando algo nuevo. QUE se emite y a quien lo sigue
+      decidiendo `emitirPorEjecucion` leyendo la cascada, igual que al cerrar por contenido.
+    */
+    if (!yaCerrada) {
       await this.certificates.emitirPorEjecucion(tenantId, enrollment.id).catch((error: unknown) => {
         this.logger.error(`No se pudo emitir la constancia de ${enrollment.id}`, error as Error);
       });

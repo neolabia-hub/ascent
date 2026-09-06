@@ -36,7 +36,7 @@ Las tres cierran **la misma obligación** y valen lo mismo para el indicador. Y 
 
 - Inducción general virtual → **A**
 - Capacitación del plan que dicta la ARL y no certifica nada → **B sola**
-- Recertificación de montacargas con la ARL → **B + C**
+- Recertificación de montacargas con la ARL → **B + C** (y su constancia propia, que no se suprime)
 - Quien llega con un certificado vigente de otro empleo → **C sola** (todavía no implementado: ver §10)
 
 **No van atadas al tipo de formación.** Es la respuesta a «¿cómo consta que cumplió?», y cada
@@ -181,14 +181,31 @@ publicar ni cancelar convocatorias**, que es lo que le daría `offerings:manage`
 
 ADMIN y ANALISTA lo traen de fábrica, así que no cambia nada de lo que ya funcionaba.
 
-## 6. Con papel de un tercero no se emite constancia propia
+## 6. La constancia propia la decide el tipo, y el papel de un tercero no la suprime
 
-Dos papeles con dos números para un mismo hecho es peor, en una auditoría, que no tener ninguno. El
-documento que vale es el del organismo acreditado.
+Aquí decía lo contrario: que con papel de un organismo acreditado no se emitía la propia, porque
+«dos documentos con dos números para un mismo hecho es peor en una auditoría que no tener ninguno».
+Sonaba bien y estaba mal. Lo cazó el cliente el 2026-09-06: *«que un externo genere certificación no
+quiere decir que no deba generarse la interna; la constancia interna la decide el TIPO»*.
 
-Al revés —una charla presencial que **no** certifica nada, la de seguridad vial de la ARL— la
-constancia propia **sí** se emite: es la única evidencia que le queda a la persona. Las dos mitades
-están medidas: paso 10 (con papel, ninguna constancia) y paso 5 (sin papel, cierra igual).
+Dos motivos, y el segundo pesa más que el primero:
+
+**No son el mismo hecho.** La constancia de la empresa dice *«esta persona asistió a esta formación
+el día X»* — es su registro. El papel de la ARL dice *«esta persona está habilitada hasta Y»* — es la
+habilitación legal. Un auditor puede pedir cualquiera de los dos, y no tener el propio deja un hueco
+en el expediente que no tapa el ajeno.
+
+**Y era una excepción cableada que le quitaba la decisión al tenant.** Si una empresa no quiere las
+dos, ya tiene dónde decirlo: `issuesCertificate`, con su cascada de tipo y ficha (Decisión #111).
+Una regla nuestra encima anulaba esa configuración sin que nadie pudiera verla.
+
+> **La regla que queda:** lo que dependa de cómo trabaja una empresa se configura; lo que no, se
+> deduce del modelo. Una regla que suena razonable y no se puede apagar es una decisión tomada por
+> el equipo en nombre de un cliente que no la pidió.
+
+Así que cerrar por asistencia emite exactamente lo que emitiría cerrar por contenido: lo que diga
+`issuesCertificate`. Medido en el paso 10 del recorrido y en la parte A de la matriz, para los siete
+tipos.
 
 ## 7. El papel manda
 
@@ -332,3 +349,9 @@ avance a 40%**, que es el real.
 5. **El informe de Vencimientos sigue leyendo `certification_grants`**, una tabla que nadie escribe,
    así que su serie de «Certificación» sale en cero. Ahora que existe `valid_until_override` y que
    `certificates.valid_until` ya se escribía, tiene con qué llenarse. Ver `seguimiento.md` §7 quater.
+6. **La constancia propia y el papel del tercero llevan fechas de vigencia distintas**, y es
+   coherente pero conviene mirarlo con un caso real delante: la constancia caduca según la
+   recurrencia (Decisión #111) y la habilitación según lo que diga el papel
+   (`valid_until_override`). Son dos documentos que dicen dos cosas, así que dos fechas no es un
+   error — pero si un cliente lee la constancia como si acreditara la habilitación, lo será para él.
+   No se ha visto todavía; queda anotado como algo que mirar, no como un fallo.

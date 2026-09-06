@@ -3206,3 +3206,53 @@ ni siquiera compilaba, porque no habia ningun `error`. Se captura al vuelo.
 
 Quedan cero avisos de accion sin explicacion. Los que siguen siendo genericos son de CARGA
 ("no se pudieron cargar los catalogos"), y ahi tambien llevan ya el motivo del servidor.
+
+### 2026-09-06 (noche, 2) — Una regla que invente y que nadie podia cambiar
+
+Al cerrar por asistencia, con papel de un tercero **no se emitia la constancia propia**. La razon
+sonaba bien —*"dos documentos con dos numeros para un mismo hecho confunden en una auditoria"*— y
+era mia. El cliente la cazo: *"que un externo genere certificacion no quiere decir que no deba
+generarse la interna; la constancia interna la decide el TIPO"*.
+
+Estaba mal por dos motivos, y el segundo pesa mas que el primero:
+
+1. **No son el mismo hecho.** La constancia de la empresa dice "esta persona asistio a esta
+   formacion el dia X" — es SU registro. El papel de la ARL dice "esta habilitada hasta Y" — es la
+   habilitacion legal. Un auditor puede pedir cualquiera de los dos.
+2. **Era una excepcion cableada que le quitaba la decision al tenant.** Si una empresa no quiere
+   las dos, ya tiene donde decirlo: `issuesCertificate`, con su cascada de tipo y ficha (Decision
+   #111). Meter una regla mia encima anulaba esa configuracion sin que nadie pudiera verla.
+
+**La leccion, que es la misma de todo el dia:** lo que dependa de como trabaja una empresa se
+configura; lo que no, se deduce del modelo. Una regla que suena razonable y no se puede apagar es
+una decision tomada por el equipo en nombre de un cliente que no la pidio.
+
+### 2026-09-06 (noche, 2) — La pantalla de la convocatoria, mirada por el cliente
+
+Cinco cosas, todas de forma y todas ciertas:
+
+- **Dos tablas con la misma gente.** "Inscritos" y, al pulsar el boton, otra lista casi igual
+  debajo. Ahora es UNA con dos modos —mirar y tomar asistencia— y **no se perdio ninguna columna**:
+  persona, cargo, area, origen y estado siguen todas. El cliente lo advirtio expresamente:
+  *"Inscritos tiene informacion importante, no se puede sacrificar"*.
+- **La tarjeta "En el plan anual" ocupaba media pantalla para decir que no aplica**, en los seis
+  tipos que no participan. Ahora es un renglon dentro de los datos de la jornada cuando no aplica,
+  y sigue siendo tarjeta cuando si. La informacion se queda; el espacio se devuelve.
+- **Faltaba informacion en los datos de la jornada**: modalidad, intensidad desglosada (que el PESV
+  exige y estaba solo en el formulario) y **como se acredita**, que es la pregunta que llega justo
+  despues de "¿por que no me sale el boton?".
+- **La columna Motivo salia siempre**, con un guion en cada fila. Ahora solo cuando hay alguna
+  falta justificada: una columna de guiones hace que nadie lea la unica que si dice algo.
+- **"Se dicto el" y "vence" se confundian.** Son cosas distintas y ahora lo dicen: el primero es el
+  dia de la sesion y queda como fecha de cumplimiento; el segundo es lo que dice el papel del
+  tercero y puede ser dentro de anos.
+
+### 2026-09-06 (noche, 2) — Quien dicto la anterior, heredado
+
+El cliente pregunto si de verdad pasa que la misma formacion la de una ARL en marzo y otra en
+septiembre. Pasa —al cambiar de ARL, al dictarla en dos ciudades, cuando un instructor propio cubre
+una sesion— pero **es minoria**. Por eso el dato sigue en la CONVOCATORIA, que es donde cambia, y
+se HEREDA de la ultima jornada de esa formacion.
+
+Se rellena, **no se bloquea**: el campo sigue editable, que es como lo pidio. Heredar y bloquear
+son cosas distintas, y bloquear seria convertir "lo normal" en "lo unico".

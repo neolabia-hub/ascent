@@ -57,6 +57,9 @@ export interface VersionUpgrade {
 }
 
 export interface OfferingListItem {
+  /** Quien la dicto: la siguiente jornada de la misma formacion lo hereda. */
+  executedBy?: string;
+  executedByOther?: string | null;
   id: string;
   code: string;
   kind: OfferingKind;
