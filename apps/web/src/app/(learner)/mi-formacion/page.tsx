@@ -117,8 +117,8 @@ function PendingList({ items, highlight }: { items: PendingItem[] | null; highli
     return (
       <EmptyState
         icon={GraduationCap}
-        title="No tienes formacion pendiente"
-        description="Cuando te asignen una, aparecera aqui."
+        title="No tienes formación pendiente"
+        description="Cuando te asignen una, aparecera aquí."
       />
     );
   }
@@ -146,8 +146,8 @@ function HistoryList({ items }: { items: HistoryItem[] | null }) {
     return (
       <EmptyState
         icon={GraduationCap}
-        title="Todavia no has terminado ninguna"
-        description="Lo que completes queda aqui con su fecha y su nota, y no se borra."
+        title="Todavía no has terminado ninguna"
+        description="Lo que completes queda aquí con su fecha y su nota, y no se borra."
       />
     );
   }

@@ -94,7 +94,7 @@ export function SurveyRunner({
                   maxLength={2000}
                   value={typeof value[pregunta.id] === 'string' ? (value[pregunta.id] as string) : ''}
                   onChange={(e) => responder(pregunta.id, e.target.value)}
-                  placeholder="Escribe aqui..."
+                  placeholder="Escribe aquí..."
                   className="focus-ring w-full resize-y rounded-xl border border-line bg-paper px-3.5 py-3 text-[15px] text-ink-900 placeholder:text-ink-300"
                 />
               )}
@@ -236,7 +236,7 @@ function Opciones({
   onPick: (valor: string) => void;
 }) {
   if (opciones.length === 0) {
-    return <p className="text-sm text-ink-500">Esta pregunta todavia no tiene opciones.</p>;
+    return <p className="text-sm text-ink-500">Esta pregunta todavía no tiene opciones.</p>;
   }
   return (
     <div className="space-y-2">

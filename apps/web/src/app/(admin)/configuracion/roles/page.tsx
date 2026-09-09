@@ -123,7 +123,7 @@ export default function RolesPage() {
       showToast({
         kind: 'success',
         title: 'Permisos guardados',
-        description: 'Cada persona los recibe en su proxima peticion.',
+        description: 'Cada persona los recibe en su próxima peticion.',
       });
     } catch (error) {
       showToast({
@@ -257,7 +257,7 @@ export default function RolesPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Nuevo rol"
-        description="Nace sin permisos. Se marcan despues en la matriz."
+        description="Nace sin permisos. Se marcan después en la matriz."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>
@@ -274,7 +274,7 @@ export default function RolesPage() {
         }
       >
         <div className="space-y-4">
-          <Field htmlFor="r-code" label="Codigo" required hint="Mayusculas, sin espacios. No se puede cambiar despues.">
+          <Field htmlFor="r-code" label="Código" required hint="Mayusculas, sin espacios. No se puede cambiar después.">
             <Input
               id="r-code"
               value={newRole.code}

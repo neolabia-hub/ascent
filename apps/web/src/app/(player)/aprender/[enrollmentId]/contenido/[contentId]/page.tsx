@@ -358,7 +358,7 @@ export default function ContentPlayerPage() {
               showToast({
                 kind: 'success',
                 title: `Racha de ${result.streak.currentStreak} ${result.streak.currentStreak === 1 ? 'dia' : 'dias'}`,
-                description: 'Terminaste una leccion hoy.',
+                description: 'Terminaste una lección hoy.',
               });
             }
             if (result === null) {
@@ -866,7 +866,7 @@ function AssessmentGate({
 
           {/* Lo que cuesta, antes de gastar un intento. */}
           <dl className="mt-7 grid gap-3 sm:grid-cols-3">
-            <GateFact label="Nota minima" value={passingScore ? `${passingScore}%` : 'La del tenant'} />
+            <GateFact label="Nota mínima" value={passingScore ? `${passingScore}%` : 'La del tenant'} />
             <GateFact label="Intentos usados" value={`${mine.length}`} />
             <GateFact label="Estado" value={passed ? 'Aprobada' : blocked ? 'Bloqueada' : open ? 'A medias' : 'Sin empezar'} />
           </dl>

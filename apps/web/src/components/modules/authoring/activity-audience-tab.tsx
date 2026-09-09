@@ -330,7 +330,7 @@ export function ActivityAudienceTab({
       await load();
       showToast({
         kind: 'success',
-        title: 'Obligacion eximida',
+        title: 'Obligación eximida',
         description: 'Deja de contar para el cumplimiento y queda con el motivo en el registro.',
       });
     } catch (error) {
@@ -491,7 +491,7 @@ export function ActivityAudienceTab({
                 >
                   <MultiSelect
                     id="q-jobs"
-                    placeholder="Ningun cargo"
+                    placeholder="Ningún cargo"
                     options={catalogs.jobTitles.map((row) => ({
                       id: row.id,
                       label: row.name,
@@ -508,7 +508,7 @@ export function ActivityAudienceTab({
                   <Field htmlFor="q-jobs" label="A todos los de un cargo">
                     <MultiSelect
                       id="q-jobs"
-                      placeholder="Ningun cargo"
+                      placeholder="Ningún cargo"
                       options={catalogs.jobTitles.map((row) => ({
                         id: row.id,
                         label: row.name,
@@ -539,7 +539,7 @@ export function ActivityAudienceTab({
                   <Field htmlFor="q-services" label="A un servicio" hint="Solo alcanza a quien lo tenga puesto en su ficha.">
                     <MultiSelect
                       id="q-services"
-                      placeholder="Ningun servicio"
+                      placeholder="Ningún servicio"
                       options={catalogs.services.map((row) => ({ id: row.id, label: row.name }))}
                       value={scope.serviceIds}
                       onChange={(serviceIds) => setScope({ ...scope, serviceIds })}
@@ -578,7 +578,7 @@ export function ActivityAudienceTab({
                     <option value="ON_HIRE">Al ingresar a la empresa</option>
                   </Select>
                 </Field>
-                <Field htmlFor="q-dias" label="Vence a los" hint="Dias. Negativo = antes.">
+                <Field htmlFor="q-dias" label="Vence a los" hint="Días. Negativo = antes.">
                   <Input
                     id="q-dias"
                     type="number"
@@ -667,7 +667,7 @@ export function ActivityAudienceTab({
                     Este tipo de formacion normalmente <strong>no se repite</strong>. Hacerla repetir funciona, y su
                     constancia pasara a vencer — pero en los informes seguira leyendose como lo que dice su tipo. Si es
                     una <strong>habilitacion legal que hay que renovar</strong> —montacargas, alturas, manipulacion de
-                    alimentos—, va mejor como <strong>Recertificacion</strong>: ahi se busca por vigencia, no por «¿se
+                    alimentos—, va mejor como <strong>Recertificación</strong>: ahi se busca por vigencia, no por «¿se
                     la hicieron?».
                   </span>
                 </p>
@@ -689,7 +689,7 @@ export function ActivityAudienceTab({
                 <Field
                   htmlFor="q-repite-fecha-mes"
                   label="Antes de que fecha, cada año"
-                  hint="Todos vencen el mismo dia, que es como se hace una campaña anual."
+                  hint="Todos vencen el mismo día, que es como se hace una campaña anual."
                 >
                   <MesDia
                     idBase="q-repite-fecha"
@@ -729,7 +729,7 @@ export function ActivityAudienceTab({
                     rows={2}
                     value={novedad}
                     onChange={(event) => setNovedad(event.target.value)}
-                    placeholder="Minimo 10 caracteres"
+                    placeholder="Mínimo 10 caracteres"
                   />
                 </Field>
               ) : null}
@@ -793,7 +793,7 @@ export function ActivityAudienceTab({
         {decide === 'TODOS' ? null : (
         <section className="card p-5">
           <h2 className="font-display text-base font-semibold text-ink-900">O a personas concretas</h2>
-          <p className="mb-4 mt-1 text-sm text-ink-500">Obligacion suelta: no alcanza a quien entre despues.</p>
+          <p className="mb-4 mt-1 text-sm text-ink-500">Obligación suelta: no alcanza a quien entre después.</p>
           <div className="space-y-4">
             <Field htmlFor="q-people" label="Personas" hint={peopleError ?? undefined}>
               <MultiSelect
@@ -808,7 +808,7 @@ export function ActivityAudienceTab({
                 onChange={(userIds) => setManual({ ...manual, userIds })}
               />
             </Field>
-            <Field htmlFor="q-due" label="Fecha limite" hint="Vacio: sin fecha, no vence.">
+            <Field htmlFor="q-due" label="Fecha límite" hint="Vacio: sin fecha, no vence.">
               <Input
                 id="q-due"
                 type="date"

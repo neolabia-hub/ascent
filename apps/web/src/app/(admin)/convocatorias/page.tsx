@@ -109,7 +109,7 @@ export default function ConvocatoriasPage() {
               setQ(event.target.value);
               setPage(1);
             }}
-            placeholder="Buscar por numero, actividad o lugar"
+            placeholder="Buscar por número, actividad o lugar"
             className="w-80 pl-9"
           />
         </div>
@@ -135,7 +135,7 @@ export default function ConvocatoriasPage() {
         <div className="card">
           <EmptyState
             icon={CalendarDays}
-            title="Sin convocatorias todavia"
+            title="Sin convocatorias todavía"
             description={
               versions.length === 0
                 ? 'Primero publica una version de una actividad formativa: solo se convoca contenido publicado.'
@@ -168,7 +168,7 @@ export default function ConvocatoriasPage() {
                   <Th className="text-right">Proyectados</Th>
                   <Th className="text-right">Inscritos</Th>
                   <Th>Estado</Th>
-                  <Th className="w-24 text-right">Accion</Th>
+                  <Th className="w-24 text-right">Acción</Th>
                 </Tr>
               </THead>
               <TBody>
@@ -187,7 +187,7 @@ export default function ConvocatoriasPage() {
                       {isOutdatedVersion(offering.activityVersion) &&
                       offering.status !== 'COMPLETED' &&
                       offering.status !== 'CANCELLED' ? (
-                        <div className="mt-1 text-xs font-medium text-warn">Hay una version mas nueva</div>
+                        <div className="mt-1 text-xs font-medium text-warn">Hay una versión mas nueva</div>
                       ) : null}
                     </Td>
                     <Td className="text-ink-700">

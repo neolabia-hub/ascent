@@ -267,7 +267,7 @@ export default function PreferenciasPage() {
           personal de alguien no lo es.
         */}
         <p className="mb-5 rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-3 text-sm leading-relaxed text-ink-700">
-          Esto se ve <strong>sin haber iniciado sesion</strong>. Pon un contacto del area (un correo
+          Esto se ve <strong>sin haber iniciado sesión</strong>. Pon un contacto del area (un correo
           corporativo, una extension), nunca el numero personal de nadie.
         </p>
 

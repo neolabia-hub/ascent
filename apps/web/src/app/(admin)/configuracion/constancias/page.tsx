@@ -153,7 +153,7 @@ export default function ConstanciasPage() {
           <Skeleton className="h-24 w-full rounded-xl" />
         ) : plantillas.length === 0 ? (
           <div className="card p-8 text-center">
-            <p className="font-display text-base font-semibold text-ink-900">Todavia no hay ninguna</p>
+            <p className="font-display text-base font-semibold text-ink-900">Todavía no hay ninguna</p>
             <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-ink-500">
               Sin una plantilla activa no se emiten constancias. La formacion se termina igual y queda registrada;
               simplemente no sale el papel.
@@ -234,7 +234,7 @@ const NOMBRES: Record<CampoClave, string> = {
   vence: 'Vigente hasta',
   serial: 'Numero de serie',
   codigo: 'Codigo de verificacion',
-  nota: 'Calificacion',
+  nota: 'Calificación',
   qr: 'Codigo QR',
 };
 
@@ -251,7 +251,7 @@ const ETIQUETAS: Record<CampoClave, string> = {
   vence: 'Vigente hasta el 15 de marzo de 2027',
   serial: 'CERT-2026-000123',
   codigo: 'K7M2P-9XQ4T-BC3JH',
-  nota: 'Calificacion: 95%',
+  nota: 'Calificación: 95%',
   qr: 'QR',
 };
 

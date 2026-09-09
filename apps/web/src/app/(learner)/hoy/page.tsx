@@ -120,8 +120,8 @@ export default function TodayPage() {
     if (esperando.length > 0) {
       salida.push({
         clave: 'esperando',
-        titulo: 'Todavia no las han abierto',
-        nota: 'No depende de ti. Aparecen aqui para que sepas que vienen.',
+        titulo: 'Todavía no las han abierto',
+        nota: 'No depende de ti. Aparecen aquí para que sepas que vienen.',
         items: esperando,
       });
     }
@@ -186,8 +186,8 @@ export default function TodayPage() {
     return (
       <EmptyState
         icon={CircleCheck}
-        title="Estas al dia"
-        description="No tienes formacion pendiente. Cuando te asignen una, aparecera aqui y te avisamos."
+        title="Estas al día"
+        description="No tienes formación pendiente. Cuando te asignen una, aparecera aquí y te avisamos."
       />
     );
   }
@@ -716,7 +716,7 @@ function useAbrir(item: PendingItem) {
     if (!item.selfServiceOfferingId) {
       showToast({
         kind: 'info',
-        title: 'Todavia no la han abierto',
+        title: 'Todavía no la han abierto',
         description: 'No depende de ti: te avisamos en cuanto te convoquen.',
       });
       return;

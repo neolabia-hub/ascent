@@ -150,7 +150,7 @@ const REGLAS: ReadonlyArray<{
     */
     detalle: 'A los 30 dias, el jefe del area responde si la persona aplica lo aprendido.',
     ayuda:
-      'Es el punto de partida, no la decision final: cada formacion puede desviarse desde su ficha. Dentro del mismo tipo conviven una de alturas —donde importa si usa el arnes— y una actualizacion documental, donde preguntarle al jefe a los 30 dias no dice nada.',
+      'Es el punto de partida, no la decision final: cada formación puede desviarse desde su ficha. Dentro del mismo tipo conviven una de alturas —donde importa si usa el arnes— y una actualizacion documental, donde preguntarle al jefe a los 30 días no dice nada.',
   },
   {
     clave: 'tracksExternalCertificate' as const,
@@ -186,15 +186,15 @@ const REGLAS: ReadonlyArray<{
     // resto vive en la ficha, que es donde de verdad se elige.
     detalle: 'Punto de partida de sus formaciones. Cada una puede decir otra cosa desde su ficha.',
     ayuda:
-      'Aqui no se configura ningun certificado: se dice que esta CLASE de formacion normalmente la acredita alguien de fuera, y con ese valor nacen sus formaciones. QUIEN lo expide no se dice ni aqui ni en la ficha, sino en cada convocatoria: la misma habilitacion la puede dictar la ARL en marzo y un centro de entrenamiento en septiembre.',
+      'Aquí no se configura ningún certificado: se dice que esta CLASE de formación normalmente la acredita alguien de fuera, y con ese valor nacen sus formaciones. QUIEN lo expide no se dice ni aquí ni en la ficha, sino en cada convocatoria: la misma habilitacion la puede dictar la ARL en marzo y un centro de entrenamiento en septiembre.',
   },
   {
     clave: 'admiteConvalidacion' as const,
     icono: FileCheck2,
-    titulo: 'Acepta certificacion previa de otra empresa',
+    titulo: 'Acepta certificación previa de otra empresa',
     detalle: 'Quien llega ya certificado no la repite: se registra su papel y queda cumplida.',
     ayuda:
-      'Solo tiene sentido cuando el papel es TRANSFERIBLE por norma —alturas, montacargas, espacios confinados—, donde la ley ya da por hecha la formacion y repetirla es gastar dinero dos veces. Apagado significa que hay que hacerla AQUI aunque traiga papel, que es lo correcto en una induccion o en cualquier formacion sobre procedimientos propios: ningun certificado ajeno enseña como se trabaja en esta empresa. Y aun encendido, aceptar cada papel concreto sigue siendo una decision de quien lo registra, con su motivo y su nombre.',
+      'Solo tiene sentido cuando el papel es TRANSFERIBLE por norma —alturas, montacargas, espacios confinados—, donde la ley ya da por hecha la formación y repetirla es gastar dinero dos veces. Apagado significa que hay que hacerla AQUÍ aunque traiga papel, que es lo correcto en una inducción o en cualquier formación sobre procedimientos propios: ningún certificado ajeno enseña como se trabaja en esta empresa. Y aun encendido, aceptar cada papel concreto sigue siendo una decision de quien lo registra, con su motivo y su nombre.',
   },
 ];
 
@@ -274,7 +274,7 @@ export default function TiposDeFormacionPage() {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-[28px] font-semibold text-ink-900">Tipos de formacion</h1>
+          <h1 className="font-display text-[28px] font-semibold text-ink-900">Tipos de formación</h1>
           <p className="mt-1 text-sm leading-relaxed text-ink-500">
             Que exige y que entrega cada clase de formacion. Es el criterio de la empresa; cada formacion puede
             desviarse desde su propia ficha.
@@ -291,7 +291,7 @@ export default function TiposDeFormacionPage() {
       {creando ? (
         <div className="card mt-5 p-4">
           <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
-            <Field htmlFor="t-code" label="Codigo" hint="No se puede cambiar despues.">
+            <Field htmlFor="t-code" label="Código" hint="No se puede cambiar después.">
               <Input
                 id="t-code"
                 value={nuevo.code}
@@ -326,7 +326,7 @@ export default function TiposDeFormacionPage() {
       ) : null}
 
       <p className="mt-5 rounded-lg border border-line bg-paper px-3.5 py-3 text-sm leading-relaxed text-ink-700">
-        Cambiar esto afecta a lo que se publique <strong>de aqui en adelante</strong>. Las versiones ya publicadas
+        Cambiar esto afecta a lo que se publique <strong>de aquí en adelante</strong>. Las versiones ya publicadas
         conservan lo que regia cuando se publicaron, y por eso una constancia emitida sigue explicandose.
       </p>
 
@@ -598,7 +598,7 @@ function Tarjeta({
         {tipo.isSystem ? (
           <span
             className="inline-flex shrink-0 items-center gap-1 rounded-full bg-paper px-2.5 py-1 text-[11px] font-semibold text-ink-500"
-            title="Los tipos del sistema no se eliminan: el producto los referencia por codigo."
+            title="Los tipos del sistema no se eliminan: el producto los referencia por código."
           >
             <Lock className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
             Del sistema
@@ -608,7 +608,7 @@ function Tarjeta({
             type="button"
             onClick={onBorrar}
             aria-label={`Eliminar ${tipo.name}`}
-            title="Borra el tipo. Solo se puede si ninguna formacion lo usa."
+            title="Borra el tipo. Solo se puede si ninguna formación lo usa."
             className="focus-ring shrink-0 rounded-lg p-2 text-ink-500 transition-colors hover:text-danger"
           >
             <Trash2 className="h-4 w-4" strokeWidth={1.75} />
@@ -766,7 +766,7 @@ function Tarjeta({
             <Field
               htmlFor={`t-fecha-${tipo.id}-mes`}
               label="Antes de que fecha"
-              hint="Todos vencen el mismo dia: es una campaña, no un aniversario por persona."
+              hint="Todos vencen el mismo día: es una campaña, no un aniversario por persona."
             >
               {/*
                 DOS LISTAS, NO UN CAMPO DE TEXTO (2026-09-04).
@@ -791,7 +791,7 @@ function Tarjeta({
             <Field
               htmlFor={`t-meses-${tipo.id}`}
               label="Cada cuantos meses"
-              hint="Se cuenta desde que cada persona la completo, asi que cada uno tiene su fecha."
+              hint="Se cuenta desde que cada persona la completo, así que cada uno tiene su fecha."
             >
               <Input
                 id={`t-meses-${tipo.id}`}
@@ -852,7 +852,7 @@ function Tarjeta({
             <Field
               htmlFor={`t-recien-${tipo.id}`}
               label="No se le exige a quien entro hace menos de"
-              hint="Su induccion es su actualizacion de ese año. En cero, se le exige a todo el mundo."
+              hint="Su inducción es su actualizacion de ese año. En cero, se le exige a todo el mundo."
             >
               <Select
                 id={`t-recien-${tipo.id}`}

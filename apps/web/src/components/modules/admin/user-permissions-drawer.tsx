@@ -168,7 +168,7 @@ export function UserPermissionsDrawer({
       showToast({
         kind: 'success',
         title: overrideCount === 0 ? 'Excepciones retiradas' : `${overrideCount} ${overrideCount === 1 ? 'excepcion guardada' : 'excepciones guardadas'}`,
-        description: 'Aplican en la proxima peticion de esa persona.',
+        description: 'Aplican en la próxima peticion de esa persona.',
       });
     } catch (error) {
       showToast({ kind: 'danger', title: error instanceof ApiError ? error.message : 'No se pudieron guardar' });

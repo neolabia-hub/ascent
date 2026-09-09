@@ -231,13 +231,13 @@ export default function InicioPage() {
                 <p className="font-display text-[22px] font-bold leading-none tabular-nums text-ink-900">
                   {vencimientos.resumen.proximos30}
                 </p>
-                <p className="mt-1 text-xs text-ink-500">en 30 dias</p>
+                <p className="mt-1 text-xs text-ink-500">en 30 días</p>
               </div>
               <div>
                 <p className="font-display text-[22px] font-bold leading-none tabular-nums text-ink-900">
                   {vencimientos.resumen.proximos90}
                 </p>
-                <p className="mt-1 text-xs text-ink-500">en 90 dias</p>
+                <p className="mt-1 text-xs text-ink-500">en 90 días</p>
               </div>
             </div>
           </div>

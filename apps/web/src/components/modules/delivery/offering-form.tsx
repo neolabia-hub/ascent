@@ -354,8 +354,8 @@ export function OfferingForm({
             onChange={(event) => set({ kind: event.target.value as OfferingKind })}
           >
             <option value="PERMANENT">Disponible siempre</option>
-            <option value="EVENT">Sesion con fecha</option>
-            <option value="HYBRID">Sesion + disponible</option>
+            <option value="EVENT">Sesión con fecha</option>
+            <option value="HYBRID">Sesión + disponible</option>
           </Select>
         </Field>
         <Field htmlFor="o-modality" label="Modalidad" required hint="Viene de la ficha; cada jornada puede cambiarla.">
@@ -411,7 +411,7 @@ export function OfferingForm({
         <Field
           htmlFor="o-cierre"
           label="Como se registra"
-          ayuda="Que queda escrito de que la persona la hizo. Con LISTA, alguien la toma en la sesion y esa marca es la que cierra la formacion. AL COMPLETAR EL CONTENIDO no hay nada que marcar: la plataforma la cierra sola cuando la persona termina el temario y, si su tipo los pide, la evaluacion y la encuesta. Lo sugiere la modalidad, pero manda lo que se elija aqui."
+          ayuda="Que queda escrito de que la persona la hizo. Con LISTA, alguien la toma en la sesión y esa marca es la que cierra la formación. AL COMPLETAR EL CONTENIDO no hay nada que marcar: la plataforma la cierra sola cuando la persona termina el temario y, si su tipo los pide, la evaluación y la encuesta. Lo sugiere la modalidad, pero manda lo que se elija aquí."
         >
           <Select
             id="o-cierre"
@@ -455,7 +455,7 @@ export function OfferingForm({
               htmlFor="o-location"
               label="Lugar"
               required
-              hint="La direccion de ESTA jornada, no la regional. Va impresa en el acta."
+              hint="La dirección de ESTA jornada, no la regional. Va impresa en el acta."
             >
               <Input
                 id="o-location"
@@ -502,7 +502,7 @@ export function OfferingForm({
               <Field
                 htmlFor="o-instructor-external"
                 label="Quien vino a dictarla"
-                hint="La persona del tercero. Va en el acta; dejalo vacio si todavia no se sabe."
+                hint="La persona del tercero. Va en el acta; dejalo vacio si todavía no se sabe."
               >
                 <Input
                   id="o-instructor-external"
@@ -528,7 +528,7 @@ export function OfferingForm({
           )}
 
           <div className="grid grid-cols-3 gap-3">
-            <Field htmlFor="o-theory" label="Horas teoricas" hint="El desglose lo exige el PESV.">
+            <Field htmlFor="o-theory" label="Horas teóricas" hint="El desglose lo exige el PESV.">
               <Input
                 id="o-theory"
                 type="number"
@@ -538,7 +538,7 @@ export function OfferingForm({
                 onChange={(event) => set({ intensityTheoryHours: event.target.value })}
               />
             </Field>
-            <Field htmlFor="o-practice" label="Horas practicas">
+            <Field htmlFor="o-practice" label="Horas prácticas">
               <Input
                 id="o-practice"
                 type="number"
@@ -590,7 +590,7 @@ export function OfferingForm({
         de desmarcarla en las jornadas nacionales, que es peor que marcarla las pocas veces que
         hace falta acotar.
       */}
-      <Field htmlFor="o-regional" label="Donde se dicta (sede)" hint="Solo logistica: la direccion de la jornada.">
+      <Field htmlFor="o-regional" label="Donde se dicta (sede)" hint="Solo logistica: la dirección de la jornada.">
         <Select
           id="o-regional"
           disabled={soloLogistica}

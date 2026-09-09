@@ -39,7 +39,7 @@ async function publishedActivity(
   tipo = 'Capacitacion extraordinaria',
 ) {
   await page.goto('/lecciones');
-  await page.getByRole('button', { name: 'Nueva leccion' }).click();
+  await page.getByRole('button', { name: 'Nueva lección' }).click();
   await page.getByRole('dialog').getByRole('textbox').first().fill(`Leccion ${name} ${suffix}`);
   await page.getByRole('button', { name: /Crear/ }).click();
   await page.waitForURL('**/lecciones/**', { timeout: 20_000 });
@@ -63,7 +63,7 @@ async function publishedActivity(
   await page.getByRole('button', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
-  await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
+  await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
   await page.locator('#c-title').fill('Bienvenida');
   // Paso 2: se reutiliza una leccion de la biblioteca en vez de crear una nueva.
   await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
@@ -80,7 +80,7 @@ async function publishedActivity(
 
   await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
-  await expect(page.getByText('Version 1 publicada')).toBeVisible();
+  await expect(page.getByText('Versión 1 publicada')).toBeVisible();
 }
 
 test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
@@ -118,7 +118,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     // y un aviso por persona en la misma peticion, y la base de desarrollo ya tiene 459. Es la
     // deuda de "el motor recorre persona por persona" asomando; con 116 reales va sobrado.
     await expect(page.getByText('Requisito creado')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('row').filter({ hasText: activityName }).getByText('1 dia antes')).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: activityName }).getByText('1 día antes')).toBeVisible();
 
     // 3. Alta de una persona con fecha de ingreso futura.
     await page.goto('/usuarios');
@@ -326,7 +326,7 @@ test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan',
   const planUrl = await crearPlanDelAno(page, ANO_PLAN_IDA_Y_VUELTA, `Plan ida y vuelta ${suffix}`);
 
   // Hay dos botones iguales: el de la cabecera y el del estado vacio. Vale cualquiera.
-  await page.getByRole('button', { name: 'Crear capacitacion' }).first().click();
+  await page.getByRole('button', { name: 'Crear capacitación' }).first().click();
   await page.waitForURL('**/contenido-formativo?**', { timeout: 20_000 });
 
   // El cajon llega ABIERTO: quien pulso "capacitacion nueva" ya dijo lo que queria.

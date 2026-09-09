@@ -103,7 +103,7 @@ export function ConstanciasDePersona({
         ) : filas.length === 0 ? (
           <div className="py-8 text-center">
             <Award className="mx-auto h-8 w-8 text-ink-300" strokeWidth={1.5} aria-hidden="true" />
-            <p className="mt-3 text-sm text-ink-700">Todavia no tiene constancias.</p>
+            <p className="mt-3 text-sm text-ink-700">Todavía no tiene constancias.</p>
             {/*
               Se dice POR QUE puede no haberlas: no toda formacion acredita, y un vacio sin
               explicacion se lee como que el sistema perdio algo.
@@ -184,13 +184,13 @@ export function ConstanciasDePersona({
           <Field
             htmlFor="motivo-revocacion"
             label="Motivo"
-            ayuda="Minimo 10 caracteres. Queda guardado: sin el, la revocacion es indefendible dentro de seis meses."
+            ayuda="Mínimo 10 caracteres. Queda guardado: sin el, la revocacion es indefendible dentro de seis meses."
           >
             <Input
               id="motivo-revocacion"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej.: se emitio con la version equivocada del examen"
+              placeholder="Ej.: se emitio con la versión equivocada del examen"
             />
           </Field>
         </div>

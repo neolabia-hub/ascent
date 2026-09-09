@@ -50,6 +50,7 @@ import { AddContentDrawer } from '@/components/modules/authoring/add-content-dra
 import { EditContentDrawer } from '@/components/modules/authoring/edit-content-drawer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
+import { ViewTabs } from '@/components/ui/view-tabs';
 import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
@@ -73,11 +74,11 @@ import { useToast } from '@/components/ui/toast';
  */
 
 const CONTENT_META: Record<ContentType, { label: string; icon: typeof FileText }> = {
-  LESSON: { label: 'Leccion en tarjetas', icon: Layers },
+  LESSON: { label: 'Lección en tarjetas', icon: Layers },
   VIDEO: { label: 'Video', icon: Video },
   PRESENTATION: { label: 'Presentacion', icon: Presentation },
   DOCUMENT: { label: 'Documento de apoyo', icon: FileText },
-  ASSESSMENT: { label: 'Evaluacion', icon: ClipboardCheck },
+  ASSESSMENT: { label: 'Evaluación', icon: ClipboardCheck },
   SURVEY: { label: 'Encuesta', icon: ClipboardCheck },
   SCORM: { label: 'Paquete SCORM', icon: Package },
   LINK: { label: 'Enlace', icon: Link2 },
@@ -85,15 +86,15 @@ const CONTENT_META: Record<ContentType, { label: string; icon: typeof FileText }
 
 const MIGRATION_LABEL: Record<MigrationPolicy, { title: string; detail: string }> = {
   MOVE_NOT_STARTED: {
-    title: 'Solo quienes no han empezado pasan a la version nueva',
+    title: 'Solo quienes no han empezado pasan a la versión nueva',
     detail: 'Recomendado. Quien va a mitad termina con el contenido que ya conocia.',
   },
   FINISH_OLD: {
-    title: 'Todos los inscritos terminan en la version anterior',
+    title: 'Todos los inscritos terminan en la versión anterior',
     detail: 'La version nueva solo aplica a inscripciones futuras.',
   },
   RESTART_NEW: {
-    title: 'Quienes van a mitad reinician en la version nueva',
+    title: 'Quienes van a mitad reinician en la versión nueva',
     detail: 'Uselo cuando el cambio es tan importante que lo anterior ya no sirve.',
   },
 };
@@ -197,7 +198,7 @@ export default function ActividadDetallePage() {
         return draft?.id ?? detail.versions[0]?.id ?? null;
       });
     } catch (error) {
-      showToast({ kind: 'danger', title: 'No se pudo cargar la formacion', description: motivoDelError(error) });
+      showToast({ kind: 'danger', title: 'No se pudo cargar la formación', description: motivoDelError(error) });
     }
   }, [activityId, showToast]);
 
@@ -212,7 +213,7 @@ export default function ActividadDetallePage() {
       .then(setVersion)
       // Se avisa en vez de tragarselo: un fallo silencioso aqui dejaba la pestana de contenido
       // cargando para siempre y sin explicacion.
-      .catch((error: unknown) => showToast({ kind: 'danger', title: 'No se pudo cargar el contenido de esta version', description: motivoDelError(error) }));
+      .catch((error: unknown) => showToast({ kind: 'danger', title: 'No se pudo cargar el contenido de esta versión', description: motivoDelError(error) }));
   }, [selectedVersionId, showToast]);
 
   useEffect(() => {
@@ -309,7 +310,7 @@ export default function ActividadDetallePage() {
     setBusy(true);
     try {
       await deleteActivity(activity.id);
-      showToast({ kind: 'success', title: 'Formacion eliminada' });
+      showToast({ kind: 'success', title: 'Formación eliminada' });
       router.push('/contenido-formativo');
     } catch (error) {
       showToast({
@@ -347,7 +348,7 @@ export default function ActividadDetallePage() {
       } else {
         showToast({
           kind: 'info',
-          title: 'Solicitud enviada a aprobacion',
+          title: 'Solicitud enviada a aprobación',
           description: 'Un administrador debe aprobarla. Se publicara automaticamente al aprobarse.',
         });
       }
@@ -382,7 +383,7 @@ export default function ActividadDetallePage() {
       showToast({
         kind: 'success',
         title: `Version ${draft.versionNumber} creada en borrador`,
-        description: 'La version publicada no se modifico.',
+        description: 'La versión publicada no se modifico.',
       });
     } catch (error) {
       showToast({
@@ -542,25 +543,17 @@ export default function ActividadDetallePage() {
         }
       />
 
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-line">
-        {TABS.map((item) => {
-          const Icon = item.icon;
-          const active = tab === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setTab(item.key)}
-              className={cn(
-                'focus-ring -mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm transition-colors duration-150',
-                active ? 'border-ink-900 font-medium text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-900',
-              )}
-            >
-              <Icon size={15} strokeWidth={1.75} />
-              {item.label}
-            </button>
-          );
-        })}
+      {/*
+        ARMAR UNA FORMACION TIENE ORDEN, Y AHORA SE VE (2026-09-09).
+
+        Eran cinco pestañas subrayadas con un trazo de 2 px, al lado de los botones de accion — y el
+        cliente dijo lo que se veia: *"el boton se parece a esos selectores"*. Ahora son ETAPAS
+        numeradas: ficha, contenido, a quienes, convocatorias, versiones, que es el orden real en que
+        se arma. La activa va rellena con el color de la empresa; lo ya recorrido, mas oscuro que lo
+        que falta.
+      */}
+      <div className="mb-6 rounded-xl border border-line bg-surface p-1">
+        <ViewTabs tabs={TABS} value={tab} onChange={setTab} forma="etapas" />
       </div>
 
       {tab === 'info' ? <ActivityInfoTab activity={activity} onSaved={loadActivity} canEdit /> : null}
@@ -613,8 +606,8 @@ export default function ActividadDetallePage() {
               <div className="card">
                 <EmptyState
                   icon={Layers}
-                  title="Todavia no hay contenido"
-                  description="Agrega lecciones, videos, documentos y la evaluacion. Todo se crea aqui mismo."
+                  title="Todavía no hay contenido"
+                  description="Agrega lecciones, videos, documentos y la evaluación. Todo se crea aquí mismo."
                   action={
                     isDraft ? (
                       <Button onClick={() => setAddOpen(true)}>
@@ -764,13 +757,13 @@ export default function ActividadDetallePage() {
           </section>
 
           <aside className="card h-fit p-5">
-            <h3 className="font-display text-sm font-semibold text-ink-900">Reglas de la version</h3>
+            <h3 className="font-display text-sm font-semibold text-ink-900">Reglas de la versión</h3>
             <p className="mb-4 mt-1 text-xs text-ink-500">
               Se congelan al publicar: cambiar el ajuste de la empresa no reinterpreta evaluaciones ya presentadas.
             </p>
             {version ? (
               <div className="space-y-3">
-                <Field htmlFor="v-score" label="Nota minima (%)">
+                <Field htmlFor="v-score" label="Nota mínima (%)">
                   <Input
                     id="v-score"
                     type="number"
@@ -936,7 +929,7 @@ export default function ActividadDetallePage() {
           </div>
 
           {!canPublish ? (
-            <Field htmlFor="p-justification" label="Justificacion" required hint="La lee quien aprueba. Minimo 10 caracteres.">
+            <Field htmlFor="p-justification" label="Justificación" required hint="La lee quien aprueba. Mínimo 10 caracteres.">
               <Textarea
                 id="p-justification"
                 rows={3}
@@ -957,8 +950,8 @@ export default function ActividadDetallePage() {
       <Drawer
         open={borrarOpen}
         onOpenChange={setBorrarOpen}
-        title="Eliminar esta formacion"
-        description="Deja de aparecer en el catalogo. Lo que ya curso alguien no se borra."
+        title="Eliminar esta formación"
+        description="Deja de aparecer en el catálogo. Lo que ya curso alguien no se borra."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setBorrarOpen(false)}>
@@ -976,7 +969,7 @@ export default function ActividadDetallePage() {
             Se va a eliminar <span className="font-medium text-ink-900">{activity.name}</span>.
           </p>
           <ul className="space-y-1 text-sm text-ink-500">
-            <li>Desaparece del catalogo y no se le puede exigir a nadie mas.</li>
+            <li>Desaparece del catálogo y no se le puede exigir a nadie mas.</li>
             <li>El historico de quien la curso se conserva: la evidencia no se borra.</li>
             <li>Si tiene convocatorias, el sistema no la deja: primero se cancelan.</li>
           </ul>

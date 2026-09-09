@@ -66,7 +66,7 @@ export function EvaluarDesempeno() {
       <EmptyState
         icon={ClipboardCheck}
         title="No tienes a nadie que calificar"
-        description="Cuando se abra un ciclo de desempeno y te toque calificar a alguien, aparecera aqui."
+        description="Cuando se abra un ciclo de desempeño y te toque calificar a alguien, aparecera aquí."
       />
     );
   }
@@ -175,7 +175,7 @@ export function EvaluarDesempeno() {
           onEntregada={() => {
             setAbierta(null);
             cargar();
-            showToast({ kind: 'success', title: 'Evaluacion entregada' });
+            showToast({ kind: 'success', title: 'Evaluación entregada' });
           }}
         />
       ) : null}
@@ -636,7 +636,7 @@ function Formulario({
                   rows={3}
                   className="mt-3"
                   disabled={soloLectura}
-                  placeholder="Escribe aqui"
+                  placeholder="Escribe aquí"
                   value={general}
                   onChange={(evento) => setGeneral(evento.target.value)}
                 />

@@ -92,12 +92,12 @@ export default function DesempenoPage() {
   if (!puedeGestionar) {
     return (
       <div>
-        <h1 className="font-display text-[28px] font-semibold text-ink-900">Desempeno</h1>
+        <h1 className="font-display text-[28px] font-semibold text-ink-900">Desempeño</h1>
         <EmptyState
           className="mt-6"
           icon={ClipboardCheck}
           title="Esto lo configura Gestion Humana"
-          description="Las campañas y las competencias se administran con el permiso de desempeno. Si tienes personas a cargo, tus evaluaciones estan en Desempeno, dentro de tu menu."
+          description="Las campañas y las competencias se administran con el permiso de desempeño. Si tienes personas a cargo, tus evaluaciones estan en Desempeño, dentro de tu menu."
           action={
             <Link href="/mi-desempeno">
               <Button>Ir a mis evaluaciones</Button>
@@ -110,7 +110,7 @@ export default function DesempenoPage() {
 
   return (
     <div>
-      <h1 className="font-display text-[28px] font-semibold text-ink-900">Desempeno</h1>
+      <h1 className="font-display text-[28px] font-semibold text-ink-900">Desempeño</h1>
       <p className="mt-1 text-sm leading-relaxed text-ink-500">
         Como lo esta haciendo cada persona en su cargo. No se mezcla con la formacion.
       </p>
@@ -241,8 +241,8 @@ function Ciclos() {
       ) : ciclos.length === 0 ? (
         <EmptyState
           icon={CalendarRange}
-          title="Todavia no hay ciclos"
-          description="Un ciclo es la campaña: «Desempeno 2026», con sus fechas. Al abrirlo se generan las evaluaciones."
+          title="Todavía no hay ciclos"
+          description="Un ciclo es la campaña: «Desempeño 2026», con sus fechas. Al abrirlo se generan las evaluaciones."
         />
       ) : (
         <div className="space-y-2">
@@ -571,20 +571,20 @@ function NuevoCiclo({
           <Casilla
             checked={form.selfEvaluation}
             onChange={(valor) => setForm({ ...form, selfEvaluation: valor })}
-            label="La persona tambien se autoevalua"
+            label="La persona también se autoevalua"
             hint="Se generan dos evaluaciones por persona: la suya y la de su jefe. Es lo que sostiene la conversacion."
           />
           <Casilla
             checked={form.visibleToEmployee}
             onChange={(valor) => setForm({ ...form, visibleToEmployee: valor })}
             label="La persona ve el resultado de su jefe"
-            hint="Solo despues de que el jefe la entregue."
+            hint="Solo después de que el jefe la entregue."
           />
           <Casilla
             checked={form.requiresSignature}
             onChange={(valor) => setForm({ ...form, requiresSignature: valor })}
             label="La persona firma que la conversacion ocurrio"
-            hint="Firmar no es estar de acuerdo: es lo que convierte la evaluacion en evidencia."
+            hint="Firmar no es estar de acuerdo: es lo que convierte la evaluación en evidencia."
           />
         </div>
       </div>
@@ -680,7 +680,7 @@ function ResultadoApertura({
             ))}
           </ul>
           <p className="mt-3 text-xs leading-relaxed text-ink-700">
-            El responsable de cada area se asigna en <strong>Configuracion → Areas</strong>. Al asignarlo,
+            El responsable de cada area se asigna en <strong>Configuración → Areas</strong>. Al asignarlo,
             el proximo ciclo ya generara sus evaluaciones.
           </p>
         </div>
@@ -891,7 +891,7 @@ function Catalogo() {
         {competencias.length === 0 ? (
           <EmptyState
             icon={ListChecks}
-            title="Todavia no hay competencias"
+            title="Todavía no hay competencias"
             description="Empieza por lo que de verdad evalua la empresa hoy: si existe un formato en papel, ese formato es la especificacion."
           />
         ) : (
@@ -899,7 +899,7 @@ function Catalogo() {
             <Table>
               <THead>
                 <Tr>
-                  <Th>Codigo</Th>
+                  <Th>Código</Th>
                   <Th>Competencia</Th>
                   <Th>Escala</Th>
                   <Th>Estado</Th>
@@ -1097,7 +1097,7 @@ function EditarCompetencia({
         {error ? <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p> : null}
 
         {competencia ? null : (
-          <Field htmlFor="k-code" label="Codigo" required hint="Corto y en mayusculas. No se puede cambiar despues.">
+          <Field htmlFor="k-code" label="Código" required hint="Corto y en mayusculas. No se puede cambiar después.">
             <Input
               id="k-code"
               value={form.code}

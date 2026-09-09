@@ -25,7 +25,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
 
     // 1. Primera evaluacion: se escribe la pregunta ahi mismo.
     await page.goto('/evaluaciones');
-    await page.getByRole('button', { name: 'Nueva evaluacion' }).first().click();
+    await page.getByRole('button', { name: 'Nueva evaluación' }).first().click();
     await page.locator('#as-title').fill(`Origen E2E ${suffix}`);
     await page.getByRole('button', { name: 'Crear y empezar' }).click();
     await page.waitForURL('**/evaluaciones/**', { timeout: 20_000 });
@@ -33,15 +33,15 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await page.getByRole('button', { name: 'Agregar', exact: true }).click();
     await page.getByRole('button', { name: 'Escribir pregunta' }).click();
     await page.getByLabel('Enunciado de la pregunta').fill(enunciado);
-    await page.getByLabel('Texto de la opcion A').fill('Cada seis meses');
-    await page.getByLabel('Texto de la opcion B').fill('Nunca');
-    await page.getByRole('button', { name: 'Marcar la opcion A como correcta' }).click();
+    await page.getByLabel('Texto de la opción A').fill('Cada seis meses');
+    await page.getByLabel('Texto de la opción B').fill('Nunca');
+    await page.getByRole('button', { name: 'Marcar la opción A como correcta' }).click();
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-    await expect(page.getByText('Evaluacion guardada')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Evaluación guardada')).toBeVisible({ timeout: 20_000 });
 
     // 2. Segunda evaluacion: la misma pregunta se trae del banco, sin volver a escribirla.
     await page.goto('/evaluaciones');
-    await page.getByRole('button', { name: 'Nueva evaluacion' }).first().click();
+    await page.getByRole('button', { name: 'Nueva evaluación' }).first().click();
     await page.locator('#as-title').fill(`Destino E2E ${suffix}`);
     await page.getByRole('button', { name: 'Crear y empezar' }).click();
     await page.waitForURL('**/evaluaciones/**', { timeout: 20_000 });
@@ -58,7 +58,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     // Ya esta en la secuencia de ESTA evaluacion, sin haberla reescrito.
     await expect(page.getByRole('navigation').getByText(enunciado)).toBeVisible();
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-    await expect(page.getByText('Evaluacion guardada')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Evaluación guardada')).toBeVisible({ timeout: 20_000 });
   });
 
 
@@ -68,7 +68,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
 
     // 1. Leccion con dos tarjetas.
     await page.goto('/lecciones');
-    await page.getByRole('button', { name: 'Nueva leccion' }).click();
+    await page.getByRole('button', { name: 'Nueva lección' }).click();
     await page.getByRole('dialog').getByRole('textbox').first().fill(`Bienvenida E2E ${suffix}`);
     await page.getByRole('button', { name: /Crear/ }).click();
     await page.waitForURL('**/lecciones/**', { timeout: 20_000 });
@@ -89,7 +89,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await page.getByRole('button', { name: 'Contenido', exact: true }).click();
     await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
     // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
-    await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
+    await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
     await page.locator('#c-title').fill('Bienvenida');
     // Se resuelve el value real de la opcion: `label` no admite expresiones regulares y el
     // texto incluye el conteo de tarjetas.
@@ -111,7 +111,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await page.getByRole('button', { name: 'Publicar cambios' }).click();
     await expect(page.getByText(/Publicar congela el contenido/)).toBeVisible();
     await page.getByRole('button', { name: 'Publicar y congelar' }).click();
-    await expect(page.getByText('Version 1 publicada')).toBeVisible();
+    await expect(page.getByText('Versión 1 publicada')).toBeVisible();
 
     // 5. La version publicada es inmutable: ya no se puede agregar contenido.
     // El rotulo cambio al reestructurar la ficha ("publicada e inmutable"): se afirma el concepto.
@@ -120,11 +120,11 @@ test.describe('Sprint 2 — catalogo formativo', () => {
 
     // 6. Editar lo publicado crea la version 2 en borrador.
     await page.getByRole('button', { name: 'Editar el contenido' }).click();
-    await expect(page.getByText('Version 2 creada en borrador')).toBeVisible();
+    await expect(page.getByText('Versión 2 creada en borrador')).toBeVisible();
 
     // El historial de versiones vive en su pestana desde la reestructuracion de la autoria.
     await page.getByRole('button', { name: 'Versiones', exact: true }).click();
-    await expect(page.getByText('Version 2').first()).toBeVisible();
+    await expect(page.getByText('Versión 2').first()).toBeVisible();
 
     // 7. La version 1 sigue publicada y con su contenido intacto.
     await page.getByText('Version 1', { exact: true }).click();
@@ -154,7 +154,7 @@ test('una evaluacion se arma en el lienzo, con huecos, y se ve como la vera el e
   const suffix = unique();
 
   await page.goto('/evaluaciones');
-  await page.getByRole('button', { name: 'Nueva evaluacion' }).first().click();
+  await page.getByRole('button', { name: 'Nueva evaluación' }).first().click();
   await page.locator('#as-title').fill(`Examen E2E ${suffix}`);
   await page.getByRole('button', { name: 'Crear y empezar' }).click();
 
@@ -174,9 +174,9 @@ test('una evaluacion se arma en el lienzo, con huecos, y se ve como la vera el e
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await page.getByRole('button', { name: 'Escribir pregunta' }).click();
   await page.getByLabel('Enunciado de la pregunta').fill(`Ante un derrame ${suffix}, que se hace primero?`);
-  await page.getByLabel('Texto de la opcion A').fill('Contener y avisar');
-  await page.getByLabel('Texto de la opcion B').fill('Seguir trabajando');
-  await page.getByRole('button', { name: 'Marcar la opcion A como correcta' }).click();
+  await page.getByLabel('Texto de la opción A').fill('Contener y avisar');
+  await page.getByLabel('Texto de la opción B').fill('Seguir trabajando');
+  await page.getByRole('button', { name: 'Marcar la opción A como correcta' }).click();
 
   // El rail la muestra ya, con su tipo y su puntaje, sin tener que guardar para verla.
   const rail = page.getByRole('navigation');
@@ -191,10 +191,10 @@ test('una evaluacion se arma en el lienzo, con huecos, y se ve como la vera el e
   await page.getByLabel('Respuesta 1 valida para el hueco 1').fill('seis meses');
 
   await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await expect(page.getByText('Evaluacion guardada')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Evaluación guardada')).toBeVisible({ timeout: 20_000 });
 
   // ── 3. LA VISTA DEL EMPLEADO: el mismo componente que el reproductor real ──
-  await page.getByRole('button', { name: 'Vista del empleado' }).click();
+  await page.getByRole('radio', { name: 'Vista del aprendiz' }).click();
   await expect(page.getByText('Pregunta 1 de 2')).toBeVisible();
   await expect(page.getByRole('heading', { name: /Ante un derrame/ })).toBeVisible();
   // La letra de la opcion: es lo que hace descubrible el atajo de teclado.

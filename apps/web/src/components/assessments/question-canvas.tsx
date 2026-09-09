@@ -577,7 +577,7 @@ function EditorNumerica({ payload, set, disabled }: { payload: QuestionPayloadCl
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <label className="block">
-          <span className="mb-1.5 block text-sm text-ink-700">Numero</span>
+          <span className="mb-1.5 block text-sm text-ink-700">Número</span>
           <input
             type="number"
             step="any"

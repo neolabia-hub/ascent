@@ -73,7 +73,7 @@ export function EximirObligacion({
       open={open}
       onOpenChange={onOpenChange}
       icon={ShieldOff}
-      title="Eximir de esta formacion"
+      title="Eximir de esta formación"
       description={[personName, activityName].filter(Boolean).join(' · ')}
       footer={
         <div className="flex justify-end gap-2">

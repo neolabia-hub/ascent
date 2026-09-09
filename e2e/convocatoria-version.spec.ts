@@ -18,7 +18,7 @@ import { agregarEvaluacion, elegirEnCombo, loginAsAdmin, unique } from './helper
 /** Crea una actividad con una leccion y la deja PUBLICADA en su version 1. */
 async function publishedActivity(page: import('@playwright/test').Page, suffix: string, name: string) {
   await page.goto('/lecciones');
-  await page.getByRole('button', { name: 'Nueva leccion' }).click();
+  await page.getByRole('button', { name: 'Nueva lección' }).click();
   await page.getByRole('dialog').getByRole('textbox').first().fill(`Leccion ${name} ${suffix}`);
   await page.getByRole('button', { name: /Crear/ }).click();
   await page.waitForURL('**/lecciones/**', { timeout: 20_000 });
@@ -35,7 +35,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
 
   await page.getByRole('button', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
-  await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
+  await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
   await page.locator('#c-title').fill('Bienvenida');
   await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
   const lessonValue = await page
@@ -51,7 +51,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
 
   await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
-  await expect(page.getByText('Version 1 publicada')).toBeVisible();
+  await expect(page.getByText('Versión 1 publicada')).toBeVisible();
 }
 
 test.describe('La convocatoria y la version vigente', () => {
@@ -84,26 +84,26 @@ test.describe('La convocatoria y la version vigente', () => {
     // 2. Se publica la v2 de la misma formacion.
     await page.goto(activityUrl);
     await page.getByRole('button', { name: 'Editar el contenido' }).click();
-    await expect(page.getByText('Version 2 creada en borrador')).toBeVisible();
+    await expect(page.getByText('Versión 2 creada en borrador')).toBeVisible();
     await page.getByRole('button', { name: 'Publicar cambios' }).click();
     await page.getByRole('button', { name: 'Publicar y congelar' }).click();
-    await expect(page.getByText('Version 2 publicada')).toBeVisible();
+    await expect(page.getByText('Versión 2 publicada')).toBeVisible();
 
     // 3. La convocatoria lo DICE, y dice tambien lo que pasa si se actualiza.
     await page.goto(offeringUrl);
-    await expect(page.getByText('Hay una version mas nueva: version 2')).toBeVisible();
+    await expect(page.getByText('Hay una versión mas nueva: versión 2')).toBeVisible();
     await expect(page.getByText(/sigue entregando la version 1/)).toBeVisible();
 
     // 4. Antes de mover a nadie se ven las cifras; sin inscritos, todas en cero.
-    await page.getByRole('button', { name: 'Actualizar a la version 2' }).click();
+    await page.getByRole('button', { name: 'Actualizar a la versión 2' }).click();
     const drawer = page.getByRole('dialog');
-    await expect(drawer.getByText('Pasan a la version 2')).toBeVisible();
+    await expect(drawer.getByText('Pasan a la versión 2')).toBeVisible();
     await expect(drawer.getByText(/Ya cerradas/)).toBeVisible();
     await drawer.getByRole('button', { name: 'Actualizar', exact: true }).click();
 
     // 5. Queda entregando la version nueva y el aviso desaparece: la pantalla no sigue pidiendo
     //    algo que ya se hizo.
-    await expect(page.getByText('Convocatoria actualizada a la version 2')).toBeVisible();
+    await expect(page.getByText('Convocatoria actualizada a la versión 2')).toBeVisible();
     await expect(page.getByText(/version 2 ·/)).toBeVisible();
     await expect(page.getByText(/Hay una version mas nueva/)).toHaveCount(0);
   });

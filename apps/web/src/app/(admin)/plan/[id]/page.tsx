@@ -98,7 +98,7 @@ import { usePaginacion } from '@/components/ui/use-paginacion';
 const PLAN_STATUS: Record<PlanStatus, { kind: StatusPillKind; label: string }> = {
   DRAFT: { kind: 'neutral', label: 'BORRADOR' },
   APPROVED: { kind: 'info', label: 'APROBADO' },
-  ACTIVE: { kind: 'ok', label: 'EN EJECUCION' },
+  ACTIVE: { kind: 'ok', label: 'EN EJECUCIÓN' },
   CLOSED: { kind: 'neutral', label: 'CERRADO' },
 };
 
@@ -411,7 +411,7 @@ export default function PlanDetallePage() {
       showToast(
         result.executed
           ? { kind: 'success', title: 'Proyectados ajustados', description: 'El motivo queda en la auditoria del renglon.' }
-          : { kind: 'info', title: 'Enviado a aprobacion', description: 'El administrador decide; el numero no cambia hasta entonces.' },
+          : { kind: 'info', title: 'Enviado a aprobación', description: 'El administrador decide; el número no cambia hasta entonces.' },
       );
     } catch (error) {
       showToast({ kind: 'danger', title: error instanceof ApiError ? error.message : 'No se pudo ajustar' });
@@ -875,7 +875,7 @@ export default function PlanDetallePage() {
             <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Meta de cumplimiento</dt>
             <dd className="mt-1 text-sm text-ink-700">
               {plan.goalPct === null ? (
-                <span className="italic text-ink-500">Sin meta acordada todavia.</span>
+                <span className="italic text-ink-500">Sin meta acordada todavía.</span>
               ) : (
                 <>
                   <span className="font-display text-lg font-bold tabular-nums text-ink-900">{plan.goalPct}%</span>
@@ -902,7 +902,7 @@ export default function PlanDetallePage() {
       {/* Tres vistas del MISMO plan: no son tres pantallas, es una pregunta distinta cada vez. */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex h-11 items-center gap-1 rounded-full bg-paper p-1">
-          <ViewTab active={view} id="capacitacion" onSelect={setView} icon={Layers} label="Por capacitacion" />
+          <ViewTab active={view} id="capacitacion" onSelect={setView} icon={Layers} label="Por capacitación" />
           <ViewTab active={view} id="mes" onSelect={setView} icon={CalendarRange} label="Cronograma" />
           <ViewTab active={view} id="proceso" onSelect={setView} icon={ShieldCheck} label="Por proceso" />
           <ViewTab active={view} id="tabla" onSelect={setView} icon={Rows3} label="Tabla" />
@@ -926,7 +926,7 @@ export default function PlanDetallePage() {
           <Input
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            placeholder="Buscar capacitacion o numero"
+            placeholder="Buscar capacitación o número"
             className="w-[260px] pl-9"
             aria-label="Buscar en el plan"
           />
@@ -975,8 +975,8 @@ export default function PlanDetallePage() {
         <div className="card">
           <EmptyState
             icon={ClipboardList}
-            title="El plan todavia no tiene nada"
-            description="Agrega la primera capacitacion del año. Puedes crear la jornada aqui mismo, sin salir del plan."
+            title="El plan todavía no tiene nada"
+            description="Agrega la primera capacitación del año. Puedes crear la jornada aquí mismo, sin salir del plan."
             action={
               canAdd ? (
                 <div className="flex flex-wrap justify-center gap-2">
@@ -1099,7 +1099,7 @@ export default function PlanDetallePage() {
               rows={3}
               value={cancelReason}
               onChange={(event) => setCancelReason(event.target.value)}
-              placeholder="Minimo 10 caracteres"
+              placeholder="Mínimo 10 caracteres"
             />
           </Field>
         </div>
@@ -1148,14 +1148,14 @@ export default function PlanDetallePage() {
             htmlFor="pr-reason"
             label="Motivo del ajuste"
             required
-            hint="Ejemplo: ingresaron 7 conductores al area en marzo, despues de congelar."
+            hint="Ejemplo: ingresaron 7 conductores al area en marzo, después de congelar."
           >
             <Textarea
               id="pr-reason"
               rows={3}
               value={adjustForm.reason}
               onChange={(event) => setAdjustForm({ ...adjustForm, reason: event.target.value })}
-              placeholder="Minimo 10 caracteres"
+              placeholder="Mínimo 10 caracteres"
             />
           </Field>
         </div>
@@ -1172,7 +1172,7 @@ export default function PlanDetallePage() {
         open={attachOpen}
         onOpenChange={setAttachOpen}
         title="Agregar una convocatoria que ya existe"
-        description="Solo la engancha al plan: no crea nada y no se apropia de la capacitacion."
+        description="Solo la engancha al plan: no crea nada y no se apropia de la capacitación."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setAttachOpen(false)}>
@@ -1262,7 +1262,7 @@ export default function PlanDetallePage() {
                 rows={2}
                 value={attachForm.justification}
                 onChange={(event) => setAttachForm({ ...attachForm, justification: event.target.value })}
-                placeholder="Minimo 10 caracteres"
+                placeholder="Mínimo 10 caracteres"
               />
             </Field>
           ) : null}
@@ -1273,7 +1273,7 @@ export default function PlanDetallePage() {
         open={reopenOpen}
         onOpenChange={setReopenOpen}
         title={`Reabrir el plan de ${plan.year}`}
-        description="Vuelve a EN EJECUCION y admite renglones otra vez. Sus obligaciones y sus indicadores no se tocan."
+        description="Vuelve a EN EJECUCIÓN y admite renglones otra vez. Sus obligaciones y sus indicadores no se tocan."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setReopenOpen(false)}>
@@ -1302,7 +1302,7 @@ export default function PlanDetallePage() {
               rows={3}
               value={reopenReason}
               onChange={(event) => setReopenReason(event.target.value)}
-              placeholder="Minimo 10 caracteres"
+              placeholder="Mínimo 10 caracteres"
             />
           </Field>
         </div>
@@ -1345,7 +1345,7 @@ export default function PlanDetallePage() {
               posibles. Los anos que YA tienen plan no se ofrecen (hay uno por ano, Decision #71);
               el suyo si, porque dejarlo como esta tiene que ser una opcion.
             */
-            <Field htmlFor="e-year" label="Año" required hint="Ancla el vencimiento de cada renglon al ultimo dia de su mes.">
+            <Field htmlFor="e-year" label="Año" required hint="Ancla el vencimiento de cada renglon al último día de su mes.">
               <Select
                 id="e-year"
                 value={editForm.year}
@@ -1417,7 +1417,7 @@ export default function PlanDetallePage() {
                 rows={2}
                 value={editForm.justification}
                 onChange={(event) => setEditForm({ ...editForm, justification: event.target.value })}
-                placeholder="Minimo 10 caracteres"
+                placeholder="Mínimo 10 caracteres"
               />
             </Field>
           ) : null}
@@ -1479,14 +1479,14 @@ export default function PlanDetallePage() {
               htmlFor="d-reason"
               label="Por que se elimina"
               required
-              hint="Queda en la auditoria: hubo personas a las que ya se les anuncio esta formacion."
+              hint="Queda en la auditoria: hubo personas a las que ya se les anuncio esta formación."
             >
               <Textarea
                 id="d-reason"
                 rows={2}
                 value={deleteReason}
                 onChange={(event) => setDeleteReason(event.target.value)}
-                placeholder="Minimo 10 caracteres"
+                placeholder="Mínimo 10 caracteres"
               />
             </Field>
           ) : null}
@@ -1591,7 +1591,7 @@ function ActivityCard({
             <Th className="text-right">Proyectados</Th>
             <Th className="text-right">Capacitados</Th>
             <Th>Estado</Th>
-            {canRemove ? <Th className="w-20 text-right">Accion</Th> : null}
+            {canRemove ? <Th className="w-20 text-right">Acción</Th> : null}
           </Tr>
         </THead>
         <TBody>
@@ -1885,7 +1885,7 @@ function ProcessTable({ plan }: { plan: PlanDetail }) {
   if (plan.byProcess.length === 0) {
     return (
       <div className="card">
-        <EmptyState icon={ShieldCheck} title="Todavia no hay nada por proceso" description="Aparece cuando el plan tenga renglones." />
+        <EmptyState icon={ShieldCheck} title="Todavía no hay nada por proceso" description="Aparece cuando el plan tenga renglones." />
       </div>
     );
   }
@@ -1963,14 +1963,14 @@ function FlatTable({
         <THead>
           <Tr>
             <Th className="w-24">Mes</Th>
-            <Th>Capacitacion</Th>
+            <Th>Capacitación</Th>
             <Th>Proceso</Th>
             <Th>Donde</Th>
             <Th>Convocatoria</Th>
             <Th className="text-right">Proyectados</Th>
             <Th className="text-right">Capacitados</Th>
             <Th>Estado</Th>
-            {canRemove ? <Th className="w-20 text-right">Accion</Th> : null}
+            {canRemove ? <Th className="w-20 text-right">Acción</Th> : null}
           </Tr>
         </THead>
         <TBody>

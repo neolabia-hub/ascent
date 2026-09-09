@@ -245,7 +245,7 @@ export function PlayerShell({
               <button
                 type="button"
                 onClick={onExit}
-                aria-label="Volver a la formacion"
+                aria-label="Volver a la formación"
                 /*
                   MISMA PASTILLA QUE LA CAMPANA Y LA CUENTA (Decision #109): borde, superficie y
                   sombra propios siempre puestos. Eran dos iconos desnudos en una barra sin fondo,

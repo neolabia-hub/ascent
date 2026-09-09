@@ -24,7 +24,7 @@ const PHONE = { width: 390, height: 844 };
 async function publishedPill(page: Page, suffix: string, pillName: string): Promise<void> {
   // 1. Leccion con DOS tarjetas: una de lectura y un quiz de refuerzo.
   await page.goto('/lecciones');
-  await page.getByRole('button', { name: 'Nueva leccion' }).click();
+  await page.getByRole('button', { name: 'Nueva lección' }).click();
   await page.getByRole('dialog').getByRole('textbox').first().fill(`Leccion ${pillName}`);
   await page.getByRole('button', { name: /Crear/ }).click();
   await page.waitForURL('**/lecciones/**', { timeout: 20_000 });
@@ -43,9 +43,9 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
     page.getByRole('radio', { name: `Marcar opcion ${position} como correcta` }).locator('xpath=following-sibling::input[1]');
   await optionText(1).fill('Que la carga este centrada');
   await optionText(2).fill('Nada, se mueve directo');
-  await page.getByRole('radio', { name: 'Marcar opcion 1 como correcta' }).check();
-  await page.getByRole('button', { name: 'Guardar leccion' }).click();
-  await expect(page.getByText('Leccion guardada')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('radio', { name: 'Marcar opción 1 como correcta' }).check();
+  await page.getByRole('button', { name: 'Guardar lección' }).click();
+  await expect(page.getByText('Lección guardada')).toBeVisible({ timeout: 20_000 });
 
   // 2. Actividad de tipo Pildora con esa leccion, publicada.
   await page.goto('/contenido-formativo');
@@ -62,7 +62,7 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
   await page.getByRole('button', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
-  await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
+  await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
   await page.locator('#c-title').fill('La pildora');
   // Paso 2: se reutiliza una leccion de la biblioteca en vez de crear una nueva.
   await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
@@ -76,7 +76,7 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
 
   await page.getByRole('button', { name: 'Publicar cambios' }).click();
   await page.getByRole('button', { name: 'Publicar y congelar' }).click();
-  await expect(page.getByText('Version 1 publicada')).toBeVisible();
+  await expect(page.getByText('Versión 1 publicada')).toBeVisible();
 }
 
 test.describe('Sprint 4 — experiencia del aprendiz', () => {
@@ -101,7 +101,7 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     // 4. La obligacion: se asigna a toda el area del usuario de pruebas (Gestion Humana).
     await page.goto('/asignaciones');
     await page.getByRole('tab', { name: 'Obligaciones' }).click();
-    await page.getByRole('button', { name: 'Asignar formacion' }).click();
+    await page.getByRole('button', { name: 'Asignar formación' }).click();
     await page.locator('#m-target').selectOption({ label: pillName });
     await page.locator('#m-area').selectOption({ label: 'Gestion Humana' });
     await page.locator('#m-due').fill('2026-12-31');
@@ -144,7 +144,7 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
 
     // 7. Vuelve al indice y la formacion quedo terminada.
     await page.waitForURL(/\/aprender\/[^/]+$/, { timeout: 20_000 });
-    await expect(page.getByText('Formacion terminada')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Formación terminada')).toBeVisible({ timeout: 20_000 });
 
     // 8. La racha avanzo. Se comprueba que NO sea cero en vez de exigir un numero exacto: la
     // racha es del dia, y varias corridas el mismo dia no la inflan (es justo lo que se quiso).

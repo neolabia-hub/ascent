@@ -34,7 +34,7 @@ const SECTIONS: Section[] = [
         key: 'responsibleUserId',
         label: 'Responsable del area',
         kind: 'user',
-        hint: 'Quien evalua el desempeno de su gente, responde la eficacia de sus formaciones y recibe el aviso cuando alguien reprueba. Es distinto del responsable de un PROCESO: aquel responde por un sistema de gestion, este por las personas.',
+        hint: 'Quien evalua el desempeño de su gente, responde la eficacia de sus formaciones y recibe el aviso cuando alguien reprueba. Es distinto del responsable de un PROCESO: aquel responde por un sistema de gestion, este por las personas.',
       },
     ],
   },
@@ -42,7 +42,7 @@ const SECTIONS: Section[] = [
     catalogKey: 'processes',
     label: 'Procesos',
     singular: 'proceso',
-    description: 'Sistemas de gestion que originan la formacion (SGI, SST, PESV, SARLAFT...).',
+    description: 'Sistemas de gestion que originan la formación (SGI, SST, PESV, SARLAFT...).',
     /**
      * De que AREA cuelga este proceso. No es decoracion: es lo que permite que la jefatura del
      * area vea todos sus procesos mientras cada responsable ve solo el suyo (Decision #57).
@@ -92,7 +92,7 @@ const SECTIONS: Section[] = [
     label: 'Normas',
     singular: 'norma',
     feminine: true,
-    description: 'Normas a las que tributa la formacion (BASC, BPM, PESV, ISO...).',
+    description: 'Normas a las que tributa la formación (BASC, BPM, PESV, ISO...).',
     extraFields: [{ key: 'annualHoursRequired', label: 'Horas/año exigidas', kind: 'number', hint: 'Ej.: BPM exige 10 horas anuales por manipulador. Vacio si no aplica.' }],
   },
   /*
@@ -118,8 +118,8 @@ export default function ConfiguracionPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-[28px] font-semibold text-ink-900">Configuracion</h1>
-          <p className="mt-1 text-sm text-ink-500">Catalogos y preferencias del tenant. Todo parametrizable, nada en codigo.</p>
+          <h1 className="font-display text-[28px] font-semibold text-ink-900">Configuración</h1>
+          <p className="mt-1 text-sm text-ink-500">Catálogos y preferencias del tenant. Todo parametrizable, nada en código.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/configuracion/roles">
@@ -161,7 +161,7 @@ export default function ConfiguracionPage() {
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
-        <nav className="flex shrink-0 flex-row flex-wrap gap-1 lg:w-56 lg:flex-col" aria-label="Catalogos">
+        <nav className="flex shrink-0 flex-row flex-wrap gap-1 lg:w-56 lg:flex-col" aria-label="Catálogos">
           {SECTIONS.map((s, i) => (
             <button
               key={s.catalogKey}

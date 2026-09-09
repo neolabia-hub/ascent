@@ -72,7 +72,7 @@ export default function EvaluacionesPage() {
       setNuevaOpen(false);
       router.push(`/evaluaciones/${created.id}`);
     } catch (error) {
-      showToast({ kind: 'danger', title: 'No se pudo crear la evaluacion', description: motivoDelError(error) });
+      showToast({ kind: 'danger', title: 'No se pudo crear la evaluación', description: motivoDelError(error) });
     } finally {
       setCreando(false);
     }
@@ -117,7 +117,7 @@ export default function EvaluacionesPage() {
         <div className="card">
           <EmptyState
             icon={ClipboardCheck}
-            title="Todavia no hay ninguna evaluacion"
+            title="Todavía no hay ninguna evaluación"
             description="Se crea con un titulo y se le escriben las preguntas dentro, viendo como quedan para quien las responda."
             action={
               <Button onClick={() => setNuevaOpen(true)}>
@@ -142,7 +142,7 @@ export default function EvaluacionesPage() {
       <Drawer
         open={nuevaOpen}
         onOpenChange={setNuevaOpen}
-        title="Nueva evaluacion"
+        title="Nueva evaluación"
         description="Solo el titulo: las preguntas se escriben dentro, viendo como van a quedar."
         footer={
           <div className="flex justify-end gap-2">
@@ -162,7 +162,7 @@ export default function EvaluacionesPage() {
             value={titulo}
             onChange={(event) => setTitulo(event.target.value)}
             maxLength={200}
-            placeholder="Examen de induccion general"
+            placeholder="Examen de inducción general"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && titulo.trim().length >= 3) void crear();
             }}

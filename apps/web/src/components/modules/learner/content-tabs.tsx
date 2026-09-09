@@ -123,9 +123,9 @@ export function ContentTabs({
                     {course.enrollment.normNames.map((norm) => (
                       <Tag key={norm} label="Norma" value={norm} />
                     ))}
-                    <Tag label="Version" value={`${course.enrollment.versionNumber}`} />
+                    <Tag label="Versión" value={`${course.enrollment.versionNumber}`} />
                     {toScore(course.enrollment.passingScore) ? (
-                      <Tag label="Nota minima" value={`${toScore(course.enrollment.passingScore)}%`} />
+                      <Tag label="Nota mínima" value={`${toScore(course.enrollment.passingScore)}%`} />
                     ) : null}
                   </div>
                 </Block>

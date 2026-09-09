@@ -41,7 +41,7 @@ import { useCan } from '@/components/providers/session-provider';
 const STATUS: Record<PlanStatus, { kind: StatusPillKind; label: string }> = {
   DRAFT: { kind: 'neutral', label: 'BORRADOR' },
   APPROVED: { kind: 'info', label: 'APROBADO' },
-  ACTIVE: { kind: 'ok', label: 'EN EJECUCION' },
+  ACTIVE: { kind: 'ok', label: 'EN EJECUCIÓN' },
   CLOSED: { kind: 'neutral', label: 'CERRADO' },
 };
 
@@ -132,7 +132,7 @@ export default function PlanPage() {
         goalPct: form.goalPct.trim() ? Number(form.goalPct) : null,
         scope: form.scope.trim() || null,
       });
-      showToast({ kind: 'success', title: 'Plan creado', description: 'Agrega los renglones y despues apruebalo.' });
+      showToast({ kind: 'success', title: 'Plan creado', description: 'Agrega los renglones y después apruebalo.' });
       router.push(`/plan/${plan.id}`);
     } catch (error) {
       // "Ya existe el plan de 2026" no es un fallo del que haya que salir: es que ya esta hecho.
@@ -185,7 +185,7 @@ export default function PlanPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-[28px] font-semibold text-ink-900">Plan de capacitacion</h1>
+          <h1 className="font-display text-[28px] font-semibold text-ink-900">Plan de capacitación</h1>
           {/*
             LO QUE HACE EL PLAN, EN DOS FRASES (reescrito el 2026-09-07).
 
@@ -223,7 +223,7 @@ export default function PlanPage() {
         "ya no esta" acierta igual cuando todavia no ha llegado a estar—, y por eso el atributo va
         en un contenedor que esta SIEMPRE.
       */}
-      <div role="region" aria-label="Planes de capacitacion" aria-busy={plans === null}>
+      <div role="region" aria-label="Planes de capacitación" aria-busy={plans === null}>
       {!plans ? (
         <Skeleton className="h-64 w-full" />
       ) : plans.length === 0 ? (
@@ -290,19 +290,19 @@ export default function PlanPage() {
                 htmlFor="d-reason"
                 label="Por que se elimina"
                 required
-                hint="Queda en la auditoria: hubo personas a las que ya se les anuncio esta formacion."
+                hint="Queda en la auditoria: hubo personas a las que ya se les anuncio esta formación."
               >
                 <Textarea
                   id="d-reason"
                   rows={2}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
-                  placeholder="Minimo 10 caracteres"
+                  placeholder="Mínimo 10 caracteres"
                 />
               </Field>
             </>
           ) : (
-            <p className="text-sm text-ink-700">Esta en borrador: nunca obligo a nadie, asi que se borra sin consecuencias.</p>
+            <p className="text-sm text-ink-700">Esta en borrador: nunca obligo a nadie, así que se borra sin consecuencias.</p>
           )}
         </div>
       </Drawer>
@@ -310,7 +310,7 @@ export default function PlanPage() {
       <Drawer
         open={open}
         onOpenChange={setOpen}
-        title="Nuevo plan de capacitacion"
+        title="Nuevo plan de capacitación"
         description="Hay un plan por año. Queda en borrador: puedes armar sus renglones antes de aprobarlo."
         footer={
           <div className="flex justify-end gap-2">

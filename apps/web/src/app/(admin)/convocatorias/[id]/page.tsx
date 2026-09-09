@@ -148,7 +148,7 @@ export default function ConvocatoriaDetallePage() {
       showToast(
         result.executed
           ? { kind: 'success', title: 'Proyectados ajustados', description: 'El motivo queda en la auditoria.' }
-          : { kind: 'info', title: 'Enviado a aprobacion', description: 'Un administrador debe autorizar el ajuste.' },
+          : { kind: 'info', title: 'Enviado a aprobación', description: 'Un administrador debe autorizar el ajuste.' },
       );
       setAjusteOpen(false);
       setAjusteCount('');
@@ -171,7 +171,7 @@ export default function ConvocatoriaDetallePage() {
       showToast(
         result.executed
           ? { kind: 'success', title: 'Convocatoria publicada', description: 'Los proyectados quedaron congelados.' }
-          : { kind: 'info', title: 'Enviada a aprobacion', description: 'Un administrador debe autorizar la publicacion.' },
+          : { kind: 'info', title: 'Enviada a aprobación', description: 'Un administrador debe autorizar la publicación.' },
       );
       setPublishOpen(false);
       await load();
@@ -189,7 +189,7 @@ export default function ConvocatoriaDetallePage() {
       showToast(
         result.executed
           ? { kind: 'success', title: 'Convocatoria cancelada' }
-          : { kind: 'info', title: 'Enviada a aprobacion', description: 'Un administrador debe autorizar la cancelacion.' },
+          : { kind: 'info', title: 'Enviada a aprobación', description: 'Un administrador debe autorizar la cancelacion.' },
       );
       setCancelOpen(false);
       setCancelReason('');
@@ -272,9 +272,9 @@ export default function ConvocatoriaDetallePage() {
           ? {
               kind: 'success',
               title: `Convocatoria actualizada a la version ${target.versionNumber}`,
-              description: 'Se aplico la politica de migracion que se eligio al publicarla.',
+              description: 'Se aplico la politica de migración que se eligio al publicarla.',
             }
-          : { kind: 'info', title: 'Enviada a aprobacion', description: 'Un administrador debe autorizar el cambio.' },
+          : { kind: 'info', title: 'Enviada a aprobación', description: 'Un administrador debe autorizar el cambio.' },
       );
       setMigrateOpen(false);
       setMigrateReason('');
@@ -504,7 +504,7 @@ export default function ConvocatoriaDetallePage() {
         */}
         {esAutoservicio ? (
           <Stat
-            label="Obligados a esta formacion"
+            label="Obligados a esta formación"
             value={pendientes ? pendientes.proyectados : '—'}
             hint="Entran por su cuenta cuando puedan: no hay que citar a nadie"
           />
@@ -949,7 +949,7 @@ export default function ConvocatoriaDetallePage() {
             htmlFor="a-reason"
             label="Motivo del ajuste"
             required
-            ayuda="Minimo 10 caracteres. Queda en la auditoria y visible en la convocatoria: es lo que lee quien audita."
+            ayuda="Mínimo 10 caracteres. Queda en la auditoria y visible en la convocatoria: es lo que lee quien audita."
           >
             <Input id="a-reason" value={ajusteReason} onChange={(event) => setAjusteReason(event.target.value)} maxLength={500} />
           </Field>
@@ -960,7 +960,7 @@ export default function ConvocatoriaDetallePage() {
         open={publishOpen}
         onOpenChange={setPublishOpen}
         title="Publicar convocatoria"
-        description="Publicar congela los proyectados: es el denominador de la cobertura y no se recalcula despues."
+        description="Publicar congela los proyectados: es el denominador de la cobertura y no se recalcula después."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setPublishOpen(false)}>
@@ -994,7 +994,7 @@ export default function ConvocatoriaDetallePage() {
         open={migrateOpen}
         onOpenChange={setMigrateOpen}
         title={`Actualizar a la version ${upgrade.target?.versionNumber ?? ''}`}
-        description="La politica de migracion la fijo quien publico esa version; aqui solo se aplica."
+        description="La politica de migración la fijo quien publico esa versión; aquí solo se aplica."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setMigrateOpen(false)}>
@@ -1049,14 +1049,14 @@ export default function ConvocatoriaDetallePage() {
 
             <Field
               htmlFor="m-reason"
-              label="Justificacion"
-              hint="Queda en la auditoria. Obligatoria si necesitas aprobacion del administrador."
+              label="Justificación"
+              hint="Queda en la auditoria. Obligatoria si necesitas aprobación del administrador."
             >
               <Input id="m-reason" value={migrateReason} onChange={(event) => setMigrateReason(event.target.value)} maxLength={500} />
             </Field>
           </div>
         ) : (
-          <p className="text-sm text-ink-500">Esta convocatoria ya esta en la version vigente.</p>
+          <p className="text-sm text-ink-500">Esta convocatoria ya esta en la versión vigente.</p>
         )}
       </Drawer>
 
@@ -1076,7 +1076,7 @@ export default function ConvocatoriaDetallePage() {
           </div>
         }
       >
-        <Field htmlFor="c-reason" label="Motivo" required hint="Minimo 10 caracteres. Queda registrado.">
+        <Field htmlFor="c-reason" label="Motivo" required hint="Mínimo 10 caracteres. Queda registrado.">
           <Input id="c-reason" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} maxLength={500} />
         </Field>
       </Drawer>

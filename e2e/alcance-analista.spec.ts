@@ -45,7 +45,7 @@ test.describe('Alcance del analista', () => {
 
     // --- El administrador, que no tiene alcance, sigue viendo las dos.
     await page.goto('/contenido-formativo');
-    await page.getByPlaceholder('Buscar por nombre o codigo').fill(`Alcance`);
+    await page.getByPlaceholder('Buscar por nombre o código').fill(`Alcance`);
     await expect(page.getByText(suyo)).toBeVisible();
     await expect(page.getByText(ajeno)).toBeVisible();
 
@@ -97,7 +97,7 @@ test.describe('Alcance del analista', () => {
 
     await page.getByRole('button', { name: 'Crear persona' }).click();
 
-    const credential = page.getByRole('dialog').filter({ hasText: 'Contrasena generada' });
+    const credential = page.getByRole('dialog').filter({ hasText: 'Contraseña generada' });
     await expect(credential).toBeVisible();
     const temporaryPassword = (await credential.locator('p.font-mono').last().innerText()).trim();
     await credential.getByRole('button', { name: 'Entendido' }).click();
@@ -141,7 +141,7 @@ test.describe('Alcance del analista', () => {
     await analyst.waitForURL('**/inicio', { timeout: 20_000 });
 
     await analyst.goto('/contenido-formativo');
-    await analyst.getByPlaceholder('Buscar por nombre o codigo').fill('Alcance');
+    await analyst.getByPlaceholder('Buscar por nombre o código').fill('Alcance');
     await expect(analyst.getByText(suyo)).toBeVisible();
     // LA asercion de la prueba: lo de PESV no esta, ni buscandolo por su nombre.
     await expect(analyst.getByText(ajeno)).toHaveCount(0);

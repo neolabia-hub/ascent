@@ -181,7 +181,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
             </>
           )}
           {matrix.broaderRules > 0 ? (
-            <span title="Requisitos sobre un area, una regional o toda la empresa. No son de un cargo, asi que se ven en la ficha de cada formacion.">
+            <span title="Requisitos sobre un area, una regional o toda la empresa. No son de un cargo, así que se ven en la ficha de cada formación.">
               {' '}
               · {matrix.broaderRules} sobre grupos mas amplios
             </span>
@@ -244,7 +244,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
         })}
 
         {cargos.length === 0 ? (
-          <p className="px-5 py-6 text-center text-sm text-ink-500">Ningun cargo se llama asi.</p>
+          <p className="px-5 py-6 text-center text-sm text-ink-500">Ningún cargo se llama así.</p>
         ) : null}
       </div>
 
@@ -290,7 +290,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
           <section className="flex min-w-0 flex-col">
             <h3 className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-500">Se le exige</h3>
             {suyasAbierto.length === 0 ? (
-              <p className="mt-2 text-sm text-ink-500">Ninguna induccion de puesto todavia.</p>
+              <p className="mt-2 text-sm text-ink-500">Ninguna inducción de puesto todavía.</p>
             ) : (
               // Cada columna se desplaza por su cuenta: si la ventana entera se desplazara, mirar
               // el final de una lista escondería el principio de la otra, que es lo que se venia a
@@ -376,8 +376,8 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
                     />
                     <Input
                       className="pl-9"
-                      placeholder="Buscar una induccion"
-                      aria-label="Buscar una induccion"
+                      placeholder="Buscar una inducción"
+                      aria-label="Buscar una inducción"
                       value={buscaEnVentana}
                       onChange={(event) => setBuscaEnVentana(event.target.value)}
                     />
@@ -430,7 +430,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
                 </ul>
 
                 {disponiblesFiltradas.length === 0 ? (
-                  <p className="mt-2 text-sm text-ink-500">Ninguna se llama asi.</p>
+                  <p className="mt-2 text-sm text-ink-500">Ninguna se llama así.</p>
                 ) : null}
               </>
             )}
@@ -492,7 +492,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
               autoFocus
               value={novedad}
               onChange={(event) => setNovedad(event.target.value)}
-              placeholder="Minimo 10 caracteres"
+              placeholder="Mínimo 10 caracteres"
             />
           </Field>
         </div>

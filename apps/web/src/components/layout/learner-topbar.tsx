@@ -436,7 +436,7 @@ export function LearnerTopbar({
           className="aurora-focus focus-ring hidden h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-transparent hover:text-ink-700 lg:flex"
         >
           <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-          <span className="flex-1 truncate text-left">Buscar una formacion</span>
+          <span className="flex-1 truncate text-left">Buscar una formación</span>
           <kbd className="shrink-0 rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
         </button>
 

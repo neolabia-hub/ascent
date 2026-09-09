@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   Dices,
   Eye,
+  Pencil,
   Library,
   Monitor,
   Palette,
@@ -329,7 +330,7 @@ export default function EvaluacionEditorPage() {
       await listQuestionCategories()
         .then(setCategories)
         .catch(() => undefined);
-      if (!silencioso) showToast({ kind: 'success', title: 'Evaluacion guardada' });
+      if (!silencioso) showToast({ kind: 'success', title: 'Evaluación guardada' });
       return true;
     } catch (err) {
       setError(err instanceof ApiError && err.message ? err.message : 'No se pudo guardar.');
@@ -352,7 +353,7 @@ export default function EvaluacionEditorPage() {
     setBusy(true);
     try {
       await deleteAssessment(assessmentId);
-      showToast({ kind: 'success', title: 'Evaluacion eliminada' });
+      showToast({ kind: 'success', title: 'Evaluación eliminada' });
       router.push(volverA);
     } catch (err) {
       // El servidor dice POR QUE no se puede —"una persona ya la respondio", "esta dentro de dos
@@ -492,27 +493,52 @@ export default function EvaluacionEditorPage() {
             que el examen se entiende. Y usa el MISMO componente que el reproductor real, para que
             no pueda enseñar algo distinto de lo que va a pasar de verdad.
           */}
-          <div className="flex items-center rounded-lg border border-line p-0.5">
+          {/*
+            CUAL DE LOS DOS MODOS ESTA PUESTO, A LA VISTA (2026-09-09).
+
+            El activo se marcaba con `bg-paper` —el gris del fondo— sobre una caja blanca: dos
+            grises a un punto de distancia. El cliente lo dijo en una linea: *"debe marcarse cual
+            esta seleccionado"*. Ahora el activo va RELLENO, que es como se marca lo seleccionado en
+            todo el producto (pastillas, etapas, escala de puntuacion).
+
+            Y «Vista del empleado» pasa a «Vista del aprendiz»: es la palabra del producto —el rol se
+            llama Usuario final y su espacio, mi aprendizaje— y ademas la correcta, porque quien
+            cursa no siempre es empleado (contratistas, temporales).
+          */}
+          <div
+            role="radiogroup"
+            aria-label="Modo de la pantalla"
+            className="flex items-center rounded-lg bg-paper p-1"
+          >
             <button
               type="button"
+              role="radio"
+              aria-checked={vista === 'EDITAR'}
               onClick={() => setVista('EDITAR')}
               className={cn(
-                'focus-ring rounded-md px-3 py-1.5 text-sm transition-colors',
-                vista === 'EDITAR' ? 'bg-paper font-medium text-ink-900' : 'text-ink-500 hover:text-ink-900',
+                'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors duration-150',
+                vista === 'EDITAR'
+                  ? 'bg-surface font-medium text-ink-900 shadow-card'
+                  : 'text-ink-500 hover:text-ink-900',
               )}
             >
+              <Pencil size={14} />
               Editar
             </button>
             <button
               type="button"
+              role="radio"
+              aria-checked={vista === 'PREVIA'}
               onClick={() => setVista('PREVIA')}
               className={cn(
-                'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                vista === 'PREVIA' ? 'bg-paper font-medium text-ink-900' : 'text-ink-500 hover:text-ink-900',
+                'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors duration-150',
+                vista === 'PREVIA'
+                  ? 'bg-surface font-medium text-ink-900 shadow-card'
+                  : 'text-ink-500 hover:text-ink-900',
               )}
             >
               <Eye size={14} />
-              Vista del empleado
+              Vista del aprendiz
             </button>
           </div>
 
@@ -529,7 +555,7 @@ export default function EvaluacionEditorPage() {
             className="text-danger"
             onClick={() => setBorrarOpen(true)}
             disabled={busy}
-            aria-label="Eliminar la evaluacion"
+            aria-label="Eliminar la evaluación"
           >
             <Trash2 size={16} />
           </Button>
@@ -571,7 +597,7 @@ export default function EvaluacionEditorPage() {
 
             <ol className="scroll-hidden min-h-0 flex-1 overflow-y-auto p-2">
               {pasos.length === 0 ? (
-                <li className="px-2 py-6 text-center text-sm text-ink-500">Todavia no hay nada.</li>
+                <li className="px-2 py-6 text-center text-sm text-ink-500">Todavía no hay nada.</li>
               ) : (
                 pasos.map((paso, indice) => {
                   const activo = seleccion.tipo === 'PASO' && seleccion.localId === paso.localId;
@@ -726,8 +752,8 @@ export default function EvaluacionEditorPage() {
             ) : !pasoActivo ? (
               <EmptyState
                 icon={ClipboardCheck}
-                title="Una evaluacion sin preguntas no se publica"
-                description="Escribe la primera desde el rail: queda tambien en el banco, para poder reutilizarla."
+                title="Una evaluación sin preguntas no se publica"
+                description="Escribe la primera desde el rail: queda también en el banco, para poder reutilizarla."
               />
             ) : pasoActivo.kind === 'PICK' ? (
               <ElegirDelBanco
@@ -1146,7 +1172,7 @@ function AjustesPregunta({
           <Field
             htmlFor="ap-expl"
             label="Explicacion"
-            hint="Se puede mostrar despues del intento, segun la politica de revision."
+            hint="Se puede mostrar después del intento, segun la politica de revisión."
           >
             <textarea
               id="ap-expl"
@@ -1421,8 +1447,8 @@ function ComoSeCalifica({
       <div className="mt-7 space-y-5">
         <Field
           htmlFor="cc-score"
-          label="Nota minima (%)"
-          hint="Vacio = la que tenga la formacion. Ponla solo si esta evaluacion debe exigir mas."
+          label="Nota mínima (%)"
+          hint="Vacio = la que tenga la formación. Ponla solo si esta evaluación debe exigir mas."
         >
           <Input
             id="cc-score"
@@ -1445,7 +1471,7 @@ function ComoSeCalifica({
         <Field
           htmlFor="cc-attempts"
           label="Intentos maximos"
-          ayuda="Vacio = los que tenga la formacion. Al agotarlos, la formacion queda bloqueada y se avisa."
+          ayuda="Vacio = los que tenga la formación. Al agotarlos, la formación queda bloqueada y se avisa."
         >
           <Input
             id="cc-attempts"
@@ -1457,7 +1483,7 @@ function ComoSeCalifica({
             onChange={(event) => onChange({ maxAttempts: event.target.value ? Number(event.target.value) : null })}
           />
         </Field>
-        <Field htmlFor="cc-time" label="Tiempo limite (minutos)" hint="Vacio = sin cronometro.">
+        <Field htmlFor="cc-time" label="Tiempo límite (minutos)" hint="Vacio = sin cronometro.">
           <Input
             id="cc-time"
             type="number"
@@ -1527,7 +1553,7 @@ function ComoSeCalifica({
             checked={revision.showScore}
             disabled={disabled}
             onChange={(showScore) => onChange({ reviewPolicy: { ...revision, showScore } })}
-            titulo="Su calificacion"
+            titulo="Su calificación"
             pista="El porcentaje que saco. Apagalo si prefieres que solo sepa si aprobo."
           />
           <Casilla
@@ -1549,7 +1575,7 @@ function ComoSeCalifica({
             disabled={disabled}
             onChange={(showCorrectAnswers) => onChange({ reviewPolicy: { ...revision, showCorrectAnswers } })}
             titulo="Cual era la respuesta correcta"
-            pista="Solo si esta evaluacion no reutiliza preguntas de otras. Es lo que mas rapido filtra un examen."
+            pista="Solo si esta evaluación no reutiliza preguntas de otras. Es lo que mas rapido filtra un examen."
           />
         </div>
       </div>
@@ -1657,7 +1683,7 @@ function ComoSeVe({
             checked={presentation.optionLetters}
             onChange={(optionLetters) => set({ optionLetters })}
             titulo="Numerar las opciones con A, B, C"
-            pista="Ademas deja responder con el teclado, que en un examen largo son minutos."
+            pista="Además deja responder con el teclado, que en un examen largo son minutos."
           />
           <Casilla
             checked={presentation.autoAdvance}
@@ -1763,7 +1789,7 @@ function VistaPrevia({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-500">Asi lo vera quien lo responda. Se puede responder aqui: no se guarda nada.</p>
+        <p className="text-sm text-ink-500">Así lo vera quien lo responda. Se puede responder aquí: no se guarda nada.</p>
         <div className="flex items-center rounded-lg border border-line p-0.5">
           <button
             type="button"

@@ -85,7 +85,7 @@ export function ActivityPlanCard({ activityId, typeConfig, publishedVersion }: A
           <div className="min-w-0 text-sm">
             {plan === null ? (
               <>
-                <p className="font-medium text-ink-900">No hay ningun plan abierto al que agregarla.</p>
+                <p className="font-medium text-ink-900">No hay ningún plan abierto al que agregarla.</p>
                 <p className="mt-0.5 text-ink-500">
                   Es una capacitacion del plan y su tipo dice que cuenta para los indicadores del plan
                   anual, pero el de {enCurso} no existe o ya esta cerrado:{' '}

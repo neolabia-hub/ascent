@@ -419,7 +419,7 @@ export function Topbar({ userFullName }: TopbarProps) {
         onOpenChange={setPaletteOpen}
         staticCommands={ADMIN_COMMANDS}
         loadCommands={loadAdminCommands}
-        placeholder="Buscar una formacion, una persona o ir a una pantalla"
+        placeholder="Buscar una formación, una persona o ir a una pantalla"
       />
     </header>
   );

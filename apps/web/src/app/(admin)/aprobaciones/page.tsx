@@ -147,7 +147,7 @@ export default function AprobacionesPage() {
                   <Th>Solicitada por</Th>
                   <Th>Fecha</Th>
                   <Th>Estado</Th>
-                  <Th className="w-28 text-right">Accion</Th>
+                  <Th className="w-28 text-right">Acción</Th>
                 </Tr>
               </THead>
               <TBody>
@@ -216,7 +216,7 @@ export default function AprobacionesPage() {
             </div>
 
             <div>
-              <p className="text-xs uppercase tracking-wide text-ink-300">Justificacion</p>
+              <p className="text-xs uppercase tracking-wide text-ink-300">Justificación</p>
               <p className="mt-1 rounded-md bg-paper px-3 py-2 text-sm text-ink-700">{selected.justification}</p>
             </div>
 

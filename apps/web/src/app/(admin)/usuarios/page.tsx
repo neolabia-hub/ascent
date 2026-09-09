@@ -412,7 +412,7 @@ export default function UsuariosPage() {
         <div className="card">
           <EmptyState
             icon={UserRound}
-            title="Sin personas todavia"
+            title="Sin personas todavía"
             description="Crea la primera persona o carga el archivo masivo con la plantilla."
             action={
               <Button onClick={openCreate}>
@@ -476,7 +476,7 @@ export default function UsuariosPage() {
                           size="sm"
                           onClick={() => setPapelesDe(user)}
                           aria-label={`Papeles de un tercero de ${user.fullName}`}
-                          title="Papel de un tercero: registrar el certificado que llego despues"
+                          title="Papel de un tercero: registrar el certificado que llego después"
                         >
                           <BadgeCheck size={14} />
                         </Button>
@@ -489,7 +489,7 @@ export default function UsuariosPage() {
                         >
                           <ShieldCheck size={14} />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setARestablecer(user)} aria-label={`Nueva contrasena para ${user.fullName}`} title="Generar una contrasena nueva y sacarle de sus sesiones">
+                        <Button variant="ghost" size="sm" onClick={() => setARestablecer(user)} aria-label={`Nueva contrasena para ${user.fullName}`} title="Generar una contraseña nueva y sacarle de sus sesiones">
                           <KeyRound size={14} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => toggleActive(user)}>
@@ -567,7 +567,7 @@ export default function UsuariosPage() {
               </Select>
             </Field>
           </div>
-          <Field htmlFor="u-phone" label="Telefono">
+          <Field htmlFor="u-phone" label="Teléfono">
             <Input id="u-phone" value={form.phone ?? ''} onChange={(e) => setForm({ ...form, phone: e.target.value || null })} maxLength={20} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -661,7 +661,7 @@ export default function UsuariosPage() {
               <Field
                 htmlFor="u-scope"
                 label="Gestiona"
-                hint="Que parte del catalogo, las convocatorias y el plan administra."
+                hint="Que parte del catálogo, las convocatorias y el plan administra."
               >
                 <div className="space-y-2">
                   <ScopeOption
@@ -714,7 +714,7 @@ export default function UsuariosPage() {
                         <p className="mb-1.5 text-xs font-medium text-ink-700">Procesos sueltos</p>
                         <MultiSelect
                           id="u-scope-processes"
-                          placeholder="Ningun proceso marcado"
+                          placeholder="Ningún proceso marcado"
                           options={processes.map((row) => ({ id: row.id, label: row.name }))}
                           value={scopeProcessIds}
                           onChange={setScopeProcessIds}
@@ -750,7 +750,7 @@ export default function UsuariosPage() {
             ) : null}
 
           <div className="grid grid-cols-2 gap-3">
-            <Field htmlFor="u-hired" label="Fecha de ingreso" hint="Dispara la induccion previa al inicio.">
+            <Field htmlFor="u-hired" label="Fecha de ingreso" hint="Dispara la inducción previa al inicio.">
               <Input id="u-hired" type="date" value={form.hiredAt ?? ''} onChange={(e) => setForm({ ...form, hiredAt: e.target.value || null })} />
             </Field>
             <Field htmlFor="u-birth" label="Fecha de nacimiento" hint="Opcional.">
@@ -783,7 +783,7 @@ export default function UsuariosPage() {
           if (!open) setARestablecer(null);
         }}
         title={aRestablecer ? `Restablecer la contrasena de ${aRestablecer.fullName}` : ''}
-        description="Se genera una contrasena nueva al azar y la actual deja de servir."
+        description="Se genera una contraseña nueva al azar y la actual deja de servir."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setARestablecer(null)}>
@@ -797,7 +797,7 @@ export default function UsuariosPage() {
       >
         <div className="space-y-3 text-sm text-ink-700">
           <p>
-            <span className="font-medium text-ink-900">La contrasena actual dejara de funcionar</span> y se cerraran
+            <span className="font-medium text-ink-900">La contraseña actual dejara de funcionar</span> y se cerraran
             todas sus sesiones. La nueva se enseña <span className="font-medium text-ink-900">una sola vez</span>:
             copiala antes de cerrar, porque despues no se puede volver a ver.
           </p>
@@ -811,7 +811,7 @@ export default function UsuariosPage() {
       <Drawer
         open={credential !== null}
         onOpenChange={(open) => { if (!open) setCredential(null); }}
-        title="Contrasena generada"
+        title="Contraseña generada"
         description="Se muestra una sola vez. Entregala de forma segura; en el primer ingreso el sistema exige cambiarla."
         footer={
           <div className="flex justify-end">
@@ -825,7 +825,7 @@ export default function UsuariosPage() {
               <p className="text-sm text-ink-500">{credential.name}</p>
               <p className="mt-2 text-xs uppercase tracking-wide text-ink-300">Usuario</p>
               <p className="font-mono text-lg">{credential.document}</p>
-              <p className="mt-3 text-xs uppercase tracking-wide text-ink-300">Contrasena temporal</p>
+              <p className="mt-3 text-xs uppercase tracking-wide text-ink-300">Contraseña temporal</p>
               <p className="font-mono text-lg">{credential.password}</p>
             </div>
             <Button
@@ -860,7 +860,7 @@ export default function UsuariosPage() {
             Descargar plantilla (Excel)
           </Button>
 
-          <Field htmlFor="import-file" label="Archivo" hint="El Excel de la plantilla (.xlsx). Tambien se acepta .csv si lo prefieres.">
+          <Field htmlFor="import-file" label="Archivo" hint="El Excel de la plantilla (.xlsx). También se acepta .csv si lo prefieres.">
             <input
               id="import-file"
               type="file"
@@ -891,7 +891,7 @@ export default function UsuariosPage() {
                 codigo, como prefieras: "Logistica" y "LOGISTICA" funcionan igual.
               </li>
               <li>Las fechas van como AAAA-MM-DD, por ejemplo 2026-09-01.</li>
-              <li>No cambies los encabezados de la primera fila. Maximo 2000 filas.</li>
+              <li>No cambies los encabezados de la primera fila. Máximo 2000 filas.</li>
               <li>
                 Si algo falla, se te dira <strong className="text-ink-700">la fila y la columna</strong> exactas; lo
                 demas entra igual.

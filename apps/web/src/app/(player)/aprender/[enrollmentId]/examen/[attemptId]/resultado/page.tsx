@@ -111,7 +111,7 @@ export default function AttemptResultPage() {
 
         {review.detail.length > 0 ? (
           <section className="space-y-2">
-            <h2 className="font-display text-sm font-semibold text-ink-500">Revision</h2>
+            <h2 className="font-display text-sm font-semibold text-ink-500">Revisión</h2>
             <ul className="space-y-2">
               {review.detail.map((row, position) => {
                 const right = row.pointsAwarded !== null && row.pointsAwarded >= row.pointsPossible;

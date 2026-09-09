@@ -162,7 +162,7 @@ export default function AsignacionesPage() {
         if (vigente()) setAssignments(page.items);
       }
     } catch (error) {
-      if (vigente()) showToast({ kind: 'danger', title: 'No se pudo cargar la informacion', description: motivoDelError(error) });
+      if (vigente()) showToast({ kind: 'danger', title: 'No se pudo cargar la información', description: motivoDelError(error) });
     }
   }, [tab, assignmentQuery, showToast]);
 
@@ -300,7 +300,7 @@ export default function AsignacionesPage() {
     if (!eximiendo) return;
     try {
       await waiveAssignment(eximiendo.id, reason);
-      showToast({ kind: 'success', title: 'Obligacion eximida' });
+      showToast({ kind: 'success', title: 'Obligación eximida' });
       await loadTab();
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo eximir', description: motivoDelError(error) });
@@ -368,7 +368,7 @@ export default function AsignacionesPage() {
         <ListFilter
           value={rulesQuery.q}
           onChange={(q) => setRulesQuery({ ...rulesQuery, q })}
-          placeholder="Buscar por formacion o grupo"
+          placeholder="Buscar por formación o grupo"
           shown={reglasVisibles.length}
           total={rules.length}
         >
@@ -395,7 +395,7 @@ export default function AsignacionesPage() {
             <EmptyState
               icon={Target}
               title="Sin requisitos definidos"
-              description="Un requisito une una audiencia con una formacion: quien entre a esa audiencia queda obligado automaticamente."
+              description="Un requisito une una audiencia con una formación: quien entre a esa audiencia queda obligado automaticamente."
               action={
                 <Button onClick={() => setRuleOpen(true)}>
                   <Plus size={16} />
@@ -410,7 +410,7 @@ export default function AsignacionesPage() {
               <Table>
                 <THead>
                   <Tr>
-                    <Th>Formacion exigida</Th>
+                    <Th>Formación exigida</Th>
                     <Th>Audiencia</Th>
                     <Th>Disparador</Th>
                     <Th>Vence</Th>
@@ -607,7 +607,7 @@ export default function AsignacionesPage() {
               <EmptyState
                 icon={ClipboardCheck}
                 title="Sin obligaciones"
-                description="Cuando definas requisitos o asignes una formacion a un cargo o area, apareceran aqui."
+                description="Cuando definas requisitos o asignes una formación a un cargo o area, apareceran aquí."
               />
             </div>
           ) : (
@@ -617,7 +617,7 @@ export default function AsignacionesPage() {
                   <THead>
                     <Tr>
                       <Th>Nombre</Th>
-                      <Th>Formacion</Th>
+                      <Th>Formación</Th>
                       <Th>Origen</Th>
                       <Th>Ronda</Th>
                       <Th>Vence</Th>
@@ -673,7 +673,7 @@ export default function AsignacionesPage() {
         open={ruleOpen}
         onOpenChange={setRuleOpen}
         title="Nuevo requisito"
-        description="Une una audiencia con una formacion. Quien pertenezca a la audiencia queda obligado."
+        description="Une una audiencia con una formación. Quien pertenezca a la audiencia queda obligado."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setRuleOpen(false)}>
@@ -701,7 +701,7 @@ export default function AsignacionesPage() {
               ))}
             </Select>
           </Field>
-          <Field htmlFor="r-target" label="Formacion exigida" required>
+          <Field htmlFor="r-target" label="Formación exigida" required>
             <Select id="r-target" value={ruleForm.targetId} onChange={(event) => setRuleForm({ ...ruleForm, targetId: event.target.value })}>
               <option value="">Seleccionar...</option>
               {activities.map((activity) => (
@@ -720,13 +720,13 @@ export default function AsignacionesPage() {
           </Field>
           <Field
             htmlFor="r-due"
-            label="Dias respecto a ese momento"
-            hint="Negativo = antes. La induccion de ingreso debe vencer ANTES del primer dia de labores."
+            label="Días respecto a ese momento"
+            hint="Negativo = antes. La inducción de ingreso debe vencer ANTES del primer día de labores."
           >
             <Input id="r-due" type="number" value={ruleForm.dueDays} onChange={(event) => setRuleForm({ ...ruleForm, dueDays: event.target.value })} />
           </Field>
           {ruleForm.trigger === 'SCHEDULED' ? (
-            <Field htmlFor="r-every" label="Se repite cada (meses)" required hint="Reinduccion anual: 12.">
+            <Field htmlFor="r-every" label="Se repite cada (meses)" required hint="Reinducción anual: 12.">
               <Input
                 id="r-every"
                 type="number"
@@ -835,8 +835,8 @@ export default function AsignacionesPage() {
       <Drawer
         open={assignOpen}
         onOpenChange={setAssignOpen}
-        title="Asignar formacion"
-        description="Asignacion puntual, fuera de los requisitos. No pisa lo que ya esta pendiente."
+        title="Asignar formación"
+        description="Asignación puntual, fuera de los requisitos. No pisa lo que ya esta pendiente."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setAssignOpen(false)}>
@@ -849,7 +849,7 @@ export default function AsignacionesPage() {
         }
       >
         <div className="space-y-4">
-          <Field htmlFor="m-target" label="Formacion" required>
+          <Field htmlFor="m-target" label="Formación" required>
             <Select id="m-target" value={assignForm.targetId} onChange={(event) => setAssignForm({ ...assignForm, targetId: event.target.value })}>
               <option value="">Seleccionar...</option>
               {activities.map((activity) => (
@@ -879,7 +879,7 @@ export default function AsignacionesPage() {
               ))}
             </Select>
           </Field>
-          <Field htmlFor="m-due" label="Fecha limite">
+          <Field htmlFor="m-due" label="Fecha límite">
             <Input id="m-due" type="date" value={assignForm.dueAt} onChange={(event) => setAssignForm({ ...assignForm, dueAt: event.target.value })} />
           </Field>
         </div>

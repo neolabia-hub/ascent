@@ -121,7 +121,7 @@ function Resultado({ datos }: { datos: VerificacionPublica }) {
       <dl className="divide-y divide-line border-t border-line">
         <Dato etiqueta="Persona" valor={datos.persona.fullName} secundario={datos.persona.documentNumber} />
         <Dato
-          etiqueta="Formacion"
+          etiqueta="Formación"
           valor={datos.formacion.name}
           secundario={datos.formacion.hours ? `${datos.formacion.hours} horas` : null}
         />

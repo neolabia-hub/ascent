@@ -106,8 +106,8 @@ export default function LeccionesPage() {
         <div className="card">
           <EmptyState
             icon={Layers}
-            title="Sin lecciones todavia"
-            description="Crea la primera leccion para empezar a armar su pila de tarjetas."
+            title="Sin lecciones todavía"
+            description="Crea la primera lección para empezar a armar su pila de tarjetas."
             action={
               <Button onClick={openCreate}>
                 <Plus size={16} />
@@ -176,7 +176,7 @@ export default function LeccionesPage() {
       <Drawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        title="Nueva leccion"
+        title="Nueva lección"
         description="Se crea vacia; agregas las tarjetas en el editor."
         footer={
           <div className="flex justify-end gap-2">

@@ -120,7 +120,7 @@ export default function PlataformaPage() {
           la pantalla de ingreso se ve sin haber iniciado sesion.
         */}
         <p className="mt-5 rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-3 text-sm leading-relaxed text-ink-700">
-          Esto lo ve cualquiera que abra la pantalla de ingreso de un cliente, <strong>sin sesion</strong>.
+          Esto lo ve cualquiera que abra la pantalla de ingreso de un cliente, <strong>sin sesión</strong>.
           Pon un canal de soporte, no datos personales.
         </p>
 
@@ -146,7 +146,7 @@ export default function PlataformaPage() {
                   onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
                 />
               </Field>
-              <Field htmlFor="ps-phone" label="Telefono">
+              <Field htmlFor="ps-phone" label="Teléfono">
                 <Input
                   id="ps-phone"
                   maxLength={60}

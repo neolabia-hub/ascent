@@ -73,7 +73,7 @@ export function MesDia({ value, onChange, idBase, disabled }: MesDiaProps) {
       </Select>
       <Select
         id={`${idBase}-dia`}
-        aria-label="Dia de la campaña"
+        aria-label="Día de la campaña"
         className="w-24"
         value={String(Math.min(dia, maximo))}
         disabled={disabled}

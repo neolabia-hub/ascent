@@ -121,7 +121,7 @@ export function MultiSelect({ options, value, onChange, placeholder = 'Seleccion
           className="card absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto p-1"
         >
           {options.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-ink-500">No hay opciones. Se crean en Configuracion.</li>
+            <li className="px-3 py-2 text-sm text-ink-500">No hay opciones. Se crean en Configuración.</li>
           ) : (
             options.map((option) => {
               const checked = value.includes(option.id);

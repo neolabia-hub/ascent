@@ -119,7 +119,7 @@ export default function AttemptPage() {
     return (
       <main className="learner-surface flex min-h-screen items-center justify-center bg-paper px-6 text-center">
         <div>
-          <p className="text-base text-ink-500">No pudimos abrir la evaluacion.</p>
+          <p className="text-base text-ink-500">No pudimos abrir la evaluación.</p>
           <Button variant="outline" className="mt-4" onClick={() => router.push(`/aprender/${params.enrollmentId}`)}>
             Volver
           </Button>

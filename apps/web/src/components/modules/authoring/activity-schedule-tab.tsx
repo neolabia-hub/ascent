@@ -281,8 +281,8 @@ export function ActivityScheduleTab({
       <div className="card">
         <EmptyState
           icon={CalendarDays}
-          title="Esta formacion todavia no tiene contenido"
-          description="Agrega su contenido en la pestana Contenido y vuelve aqui para programarla."
+          title="Esta formación todavía no tiene contenido"
+          description="Agrega su contenido en la pestana Contenido y vuelve aquí para programarla."
         />
       </div>
     );
@@ -341,7 +341,7 @@ export function ActivityScheduleTab({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink-900">Convocatorias</h2>
-          <p className="mt-1 text-sm text-ink-500">Cada vez que esta formacion se dicta o se abre, es una convocatoria.</p>
+          <p className="mt-1 text-sm text-ink-500">Cada vez que esta formación se dicta o se abre, es una convocatoria.</p>
         </div>
         {!creating ? (
           <Button onClick={() => setCreating(true)}>
@@ -377,7 +377,7 @@ export function ActivityScheduleTab({
       */}
       {sinAbrir ? (
         <section className="card border-warn bg-warn-soft p-5">
-          <h3 className="font-display text-base font-semibold text-warn">Todavia nadie puede hacerla</h3>
+          <h3 className="font-display text-base font-semibold text-warn">Todavía nadie puede hacerla</h3>
           <p className="mt-1 text-sm text-ink-700">
             El contenido esta publicado, pero a quien la tenga exigida le sale con{' '}
             <strong>candado</strong>.{' '}
@@ -439,7 +439,7 @@ export function ActivityScheduleTab({
         <section className="card border-warn bg-warn-soft p-5">
           <h3 className="font-display text-base font-semibold text-warn">Falta aprobar el plan</h3>
           <p className="mt-1 text-sm text-ink-700">
-            La jornada esta publicada, pero <strong>todavia no le llega a nadie</strong>: las obligaciones de una
+            La jornada esta publicada, pero <strong>todavía no le llega a nadie</strong>: las obligaciones de una
             capacitacion del plan nacen al <strong>aprobar el plan de {planDelAno.year}</strong>. Hasta entonces nadie
             la tiene en sus pendientes y no hay a quien convocar.
           </p>
@@ -503,7 +503,7 @@ export function ActivityScheduleTab({
                   maxLength={500}
                   value={motivoDelPlan}
                   onChange={(event) => setMotivoDelPlan(event.target.value)}
-                  placeholder="Minimo 10 caracteres"
+                  placeholder="Mínimo 10 caracteres"
                 />
               </Field>
             </div>
@@ -536,7 +536,7 @@ export function ActivityScheduleTab({
           <EmptyState
             icon={CalendarDays}
             title="Sin programar"
-            description="Nadie puede empezar esta formacion hasta que exista una convocatoria. Para autoservicio, crea una permanente."
+            description="Nadie puede empezar esta formación hasta que exista una convocatoria. Para autoservicio, crea una permanente."
             action={
               <Button onClick={() => setCreating(true)}>
                 <CalendarPlus size={16} />

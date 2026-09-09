@@ -262,7 +262,7 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
         <Table>
           <THead>
             <Tr>
-              <Th>Codigo</Th>
+              <Th>Código</Th>
               <Th>Nombre</Th>
               {extraColumn ? <Th>{extraColumn.label}</Th> : null}
               <Th>Estado</Th>
@@ -286,7 +286,7 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                             <button
                               type="button"
                               onClick={() => openEdit(row)}
-                              title="Sin area, ninguna jefatura de area ve este proceso en su catalogo"
+                              title="Sin area, ninguna jefatura de area ve este proceso en su catálogo"
                               className="focus-ring rounded bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn underline decoration-dotted underline-offset-4"
                             >
                               Sin area
@@ -361,8 +361,8 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
           {!editing ? (
             <Field
               htmlFor="cat-code"
-              label="Codigo"
-              hint="Mayusculas, numeros y guion bajo. No se puede cambiar despues."
+              label="Código"
+              hint="Mayusculas, numeros y guion bajo. No se puede cambiar después."
               required
             >
               <Input

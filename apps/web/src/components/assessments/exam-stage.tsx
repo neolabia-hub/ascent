@@ -636,7 +636,7 @@ function Ordenar({ question, answer, disabled, animate, onAnswer }: TipoNuevoPro
   return (
     <div>
       <h2 className="font-display text-xl font-semibold leading-snug text-ink-900 lg:text-[26px]">{question.stem}</h2>
-      <p className="mt-2 text-sm text-ink-500">Ponlos en el orden correcto, del primero al ultimo.</p>
+      <p className="mt-2 text-sm text-ink-500">Ponlos en el orden correcto, del primero al último.</p>
       <ol className="mt-6 space-y-3">
         {actual.map((id, posicion) => (
           <li

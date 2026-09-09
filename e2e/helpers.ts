@@ -151,7 +151,7 @@ export async function elegirEnCombo(page: Page, comboId: string, nombre: string)
  */
 export async function agregarEvaluacion(page: import('@playwright/test').Page, titulo: string) {
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
-  await page.getByRole('button', { name: 'Evaluacion' }).click();
+  await page.getByRole('button', { name: 'Evaluación' }).click();
   await page.locator('#c-title').fill(titulo);
   // El banco por defecto: el primero con preguntas. Sin categorias no hay examen posible, y eso lo
   // cubre la semilla.

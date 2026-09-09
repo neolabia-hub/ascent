@@ -54,7 +54,7 @@ interface TypeMeta {
 }
 
 const TYPES: TypeMeta[] = [
-  { type: 'LESSON', label: 'Leccion en tarjetas', description: 'El formato principal. De 5 a 15 tarjetas de menos de 5 minutos.', icon: Layers },
+  { type: 'LESSON', label: 'Lección en tarjetas', description: 'El formato principal. De 5 a 15 tarjetas de menos de 5 minutos.', icon: Layers },
   {
     type: 'PRESENTATION',
     label: 'Presentacion',
@@ -68,12 +68,12 @@ const TYPES: TypeMeta[] = [
     description: 'Archivo subido o enlace de YouTube: se mide lo que la persona ve de verdad. Otros enlaces quedan como declaracion suya.',
     icon: Video,
   },
-  { type: 'ASSESSMENT', label: 'Evaluacion', description: 'Examen con nota, intentos y bloqueo al agotarlos.', icon: ClipboardCheck },
+  { type: 'ASSESSMENT', label: 'Evaluación', description: 'Examen con nota, intentos y bloqueo al agotarlos.', icon: ClipboardCheck },
   {
     type: 'DOCUMENT',
     label: 'Documento de apoyo',
     description:
-      'Manual, politica o instructivo para consultar. No es una leccion: se lee en visor y solo queda la confirmacion de la persona.',
+      'Manual, politica o instructivo para consultar. No es una lección: se lee en visor y solo queda la confirmacion de la persona.',
     icon: FileText,
   },
   { type: 'LINK', label: 'Enlace externo', description: 'Un recurso que vive fuera de la plataforma.', icon: Link2 },
@@ -216,7 +216,7 @@ export function AddContentDrawer({
 
       if (newLessonId) {
         // Crear una leccion vacia no sirve de nada: lo siguiente es escribir sus tarjetas.
-        showToast({ kind: 'success', title: 'Leccion creada', description: 'Ahora escribe sus tarjetas.' });
+        showToast({ kind: 'success', title: 'Lección creada', description: 'Ahora escribe sus tarjetas.' });
         router.push(
           `/lecciones/${newLessonId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}&formacion=${activityId}`,
         );
@@ -303,7 +303,7 @@ export function AddContentDrawer({
           */}
           <Field
             htmlFor="c-description"
-            label="Descripcion"
+            label="Descripción"
             hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
           >
             <Textarea
@@ -353,7 +353,7 @@ export function AddContentDrawer({
           ) : null}
 
           {type === 'LESSON' && mode === 'library' ? (
-            <Field htmlFor="c-lesson" label="Leccion" hint="Solo las que estan en borrador se pueden reutilizar.">
+            <Field htmlFor="c-lesson" label="Lección" hint="Solo las que estan en borrador se pueden reutilizar.">
               <Select id="c-lesson" value={lessonId} onChange={(event) => setLessonId(event.target.value)}>
                 <option value="">Seleccionar...</option>
                 {lessons.map((lesson) => (
@@ -369,7 +369,7 @@ export function AddContentDrawer({
             <>
               <Field htmlFor="c-category" label="Banco de preguntas" required hint="De donde salen las preguntas.">
                 <Select id="c-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-                  {categories.length === 0 ? <option value="">No hay categorias todavia</option> : null}
+                  {categories.length === 0 ? <option value="">No hay categorías todavía</option> : null}
                   {categories.map((row) => (
                     <option key={row.id} value={row.id}>
                       {row.name} ({row._count?.questions ?? 0} preguntas)
@@ -380,7 +380,7 @@ export function AddContentDrawer({
               <Field
                 htmlFor="c-pick"
                 label="Cuantas preguntas al azar"
-                hint="Cada persona recibe una seleccion distinta: repetir el mismo examen lo publica."
+                hint="Cada persona recibe una selección distinta: repetir el mismo examen lo publica."
               >
                 <Input
                   id="c-pick"
@@ -407,7 +407,7 @@ export function AddContentDrawer({
           ) : null}
 
           {type === 'ASSESSMENT' && mode === 'library' ? (
-            <Field htmlFor="c-assessment" label="Evaluacion">
+            <Field htmlFor="c-assessment" label="Evaluación">
               <Select
                 id="c-assessment"
                 value={assessmentId}
@@ -473,7 +473,7 @@ export function AddContentDrawer({
               htmlFor="c-file"
               label="Archivo"
               required
-              ayuda="Manual, politica o instructivo. Si lo que quieres es que lo CURSEN, usa Presentacion o Leccion: de un documento solo se registra que la persona confirmo haberlo leido."
+              ayuda="Manual, politica o instructivo. Si lo que quieres es que lo CURSEN, usa Presentacion o Lección: de un documento solo se registra que la persona confirmo haberlo leido."
             >
               <label
                 htmlFor="c-file"

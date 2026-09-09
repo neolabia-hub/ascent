@@ -29,9 +29,9 @@
     lo que le da al texto el maximo contraste. El borde baja un paso con el, o se perderia contra
     el fondo nuevo.
   */
-  --paper: #eceff4;
+  --paper: #e8ecf2;
   --surface: #ffffff;
-  --line: #dfe3e9;
+  --line: #d8dee6;
   --line-strong: #c6cdd6;
 
   /* Plataforma — semanticos (color + fondo suave) */

@@ -21,10 +21,10 @@ export default function CambiarContrasenaPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const requirements: Requirement[] = [
-    { label: 'Minimo 10 caracteres', met: newPassword.length >= 10 },
+    { label: 'Mínimo 10 caracteres', met: newPassword.length >= 10 },
     { label: 'Al menos una mayuscula', met: /[A-Z]/.test(newPassword) },
     { label: 'Al menos una minuscula', met: /[a-z]/.test(newPassword) },
-    { label: 'Al menos un numero', met: /[0-9]/.test(newPassword) },
+    { label: 'Al menos un número', met: /[0-9]/.test(newPassword) },
   ];
   const allRequirementsMet = requirements.every((requirement) => requirement.met);
   const passwordsMatch = confirmPassword.length > 0 && newPassword === confirmPassword;

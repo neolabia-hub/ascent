@@ -109,7 +109,7 @@ export default function EnrollmentPage() {
     return (
       <main className="learner-surface flex min-h-screen items-center justify-center bg-paper px-6 text-center">
         <div>
-          <p className="text-base text-ink-500">No pudimos abrir esta formacion.</p>
+          <p className="text-base text-ink-500">No pudimos abrir esta formación.</p>
           <Button variant="outline" className="mt-4" onClick={() => router.push('/hoy')}>
             Volver al inicio
           </Button>
@@ -228,13 +228,13 @@ export default function EnrollmentPage() {
                 <dd className="mt-1 text-sm text-ink-900">{MODALITY_LABEL[enrollment.activityModality]}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Nota minima</dt>
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Nota mínima</dt>
                 <dd className="mt-1 text-sm tabular-nums text-ink-900">
                   {toScore(enrollment.passingScore) ?? '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Version</dt>
+                <dt className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Versión</dt>
                 <dd className="mt-1 text-sm tabular-nums text-ink-900">{enrollment.versionNumber}</dd>
               </div>
               <div className="col-span-2">
@@ -247,7 +247,7 @@ export default function EnrollmentPage() {
 
             {blocked ? (
               <section className="mt-4 rounded-xl border border-danger/40 bg-danger-soft p-5">
-                <h2 className="font-display text-base font-semibold text-danger">Formacion bloqueada</h2>
+                <h2 className="font-display text-base font-semibold text-danger">Formación bloqueada</h2>
                 <p className="mt-1 text-sm text-ink-700">
                   {enrollment.blockedReason ?? 'Agotaste los intentos de la evaluacion.'} Tu analista y tu jefe ya
                   fueron avisados para habilitarte un refuerzo.
@@ -265,7 +265,7 @@ export default function EnrollmentPage() {
             ) : (
               <section className="mt-4 rounded-xl border border-ok/40 bg-ok-soft p-5 text-center">
                 <Check className="mx-auto h-8 w-8 text-ok" strokeWidth={2} aria-hidden="true" />
-                <h2 className="mt-2 font-display text-base font-semibold text-ok">Formacion terminada</h2>
+                <h2 className="mt-2 font-display text-base font-semibold text-ok">Formación terminada</h2>
                 <p className="mt-1 text-sm text-ink-700">Quedo registrada en tu historial.</p>
               </section>
             )}

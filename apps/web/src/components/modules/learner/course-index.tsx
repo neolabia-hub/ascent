@@ -45,11 +45,11 @@ interface TypeMeta {
 }
 
 const TYPES: Record<ContentType, TypeMeta> = {
-  LESSON: { icon: Layers, label: 'Leccion' },
+  LESSON: { icon: Layers, label: 'Lección' },
   PRESENTATION: { icon: Presentation, label: 'Presentacion' },
   VIDEO: { icon: Video, label: 'Video' },
   DOCUMENT: { icon: FileText, label: 'Documento de apoyo' },
-  ASSESSMENT: { icon: ClipboardCheck, label: 'Evaluacion' },
+  ASSESSMENT: { icon: ClipboardCheck, label: 'Evaluación' },
   SURVEY: { icon: MessageSquareText, label: 'Encuesta' },
   SCORM: { icon: Package, label: 'Paquete' },
   LINK: { icon: Link2, label: 'Recurso externo' },

@@ -57,7 +57,7 @@ const NAV_ITEMS: NavItem[] = [
  * cuando no queda nada: un item permanente que casi todo el año no lleva a ninguna parte enseña a
  * no pulsarlo. En movil la barra inferior pasa de cuatro a cinco items solo durante la campaña.
  */
-const ITEM_DESEMPENO: NavItem = { href: '/mi-desempeno', label: 'Desempeno', icon: ClipboardCheck };
+const ITEM_DESEMPENO: NavItem = { href: '/mi-desempeno', label: 'Desempeño', icon: ClipboardCheck };
 
 
 export function LearnerShell({ children }: { children: ReactNode }) {
@@ -373,7 +373,7 @@ function ProgresoPropio() {
           convierte un premio en un reproche.
         */}
         {progress.freezesAvailable > 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs text-ink-500" title="Te salvan la racha un dia">
+          <span className="inline-flex items-center gap-1 text-xs text-ink-500" title="Te salvan la racha un día">
             <Snowflake className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
             {progress.freezesAvailable}
           </span>

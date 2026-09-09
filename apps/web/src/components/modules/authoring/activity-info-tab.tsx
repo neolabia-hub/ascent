@@ -117,7 +117,7 @@ export function ActivityInfoTab({
       .catch((error: unknown) =>
         showToast({
           kind: 'danger',
-          title: 'No se pudieron cargar los catalogos',
+          title: 'No se pudieron cargar los catálogos',
           description: motivoDelError(error),
         }),
       );
@@ -218,7 +218,7 @@ export function ActivityInfoTab({
     <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
       <div className="space-y-6">
         <section className="card p-6">
-          <h2 className="font-display text-lg font-semibold text-ink-900">Informacion basica</h2>
+          <h2 className="font-display text-lg font-semibold text-ink-900">Información basica</h2>
           <p className="mb-5 mt-1 text-sm text-ink-500">Que se aprende y de quien depende. Se llena una vez.</p>
 
           <div className="space-y-4">
@@ -239,7 +239,7 @@ export function ActivityInfoTab({
               juntos son la frase que contesta "¿que es esto?".
             */}
             <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-              <Field htmlFor="i-name" label="Nombre de la formacion" required>
+              <Field htmlFor="i-name" label="Nombre de la formación" required>
                 <Input
                   id="i-name"
                   disabled={!canEdit}
@@ -249,7 +249,7 @@ export function ActivityInfoTab({
                 />
               </Field>
 
-              <Field htmlFor="i-type" label="Tipo de formacion" required>
+              <Field htmlFor="i-type" label="Tipo de formación" required>
                 <Select
                   id="i-type"
                   disabled={!canEdit}
@@ -270,7 +270,7 @@ export function ActivityInfoTab({
                 htmlFor="i-process"
                 label="Proceso"
                 required
-                hint="El sistema de gestion que origina la formacion."
+                hint="El sistema de gestion que origina la formación."
               >
                 <Select
                   id="i-process"
@@ -328,7 +328,7 @@ export function ActivityInfoTab({
               <Field
                 htmlFor="i-modality"
                 label="Modalidad por defecto"
-                ayuda="Con la que nace cada convocatoria de esta formacion, para no repetirla cada vez. Cada jornada puede cambiarla: es la de ESA sesion. Y es la que se usa cuando el sistema crea solo la jornada permanente de una formacion de autoservicio."
+                ayuda="Con la que nace cada convocatoria de esta formación, para no repetirla cada vez. Cada jornada puede cambiarla: es la de ESA sesión. Y es la que se usa cuando el sistema crea solo la jornada permanente de una formación de autoservicio."
               >
                 <Select
                   id="i-modality"
@@ -379,7 +379,7 @@ export function ActivityInfoTab({
               <Field
                 htmlFor="i-cert-externo"
                 label="La acredita un tercero"
-                ayuda="Si emite su propio certificado, la lista de asistencia pedira su numero y su vencimiento, y esa fecha manda. QUIEN lo expide no se dice aqui: sale de cada convocatoria, porque la misma formacion la puede dictar la ARL en marzo y un centro en septiembre."
+                ayuda="Si emite su propio certificado, la lista de asistencia pedira su número y su vencimiento, y esa fecha manda. QUIEN lo expide no se dice aquí: sale de cada convocatoria, porque la misma formación la puede dictar la ARL en marzo y un centro en septiembre."
                 hint={
                   certExternoEsExplicito
                     ? 'Decidido en esta formacion, distinto de lo que diga su tipo.'
@@ -427,7 +427,7 @@ export function ActivityInfoTab({
               */}
               <Field
                 htmlFor="i-convalida"
-                label="Acepta certificacion previa"
+                label="Acepta certificación previa"
                 ayuda="De otra empresa, obtenida antes de entrar. Solo tiene sentido cuando la norma hace el papel transferible —alturas, montacargas, espacios confinados—, donde repetir el curso es gastar dos veces en lo mismo. En NO, quien llega certificado la hace igual, que es lo correcto en todo lo que trate sobre procedimientos propios. Y aun en SI, aceptar cada papel concreto sigue siendo una decision de quien lo registra, con su motivo."
                 hint={
                   convalidacionEsExplicita
@@ -437,7 +437,7 @@ export function ActivityInfoTab({
               >
                 <div className="flex flex-wrap items-center gap-3">
                   <Segmented
-                    label="Acepta certificacion previa de otra empresa"
+                    label="Acepta certificación previa de otra empresa"
                     disabled={!canEdit}
                     value={convalidacionVisible}
                     onChange={(valor) => setForm({ ...form, admiteConvalidacion: valor })}
@@ -485,7 +485,7 @@ export function ActivityInfoTab({
             <Field
               htmlFor="i-norms"
               label="Norma aplicable"
-              ayuda="Solo clasifica, para poder decir despues cuanta formacion tributa a cada norma. No decide a quien se le exige."
+              ayuda="Solo clasifica, para poder decir después cuanta formación tributa a cada norma. No decide a quien se le exige."
             >
               <MultiSelect
                 id="i-norms"
@@ -500,7 +500,7 @@ export function ActivityInfoTab({
               />
             </Field>
 
-            <Field htmlFor="i-description" label="Descripcion" hint="Lo que vera el colaborador antes de empezar.">
+            <Field htmlFor="i-description" label="Descripción" hint="Lo que vera el colaborador antes de empezar.">
               <Textarea
                 id="i-description"
                 rows={3}
@@ -559,7 +559,7 @@ export function ActivityInfoTab({
           </p>
           <dl className="mt-4 space-y-3 text-sm">
             <div>
-              <dt className="font-medium text-ink-900">Aqui, en la ficha</dt>
+              <dt className="font-medium text-ink-900">Aquí, en la ficha</dt>
               <dd className="text-ink-500">
                 Proceso, responsable, tipo, nombre, descripcion, modalidad y norma. Se escribe una vez y sirve para
                 siempre.
@@ -574,7 +574,7 @@ export function ActivityInfoTab({
             </div>
             <div>
               <dt className="font-medium text-ink-900">En Contenido</dt>
-              <dd className="text-ink-500">Las lecciones, videos, documentos y la evaluacion.</dd>
+              <dd className="text-ink-500">Las lecciones, videos, documentos y la evaluación.</dd>
             </div>
             <div>
               <dt className="font-medium text-ink-900">En Quienes</dt>

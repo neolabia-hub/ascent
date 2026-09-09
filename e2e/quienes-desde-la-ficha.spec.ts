@@ -85,7 +85,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     // Dejarlo puesto hizo fallar a sprint-3, que crea una persona con este mismo cargo y esperaba
     // encontrarle una sola obligacion. Es la misma leccion que ya estaba escrita alli.
     await page.getByRole('button', { name: 'Retirar' }).first().click();
-    await expect(page.getByText('Todavia no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Todavía no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
     // La obligacion no se BORRA: queda RETIRADA. Un registro que el sistema borra solo es un
     // registro en el que no se puede confiar.
     await expect(page.locator('tbody tr').filter({ hasText: 'RETIRADA' }).first()).toBeVisible({ timeout: 20_000 });
@@ -120,7 +120,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
 
     // Una leccion para que la version tenga contenido y se pueda publicar.
     await page.goto('/lecciones');
-    await page.getByRole('button', { name: 'Nueva leccion' }).click();
+    await page.getByRole('button', { name: 'Nueva lección' }).click();
     await page.getByRole('dialog').getByRole('textbox').first().fill(`Leccion auto ${suffix}`);
     await page.getByRole('button', { name: /Crear/ }).click();
     await page.waitForURL('**/lecciones/**', { timeout: 20_000 });
@@ -137,7 +137,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
 
     await page.getByRole('button', { name: 'Contenido', exact: true }).click();
     await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
-    await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
+    await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
     await page.locator('#c-title').fill('Bienvenida');
     // Se reutiliza la leccion de la biblioteca, igual que en sprint-3.
     await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
@@ -155,7 +155,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     // PUBLICAR es el acto que la exige. Nadie pulsa nada mas.
     await page.getByRole('button', { name: /Publicar cambios/ }).click();
     await page.getByRole('button', { name: 'Publicar y congelar' }).click();
-    await expect(page.getByText('Version 1 publicada')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Versión 1 publicada')).toBeVisible({ timeout: 20_000 });
 
     await page.getByRole('button', { name: 'Quienes', exact: true }).click();
     await expect(page.getByText('Ya se le exige a toda la empresa')).toBeVisible({ timeout: 20_000 });
@@ -165,7 +165,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
 
     // Se retira al terminar: si no, obliga a cada persona que otra prueba cree despues.
     await page.getByRole('button', { name: 'Retirar' }).first().click();
-    await expect(page.getByText('Todavia no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Todavía no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
   });
 });
 
@@ -226,5 +226,5 @@ test('la capacitacion del plan solo pregunta a quienes: ni plazo, ni recurrencia
 
   // Se retira al terminar: un requisito vivo de una prueba envenena a las siguientes.
   await page.getByRole('button', { name: 'Retirar' }).first().click();
-  await expect(page.getByText('Todavia no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Todavía no hay ninguna regla')).toBeVisible({ timeout: 20_000 });
 });

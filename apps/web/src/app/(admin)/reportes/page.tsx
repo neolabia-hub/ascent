@@ -89,7 +89,7 @@ export default function ReportesPage() {
       </p>
 
       <div className="mt-5 mb-5 inline-flex gap-1 rounded-full bg-paper p-1">
-        <TabSeguimiento id="ejecucion" activa={pestana} onSelect={setPestana} icon={Activity} label="Ejecucion" />
+        <TabSeguimiento id="ejecucion" activa={pestana} onSelect={setPestana} icon={Activity} label="Ejecución" />
         <TabSeguimiento id="analitica" activa={pestana} onSelect={setPestana} icon={PieChart} label="Analitica" />
         <TabSeguimiento
           id="vencimientos"
@@ -199,8 +199,8 @@ function VistaEjecucion() {
     else {
       showToast({
         kind: 'info',
-        title: 'Esa formacion todavia no tiene seguimiento',
-        description: 'Nadie la tiene asignada aun, asi que no hay ejecucion que mostrar.',
+        title: 'Esa formación todavía no tiene seguimiento',
+        description: 'Nadie la tiene asignada aun, así que no hay ejecución que mostrar.',
       });
     }
     router.replace('/reportes', { scroll: false });
@@ -244,8 +244,8 @@ function VistaEjecucion() {
     return (
       <EmptyState
         icon={Search}
-        title="Todavia no hay nada que seguir"
-        description="Cuando se asignen obligaciones de formacion, aqui se vera como va cada una y quien la ha hecho."
+        title="Todavía no hay nada que seguir"
+        description="Cuando se asignen obligaciones de formación, aquí se vera como va cada una y quien la ha hecho."
       />
     );
   }
@@ -253,24 +253,11 @@ function VistaEjecucion() {
   return (
     <div>
       {/*
-        EL EXCEL ES LO QUE SE LLEVA EL AUDITOR. Va arriba y no escondido en un menu: es la accion por
-        la que se abre esta pantalla el dia de la auditoria.
-      */}
-      {puedeExportar ? (
-        <div className="flex justify-end">
-          <Button variant="ghost" onClick={exportar} loading={bajando}>
-            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-            Exportar a Excel
-          </Button>
-        </div>
-      ) : null}
-
-      {/*
         EL RESUMEN DE TODO, arriba. Es la respuesta a "¿como vamos?" antes de mirar nada mas, y la
         barra hace visible de que esta hecho ese numero: no es lo mismo un 60% con el resto atrasado
         que un 60% con el resto esperando convocatoria.
       */}
-      <section className="card mt-6 p-5">
+      <section className="card p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             {/* Que universo es: no es el del plan, que tiene sus propios indicadores. */}
@@ -281,9 +268,21 @@ function VistaEjecucion() {
               {datos.resumen.avancePct}%
             </p>
           </div>
-          <p className="text-sm text-ink-500">
-            {datos.resumen.terminadas} de {datos.resumen.total} en toda la formacion viva
-          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <p className="text-sm text-ink-500">
+              {datos.resumen.terminadas} de {datos.resumen.total} en toda la formación viva
+            </p>
+            {/*
+              EL EXCEL ES LO QUE SE LLEVA EL AUDITOR: sigue arriba del todo, pero en la misma linea
+              que el numero en vez de en una franja propia.
+            */}
+            {puedeExportar ? (
+              <Button variant="outline" size="sm" onClick={exportar} loading={bajando}>
+                <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                Exportar a Excel
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div className="mt-4">
           <BarraEjecucion resumen={datos.resumen} onFiltrar={setFiltro} activo={filtro} />
@@ -303,7 +302,7 @@ function VistaEjecucion() {
           />
           <Input
             className="pl-9"
-            placeholder="Buscar formacion, tipo o proceso"
+            placeholder="Buscar formación, tipo o proceso"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
           />
@@ -582,7 +581,7 @@ function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
         ) : persona.estado === 'TERMINADA' ? (
           // Terminada y sin constancia no es un error: esta formacion puede no acreditar. Se dice
           // con un icono apagado en vez de con un hueco, que se leeria como que falta algo.
-          <span title="Esta formacion no entrega constancia">
+          <span title="Esta formación no entrega constancia">
             <Award className="h-4 w-4 text-ink-300" strokeWidth={1.75} aria-hidden="true" />
           </span>
         ) : (

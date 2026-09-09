@@ -84,7 +84,7 @@ export default function ProfilePage() {
             icon={Shield}
             label="Protectores"
             value={`${progress.freezesAvailable}`}
-            hint="cubren un dia sin señal"
+            hint="cubren un día sin señal"
           />
         </section>
       )}

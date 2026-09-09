@@ -36,7 +36,7 @@ let renovando: Promise<string> | null = null;
 async function renovar(): Promise<string> {
   renovando ??= (async () => {
     const response = await fetch(`${API_URL}/v1/platform/auth/refresh`, { method: 'POST', credentials: 'include' });
-    if (!response.ok) throw new ApiError({ code: 'INVALID_REFRESH', title: 'Sesion de plataforma caducada' }, response.status);
+    if (!response.ok) throw new ApiError({ code: 'INVALID_REFRESH', title: 'Sesión de plataforma caducada' }, response.status);
     const data = (await response.json()) as { accessToken: string };
     platformToken = data.accessToken;
     return data.accessToken;
@@ -65,7 +65,7 @@ async function platformFetch<T>(path: string, init: RequestInit = {}, reintentad
       return platformFetch<T>(path, init, true);
     } catch {
       platformToken = null;
-      throw new ApiError({ code: 'PLATFORM_UNAUTHORIZED', title: 'Sesion de plataforma caducada' }, 401);
+      throw new ApiError({ code: 'PLATFORM_UNAUTHORIZED', title: 'Sesión de plataforma caducada' }, 401);
     }
   }
 

@@ -23,8 +23,8 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await page.getByRole('link', { name: 'Usuarios' }).click();
     await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Configuracion' }).click();
-    await expect(page.getByRole('heading', { name: 'Configuracion' })).toBeVisible();
+    await page.getByRole('link', { name: 'Configuración' }).click();
+    await expect(page.getByRole('heading', { name: 'Configuración' })).toBeVisible();
   });
 
   test('catalogos: crear una regional, verla en la tabla y desactivarla', async ({ page }) => {
@@ -39,7 +39,7 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     const name = `Regional Prueba ${suffix}`;
 
     await page.getByRole('button', { name: 'Nueva regional' }).click();
-    await page.getByLabel('Codigo').fill(code);
+    await page.getByLabel('Código').fill(code);
     await page.getByLabel('Nombre').fill(name);
     await page.getByRole('button', { name: 'Crear' }).click();
 
@@ -70,7 +70,7 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await page.getByRole('button', { name: 'Crear persona' }).click();
 
     // La credencial se muestra UNA vez, con el patron cedula + caracteres.
-    const credential = page.getByRole('dialog').filter({ hasText: 'Contrasena generada' });
+    const credential = page.getByRole('dialog').filter({ hasText: 'Contraseña generada' });
     await expect(credential).toBeVisible();
     await expect(credential).toContainText(document);
     await expect(credential.locator('p.font-mono').last()).toContainText(new RegExp(`^${document}.{5,}$`));

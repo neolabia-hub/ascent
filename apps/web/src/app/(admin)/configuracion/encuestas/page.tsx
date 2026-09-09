@@ -191,12 +191,12 @@ function Grupo({
 
 /** Como se llama cada tipo de pregunta, y que hace con el resultado. */
 const TIPOS = [
-  { valor: 'SCALE' as const, label: 'Escala 1 a 5', nota: 'Se promedia. Es lo unico que produce un indicador.' },
+  { valor: 'SCALE' as const, label: 'Escala 1 a 5', nota: 'Se promedia. Es lo único que produce un indicador.' },
   { valor: 'YES_NO' as const, label: 'Si / No', nota: 'Un "no" marca la encuesta como negativa, aunque el resto puntue alto.' },
   {
     valor: 'CHOICE' as const,
-    label: 'Una opcion entre varias',
-    nota: 'No se promedia: sirve para segmentar, no para medir. Se cuenta por opcion.',
+    label: 'Una opción entre varias',
+    nota: 'No se promedia: sirve para segmentar, no para medir. Se cuenta por opción.',
   },
   { valor: 'TEXT' as const, label: 'Texto libre', nota: 'No se promedia. Es donde aparece lo que nadie penso preguntar.' },
 ];
@@ -304,7 +304,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
                 value={dias}
                 onChange={(e) => setDias(Math.min(365, Math.max(1, Number(e.target.value) || 1)))}
               />
-              <span className="text-sm text-ink-500">dias de terminada la formacion</span>
+              <span className="text-sm text-ink-500">días de terminada la formación</span>
             </div>
           </Field>
         </div>
@@ -432,7 +432,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
                         <button
                           type="button"
                           onClick={() => actualizar(indice, { options: pregunta.options.filter((_, j) => j !== i) })}
-                          aria-label="Quitar opcion"
+                          aria-label="Quitar opción"
                           className="focus-ring shrink-0 rounded p-1.5 text-ink-500 hover:text-danger"
                         >
                           <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />

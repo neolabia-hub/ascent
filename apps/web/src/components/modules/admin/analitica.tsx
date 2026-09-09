@@ -63,7 +63,7 @@ export function Analitica({ planId }: { planId?: string | null }) {
     return (
       <EmptyState
         icon={Info}
-        title="Todavia no hay obligaciones que analizar"
+        title="Todavía no hay obligaciones que analizar"
         description={
           planId
             ? 'Este plan aun no ha generado obligaciones: se crean al aprobar sus renglones.'

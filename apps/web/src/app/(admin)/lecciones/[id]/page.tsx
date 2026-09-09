@@ -255,7 +255,7 @@ export default function LessonEditorPage() {
       const data = await getLesson(lessonId);
       applyLesson(data);
     } catch (error) {
-      showToast({ kind: 'danger', title: 'No se pudo cargar la leccion', description: motivoDelError(error) });
+      showToast({ kind: 'danger', title: 'No se pudo cargar la lección', description: motivoDelError(error) });
       setLesson(null);
     } finally {
       setInitialLoading(false);
@@ -296,7 +296,7 @@ export default function LessonEditorPage() {
         lesson.id,
         cards.map((c) => ({ id: c.id, payload: c.payload })),
       );
-      showToast({ kind: 'success', title: 'Leccion guardada' });
+      showToast({ kind: 'success', title: 'Lección guardada' });
       await load();
     } catch (error) {
       showToast({ kind: 'danger', title: apiErrorText(error) });
@@ -318,7 +318,7 @@ export default function LessonEditorPage() {
       showToast({
         kind: 'success',
         title: 'Copia creada en la biblioteca',
-        description: 'Es una leccion nueva e independiente: la original no cambia.',
+        description: 'Es una lección nueva e independiente: la original no cambia.',
       });
       router.push(`/lecciones/${copy.id}`);
     } catch (error) {
@@ -344,13 +344,13 @@ export default function LessonEditorPage() {
       showToast({
         kind: 'success',
         title: `Version ${draft.versionNumber} creada en borrador`,
-        description: 'Sus lecciones ya son editables. La version publicada no se toco.',
+        description: 'Sus lecciones ya son editables. La versión publicada no se toco.',
       });
       router.push(`/contenido-formativo/${fromActivityId}?tab=contenido`);
     } catch (error) {
       // Ya habia un borrador: no es un fallo, es que el trabajo estaba empezado. Se lleva alli.
       if (error instanceof ApiError && error.code === 'DRAFT_ALREADY_EXISTS') {
-        showToast({ kind: 'info', title: 'Ya habia una version en borrador', description: 'Te llevamos a ella.' });
+        showToast({ kind: 'info', title: 'Ya habia una versión en borrador', description: 'Te llevamos a ella.' });
         router.push(`/contenido-formativo/${fromActivityId}?tab=contenido`);
         return;
       }
@@ -382,7 +382,7 @@ export default function LessonEditorPage() {
 
   const removeCard = (key: string) => {
     if (cards.length <= 1) {
-      showToast({ kind: 'warning', title: 'La leccion necesita al menos una tarjeta' });
+      showToast({ kind: 'warning', title: 'La lección necesita al menos una tarjeta' });
       return;
     }
     const idx = cards.findIndex((c) => c.key === key);
@@ -427,7 +427,7 @@ export default function LessonEditorPage() {
     return (
       <EmptyState
         icon={Layers}
-        title="Leccion no encontrada"
+        title="Lección no encontrada"
         description="Puede que haya sido eliminada o que el enlace este incorrecto."
         action={
           <Button variant="outline" onClick={() => router.push(backTo ?? '/lecciones')}>
@@ -457,7 +457,7 @@ export default function LessonEditorPage() {
             onChange={(e) => setTitle(e.target.value)}
             disabled={isPublished}
             maxLength={200}
-            aria-label="Titulo de la leccion"
+            aria-label="Titulo de la lección"
             className="focus-ring min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 font-display text-xl font-semibold text-ink-900 transition-colors duration-150 hover:border-line-strong disabled:cursor-not-allowed disabled:text-ink-500"
           />
           <StatusPill kind={isPublished ? 'info' : 'neutral'} label={isPublished ? 'PUBLICADA' : 'BORRADOR'} />
@@ -499,7 +499,7 @@ export default function LessonEditorPage() {
         <div className="mb-4 flex items-start gap-3 rounded-md bg-warn-soft px-4 py-3">
           <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-warn" strokeWidth={1.75} />
           <div className="text-sm text-warn">
-            <p className="font-medium">Esta leccion esta publicada y ya no se puede cambiar.</p>
+            <p className="font-medium">Esta lección esta publicada y ya no se puede cambiar.</p>
             {fromActivityId ? (
               <p className="mt-1">
                 Es lo que congela la evidencia: quien la curso tiene que poder ver siempre lo mismo. Para cambiar el
@@ -520,7 +520,7 @@ export default function LessonEditorPage() {
       {!isPublished && backTo ? (
         <div className="mb-4 rounded-md bg-info-soft px-4 py-3 text-sm text-info">
           Estas editando un borrador: los cambios se guardan aqui, pero nadie los vera hasta que{' '}
-          <strong>publiques la version</strong> desde la formacion.
+          <strong>publiques la versión</strong> desde la formacion.
         </div>
       ) : null}
 
@@ -738,7 +738,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
     case 'TEXT_IMAGE':
       return (
         <>
-          <Field htmlFor="c-title" label="Titulo" hint="Opcional, maximo 120 caracteres.">
+          <Field htmlFor="c-title" label="Titulo" hint="Opcional, máximo 120 caracteres.">
             <Input id="c-title" value={payload.title ?? ''} maxLength={120} onChange={(e) => patch({ title: e.target.value })} />
           </Field>
           <Field htmlFor="c-body" label="Cuerpo" required hint={`${(payload.body ?? '').length}/1200 caracteres.`}>
@@ -773,7 +773,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
               )}
             </div>
           </Field>
-          <Field htmlFor="c-caption" label="Epigrafe" hint="Opcional, maximo 200 caracteres.">
+          <Field htmlFor="c-caption" label="Epigrafe" hint="Opcional, máximo 200 caracteres.">
             <Input id="c-caption" value={payload.caption ?? ''} maxLength={200} onChange={(e) => patch({ caption: e.target.value })} />
           </Field>
         </>
@@ -782,7 +782,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
     case 'VIDEO_SHORT':
       return (
         <>
-          <Field htmlFor="v-title" label="Titulo" hint="Opcional, maximo 120 caracteres.">
+          <Field htmlFor="v-title" label="Titulo" hint="Opcional, máximo 120 caracteres.">
             <Input id="v-title" value={payload.title ?? ''} maxLength={120} onChange={(e) => patch({ title: e.target.value })} />
           </Field>
           <Field htmlFor="v-file" label="Archivo de video" hint="Sube un archivo o pega una URL externa abajo (uno de los dos).">
@@ -818,7 +818,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
               onChange={(e) => patch({ externalUrl: e.target.value || null })}
             />
           </Field>
-          <Field htmlFor="v-duration" label="Duracion (segundos)" hint={`Maximo ${MAX_CARD_VIDEO_SECONDS} segundos.`}>
+          <Field htmlFor="v-duration" label="Duración (segundos)" hint={`Maximo ${MAX_CARD_VIDEO_SECONDS} segundos.`}>
             <Input
               id="v-duration"
               type="number"
@@ -860,7 +860,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
                   type="button"
                   onClick={() => removeOption(opt.id, 2)}
                   disabled={options.length <= 2}
-                  aria-label="Eliminar opcion"
+                  aria-label="Eliminar opción"
                   className="focus-ring shrink-0 rounded p-1.5 text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   <Trash2 size={14} />
@@ -908,7 +908,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
                   type="button"
                   onClick={() => removeOption(opt.id, 2)}
                   disabled={options.length <= 2}
-                  aria-label="Eliminar opcion"
+                  aria-label="Eliminar opción"
                   className="focus-ring shrink-0 rounded p-1.5 text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   <Trash2 size={14} />

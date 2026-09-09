@@ -86,11 +86,11 @@ const NAV_GROUPS: NavGroup[] = [
     titulo: 'Administrar',
     items: [
       { href: '/usuarios', label: 'Usuarios', icon: Users },
-      { href: '/desempeno', label: 'Desempeno', icon: ClipboardCheck },
+      { href: '/desempeno', label: 'Desempeño', icon: ClipboardCheck },
       { href: '/aprobaciones', label: 'Aprobaciones', icon: CheckSquare },
       {
         href: '/configuracion',
-        label: 'Configuracion',
+        label: 'Configuración',
         icon: Settings,
         /*
           CONFIGURACION SE DESPLIEGA Y EL PLAN NO, y la diferencia no es de gusto.
@@ -105,8 +105,8 @@ const NAV_GROUPS: NavGroup[] = [
           La regla: se despliega lo que son destinos propios; no se despliega lo que son filtros.
         */
         hijos: [
-          { href: '/configuracion', label: 'Catalogos' },
-          { href: '/configuracion/tipos-de-formacion', label: 'Tipos de formacion' },
+          { href: '/configuracion', label: 'Catálogos' },
+          { href: '/configuracion/tipos-de-formacion', label: 'Tipos de formación' },
           { href: '/configuracion/constancias', label: 'Constancias' },
           { href: '/configuracion/encuestas', label: 'Encuestas' },
           { href: '/configuracion/roles', label: 'Roles y permisos' },

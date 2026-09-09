@@ -134,7 +134,7 @@ export function EditContentDrawer({
       open={open}
       onOpenChange={onOpenChange}
       title="Editar contenido"
-      description="Los cambios viven en el borrador; nadie los ve hasta publicar la version."
+      description="Los cambios viven en el borrador; nadie los ve hasta publicar la versión."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -147,13 +147,13 @@ export function EditContentDrawer({
       }
     >
       <div className="space-y-4">
-        <Field htmlFor="ec-title" label="Titulo" required hint="Es lo que ve la persona en el indice de la formacion.">
+        <Field htmlFor="ec-title" label="Titulo" required hint="Es lo que ve la persona en el indice de la formación.">
           <Input id="ec-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} />
         </Field>
 
         <Field
           htmlFor="ec-description"
-          label="Descripcion"
+          label="Descripción"
           hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
         >
           <Textarea
@@ -175,7 +175,7 @@ export function EditContentDrawer({
             />
             <span>
               Se puede descargar el archivo original
-              <span className="mt-0.5 block text-xs text-ink-500">Una presentacion se reproduce convertida en diapositivas. Marca esto solo si ademas quieres entregar el archivo tal como llego.</span>
+              <span className="mt-0.5 block text-xs text-ink-500">Una presentacion se reproduce convertida en diapositivas. Marca esto solo si además quieres entregar el archivo tal como llego.</span>
             </span>
           </label>
         ) : null}
@@ -198,7 +198,7 @@ export function EditContentDrawer({
           <>
             <Field
               htmlFor="ec-pct"
-              label="Minimo visto para darlo por hecho"
+              label="Mínimo visto para darlo por hecho"
               ayuda="Se cuentan los segundos distintos reproducidos: adelantar no suma. Con un video de otra plataforma que no se pueda medir, queda como declaracion de la persona."
             >
               <Input
@@ -217,7 +217,7 @@ export function EditContentDrawer({
               </p>
             ) : null}
 
-            <Field htmlFor="ec-file" label="Reemplazar el archivo" hint="Opcional. Al subir otro, el anterior deja de usarse aqui.">
+            <Field htmlFor="ec-file" label="Reemplazar el archivo" hint="Opcional. Al subir otro, el anterior deja de usarse aquí.">
               <label
                 htmlFor="ec-file"
                 className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-5 text-sm text-ink-500 hover:border-primary"
@@ -277,7 +277,7 @@ export function EditContentDrawer({
         {isDocument || isLesson ? (
           <Field
             htmlFor="ec-seconds"
-            label="Tiempo minimo en pantalla (segundos)"
+            label="Tiempo mínimo en pantalla (segundos)"
             hint="Freno al click siguiente. Dejalo vacio para no exigir tiempo."
           >
             <Input

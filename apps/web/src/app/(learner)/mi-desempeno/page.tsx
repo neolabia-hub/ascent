@@ -30,7 +30,7 @@ export default function DesempenoPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-[26px] font-semibold text-ink-900 lg:text-[32px]">Desempeno</h1>
+        <h1 className="font-display text-[26px] font-semibold text-ink-900 lg:text-[32px]">Desempeño</h1>
         <p className="mt-1 text-sm leading-relaxed text-ink-500">
           Como va tu trabajo, y el de la gente que calificas. Se responde una vez y no se puede
           corregir despues.

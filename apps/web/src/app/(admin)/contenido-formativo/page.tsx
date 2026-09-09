@@ -33,7 +33,7 @@ function versionState(versions: Array<{ status: string; versionNumber: number }>
   if (published) return { kind: 'ok', label: `PUBLICADA v${published.versionNumber}` };
   const draft = versions.find((v) => v.status === 'DRAFT');
   if (draft) return { kind: 'neutral', label: `BORRADOR v${draft.versionNumber}` };
-  return { kind: 'neutral', label: 'SIN VERSION' };
+  return { kind: 'neutral', label: 'SIN VERSIÓN' };
 }
 
 /** Palabras que no distinguen nada y solo gastan sitio en un codigo. */
@@ -164,7 +164,7 @@ export default function ContenidoFormativoPage() {
         activityTypeId: form.activityTypeId,
         processId: form.processId,
       });
-      showToast({ kind: 'success', title: 'Actividad creada', description: 'Se abrio su version 1 en borrador.' });
+      showToast({ kind: 'success', title: 'Actividad creada', description: 'Se abrio su versión 1 en borrador.' });
       // `volverA` se arrastra: quien vino del plan a crear la capacitacion tiene que poder
       // regresar a el cuando la termine, sin acordarse de por donde entro.
       router.push(
@@ -223,7 +223,7 @@ export default function ContenidoFormativoPage() {
               setQ(e.target.value);
               setPage(1);
             }}
-            placeholder="Buscar por nombre o codigo"
+            placeholder="Buscar por nombre o código"
             className="w-72 pl-9"
           />
         </div>
@@ -250,8 +250,8 @@ export default function ContenidoFormativoPage() {
         <div className="card">
           <EmptyState
             icon={BookOpen}
-            title="Sin actividades todavia"
-            description="Crea la primera actividad formativa: una induccion, una capacitacion del plan o una pildora."
+            title="Sin actividades todavía"
+            description="Crea la primera actividad formativa: una inducción, una capacitación del plan o una píldora."
             action={
               <Button onClick={() => setDrawerOpen(true)}>
                 <Plus size={16} />
@@ -315,7 +315,7 @@ export default function ContenidoFormativoPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         title="Nueva actividad formativa"
-        description="Se crea con su version 1 en borrador, lista para armar el contenido."
+        description="Se crea con su versión 1 en borrador, lista para armar el contenido."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setDrawerOpen(false)}>
@@ -336,7 +336,7 @@ export default function ContenidoFormativoPage() {
             ensena lo que implica, porque la primera senal de que "induccion general" obliga a la
             empresa entera no puede ser que ya la obligo.
           */}
-          <Field htmlFor="a-type" label="Tipo de formacion" required hint="Decide a quien se le exige y como se dicta.">
+          <Field htmlFor="a-type" label="Tipo de formación" required hint="Decide a quien se le exige y como se dicta.">
             <Select id="a-type" value={form.activityTypeId} onChange={(e) => setForm({ ...form, activityTypeId: e.target.value })}>
               <option value="">Seleccionar...</option>
               {types.map((t) => (
@@ -394,7 +394,7 @@ export default function ContenidoFormativoPage() {
             siempre cual quedo —plegado no es escondido— y se abre de un clic.
           */}
           {form.codeOpen ? (
-            <Field htmlFor="a-code" label="Codigo" required hint="Identificador corto y estable. No se puede cambiar.">
+            <Field htmlFor="a-code" label="Código" required hint="Identificador corto y estable. No se puede cambiar.">
               <Input
                 id="a-code"
                 value={form.code}

@@ -355,20 +355,20 @@ export function NewOfferingDrawer({
               rows={2}
               value={justification}
               onChange={(event) => setJustification(event.target.value)}
-              placeholder="Minimo 10 caracteres"
+              placeholder="Mínimo 10 caracteres"
             />
           </Field>
         ) : null}
 
         {lockedVersion ? (
           <div className="rounded-lg border border-line bg-paper px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Capacitacion</p>
+            <p className="text-xs font-medium uppercase tracking-[0.04em] text-ink-500">Capacitación</p>
             <p className="mt-0.5 text-sm font-medium text-ink-900">{lockedVersion.label}</p>
           </div>
         ) : (
           <Field
             htmlFor="o-version"
-            label="Formacion"
+            label="Formación"
             required
             hint={
               askPlanMonth
@@ -378,7 +378,7 @@ export function NewOfferingDrawer({
           >
             <Combo
               id="o-version"
-              placeholder="Elegir la formacion..."
+              placeholder="Elegir la formación..."
               searchPlaceholder="Buscar por nombre o codigo..."
               value={activityVersionId}
               onChange={setActivityVersionId}

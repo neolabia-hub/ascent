@@ -590,7 +590,7 @@ export function ListaDeAsistencia({
       {roster.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="Nadie inscrito todavia"
+          title="Nadie inscrito todavía"
           description={
             puedeInscribir
               ? 'Inscribe a quienes ya tienen la obligacion de esta actividad en la sede de la convocatoria.'
@@ -638,7 +638,7 @@ export function ListaDeAsistencia({
                 <Field
                   htmlFor="asist-fecha"
                   label="Se dicto el"
-                  ayuda="El dia de la sesion, no el dia en que se teclea: se toma asistencia al dia siguiente muchas veces. Queda como fecha de cumplimiento de todos los que asistieron."
+                  ayuda="El día de la sesión, no el día en que se teclea: se toma asistencia al día siguiente muchas veces. Queda como fecha de cumplimiento de todos los que asistieron."
                 >
                   <Input
                     id="asist-fecha"
@@ -715,7 +715,7 @@ export function ListaDeAsistencia({
                     <Field
                       htmlFor="asist-vence-lote"
                       label="El certificado vence el"
-                      ayuda="Lo que dice el papel, que puede ser dentro de años y no el dia de la sesion. Esa fecha MANDA sobre la que calcularia el sistema por la recurrencia: es la que decide cuando vuelve a deberse la formacion."
+                      ayuda="Lo que dice el papel, que puede ser dentro de años y no el día de la sesión. Esa fecha MANDA sobre la que calcularia el sistema por la recurrencia: es la que decide cuando vuelve a deberse la formación."
                     >
                       {/*
                         UN CERTIFICADO NO PUEDE VENCER ANTES DE LA SESION QUE LO ORIGINA.
@@ -826,7 +826,7 @@ export function ListaDeAsistencia({
                         {corregibles.length > 0 ? (
                           <span className="mt-2 block">
                             De quien ya cumplio solo se corrige el certificado:{' '}
-                            <strong className="font-medium text-ink-900">lo cumplido no se deshace desde aqui</strong>.
+                            <strong className="font-medium text-ink-900">lo cumplido no se deshace desde aquí</strong>.
                           </span>
                         ) : null}
                       </Ayuda>
