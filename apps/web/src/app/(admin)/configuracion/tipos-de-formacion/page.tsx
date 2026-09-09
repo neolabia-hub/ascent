@@ -90,7 +90,7 @@ interface TipoDeFormacion extends CatalogRow {
  */
 const COMO_SE_REPITE: Record<string, string> = {
   NO: 'Se hace una vez y no vuelve.',
-  ANUAL: 'CAMPANA: todos vencen el mismo dia, sea cuando sea que la hicieran.',
+  ANUAL: 'CAMPANA: todos vencen el mismo día, sea cuando sea que la hicieran.',
   MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que la completo.',
 };
 
@@ -118,22 +118,22 @@ const REGLAS: ReadonlyArray<{
   {
     clave: 'requiresAssessment' as const,
     icono: FileCheck2,
-    titulo: 'Se evalua',
+    titulo: 'Se evalúa',
     // Se explica la CONSECUENCIA, no la regla: "exige evaluacion" deja pensando si es un capricho
     // del sistema; "sin nota no hay nada que ensenarle a un auditor" no se discute.
-    detalle: 'No se puede publicar sin una evaluacion. Sin nota no hay nada que ensenarle a un auditor.',
+    detalle: 'No se puede publicar sin una evaluación. Sin nota no hay nada que enseñarle a un auditor.',
   },
   {
     clave: 'requiresSurvey' as const,
     icono: ClipboardCheck,
     titulo: 'Lleva encuesta',
-    detalle: 'La encuesta elegida se agrega sola al final de cada formacion de este tipo.',
+    detalle: 'La encuesta elegida se agrega sola al final de cada formación de este tipo.',
   },
   {
     clave: 'issuesCertificate' as const,
     icono: Award,
     titulo: 'Entrega constancia',
-    detalle: 'Al terminarla se emite el papel. Una pildora de tres minutos normalmente no acredita nada.',
+    detalle: 'Al terminarla se emite el papel. Una píldora de tres minutos normalmente no acredita nada.',
   },
   {
     clave: 'requiresEfficacy' as const,
@@ -148,7 +148,7 @@ const REGLAS: ReadonlyArray<{
       ficha. Dentro del mismo tipo conviven alturas —donde importa si usa el arnes— y una
       actualizacion documental, donde preguntarle al jefe a los 30 dias no dice nada.
     */
-    detalle: 'A los 30 dias, el jefe del area responde si la persona aplica lo aprendido.',
+    detalle: 'A los 30 días, el jefe del área responde si la persona aplica lo aprendido.',
     ayuda:
       'Es el punto de partida, no la decision final: cada formación puede desviarse desde su ficha. Dentro del mismo tipo conviven una de alturas —donde importa si usa el arnes— y una actualizacion documental, donde preguntarle al jefe a los 30 días no dice nada.',
   },
@@ -269,7 +269,7 @@ export default function TiposDeFormacionPage() {
     <div className="max-w-3xl">
       <Link href="/configuracion" className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700">
         <ArrowLeft size={14} />
-        Configuracion
+        Configuración
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -732,7 +732,7 @@ function Tarjeta({
 
         Va aqui y no en cada formacion porque es politica de EMPRESA: si cada reinduccion eligiera su
         propia fecha no habria "la reinduccion de 2026" que ensenarle a un auditor. Una formacion
-        suelta puede apartarse en Quienes -> Ajustar, y ahi queda con su novedad.
+        suelta puede apartarse en Quiénes -> Ajustar, y ahi queda con su novedad.
       */}
       {/*
         PLEGADO, Y DICIENDO LO QUE HACE (2026-09-04).
@@ -890,7 +890,7 @@ function Tarjeta({
  */
 function resumenDelTipo(config: TipoConfig, encuestas: SurveyTemplate[]): string {
   const partes: string[] = [];
-  if (config.requiresAssessment) partes.push('Se evalua');
+  if (config.requiresAssessment) partes.push('Se evalúa');
   if (config.requiresSurvey) {
     const encuesta = encuestas.find((e) => e.id === config.surveyTemplateId);
     partes.push(encuesta ? `Lleva "${encuesta.name}"` : 'Lleva encuesta (sin elegir)');

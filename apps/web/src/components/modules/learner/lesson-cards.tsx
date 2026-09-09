@@ -410,7 +410,7 @@ function FillGapCard({
             color: 'var(--reading-ink)',
           }}
         >
-          {allCorrect ? 'Asi es.' : 'Revisa: toca un hueco para vaciarlo y vuelve a intentarlo.'}
+          {allCorrect ? 'Así es.' : 'Revisa: toca un hueco para vaciarlo y vuelve a intentarlo.'}
         </p>
       ) : null}
     </div>

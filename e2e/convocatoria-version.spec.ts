@@ -33,7 +33,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
   await page.getByRole('button', { name: 'Crear actividad' }).click();
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+  await page.getByRole('tab', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
   await page.locator('#c-title').fill('Bienvenida');
@@ -79,7 +79,7 @@ test.describe('La convocatoria y la version vigente', () => {
     await expect(page.getByText('Convocatoria publicada')).toBeVisible();
 
     // Mientras la v1 es la vigente NO hay aviso: un cartel permanente se vuelve invisible.
-    await expect(page.getByText(/Hay una version mas nueva/)).toHaveCount(0);
+    await expect(page.getByText(/Hay una versión mas nueva/)).toHaveCount(0);
 
     // 2. Se publica la v2 de la misma formacion.
     await page.goto(activityUrl);
@@ -105,6 +105,6 @@ test.describe('La convocatoria y la version vigente', () => {
     //    algo que ya se hizo.
     await expect(page.getByText('Convocatoria actualizada a la versión 2')).toBeVisible();
     await expect(page.getByText(/version 2 ·/)).toBeVisible();
-    await expect(page.getByText(/Hay una version mas nueva/)).toHaveCount(0);
+    await expect(page.getByText(/Hay una versión mas nueva/)).toHaveCount(0);
   });
 });

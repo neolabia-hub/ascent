@@ -26,6 +26,8 @@ import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { useCan } from '@/components/providers/session-provider';
 import { Analitica } from '@/components/modules/admin/analitica';
+import { Conocimiento } from '@/components/modules/admin/conocimiento';
+import { Evolucion } from '@/components/modules/admin/evolucion';
 import { Vencimientos } from '@/components/modules/admin/vencimientos';
 import { motivoDelError } from '@/lib/api';
 import { usePaginacion } from '@/components/ui/use-paginacion';
@@ -101,7 +103,22 @@ export default function ReportesPage() {
       </div>
 
       {pestana === 'ejecucion' ? <VistaEjecucion /> : null}
-      {pestana === 'analitica' ? <Analitica /> : null}
+      {/*
+        LA EVOLUCION VA ENCIMA DE LOS CORTES, y en la misma pestaña (2026-09-09).
+
+        No es una pestaña nueva porque no es un publico nuevo: quien abre «Analitica» viene a decidir,
+        y lo primero que necesita para decidir es si la cosa mejora o empeora. Los cortes contestan
+        DONDE esta el problema; la evolucion, si el problema es de ahora o lleva todo el año. Puestas
+        al reves —el detalle antes que la tendencia— se decide sobre una foto sin saber si es la
+        mejor del año o la peor.
+      */}
+      {pestana === 'analitica' ? (
+        <div className="space-y-4">
+          <Evolucion />
+          <Analitica />
+          <Conocimiento />
+        </div>
+      ) : null}
       {pestana === 'vencimientos' ? <Vencimientos /> : null}
     </div>
   );
@@ -291,7 +308,7 @@ function VistaEjecucion() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-lg font-semibold text-ink-900">
-          {filtro ? `Con ${ESTADOS[filtro].label.toLowerCase()}` : 'Por formacion'}
+          {filtro ? `Con ${ESTADOS[filtro].label.toLowerCase()}` : 'Por formación'}
           <span className="ml-2 text-sm font-normal text-ink-500">{filtradas.length}</span>
         </h2>
         <div className="relative min-w-[240px] flex-1 sm:max-w-xs">

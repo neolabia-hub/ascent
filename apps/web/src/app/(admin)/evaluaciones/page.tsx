@@ -90,7 +90,7 @@ export default function EvaluacionesPage() {
         </div>
         <Button onClick={() => setNuevaOpen(true)}>
           <Plus size={16} />
-          Nueva evaluacion
+          Nueva evaluación
         </Button>
       </div>
 
@@ -122,7 +122,7 @@ export default function EvaluacionesPage() {
             action={
               <Button onClick={() => setNuevaOpen(true)}>
                 <Plus size={16} />
-                Nueva evaluacion
+                Nueva evaluación
               </Button>
             }
           />
@@ -224,10 +224,10 @@ function TarjetaEvaluacion({ assessment, onOpen }: { assessment: AssessmentListI
       */}
       <p className={cn('mt-auto pt-4 text-xs', enUso ? 'text-ink-500' : 'text-ink-300')}>
         {secciones === 0
-          ? 'Sin preguntas todavia: no se puede poner en una formacion'
+          ? 'Sin preguntas todavía: no se puede poner en una formación'
           : enUso
             ? `Dentro de ${assessment._count.copias} ${assessment._count.copias === 1 ? 'formacion publicada' : 'formaciones publicadas'}`
-            : 'Lista para ponerla en una formacion'}
+            : 'Lista para ponerla en una formación'}
       </p>
     </button>
   );

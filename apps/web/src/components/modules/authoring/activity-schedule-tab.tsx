@@ -259,7 +259,7 @@ export function ActivityScheduleTab({
       await load();
       showToast({
         kind: 'success',
-        title: result.executed ? 'Ya esta disponible' : 'Solicitud enviada a aprobacion',
+        title: result.executed ? 'Ya esta disponible' : 'Solicitud enviada a aprobación',
         description: result.executed
           ? 'Quien la tenga exigida puede empezarla cuando quiera.'
           : 'Un administrador debe aprobarla antes de que se abra.',
@@ -392,7 +392,7 @@ export function ActivityScheduleTab({
                 {esPermanente ? 'volver a dejarla disponible' : 'programar otra jornada'}.
               </>
             ) : esPermanente ? (
-              'Esta formacion es de autoservicio, asi que solo necesita quedar disponible.'
+              'Esta formación es de autoservicio, así que solo necesita quedar disponible.'
             ) : (
               'Programa la jornada con su fecha, lugar e instructor.'
             )}

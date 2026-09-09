@@ -534,6 +534,8 @@ export interface AssignmentsPage {
 
 export function listAssignments(params: {
   q?: string;
+  /** Todas las obligaciones de UNA persona: es lo que pide el expediente (2026-09-09). */
+  userId?: string;
   status?: string;
   source?: string;
   targetId?: string;

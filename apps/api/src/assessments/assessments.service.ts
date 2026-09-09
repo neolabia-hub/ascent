@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { PresentationInput, UpdateAssessmentDraftInput } from '@neo-pulse/shared';
+import { tenantSettingsSchema, type PresentationInput, type UpdateAssessmentDraftInput } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -99,8 +99,33 @@ export class AssessmentsService {
       : [];
     const porVersion = new Map(preguntas.map((row) => [row.id, row]));
 
+    /*
+      DE DONDE SALE EL NUMERO CUANDO ESTE CAMPO ESTA VACIO (2026-09-09).
+
+      La nota minima y los intentos son una CASCADA de tres pisos: empresa -> formacion -> examen.
+      Cada version de formacion nace con los valores por defecto de la empresa (`tenantDefaults` en
+      `versioning.service`), y la evaluacion los deja en NULL salvo que tenga que exigir mas.
+      Funcionaba bien y no se veia por ningun lado: la pantalla enseñaba una caja vacia y quien la
+      miraba no tenia forma de saber con que nota se aprueba de verdad.
+
+      Se manda el piso de la cascada —el de la EMPRESA— y no el de la formacion a proposito: una
+      evaluacion puede estar dentro de varias formaciones y cada una tener su propia nota, asi que
+      un solo numero de formacion aqui seria mentira la mitad de las veces. El de la empresa es el
+      que siempre es cierto: es con el que nace cualquiera que la use.
+    */
+    const tenant = await this.prisma.scoped.tenant.findUniqueOrThrow({
+      where: { id: this.prisma.currentTenantId },
+      select: { settings: true },
+    });
+    const porDefecto = tenantSettingsSchema.parse(tenant.settings ?? {});
+
     return {
       ...assessment,
+      /** Lo que se aplica si los campos de este examen se dejan vacios. Solo para ENSEÑARLO. */
+      heredado: {
+        passingScore: porDefecto.passingScoreDefault,
+        maxAttempts: porDefecto.maxAttemptsDefault,
+      },
       /** `true` = ya esta dentro de alguna formacion publicada, con copias congeladas. */
       enUso: assessment._count.copias > 0,
       sections: assessment.sections.map((section) => ({

@@ -462,6 +462,13 @@ export interface AssessmentDetail {
   /** Ya esta dentro de alguna formacion publicada: hay copias congeladas de ella. */
   enUso: boolean;
 
+  /**
+   * LO QUE SE APLICA SI LOS CAMPOS DE ABAJO SE DEJAN VACIOS. Es el piso de la cascada
+   * empresa -> formacion -> examen, y viene del servidor para que la pantalla no tenga que
+   * adivinarlo. Solo para enseñarlo: no se manda de vuelta.
+   */
+  heredado: { passingScore: number; maxAttempts: number };
+
   timeLimitMin: number | null;
   maxAttempts: number | null;
   passingScore: number | null;

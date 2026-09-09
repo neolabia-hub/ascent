@@ -6,6 +6,7 @@ import { CalendarRange } from 'lucide-react';
 import type { ActivityTypeConfig } from '@/lib/activity-type';
 import { getPlan, listPlans, type PlanDetail } from '@/lib/delivery-api';
 import { monthName } from '@/lib/format';
+import { Ayuda } from '@/components/ui/ayuda';
 
 /**
  * "ESTA ES DEL PLAN" — Y QUE HACE FALTA PARA QUE DE VERDAD LO ESTE.
@@ -78,73 +79,72 @@ export function ActivityPlanCard({ activityId, typeConfig, publishedVersion }: A
   const enCurso = new Date().getFullYear();
 
   return (
-    <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 rounded-lg border border-line bg-paper px-4 py-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <CalendarRange size={17} className="mt-0.5 shrink-0 text-ink-500" strokeWidth={1.75} />
-          <div className="min-w-0 text-sm">
-            {plan === null ? (
-              <>
-                <p className="font-medium text-ink-900">No hay ningún plan abierto al que agregarla.</p>
-                <p className="mt-0.5 text-ink-500">
-                  Es una capacitacion del plan y su tipo dice que cuenta para los indicadores del plan
-                  anual, pero el de {enCurso} no existe o ya esta cerrado:{' '}
-                  <Link href="/plan" className="focus-ring underline underline-offset-2">
-                    crear el plan de {enCurso}
-                  </Link>
-                  .
-                </p>
-              </>
-            ) : meses.length > 0 ? (
-              <>
-                <p className="font-medium text-ink-900">
-                  En el plan de {plan.year}: {meses.map((mes) => monthName(mes)).join(', ')}
-                  {renglones.length > meses.length ? ` · ${renglones.length} jornadas` : ''}.
-                </p>
-                <p className="mt-0.5 text-ink-500">
-                  De ahi salen su cumplimiento y su cobertura.{' '}
-                  <Link href={`/plan/${plan.id}`} className="focus-ring underline underline-offset-2">
-                    Ver el plan
-                  </Link>
-                  .
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="font-medium text-ink-900">
-                  Esta capacitacion no esta en el plan de {plan.year}.
-                </p>
-                <p className="mt-0.5 text-ink-500">
-                  {/*
-                    Se dice la consecuencia, no la mecanica. "No tiene renglon" no significa nada
-                    para quien acaba de crearla; "no cuenta para ningun indicador" si.
-                  */}
-                  Mientras no tenga una jornada programada no cuenta para el cumplimiento ni para la
-                  cobertura del plan, aunque su tipo diga que es del plan.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
+    /*
+      UNA SOLA LINEA (2026-09-09, lo pidio el cliente mirandolo: «ocupa mucho espacio»).
 
-        {/*
-          AQUI YA NO SE PROGRAMA (2026-09-04).
+      Eran dos parrafos —el estado y su explicacion— encima de la ficha, todos los dias, en una
+      pantalla que se abre para otra cosa. La explicacion hace falta la primera vez y estorba las
+      siguientes, asi que se va detras del icono de ayuda, igual que en el resto del producto.
 
-          Habia un boton que abria un cajon para crear la jornada, y en la misma pantalla, una
-          pestana mas abajo, esta "Convocatorias" haciendo lo mismo. Dos caminos para lo mismo en la
-          misma pantalla no son una comodidad: obligan a preguntarse cual de los dos es el bueno.
+      LO QUE NO SE HACE es esconder el aviso entero detras de un icono desplegable: cuando NO esta en
+      el plan, la formacion no cuenta para ningun indicador, y un aviso que hay que abrir para
+      enterarse no es un aviso. Se queda a la vista, en una linea.
 
-          Se queda el que la gente ya usa —la pestana— y desde hoy esa entra al plan SIEMPRE, tambien
-          con el plan aprobado, pidiendo el motivo. Antes solo entraba sola con el plan en borrador, y
-          esa diferencia invisible era la unica razon para tener dos botones.
+      SIN AMBAR NI COLOR DE ESTADO (2026-09-09, dicho por el cliente: «no quiero nada ambar»). Iba
+      en el amarillo de advertencia y lo que hacia era gritar en una ficha que se abre todos los
+      dias. Lo que distingue los dos casos son LAS PALABRAS —«En el plan de 2026: marzo» frente a
+      «No esta en el plan de 2026»—, y esa diferencia se lee igual de rapido sobre el mismo gris.
+    */
+    <div
+      className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-line bg-paper px-4 py-2.5 text-sm"
+    >
+      <CalendarRange size={16} className="shrink-0 text-ink-500" strokeWidth={1.75} />
 
-          La tarjeta se queda como lo que de verdad es: el aviso de si esta o no en el plan.
-        */}
-        {plan !== null && !publishedVersion ? (
-          <p className="text-xs text-ink-500">Publica el contenido para poder programarla.</p>
-        ) : null}
-      </div>
-
-    </>
+      {plan === null ? (
+        <>
+          <span className="font-medium text-ink-900">No hay ningún plan abierto al que agregarla.</span>
+          <Ayuda sobre="por qué hace falta un plan">
+            Su tipo dice que cuenta para los indicadores del plan anual, pero el de {enCurso} no
+            existe o ya está cerrado.
+          </Ayuda>
+          <Link href="/plan" className="focus-ring underline underline-offset-2 text-ink-500 hover:text-ink-900">
+            Crear el plan de {enCurso}
+          </Link>
+        </>
+      ) : meses.length > 0 ? (
+        <>
+          <span className="font-medium text-ink-900">
+            En el plan de {plan.year}: {meses.map((mes) => monthName(mes)).join(', ')}
+            {renglones.length > meses.length ? ` · ${renglones.length} jornadas` : ''}
+          </span>
+          <Ayuda sobre="qué significa estar en el plan">
+            De ahí salen su cumplimiento y su cobertura: los indicadores del plan se calculan solo
+            sobre las obligaciones que nacen de un renglón suyo.
+          </Ayuda>
+          <Link
+            href={`/plan/${plan.id}`}
+            className="focus-ring underline underline-offset-2 text-ink-500 hover:text-ink-900"
+          >
+            Ver el plan
+          </Link>
+        </>
+      ) : (
+        <>
+          <span className="font-medium text-ink-900">No está en el plan de {plan.year}.</span>
+          <Ayuda sobre="qué pasa si no está en el plan">
+            {/*
+              Se dice la consecuencia, no la mecanica. "No tiene renglon" no significa nada para
+              quien acaba de crearla; "no cuenta para ningun indicador" si.
+            */}
+            Mientras no tenga una jornada programada no cuenta para el cumplimiento ni para la
+            cobertura del plan, aunque su tipo diga que es del plan. Se programa desde la pestaña
+            <strong> Convocatorias</strong>.
+          </Ayuda>
+          {!publishedVersion ? (
+            <span className="text-xs text-ink-500">Publica el contenido para poder programarla.</span>
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }

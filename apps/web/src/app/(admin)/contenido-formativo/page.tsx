@@ -177,9 +177,9 @@ export default function ContenidoFormativoPage() {
       // adivinar cual: el codigo con un caracter raro, el proceso fuera del alcance y un fallo de
       // red se leian exactamente igual.
       const mensajes: Record<string, string> = {
-        DUPLICATE_CODE: 'Ya existe una actividad con ese codigo. Cambialo en "Codigo".',
+        DUPLICATE_CODE: 'Ya existe una actividad con ese código. Cámbialo en "Código".',
         VALIDATION_ERROR:
-          'El codigo solo admite mayusculas, numeros, guion y guion bajo. Abrelo en "Codigo" y corrigelo.',
+          'El código solo admite mayúsculas, numeros, guion y guion bajo. Ábrelo en "Código" y corrígelo.',
         FORBIDDEN: 'No puedes crear formaciones en ese proceso.',
         PROCESS_NOT_FOUND: 'Ese proceso ya no existe o no esta a tu alcance.',
       };

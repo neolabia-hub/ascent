@@ -86,7 +86,7 @@ export default function ConstanciasPage() {
     // El motivo se guarda al vuelo: `.catch(() => null)` lo perdia una linea antes del aviso.
     let falloAlCrear: unknown = null;
     const creada = await createTemplate({
-      name: 'Constancia de formacion',
+      name: 'Constancia de formación',
       backgroundKey: null,
       landscape: true,
       fields: CAMPOS_POR_DEFECTO,
@@ -120,7 +120,7 @@ export default function ConstanciasPage() {
     <div className="max-w-3xl">
       <Link href="/configuracion" className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700">
         <ArrowLeft size={14} />
-        Configuracion
+        Configuración
       </Link>
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -171,7 +171,7 @@ export default function ConstanciasPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-display text-[15px] font-semibold text-ink-900">{fila.name}</p>
                 <p className="mt-0.5 text-xs text-ink-500">
-                  Version {fila.versionNumber} · {fila.landscape ? 'Horizontal' : 'Vertical'}
+                  Versión {fila.versionNumber} · {fila.landscape ? 'Horizontal' : 'Vertical'}
                 </p>
               </div>
               {fila.active ? (
@@ -226,16 +226,16 @@ const NOMBRES: Record<CampoClave, string> = {
   nombre: 'Nombre',
   documento: 'Documento',
   cargo: 'Cargo',
-  area: 'Area',
-  formacion: 'Formacion',
-  tipo: 'Tipo de formacion',
+  area: 'Área',
+  formacion: 'Formación',
+  tipo: 'Tipo de formación',
   horas: 'Horas',
   fecha: 'Fecha en que la curso',
   vence: 'Vigente hasta',
-  serial: 'Numero de serie',
-  codigo: 'Codigo de verificacion',
+  serial: 'Número de serie',
+  codigo: 'Código de verificación',
   nota: 'Calificación',
-  qr: 'Codigo QR',
+  qr: 'Código QR',
 };
 
 /** Lo que se escribe en cada campo mientras se coloca. Es texto de ejemplo, no datos reales. */
@@ -245,7 +245,7 @@ const ETIQUETAS: Record<CampoClave, string> = {
   cargo: 'Auxiliar de Bodega',
   area: 'Operaciones',
   formacion: 'Trabajo seguro en alturas',
-  tipo: 'Capacitacion del plan',
+  tipo: 'Capacitación del plan',
   horas: '8 horas',
   fecha: '15 de marzo de 2026',
   vence: 'Vigente hasta el 15 de marzo de 2027',
@@ -503,7 +503,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
           </p>
           <p className="mt-0.5 text-sm leading-relaxed text-ink-500">
             {activa
-              ? 'Quien termine una formacion que acredite recibira este diseño.'
+              ? 'Quien termine una formación que acredite recibirá este diseño.'
               : fondo
                 ? 'Actívala para que sea la que reciba la gente. Solo puede haber una en uso.'
                 : 'Sube el diseño antes de poder usarla.'}

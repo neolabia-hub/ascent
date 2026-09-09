@@ -94,7 +94,7 @@ export function QuestionCanvas({
         maxLength={1000}
         placeholder="Escribe la pregunta"
         aria-label="Enunciado de la pregunta"
-        className="focus-ring block w-full resize-none rounded-lg border-2 border-transparent bg-transparent px-2 py-1 font-display text-xl font-semibold leading-snug text-ink-900 placeholder:text-ink-300 hover:border-line focus:border-line-strong lg:text-[26px]"
+        className="focus-ring block w-full resize-none overflow-hidden rounded-lg border-2 border-transparent bg-transparent px-2 py-1 font-display text-xl font-semibold leading-snug text-ink-900 placeholder:text-ink-300 hover:border-line focus:border-line-strong lg:text-[26px]"
       />
 
       {payload.qtype === 'ESSAY' ? (
@@ -162,7 +162,7 @@ export function QuestionCanvas({
                       disabled={disabled}
                       onClick={() => marcar(option.id)}
                       aria-pressed={correcta}
-                      aria-label={`Marcar la opcion ${(OPTION_IDS[posicion] ?? '').toUpperCase()} como correcta`}
+                      aria-label={`Marcar la opción ${(OPTION_IDS[posicion] ?? '').toUpperCase()} como correcta`}
                       title={correcta ? 'Es la correcta' : 'Marcar como correcta'}
                       className="focus-ring -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-black/5"
                     >
@@ -174,7 +174,7 @@ export function QuestionCanvas({
                       disabled={disabled}
                       maxLength={500}
                       placeholder={`Opcion ${(OPTION_IDS[posicion] ?? '').toUpperCase()}`}
-                      aria-label={`Texto de la opcion ${(OPTION_IDS[posicion] ?? '').toUpperCase()}`}
+                      aria-label={`Texto de la opción ${(OPTION_IDS[posicion] ?? '').toUpperCase()}`}
                       onChange={(event) =>
                         set({
                           options: opciones.map((row) =>

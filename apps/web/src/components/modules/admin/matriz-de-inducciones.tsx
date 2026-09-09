@@ -104,7 +104,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
         title: `${marcadas.length} ${marcadas.length === 1 ? 'induccion anadida' : 'inducciones anadidas'} a ${cargoDe(abierto)?.name ?? 'el cargo'}`,
         description: nacidas
           ? `Nacieron ${nacidas} obligaciones para quienes ya tienen el cargo.`
-          : 'Todavia no obligan a nadie: nadie tiene ese cargo hoy.',
+          : 'Todavía no obligan a nadie: nadie tiene ese cargo hoy.',
       });
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo guardar', description: motivoDelError(error) });
@@ -142,8 +142,8 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
           title={matrix.activities.length === 0 ? 'Todavia no hay inducciones especificas' : 'Faltan cargos'}
           description={
             matrix.activities.length === 0
-              ? 'Aqui se declara que induccion de puesto le toca a cada cargo. Crea la primera formacion de tipo "Induccion especifica" desde Formaciones.'
-              : 'Crea al menos un cargo en Configuracion.'
+              ? 'Aquí se declara que inducción de puesto le toca a cada cargo. Crea la primera formación de tipo "Inducción especifica" desde Formaciones.'
+              : 'Crea al menos un cargo en Configuración.'
           }
         />
       </div>
@@ -173,7 +173,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
         </div>
         <p className="text-sm text-ink-500">
           {sinNinguna === 0 ? (
-            'Todos los cargos tienen su induccion.'
+            'Todos los cargos tienen su inducción.'
           ) : (
             <>
               <span className="font-medium text-ink-900">{sinNinguna}</span>{' '}
@@ -308,7 +308,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
                         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
                           <span>
                             {celda.assignmentCount === 0
-                              ? 'Nadie obligado todavia'
+                              ? 'Nadie obligado todavía'
                               : `${celda.assignmentCount} ${celda.assignmentCount === 1 ? 'persona obligada' : 'personas obligadas'}`}
                           </span>
                           {/*
@@ -333,7 +333,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
                         disabled={busy || celda.shared}
                         title={
                           celda.shared
-                            ? 'Viene de un requisito de varios cargos: se retira desde la ficha de la formacion.'
+                            ? 'Viene de un requisito de varios cargos: se retira desde la ficha de la formación.'
                             : undefined
                         }
                         onClick={() => {
@@ -477,7 +477,7 @@ export function MatrizDeInducciones({ matrix, onChanged }: { matrix: JobTitleMat
           <p className="text-sm leading-relaxed text-ink-500">
             {retirando && retirando.obligados > 0
               ? `Lo pendiente de ${retirando.obligados} ${retirando.obligados === 1 ? 'persona' : 'personas'} queda retirado. Lo que ya se cumplio no se toca, y sus constancias siguen valiendo.`
-              : 'Todavia no obliga a nadie, asi que no se retira ninguna obligacion.'}
+              : 'Todavía no obliga a nadie, así que no se retira ninguna obligación.'}
           </p>
           <Field
             htmlFor="matriz-novedad"

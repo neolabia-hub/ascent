@@ -52,11 +52,11 @@ const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string
  */
 const MIGRATION_EFFECT: Record<MigrationPolicyCode, string> = {
   FINISH_OLD:
-    'Quien ya estaba inscrito TERMINA en la version anterior. La version nueva la veran solo quienes se inscriban de aqui en adelante.',
+    'Quien ya estaba inscrito TERMINA en la versión anterior. La versión nueva la veran solo quiénes se inscriban de aquí en adelante.',
   MOVE_NOT_STARTED:
-    'Pasan a la version nueva quienes todavia no han abierto nada. Quien ya empezo termina en la anterior, para no quitarle el avance.',
+    'Pasan a la versión nueva quiénes todavía no han abierto nada. Quien ya empezo termina en la anterior, para no quitarle el avance.',
   RESTART_NEW:
-    'Todos los que no han cerrado pasan a la version nueva y vuelven a empezar. Lo ya completado no se toca.',
+    'Todos los que no han cerrado pasan a la versión nueva y vuelven a empezar. Lo ya completado no se toca.',
 };
 
 function Stat({
@@ -247,7 +247,7 @@ export default function ConvocatoriaDetallePage() {
             ? `${result.enrolled} inscritas de ${result.enrolled + result.sinCupo} obligadas`
             : result.enrolled > 0
               ? `${result.enrolled} personas inscritas`
-              : 'No habia obligados sin inscribir',
+              : 'No había obligados sin inscribir',
         description: restos || undefined,
       });
       await load();
@@ -271,7 +271,7 @@ export default function ConvocatoriaDetallePage() {
         result.executed
           ? {
               kind: 'success',
-              title: `Convocatoria actualizada a la version ${target.versionNumber}`,
+              title: `Convocatoria actualizada a la versión ${target.versionNumber}`,
               description: 'Se aplico la politica de migración que se eligio al publicarla.',
             }
           : { kind: 'info', title: 'Enviada a aprobación', description: 'Un administrador debe autorizar el cambio.' },
@@ -285,7 +285,7 @@ export default function ConvocatoriaDetallePage() {
       const superseded = error instanceof ApiError && error.code === 'VERSION_SUPERSEDED';
       showToast({
         kind: 'danger',
-        title: superseded ? 'Se publico otra version mientras decidias' : 'No se pudo actualizar',
+        title: superseded ? 'Se publico otra versión mientras decidias' : 'No se pudo actualizar',
         description: superseded ? 'Revisa la nueva antes de mover a los inscritos.' : undefined,
       });
       if (superseded) await load();
@@ -444,7 +444,7 @@ export default function ConvocatoriaDetallePage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="font-display text-sm font-semibold text-ink-900">
-                Hay una version mas nueva: version {upgrade.target.versionNumber}
+                Hay una versión mas nueva: versión {upgrade.target.versionNumber}
               </p>
               <p className="mt-1 text-sm text-ink-700">
                 Esta convocatoria sigue entregando la version {upgrade.current.versionNumber}. Quien la curse hoy vera el
@@ -454,7 +454,7 @@ export default function ConvocatoriaDetallePage() {
             </div>
             <Button onClick={() => setMigrateOpen(true)}>
               <ArrowUpCircle size={16} />
-              Actualizar a la version {upgrade.target.versionNumber}
+              Actualizar a la versión {upgrade.target.versionNumber}
             </Button>
           </div>
         </div>
@@ -567,7 +567,7 @@ export default function ConvocatoriaDetallePage() {
             <div>
               <dt className="text-xs text-ink-500">A quien atiende</dt>
               <dd className="text-sm text-ink-900">
-                {offering.audience?.name ?? 'A todos los obligados de esta formacion'}
+                {offering.audience?.name ?? 'A todos los obligados de esta formación'}
               </dd>
             </div>
             <div>
@@ -686,7 +686,7 @@ export default function ConvocatoriaDetallePage() {
             <div>
               <dt className="text-xs text-ink-500">Como se registra</dt>
               <dd className="text-sm text-ink-900">
-                {offering.admiteAsistencia ? 'Con la lista de asistencia de la sesion' : 'Automatico, al completar el contenido'}
+                {offering.admiteAsistencia ? 'Con la lista de asistencia de la sesión' : 'Automático, al completar el contenido'}
                 {/*
                   Y DE DONDE SALIO ESA RESPUESTA, que es la mitad que faltaba: no es lo mismo que
                   alguien lo eligiera para esta jornada que que lo sugiriera su modalidad. Sin esto,
@@ -724,7 +724,7 @@ export default function ConvocatoriaDetallePage() {
                   {!offering.registraCertificadoExterno
                     ? '(solo queda la constancia de la empresa)'
                     : offering.admiteAsistencia
-                      ? '(la lista pedira su numero y su vencimiento)'
+                      ? '(la lista pedira su número y su vencimiento)'
                       : '(esta jornada no lo pide: se cierra al completar el contenido)'}
                 </span>
               </dd>
@@ -993,7 +993,7 @@ export default function ConvocatoriaDetallePage() {
       <Drawer
         open={migrateOpen}
         onOpenChange={setMigrateOpen}
-        title={`Actualizar a la version ${upgrade.target?.versionNumber ?? ''}`}
+        title={`Actualizar a la versión ${upgrade.target?.versionNumber ?? ''}`}
         description="La politica de migración la fijo quien publico esa versión; aquí solo se aplica."
         footer={
           <div className="flex justify-end gap-2">
@@ -1014,7 +1014,7 @@ export default function ConvocatoriaDetallePage() {
 
             <dl className="grid gap-2 text-sm">
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-ink-700">Pasan a la version {upgrade.target.versionNumber}</dt>
+                <dt className="text-ink-700">Pasan a la versión {upgrade.target.versionNumber}</dt>
                 <dd className="font-display text-lg font-semibold tabular-nums text-ink-900">{upgrade.enrollments.moving}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">

@@ -144,7 +144,7 @@ for (const tipo of tiposAProbar) {
     interfaz"— y se cumplio.
 
     La salida para quien no quiera evaluar un tipo no es un boton de "publicar igualmente": es
-    apagar "Se evalua" en el tipo. Se dice una vez, en su sitio, y vale para todas.
+    apagar "Se evalúa" en el tipo. Se dice una vez, en su sitio, y vale para todas.
   */
   if (contrato.examen) {
     const suelta = await admin.post('/activities', {

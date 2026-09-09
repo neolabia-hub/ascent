@@ -89,6 +89,12 @@ export interface Ciclo {
    */
   forms: FormularioDelCiclo[];
   _count: { reviews: number };
+  /**
+   * LAS CIFRAS DE LA CAMPAÑA, en la propia lista (2026-09-09). Las mismas que el consolidado y el
+   * Excel, calculadas por el mismo metodo en el servidor. Estan aqui para que el estado de la
+   * campaña se vea sin abrir nada.
+   */
+  cifras: CifrasDeCiclo;
 }
 
 export type RolEvaluador = 'SELF' | 'MANAGER';
@@ -152,14 +158,14 @@ export interface AperturaDeCiclo {
 }
 
 export const MOTIVOS_SIN_EVALUADOR: Record<AperturaDeCiclo['sinEvaluador'][number]['motivo'], string> = {
-  SIN_AREA: 'No tiene area asignada',
-  SIN_RESPONSABLE: 'Su area no tiene responsable',
-  ES_SU_PROPIO_JEFE: 'Dirige su propia area',
+  SIN_AREA: 'No tiene área asignada',
+  SIN_RESPONSABLE: 'Su área no tiene responsable',
+  ES_SU_PROPIO_JEFE: 'Dirige su propia área',
 };
 
 export const MOTIVOS_SIN_FORMULARIO: Record<AperturaDeCiclo['sinFormulario'][number]['motivo'], string> = {
   SIN_CARGO: 'No tiene cargo, y el ciclo no lleva formulario general',
-  CARGO_SIN_FORMULARIO: 'Ningun formulario del ciclo cubre su cargo',
+  CARGO_SIN_FORMULARIO: 'Ningún formulario del ciclo cubre su cargo',
 };
 
 /** Las cifras de una campaña, o de uno de sus formularios. Se cuentan igual. */
@@ -170,10 +176,46 @@ export interface CifrasDeCiclo {
   promedio: number | null;
 }
 
+
+/** Un corte del promedio de una competencia: «en Logistica, 52 %». */
+export interface CortePorCompetencia {
+  nombre: string;
+  promedio: number | null;
+}
+
+/**
+ * EL RESULTADO DE UNA COMPETENCIA en la campaña. Es la unidad del analisis: contesta «¿en qué
+ * estamos flojos?», y sus dos cortes contestan «¿dónde?» y «¿a quién?».
+ */
+export interface ResultadoDeCompetencia {
+  competencyId: string;
+  name: string;
+  escala: 'ONE_TO_FIVE' | 'ONE_TO_TEN' | 'YES_NO' | 'TEXT_ONLY';
+  /** Cuantas respuestas con valor la sostienen. Un promedio de dos respuestas no es un diagnostico. */
+  respuestas: number;
+  promedio: number | null;
+  /** Separados a proposito: la diferencia entre los dos ES el analisis. */
+  promedioJefe: number | null;
+  promedioAuto: number | null;
+  /** La formacion que la refuerza, si el catalogo la declara. Es la costura hacia el plan. */
+  formacion: { id: string; name: string } | null;
+  porArea: CortePorCompetencia[];
+  porCargo: CortePorCompetencia[];
+}
+
+/** Las cifras de un grupo de personas —un area, un cargo—, con su nombre. */
+export interface GrupoDeCiclo extends CifrasDeCiclo {
+  nombre: string;
+}
+
 export interface Consolidado extends CifrasDeCiclo {
   cycle: Ciclo;
   /** El mismo recuento, formulario a formulario: es para lo que sirve tenerlos en una campaña. */
   porFormulario: (CifrasDeCiclo & { cycleFormId: string; name: string })[];
+  /** EL ANALISIS (2026-09-09): en que estamos flojos, donde y con quien. Ver `docs/modulos/desempeno.md`. */
+  porCompetencia: ResultadoDeCompetencia[];
+  porArea: GrupoDeCiclo[];
+  porCargo: GrupoDeCiclo[];
   items: Evaluacion[];
 }
 

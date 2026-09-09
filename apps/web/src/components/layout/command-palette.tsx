@@ -78,7 +78,7 @@ export function CommandPalette({
   onOpenChange,
   staticCommands = LEARNER_COMMANDS,
   loadCommands = loadLearnerCommands,
-  placeholder = 'Buscar una formacion o ir a una pantalla',
+  placeholder = 'Buscar una formación o ir a una pantalla',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;

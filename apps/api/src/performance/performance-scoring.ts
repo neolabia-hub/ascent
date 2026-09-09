@@ -16,6 +16,20 @@ const TOPE: Record<EscalaCompetencia, number | null> = {
   TEXT_ONLY: null,
 };
 
+
+/**
+ * UNA RESPUESTA, EN PORCENTAJE DE SU ESCALA.
+ *
+ * La saco aparte el 2026-09-09, cuando el consolidado empezo a promediar POR COMPETENCIA: esa
+ * cuenta y la nota de una persona tienen que aplicar exactamente la misma regla —un 4 de 5 es 80,
+ * un «cumple» es 100, y lo que no se respondio no es un cero— o el promedio de la competencia y la
+ * nota de quien la respondio dirian cosas distintas sobre los mismos numeros.
+ */
+export function notaDeRespuesta(escala: EscalaCompetencia, valor: number | null): number | null {
+  const tope = TOPE[escala];
+  if (tope === null || valor === null) return null;
+  return (valor / tope) * 100;
+}
 export interface RespuestaCalificable {
   escala: EscalaCompetencia;
   /** `null` = no se respondio, o la competencia era de solo texto. */
@@ -46,10 +60,10 @@ export function calcularNota(respuestas: RespuestaCalificable[]): number | null 
   let pesos = 0;
 
   for (const respuesta of respuestas) {
-    const tope = TOPE[respuesta.escala];
-    if (tope === null || respuesta.valor === null) continue;
+    const nota = notaDeRespuesta(respuesta.escala, respuesta.valor);
+    if (nota === null) continue;
     const peso = Math.max(1, respuesta.peso);
-    suma += (respuesta.valor / tope) * 100 * peso;
+    suma += nota * peso;
     pesos += peso;
   }
 

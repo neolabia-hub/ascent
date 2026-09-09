@@ -12,12 +12,12 @@ import type { EstadoEjecucion, ResumenEjecucion } from './reports-api';
 export type Dimension = 'area' | 'cargo' | 'regional' | 'servicio' | 'proceso' | 'tipo' | 'norma';
 
 export const DIMENSION_LABEL: Record<Dimension, string> = {
-  area: 'Por area',
+  area: 'Por área',
   cargo: 'Por cargo',
   regional: 'Por regional',
   servicio: 'Por servicio',
   proceso: 'Por proceso',
-  tipo: 'Por tipo de formacion',
+  tipo: 'Por tipo de formación',
   norma: 'Por norma',
 };
 
@@ -122,3 +122,66 @@ export function nombreDeMes(clave: string): string {
 }
 
 export type { EstadoEjecucion, ResumenEjecucion };
+
+// ── Evolucion del año ─────────────────────────────────────────────────────
+
+/** Un mes del año: lo que vencia y lo que se cumplio. `pct` es `null` si no vencia nada. */
+export interface MesDeEvolucion {
+  mes: number;
+  vencian: number;
+  cumplidas: number;
+  aTiempo: number;
+  pct: number | null;
+}
+
+export interface Evolucion {
+  year: number;
+  meses: MesDeEvolucion[];
+  resumen: { vencian: number; cumplidas: number; aTiempo: number; pct: number | null };
+}
+
+/**
+ * COMO FUE EL AÑO, MES A MES (2026-09-09).
+ *
+ * El resto de los informes es una foto de hoy. Esto contesta la otra pregunta, la del comite
+ * mensual: «de lo que habia que hacer en marzo, ¿cuanto se hizo?». No es un historico del
+ * indicador —nadie guardo cuanto marcaba el 1 de marzo— y por eso se cuenta por FECHA DE
+ * VENCIMIENTO, que si esta guardada.
+ */
+export function getEvolucion(year?: number): Promise<Evolucion> {
+  return apiFetch(`/reportes/evolucion${year ? `?year=${year}` : ''}`, { method: 'GET' });
+}
+
+// ── En que falla la gente ─────────────────────────────────────────────────
+
+export interface TemaDeConocimiento {
+  categoryId: string | null;
+  name: string;
+  preguntas: number;
+  respuestas: number;
+  /** Porcentaje de PUNTOS obtenidos sobre posibles. `null` si no hay nada calificado. */
+  aciertoPct: number | null;
+}
+
+export interface PreguntaFallada {
+  questionVersionId: string;
+  stem: string;
+  categoryName: string | null;
+  respuestas: number;
+  aciertoPct: number | null;
+}
+
+export interface Conocimiento {
+  porTema: TemaDeConocimiento[];
+  peoresPreguntas: PreguntaFallada[];
+}
+
+/**
+ * EN QUE FALLA LA GENTE (2026-09-09).
+ *
+ * Los demas informes dicen cuantos aprobaron. Este dice QUE fallaron, que es lo unico que se
+ * convierte directamente en una formacion del año siguiente.
+ */
+export function getConocimiento(): Promise<Conocimiento> {
+  return apiFetch('/reportes/conocimiento', { method: 'GET' });
+}

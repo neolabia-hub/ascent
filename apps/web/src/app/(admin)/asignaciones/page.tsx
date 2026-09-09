@@ -352,7 +352,7 @@ export default function AsignacionesPage() {
           {tab === 'obligaciones' ? (
             <Button onClick={() => setAssignOpen(true)}>
               <Plus size={16} />
-              Asignar formacion
+              Asignar formación
             </Button>
           ) : null}
         </div>

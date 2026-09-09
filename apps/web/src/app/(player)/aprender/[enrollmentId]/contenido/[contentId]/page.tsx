@@ -846,8 +846,8 @@ function AssessmentGate({
           error instanceof ApiError && error.code === 'ENROLLMENT_BLOCKED'
             ? 'Agotaste los intentos. Tu analista debe habilitarte un refuerzo.'
             : error instanceof ApiError && error.code === 'MAX_ATTEMPTS_REACHED'
-              ? 'Ya no te quedan intentos para esta evaluacion.'
-              : 'No se pudo abrir la evaluacion. Intenta de nuevo.',
+              ? 'Ya no te quedan intentos para esta evaluación.'
+              : 'No se pudo abrir la evaluación. Intenta de nuevo.',
       });
       setStarting(false);
     }
@@ -873,7 +873,7 @@ function AssessmentGate({
 
           <div className="mt-8">
             <Button size="lg" className="min-w-[240px]" loading={starting} disabled={blocked || passed} onClick={() => void begin()}>
-              {passed ? 'Ya la aprobaste' : open ? 'Retomar la evaluacion' : 'Empezar la evaluacion'}
+              {passed ? 'Ya la aprobaste' : open ? 'Retomar la evaluación' : 'Empezar la evaluación'}
             </Button>
             <p className="mt-3 max-w-[520px] text-sm" style={{ color: 'var(--reading-muted)' }}>
               {blocked
@@ -882,7 +882,7 @@ function AssessmentGate({
                   ? 'Queda registrada con la nota que sacaste. No hace falta repetirla.'
                   : open
                     ? 'Tienes un intento abierto. Al retomarlo sigues donde lo dejaste; no gastas otro.'
-                    : 'Se abre a pantalla completa y sin el contenido a la vista: la evaluacion mide lo que recuerdas, no lo que puedes buscar.'}
+                    : 'Se abre a pantalla completa y sin el contenido a la vista: la evaluación mide lo que recuerdas, no lo que puedes buscar.'}
             </p>
           </div>
         </div>
@@ -892,7 +892,7 @@ function AssessmentGate({
         description={detail.content.description ?? listed?.description ?? null}
         requirement={
           <p>
-            Se aprueba con {passingScore ?? 'la nota minima de la empresa'}
+            Se aprueba con {passingScore ?? 'la nota mínima de la empresa'}
             {passingScore ? '%' : ''} o mas. Los intentos son limitados y al agotarlos la formacion queda bloqueada
             hasta que tu analista habilite un refuerzo.
           </p>

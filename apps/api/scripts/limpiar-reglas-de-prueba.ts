@@ -63,22 +63,43 @@ async function main() {
       regla de prueba viva —las corridas tambien publican— y esta bien: desde que el alta de
       personas dejo de recorrer todas las reglas (0,4 s en vez de 9 s), unas cuantas de mas ya no
       cuestan nada. Perder el trabajo de alguien si costaba.
+
+      ─── Y ESA EXCEPCION SE COMIO EL SCRIPT (2026-09-09) ───
+
+      "Unas cuantas de mas" fueron 104 de 131: hoy CASI TODAS las specs publican su formacion, asi
+      que la excepcion dejo de ser una esquina y paso a ser el caso normal. El script informaba
+      "Desactivadas 0" con la base a 131 reglas activas y 453.091 obligaciones, y `alcance-analista`
+      volvia a expirar esperando el dialogo de la contrasena — el mismo sintoma del 2026-08-31.
+
+      La correccion no es quitar la guarda, que protege trabajo de verdad, sino AFINARLA: se mira el
+      NOMBRE de la formacion. Todo lo que deja la suite acaba en un espacio y seis o mas digitos
+      ("Induccion E2E 04084758", "Con papel adjunto 22943513"); lo que escribe una persona, no. La
+      induccion real que se perdio aquel dia se llamaba como la llamo su autor y sigue a salvo.
+
+      La leccion, que es la de siempre en este archivo: **una excepcion que se justifica con "son
+      unas pocas" caduca el dia que dejan de ser pocas, y nadie vuelve a mirarla.** Por eso el
+      recuento de lo respetado se imprime SIEMPRE, con su motivo.
     */
     const candidatas = await prisma.assignmentRule.findMany({
       where: { active: true, audienceId: { in: audiencias.map((a) => a.id) } },
       select: { id: true, targetId: true },
     });
 
-    const publicadas = new Set(
+    /** Lo que genera la suite termina en " 04084758". Lo que escribe alguien, no. */
+    const LA_GENERO_LA_SUITE = / \d{6,}$/;
+
+    const protegidas = new Set(
       (
         await prisma.activityVersion.findMany({
           where: { status: 'PUBLISHED', activityId: { in: candidatas.map((r) => r.targetId) } },
-          select: { activityId: true },
+          select: { activityId: true, activity: { select: { name: true } } },
         })
-      ).map((v) => v.activityId),
+      )
+        .filter((v) => !LA_GENERO_LA_SUITE.test(v.activity.name))
+        .map((v) => v.activityId),
     );
 
-    const aDesactivar = candidatas.filter((r) => !publicadas.has(r.targetId)).map((r) => r.id);
+    const aDesactivar = candidatas.filter((r) => !protegidas.has(r.targetId)).map((r) => r.id);
     const respetadas = candidatas.length - aDesactivar.length;
 
     const { count } = aDesactivar.length
@@ -88,7 +109,7 @@ async function main() {
     const quedan = await prisma.assignmentRule.count({ where: { active: true } });
     console.log(`Desactivadas ${count} regla(s) de ${audiencias.length} audiencia(s) de prueba.`);
     if (respetadas > 0) {
-      console.log(`Respetadas ${respetadas}: su formacion esta PUBLICADA, asi que no es basura de una corrida.`);
+      console.log(`Respetadas ${respetadas}: formacion PUBLICADA y con nombre puesto por una persona.`);
     }
     console.log(`Quedan ${quedan} regla(s) activa(s).`);
   } finally {

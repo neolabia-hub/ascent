@@ -32,9 +32,9 @@ const SECTIONS: Section[] = [
     extraFields: [
       {
         key: 'responsibleUserId',
-        label: 'Responsable del area',
+        label: 'Responsable del área',
         kind: 'user',
-        hint: 'Quien evalua el desempeño de su gente, responde la eficacia de sus formaciones y recibe el aviso cuando alguien reprueba. Es distinto del responsable de un PROCESO: aquel responde por un sistema de gestion, este por las personas.',
+        hint: 'Quien evalúa el desempeño de su gente, responde la eficacia de sus formaciones y recibe el aviso cuando alguien reprueba. Es distinto del responsable de un PROCESO: aquel responde por un sistema de gestión, este por las personas.',
       },
     ],
   },
@@ -42,7 +42,7 @@ const SECTIONS: Section[] = [
     catalogKey: 'processes',
     label: 'Procesos',
     singular: 'proceso',
-    description: 'Sistemas de gestion que originan la formación (SGI, SST, PESV, SARLAFT...).',
+    description: 'Sistemas de gestión que originan la formación (SGI, SST, PESV, SARLAFT...).',
     /**
      * De que AREA cuelga este proceso. No es decoracion: es lo que permite que la jefatura del
      * area vea todos sus procesos mientras cada responsable ve solo el suyo (Decision #57).
@@ -52,7 +52,7 @@ const SECTIONS: Section[] = [
     extraFields: [
       {
         key: 'areaId',
-        label: 'Area responsable',
+        label: 'Área responsable',
         kind: 'select',
         optionsFrom: 'areas',
         /**
@@ -67,13 +67,13 @@ const SECTIONS: Section[] = [
          * proceso Comercial en el area Comercial.
          */
         required: true,
-        hint: 'Quien tenga alcance sobre esa area vera este proceso. Si el proceso lleva el nombre de un area, es esa misma.',
+        hint: 'Quien tenga alcance sobre esa área vera este proceso. Si el proceso lleva el nombre de un área, es esa misma.',
       },
       {
         key: 'responsibleUserId',
         label: 'Responsable',
         kind: 'user',
-        hint: 'Quien responde por este proceso. No tiene por que ser el jefe del area: SARLAFT y SST cuelgan de la misma area y los llevan personas distintas.',
+        hint: 'Quien responde por este proceso. No tiene por que ser el jefe del área: SARLAFT y SST cuelgan de la misma área y los llevan personas distintas.',
       },
     ],
   },

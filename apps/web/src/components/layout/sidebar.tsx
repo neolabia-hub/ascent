@@ -228,8 +228,8 @@ export function Sidebar() {
       <button
         type="button"
         onClick={toggleCollapsed}
-        aria-label={collapsed ? 'Expandir menu' : 'Contraer menu'}
-        title={collapsed ? 'Expandir menu' : 'Contraer menu'}
+        aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+        title={collapsed ? 'Expandir menú' : 'Contraer menú'}
         className={cn(
           // Al pasar por encima, el fondo sube al color de la empresa: el control se enciende con
           // la marca del tenant en vez de con un gris que podria ser de cualquiera.

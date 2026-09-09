@@ -10,8 +10,8 @@ import type { QuestionPayloadClient, QuestionType } from '@/lib/catalog-api';
  */
 
 export const QTYPE_LABEL: Record<QuestionType, string> = {
-  SINGLE: 'Seleccion unica',
-  MULTI: 'Seleccion multiple',
+  SINGLE: 'Selección única',
+  MULTI: 'Selección multiple',
   TRUE_FALSE: 'Verdadero o falso',
   FILL_BLANK: 'Completar huecos',
   ORDER: 'Ordenar los pasos',
@@ -35,7 +35,7 @@ export const QTYPE_HINT: Record<QuestionType, string> = {
   FILL_BLANK: 'Escribe la palabra que falta. No hay opciones a la vista de donde copiar.',
   ORDER: 'Pone los pasos en su orden. Para procedimientos: un bloqueo, una emergencia.',
   MATCH: 'Une dos columnas: señal con significado, EPP con riesgo. Cubre mucho en una pregunta.',
-  NUMERIC: 'Un numero con su unidad y su margen. Evita acertar la distancia por descarte.',
+  NUMERIC: 'Un número con su unidad y su margen. Evita acertar la distancia por descarte.',
   ESSAY: 'Responde con sus palabras. No se corrige sola: alguien tiene que calificarla.',
 };
 
@@ -120,7 +120,7 @@ export function loQueFaltaEnLaPregunta(payload: QuestionPayloadClient): string[]
     const huerfanos = blanks.filter((blank) => !enElTexto.includes(blank.id));
     if (huerfanos.length > 0) faltan.push('Hay huecos que ya no aparecen en el enunciado: quitalos.');
     if (blanks.some((blank) => (blank.accept ?? []).every((value) => !value.trim()))) {
-      faltan.push('Algun hueco no tiene ninguna respuesta valida.');
+      faltan.push('Algún hueco no tiene ninguna respuesta valida.');
     }
   }
 
@@ -134,13 +134,13 @@ export function loQueFaltaEnLaPregunta(payload: QuestionPayloadClient): string[]
     const pairs = payload.pairs ?? [];
     if (pairs.length < 2) faltan.push('Hacen falta al menos dos parejas.');
     if (pairs.some((pair) => !pair.left.trim() || !pair.right.trim())) {
-      faltan.push('Hay parejas con algun lado vacio.');
+      faltan.push('Hay parejas con algún lado vacio.');
     }
   }
 
   if (payload.qtype === 'NUMERIC') {
     if (typeof payload.correctNumber !== 'number' || Number.isNaN(payload.correctNumber)) {
-      faltan.push('Escribe el numero correcto.');
+      faltan.push('Escribe el número correcto.');
     }
   }
 

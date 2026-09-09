@@ -65,7 +65,7 @@ import { usePaginacion } from '@/components/ui/use-paginacion';
  */
 const COMO_SE_REPITE: Record<'NO' | 'MESES' | 'ANUAL', string> = {
   NO: 'Se hace una vez y no vuelve.',
-  ANUAL: 'CAMPANA: todos vencen el mismo dia, sea cuando sea que la hicieran.',
+  ANUAL: 'CAMPANA: todos vencen el mismo día, sea cuando sea que la hicieran.',
   MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que la completo.',
 };
 
@@ -419,9 +419,9 @@ export function ActivityAudienceTab({
                       </p>
                       <p className="mt-0.5 text-sm text-ink-500">
                         {yaEsDeTodos
-                          ? 'Se aplico sola al publicar: en este tipo de formacion no hay nada que decidir.'
+                          ? 'Se aplico sola al publicar: en este tipo de formación no hay nada que decidir.'
                           : typeConfig.requiresBeforeHire
-                            ? 'Es una induccion de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada año es la reinduccion, que es otra formacion.'
+                            ? 'Es una inducción de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su inducción se hizo cuando entró. Lo que le toca cada año es la reinducción, que es otra formación.'
                             : `Al publicar quedara exigida a ${reach ?? '...'} personas, y a quien entre despues. No hay que marcar a nadie.`}
                       </p>
                       {/*
@@ -461,7 +461,7 @@ export function ActivityAudienceTab({
                           onClick={() => setVerAlcance((visible) => !visible)}
                           className="focus-ring mt-1 rounded text-xs font-medium text-info hover:underline"
                         >
-                          {verAlcance ? 'Ocultar quienes son' : `Ver quienes son (${reach})`}
+                          {verAlcance ? 'Ocultar quiénes son' : `Ver quienes son (${reach})`}
                         </button>
                       ) : null}
                     </div>
@@ -852,8 +852,8 @@ export function ActivityAudienceTab({
                 ninguna regla" ahi hace pensar que hay que hacer algo aqui, y no lo hay.
               */}
               {decide === 'TODOS' && !hayContenidoPublicado
-                ? 'Todavia no, porque el contenido no esta publicado. Al publicarlo quedara exigida a toda la empresa, sin que tengas que marcar nada.'
-                : 'Todavia no hay ninguna regla. Lo que salga abajo son obligaciones sueltas, que no alcanzan a quien entre despues.'}
+                ? 'Todavía no, porque el contenido no esta publicado. Al publicarlo quedara exigida a toda la empresa, sin que tengas que marcar nada.'
+                : 'Todavía no hay ninguna regla. Lo que salga abajo son obligaciones sueltas, que no alcanzan a quien entre después.'}
             </div>
           ) : (
             <div className="card divide-y divide-line">
@@ -940,7 +940,7 @@ export function ActivityAudienceTab({
 
         <section>
           <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="font-display text-lg font-semibold text-ink-900">Quienes la tienen que hacer</h2>
+            <h2 className="font-display text-lg font-semibold text-ink-900">Quiénes la tienen que hacer</h2>
             {rows ? <span className="text-sm text-ink-500">{total} en total</span> : null}
           </div>
 
@@ -1070,12 +1070,12 @@ function describirRequisito(requirement: ActivityRequirement): string {
   const cuando =
     requirement.trigger === 'ON_HIRE'
       ? dias === 0
-        ? 'vence el dia del ingreso'
+        ? 'vence el día del ingreso'
         : dias < 0
-          ? `vence ${Math.abs(dias)} dias antes del ingreso`
-          : `vence a los ${dias} dias del ingreso`
+          ? `vence ${Math.abs(dias)} días antes del ingreso`
+          : `vence a los ${dias} días del ingreso`
       : dias === 0
-        ? 'vence el mismo dia'
+        ? 'vence el mismo día'
         : `vence a los ${dias} dias`;
   const repite = requirement.fixedDate
     ? ` · cada año antes del ${requirement.fixedDate.replace("-", "/")}`
@@ -1110,7 +1110,7 @@ function statusLabel(status: string): string {
 
 function sourceLabel(source: string): string {
   const map: Record<string, string> = {
-    MANUAL: 'Asignacion directa',
+    MANUAL: 'Asignación directa',
     RULE: 'Requisito',
     PLAN: 'Plan anual',
     STATIC_SNAPSHOT: 'Instantanea',

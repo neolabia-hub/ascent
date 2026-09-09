@@ -149,7 +149,7 @@ export function EvaluarDesempeno() {
             ? `Nadie coincide con "${busca.trim()}".`
             : vista === 'PENDIENTE'
               ? 'No te queda ninguna por responder.'
-              : 'Todavia no has entregado ninguna.'}
+              : 'Todavía no has entregado ninguna.'}
         </p>
       ) : (
         grupos.map((grupo) => (
@@ -465,7 +465,7 @@ function Formulario({
         icon={confirmando ? ShieldCheck : evaluacion.reviewerRole === 'SELF' ? UserRound : ClipboardCheck}
         title={
           confirmando
-            ? 'Entregar la evaluacion'
+            ? 'Entregar la evaluación'
             : evaluacion.reviewerRole === 'SELF'
               ? 'Tu autoevaluacion'
               : (evaluacion.subjectName ?? 'Evaluacion')

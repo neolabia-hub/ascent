@@ -68,7 +68,7 @@ export default function ReviewPage() {
         description={
           session.pendingLater > 0 && session.nextDueAt
             ? `Tienes ${session.pendingLater} ${session.pendingLater === 1 ? 'pregunta guardada' : 'preguntas guardadas'}; la proxima vuelve el ${formatDate(session.nextDueAt)}.`
-            : 'Cuando falles una pregunta en un examen, vuelve aqui a los dos dias.'
+            : 'Cuando falles una pregunta en un examen, vuelve aquí a los dos días.'
         }
       />
     );

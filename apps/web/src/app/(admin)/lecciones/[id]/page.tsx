@@ -343,14 +343,14 @@ export default function LessonEditorPage() {
       const draft = await createNextVersion(fromActivityId);
       showToast({
         kind: 'success',
-        title: `Version ${draft.versionNumber} creada en borrador`,
+        title: `Versión ${draft.versionNumber} creada en borrador`,
         description: 'Sus lecciones ya son editables. La versión publicada no se toco.',
       });
       router.push(`/contenido-formativo/${fromActivityId}?tab=contenido`);
     } catch (error) {
       // Ya habia un borrador: no es un fallo, es que el trabajo estaba empezado. Se lleva alli.
       if (error instanceof ApiError && error.code === 'DRAFT_ALREADY_EXISTS') {
-        showToast({ kind: 'info', title: 'Ya habia una versión en borrador', description: 'Te llevamos a ella.' });
+        showToast({ kind: 'info', title: 'Ya había una versión en borrador', description: 'Te llevamos a ella.' });
         router.push(`/contenido-formativo/${fromActivityId}?tab=contenido`);
         return;
       }
@@ -431,7 +431,7 @@ export default function LessonEditorPage() {
         description="Puede que haya sido eliminada o que el enlace este incorrecto."
         action={
           <Button variant="outline" onClick={() => router.push(backTo ?? '/lecciones')}>
-            {backTo ? 'Volver a la formacion' : 'Volver a lecciones'}
+            {backTo ? 'Volver a la formación' : 'Volver a lecciones'}
           </Button>
         }
       />
@@ -483,7 +483,7 @@ export default function LessonEditorPage() {
               </Button>
               <Button onClick={() => void save()} disabled={!canSave} loading={saving}>
                 <Save size={16} />
-                Guardar leccion
+                Guardar lección
               </Button>
             </>
           )}
@@ -852,7 +852,7 @@ function CardForm({ card, uploading, onChange, onUpload }: CardFormProps) {
                   name={`quiz-correct-${card.key}`}
                   checked={payload.correctOptionId === opt.id}
                   onChange={() => patch({ correctOptionId: opt.id })}
-                  aria-label={`Marcar opcion ${i + 1} como correcta`}
+                  aria-label={`Marcar opción ${i + 1} como correcta`}
                   className="h-4 w-4 shrink-0 accent-[var(--brand-primary)]"
                 />
                 <Input value={opt.text} maxLength={300} onChange={(e) => updateOptionText(opt.id, e.target.value)} />

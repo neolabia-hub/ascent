@@ -102,7 +102,7 @@ function escribirCabecera(hoja: ExcelJS.Worksheet, cabecera: Cabecera, titulo: s
 /** Resumen por formacion: una fila por formacion, con su desglose de estados. */
 export async function libroDeEjecucionGeneral(items: FilaGeneralExport[], cabecera: Cabecera): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'NEO PULSE';
+  libro.creator = 'Ascent';
   libro.created = cabecera.generadoEn;
 
   const hoja = libro.addWorksheet('Seguimiento');
@@ -153,7 +153,7 @@ export async function libroDeEjecucionDeActividad(
   cabecera: Cabecera,
 ): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'NEO PULSE';
+  libro.creator = 'Ascent';
   libro.created = cabecera.generadoEn;
 
   const hoja = libro.addWorksheet('Personas');

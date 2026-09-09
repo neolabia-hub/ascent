@@ -8,16 +8,13 @@ import {
   createAssessment,
   createLesson,
   listAssessments,
-  listQuestionCategories,
   presentationCapabilities,
   listLessons,
-  updateAssessment,
   uploadMedia,
   uploadPresentation,
   type AssessmentListItem,
   type ContentType,
   type LessonListItem,
-  type QuestionCategory,
 } from '@/lib/catalog-api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -80,7 +77,7 @@ const TYPES: TypeMeta[] = [
   {
     type: 'SURVEY',
     label: 'Encuesta',
-    description: 'Satisfaccion o eficacia diferida.',
+    description: 'Satisfacción o eficacia diferida.',
     icon: ClipboardCheck,
     disabled: 'Llega en el Sprint 5, con el motor de encuestas.',
   },
@@ -119,13 +116,10 @@ export function AddContentDrawer({
   const [lessonId, setLessonId] = useState('');
   const [assessmentId, setAssessmentId] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [pickCount, setPickCount] = useState(5);
   const [file, setFile] = useState<File | null>(null);
 
   const [lessons, setLessons] = useState<LessonListItem[]>([]);
   const [assessments, setAssessments] = useState<AssessmentListItem[]>([]);
-  const [categories, setCategories] = useState<QuestionCategory[]>([]);
   /** null mientras no se sabe; false = este servidor solo convierte PDF. */
   const [officeReady, setOfficeReady] = useState<boolean | null>(null);
 
@@ -147,12 +141,6 @@ export function AddContentDrawer({
       .then((value) => setOfficeReady(value.office))
       .catch(() => setOfficeReady(null));
     void listAssessments().then(setAssessments).catch(() => undefined);
-    void listQuestionCategories()
-      .then((rows) => {
-        setCategories(rows);
-        setCategoryId((current) => current || (rows[0]?.id ?? ''));
-      })
-      .catch(() => undefined);
   }, [open]);
 
   const submit = async () => {
@@ -161,6 +149,7 @@ export function AddContentDrawer({
     try {
       const finalTitle = title.trim();
       let newLessonId: string | null = null;
+      let newAssessmentId: string | null = null;
 
     const body: Parameters<typeof addContent>[1] = {
         type,
@@ -182,12 +171,10 @@ export function AddContentDrawer({
 
       if (type === 'ASSESSMENT') {
         if (mode === 'new') {
-          // Nace con un bloque al azar del banco: es el caso comun y el que evita repetir el
-          // mismo examen a todo el mundo. Se afina despues desde su pantalla si hace falta.
+          // Nace VACIA y con su titulo. Lo que decide como se arma —una pregunta escrita, una traida
+          // del banco o un bloque al azar— se decide en su editor, mirando el examen.
           const created = await createAssessment(finalTitle);
-          await updateAssessment(created.id, {
-            sections: [{ mode: 'RANDOM_FROM_POOL', categoryId, pickCount }],
-          });
+          newAssessmentId = created.id;
           body.assessmentId = created.id;
         } else {
           body.assessmentId = assessmentId;
@@ -222,6 +209,15 @@ export function AddContentDrawer({
         );
         return;
       }
+
+      if (newAssessmentId) {
+        // Igual que la leccion: una evaluacion vacia no sirve de nada, y lo siguiente es armarla.
+        showToast({ kind: 'success', title: 'Evaluación creada', description: 'Ahora arma sus preguntas.' });
+        router.push(
+          `/evaluaciones/${newAssessmentId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}`,
+        );
+        return;
+      }
       showToast({ kind: 'success', title: 'Contenido agregado' });
     } catch (error) {
       showToast({
@@ -236,7 +232,7 @@ export function AddContentDrawer({
   const canSubmit = (() => {
     if (!type || title.trim().length < 2) return false;
     if (type === 'LESSON') return mode === 'new' || Boolean(lessonId);
-    if (type === 'ASSESSMENT') return mode === 'new' ? Boolean(categoryId) : Boolean(assessmentId);
+    if (type === 'ASSESSMENT') return mode === 'new' || Boolean(assessmentId);
     if (type === 'DOCUMENT' || type === 'PRESENTATION') return Boolean(file);
     if (type === 'VIDEO') return Boolean(file) || externalUrl.trim().startsWith('http');
     if (type === 'LINK') return externalUrl.trim().startsWith('http');
@@ -250,7 +246,7 @@ export function AddContentDrawer({
       open={open}
       onOpenChange={onOpenChange}
       title={type ? 'Agregar contenido' : 'Que quieres agregar'}
-      description={type ? undefined : 'Todo se crea aqui mismo. No hace falta salir a otra pantalla.'}
+      description={type ? undefined : 'Todo se crea aquí mismo. No hace falta salir a otra pantalla.'}
       footer={
         type ? (
           <div className="flex justify-between gap-2">
@@ -295,25 +291,29 @@ export function AddContentDrawer({
           <Field htmlFor="c-title" label="Titulo" required hint="Es lo que vera el colaborador en la lista.">
             <Input id="c-title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />
           </Field>
-
           {/*
-            La descripcion la lee quien cursa, en el reproductor, justo debajo del contenido. No
-            es la descripcion de la formacion: es de ESTA parte. Sin ella el aprendiz ve un video
-            sin saber que va a ver ni por que se lo exigen.
+            LA DESCRIPCION NO VA EN TODOS (2026-09-09, `PENDIENTES` 7.2, decidido con el cliente).
+
+            La lee quien cursa, en el reproductor, justo debajo del contenido: sin ella el aprendiz ve
+            un video sin saber que va a ver ni por que se lo exigen. Pero en una EVALUACION y en una
+            ENCUESTA nadie la ve —lo que se abre es el examen— asi que ahi era un campo que solo
+            servia para alargar el formulario. Se pide donde se lee, y no donde no.
           */}
-          <Field
-            htmlFor="c-description"
-            label="Descripción"
-            hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
-          >
-            <Textarea
-              id="c-description"
-              rows={3}
-              value={description}
-              maxLength={2000}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </Field>
+          {type !== 'ASSESSMENT' && type !== 'SURVEY' ? (
+            <Field
+              htmlFor="c-description"
+              label="Descripción"
+              hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
+            >
+              <Textarea
+                id="c-description"
+                rows={3}
+                value={description}
+                maxLength={2000}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </Field>
+          ) : null}
 
           {(type === 'LESSON' || type === 'ASSESSMENT') && (
             <div role="radiogroup" aria-label="Origen" className="flex gap-1 rounded-md bg-paper p-1">
@@ -365,47 +365,24 @@ export function AddContentDrawer({
             </Field>
           ) : null}
 
-          {type === 'ASSESSMENT' && mode === 'new' ? (
-            <>
-              <Field htmlFor="c-category" label="Banco de preguntas" required hint="De donde salen las preguntas.">
-                <Select id="c-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-                  {categories.length === 0 ? <option value="">No hay categorías todavía</option> : null}
-                  {categories.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.name} ({row._count?.questions ?? 0} preguntas)
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field
-                htmlFor="c-pick"
-                label="Cuantas preguntas al azar"
-                hint="Cada persona recibe una selección distinta: repetir el mismo examen lo publica."
-              >
-                <Input
-                  id="c-pick"
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={pickCount}
-                  onChange={(event) => setPickCount(Number(event.target.value))}
-                />
-              </Field>
-              {/*
-                ESTE ES EL ATAJO, NO LA UNICA FORMA.
-                Nace con un bloque al azar del banco, que es el caso comun y resuelve en dos clics.
-                Pero desde aqui no se puede escribir una pregunta, y eso dejaba INVISIBLE el
-                constructor: quien queria diez preguntas concretas no tenia forma de saber que se
-                podia. Se dice, y desde la lista de contenidos se entra a armarla.
-              */}
-              <p className="rounded-md border border-line-strong bg-paper px-3 py-2 text-xs text-ink-500">
-                Nace con ese bloque al azar, que resuelve el caso comun. Si quieres escribir preguntas concretas,
-                agregala y despues pulsa <strong className="text-ink-700">Armar preguntas</strong> en la lista de
-                contenidos: ahi se escriben, se traen del banco y se ordenan.
-              </p>
-            </>
-          ) : null}
 
+          {/*
+            AL CREAR NO SE PIDE NADA MAS QUE EL TITULO (2026-09-09, decidido con el cliente).
+
+            Antes esto pedia DOS cosas mas, las dos obligatorias: de que tema salian las preguntas
+            y cuantas al azar. Se pedian ANTES de que existiera el examen y antes de que hubiera
+            una sola pregunta escrita — y en una empresa recien montada, sin temas, el boton
+            Agregar no se dejaba pulsar: no habia forma de crear una evaluacion desde aqui.
+
+            Ahora nace vacia con su titulo y se abre su editor, que es donde se ve lo que se esta
+            armando: escribir una pregunta, traer una ya escrita o poner el bloque al azar. Lo mismo
+            que hace una leccion al crearse, y lo mismo que pide «Nueva evaluacion» desde su lista.
+          */}
+          {type === 'ASSESSMENT' && mode === 'new' ? (
+            <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+              Al agregarla se abre su editor, y desde ahi se vuelve a esta formacion.
+            </p>
+          ) : null}
           {type === 'ASSESSMENT' && mode === 'library' ? (
             <Field htmlFor="c-assessment" label="Evaluación">
               <Select

@@ -101,6 +101,29 @@ export class ReportsController {
     return this.reports.vencimientos(horizonte);
   }
 
+  /**
+   * LA EVOLUCION DEL AÑO. Mismo permiso que la analitica: es el mismo dato, mirado en el tiempo.
+   *
+   * El año se acota a un rango con sentido —no hay datos antes de que existiera la plataforma, y
+   * pedir el 3025 solo gasta una consulta—; fuera de rango se devuelve el año en curso.
+   */
+  @Get('evolucion')
+  @RequirePermissions('reports:read_scope')
+  evolucion(@Query('year') year?: string) {
+    const enCurso = new Date().getFullYear();
+    const pedido = Number(year);
+    const elegido =
+      Number.isFinite(pedido) && pedido >= 2020 && pedido <= enCurso + 5 ? Math.trunc(pedido) : enCurso;
+    return this.reports.evolucion(elegido);
+  }
+
+  /** EN QUE FALLA LA GENTE. Mismo permiso que la analitica: es la misma pregunta, por dentro. */
+  @Get('conocimiento')
+  @RequirePermissions('reports:read_scope')
+  conocimiento() {
+    return this.reports.conocimiento();
+  }
+
   /*
     LAS DESCARGAS VAN BAJO `reports:export` Y NO BAJO `reports:read_scope`.
 

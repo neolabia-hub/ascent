@@ -321,7 +321,7 @@ export function NewOfferingDrawer({
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title={lockedVersion ? 'Otra convocatoria de esta capacitacion' : 'Nueva convocatoria'}
+      title={lockedVersion ? 'Otra convocatoria de esta capacitación' : 'Nueva convocatoria'}
       description={
         askPlanMonth
           ? 'Se crea en borrador y entra al plan como renglon. Al publicarla se congelan los proyectados.'
@@ -372,7 +372,7 @@ export function NewOfferingDrawer({
             required
             hint={
               askPlanMonth
-                ? 'Solo capacitaciones del plan: una induccion o una extraordinaria no cuenta para sus indicadores.'
+                ? 'Solo capacitaciones del plan: una inducción o una extraordinaria no cuenta para sus indicadores.'
                 : 'Se puede programar aunque el contenido siga en borrador; publicarla exige publicarlo antes.'
             }
           >
@@ -383,12 +383,12 @@ export function NewOfferingDrawer({
               value={activityVersionId}
               onChange={setActivityVersionId}
               emptyLabel={
-                askPlanMonth ? 'No hay capacitaciones del plan' : 'Todavia no hay formaciones'
+                askPlanMonth ? 'No hay capacitaciones del plan' : 'Todavía no hay formaciones'
               }
               emptyHint={
                 askPlanMonth
-                  ? 'Su tipo tiene que ser "Capacitacion del plan" para que cuente en el cumplimiento y la cobertura.'
-                  : 'Crea una formacion y agregale contenido; despues vuelve aqui para programarla.'
+                  ? 'Su tipo tiene que ser "Capacitación del plan" para que cuente en el cumplimiento y la cobertura.'
+                  : 'Crea una formación y agregale contenido; después vuelve aquí para programarla.'
               }
               options={elegibles.map((version) => ({
                 id: version.versionId,
@@ -411,8 +411,8 @@ export function NewOfferingDrawer({
             required
             hint={
               fechaAncla && !monthTouched
-                ? 'Tomado de la fecha de la jornada. Es el mes contra el que se mide el cumplimiento, y se queda quieto aunque despues se reprograme.'
-                : 'El mes contra el que se mide el cumplimiento del plan, aunque la fecha exacta cambie despues.'
+                ? 'Tomado de la fecha de la jornada. Es el mes contra el que se mide el cumplimiento, y se queda quieto aunque después se reprograme.'
+                : 'El mes contra el que se mide el cumplimiento del plan, aunque la fecha exacta cambie después.'
             }
           >
             <Select

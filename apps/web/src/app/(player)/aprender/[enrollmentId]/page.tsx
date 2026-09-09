@@ -162,8 +162,8 @@ export default function EnrollmentPage() {
         error instanceof ApiError && error.code === 'ENROLLMENT_BLOCKED'
           ? 'Agotaste los intentos. Tu analista debe habilitarte un refuerzo.'
           : error instanceof ApiError && error.code === 'MAX_ATTEMPTS_REACHED'
-            ? 'Ya no te quedan intentos para esta evaluacion.'
-            : 'No se pudo abrir la evaluacion. Intenta de nuevo.';
+            ? 'Ya no te quedan intentos para esta evaluación.'
+            : 'No se pudo abrir la evaluación. Intenta de nuevo.';
       showToast({ kind: 'danger', title: message });
       setStartingId(null);
     }
@@ -205,7 +205,7 @@ export default function EnrollmentPage() {
                   {done} de {contents.length} {contents.length === 1 ? 'parte' : 'partes'}
                 </p>
                 <p className="mt-0.5 text-sm text-ink-500">
-                  Version {enrollment.versionNumber}
+                  Versión {enrollment.versionNumber}
                   {enrollment.estimatedMinutes ? ` · ${enrollment.estimatedMinutes} min en total` : ''}
                 </p>
               </div>
@@ -249,7 +249,7 @@ export default function EnrollmentPage() {
               <section className="mt-4 rounded-xl border border-danger/40 bg-danger-soft p-5">
                 <h2 className="font-display text-base font-semibold text-danger">Formación bloqueada</h2>
                 <p className="mt-1 text-sm text-ink-700">
-                  {enrollment.blockedReason ?? 'Agotaste los intentos de la evaluacion.'} Tu analista y tu jefe ya
+                  {enrollment.blockedReason ?? 'Agotaste los intentos de la evaluación.'} Tu analista y tu jefe ya
                   fueron avisados para habilitarte un refuerzo.
                 </p>
               </section>

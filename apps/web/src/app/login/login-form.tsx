@@ -112,7 +112,7 @@ export function LoginForm() {
             : 'Cuenta bloqueada temporalmente. Intenta de nuevo mas tarde.',
         );
       } else {
-        setErrorMessage('No se pudo iniciar sesion. Intenta de nuevo.');
+        setErrorMessage('No se pudo iniciar sesión. Intenta de nuevo.');
       }
     } finally {
       setSubmitting(false);
@@ -230,7 +230,7 @@ export function LoginForm() {
             <p className="truncate font-display text-lg font-bold leading-tight text-white">
               {branding.companyDisplayName}
             </p>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">NEO PULSE</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">Ascent</p>
           </div>
         </div>
 
@@ -362,7 +362,7 @@ export function LoginForm() {
 const FRASES = [
   'Lo que te toca hacer, y cuando vence.',
   'Tus constancias, siempre a la mano.',
-  'Tu formacion, aunque estes en ruta.',
+  'Tu formación, aunque estes en ruta.',
   'Lo aprendido no se olvida: vuelve.',
 ];
 

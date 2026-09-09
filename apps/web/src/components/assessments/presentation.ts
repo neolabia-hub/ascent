@@ -85,5 +85,5 @@ export const TRANSITION_LABEL: Record<Transition, string> = {
 export const TRANSITION_HINT: Record<Transition, string> = {
   slide: 'La pregunta entra desde el lado al que se avanza. Es lo que da la sensacion de avanzar.',
   fade: 'Mas sobria: aparece y desaparece sin movimiento lateral.',
-  none: 'Cambio seco. Es lo mas rapido en equipos viejos.',
+  none: 'Cambio seco. Es lo mas rápido en equipos viejos.',
 };

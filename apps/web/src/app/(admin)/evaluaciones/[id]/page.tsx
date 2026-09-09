@@ -20,6 +20,7 @@ import {
   Scale,
   Search,
   Smartphone,
+  Tags,
   Trash2,
 } from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
@@ -64,7 +65,7 @@ import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Combo } from '@/components/ui/combo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { useToast } from '@/components/ui/toast';
@@ -123,7 +124,7 @@ type Seleccion = { tipo: 'PASO'; localId: string } | { tipo: 'CALIFICA' } | { ti
 
 const POLITICA_NOTA: Record<AssessmentDetail['gradingPolicy'], string> = {
   HIGHEST: 'La nota mas alta de sus intentos',
-  LAST: 'La del ultimo intento',
+  LAST: 'La del último intento',
   FIRST: 'La del primer intento',
   AVERAGE: 'El promedio de sus intentos',
 };
@@ -209,8 +210,34 @@ export default function EvaluacionEditorPage() {
           dirty: false,
         }));
       });
+    /*
+      UNA EVALUACION VACIA ENTRA ESCRIBIENDO (2026-09-09, pedido del cliente).
+
+      Se abria en «Como se califica», que son los ajustes: la nota mínima, los intentos y el tiempo.
+      Es lo ultimo que se decide y lo primero que se veia, asi que recien creada la pantalla pedia
+      configurar un examen que todavia no existe. Ahora nace con la PRIMERA PREGUNTA en blanco y el
+      cursor donde va el enunciado, que es lo unico que se puede querer hacer ahi.
+
+      No se guarda sola: entra sin marcar la pantalla como sucia, y `guardar()` se niega mientras la
+      pregunta este a medias. Si alguien abrio y se fue, no queda nada.
+    */
+    if (cargados.length === 0) {
+      const primera: Paso = {
+        kind: 'Q',
+        localId: nuevoId(),
+        questionId: null,
+        payload: emptyPayload('SINGLE'),
+        categoryId: null,
+        categoryName: null,
+        dirty: false,
+      };
+      setPasos([primera]);
+      setSeleccion({ tipo: 'PASO', localId: primera.localId });
+      setSucio(false);
+      return;
+    }
     setPasos(cargados);
-    setSeleccion(cargados[0] ? { tipo: 'PASO', localId: cargados[0].localId } : { tipo: 'CALIFICA' });
+    setSeleccion({ tipo: 'PASO', localId: cargados[0]!.localId });
     setSucio(false);
   }, [assessmentId]);
 
@@ -239,13 +266,36 @@ export default function EvaluacionEditorPage() {
 
   const volverA = searchParams.get('volverA') ?? '/evaluaciones';
   /*
+    EL ENLACE DE VOLVER DICE A DONDE VUELVE (2026-09-09). Decia siempre «Evaluaciones», y desde
+    que se entra aqui al crear una evaluacion DENTRO de una formacion eso era falso: el enlace
+    llevaba a la formacion y anunciaba la lista.
+  */
+  const volverTexto = volverA.startsWith('/contenido-formativo') ? 'Volver a la formación' : 'Evaluaciones';
+  /*
     SE EDITA SIEMPRE (Decision #87). Ya no hay borrador ni publicacion propias de la evaluacion:
     lo que congela una copia es publicar la FORMACION. Lo unico que no se toca es esa copia, y
     esta pantalla nunca la abre —el listado solo trae las editables—.
   */
   const isDraft = true;
 
-  const preguntas = pasos.filter((p): p is Extract<Paso, { kind: 'Q' }> => p.kind === 'Q');
+  /*
+    LA PREGUNTA EN BLANCO CON LA QUE SE ENTRA NO CUENTA COMO PREGUNTA (2026-09-09).
+
+    Una evaluacion vacia se abre con la primera pregunta ya puesta, para que se entre escribiendo.
+    Pero mientras nadie la haya tocado no es una pregunta: es el papel en blanco. Si contara, pasarian
+    dos cosas y las dos se vieron en la suite — «Guardar» se encenderia en un examen sin nada que
+    guardar, y al añadir la segunda pregunta la vacia se quedaria detras y el guardado se negaria
+    entero por «hay preguntas a medias».
+
+    Se reconoce por lo que es: sin enunciado, sin id en el servidor y sin que nadie la haya tocado.
+    En cuanto se escribe una letra deja de serlo.
+  */
+  const esPapelEnBlanco = (paso: Paso) =>
+    paso.kind === 'Q' && !paso.questionId && !paso.dirty && !(paso.payload.stem ?? '').trim();
+
+  const preguntas = pasos.filter(
+    (p): p is Extract<Paso, { kind: 'Q' }> => p.kind === 'Q' && !esPapelEnBlanco(p),
+  );
   const bloques = pasos.filter((p): p is Extract<Paso, { kind: 'RANDOM' }> => p.kind === 'RANDOM');
   const disponiblesEn = (categoryId: string) =>
     categories.find((categoria) => categoria.id === categoryId)?._count.questions ?? 0;
@@ -279,7 +329,8 @@ export default function EvaluacionEditorPage() {
     setError(null);
     try {
       const resueltos: Paso[] = [];
-      for (const paso of pasos) {
+      // Sin el papel en blanco de la entrada, que no es una pregunta a medias: es una que no existe.
+      for (const paso of pasos.filter((p) => !esPapelEnBlanco(p))) {
         if (paso.kind !== 'Q') {
           if (paso.kind === 'RANDOM') resueltos.push(paso);
           continue; // los PICK sin elegir no se guardan
@@ -361,7 +412,7 @@ export default function EvaluacionEditorPage() {
       setBorrarOpen(false);
       showToast({
         kind: 'danger',
-        title: err instanceof ApiError && err.message ? err.message : 'No se pudo eliminar la evaluacion',
+        title: err instanceof ApiError && err.message ? err.message : 'No se pudo eliminar la evaluación',
       });
     } finally {
       setBusy(false);
@@ -371,7 +422,9 @@ export default function EvaluacionEditorPage() {
   // ─────────────────────────── Agregar pasos ───────────────────────────
 
   const agregar = (paso: Paso) => {
-    tocar([...pasos, paso]);
+    // El papel en blanco de la entrada se va cuando llega algo de verdad: si no, se quedaria detras
+    // y el guardado se negaria por «hay preguntas a medias».
+    tocar([...pasos.filter((p) => !esPapelEnBlanco(p)), paso]);
     setSeleccion({ tipo: 'PASO', localId: paso.localId });
     setAgregarOpen(false);
     setVista('EDITAR');
@@ -451,7 +504,7 @@ export default function EvaluacionEditorPage() {
         key: `${paso.localId}-${i}`,
         qtype: 'SINGLE' as QuestionType,
         stem: `Una pregunta al azar de "${tema}"`,
-        options: [{ id: 'a', text: 'Cada persona recibe una distinta: aqui no se puede adivinar cual.' }],
+        options: [{ id: 'a', text: 'Cada persona recibe una distinta: aquí no se puede adivinar cual.' }],
       }));
     }
     return [];
@@ -464,7 +517,7 @@ export default function EvaluacionEditorPage() {
         className="focus-ring mb-3 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
       >
         <ArrowLeft size={14} />
-        Evaluaciones
+        {volverTexto}
       </Link>
 
       {/* ─────────────── Cabecera ─────────────── */}
@@ -481,67 +534,13 @@ export default function EvaluacionEditorPage() {
           </div>
           <p className="mt-1 text-sm text-ink-500">
             {totalPreguntas === 0
-              ? 'Todavia no tiene preguntas.'
+              ? 'Todavía no tiene preguntas.'
               : `${totalPreguntas} preguntas · ${puntos} puntos en las elegidas`}
             {incompletas > 0 ? ` · ${incompletas} a medias` : ''}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/*
-            VER COMO EL EMPLEADO no es un extra: es la unica forma de comprobar antes de publicar
-            que el examen se entiende. Y usa el MISMO componente que el reproductor real, para que
-            no pueda enseñar algo distinto de lo que va a pasar de verdad.
-          */}
-          {/*
-            CUAL DE LOS DOS MODOS ESTA PUESTO, A LA VISTA (2026-09-09).
-
-            El activo se marcaba con `bg-paper` —el gris del fondo— sobre una caja blanca: dos
-            grises a un punto de distancia. El cliente lo dijo en una linea: *"debe marcarse cual
-            esta seleccionado"*. Ahora el activo va RELLENO, que es como se marca lo seleccionado en
-            todo el producto (pastillas, etapas, escala de puntuacion).
-
-            Y «Vista del empleado» pasa a «Vista del aprendiz»: es la palabra del producto —el rol se
-            llama Usuario final y su espacio, mi aprendizaje— y ademas la correcta, porque quien
-            cursa no siempre es empleado (contratistas, temporales).
-          */}
-          <div
-            role="radiogroup"
-            aria-label="Modo de la pantalla"
-            className="flex items-center rounded-lg bg-paper p-1"
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={vista === 'EDITAR'}
-              onClick={() => setVista('EDITAR')}
-              className={cn(
-                'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors duration-150',
-                vista === 'EDITAR'
-                  ? 'bg-surface font-medium text-ink-900 shadow-card'
-                  : 'text-ink-500 hover:text-ink-900',
-              )}
-            >
-              <Pencil size={14} />
-              Editar
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={vista === 'PREVIA'}
-              onClick={() => setVista('PREVIA')}
-              className={cn(
-                'focus-ring inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors duration-150',
-                vista === 'PREVIA'
-                  ? 'bg-surface font-medium text-ink-900 shadow-card'
-                  : 'text-ink-500 hover:text-ink-900',
-              )}
-            >
-              <Eye size={14} />
-              Vista del aprendiz
-            </button>
-          </div>
-
           {/*
             SOLO GUARDAR. Ya no hay "publicar" aqui: lo que pone una evaluacion en manos de la
             gente es publicar la FORMACION que la lleva, y ese es el momento en que se congela una
@@ -562,20 +561,64 @@ export default function EvaluacionEditorPage() {
         </div>
       </div>
 
+      {/*
+        EL MODO, EN SU PROPIA FILA Y CON SU NOMBRE (2026-09-09, pedido del cliente).
+
+        Estaba pegado a Guardar, y ahí no se leía como lo que es: *«no sé por qué está al lado de
+        Guardar»*. Cambiar de modo no es una acción sobre la evaluación —no guarda, no publica, no
+        borra—: es dónde te pones a mirar. Mezclarlo con los botones obliga a distinguir por el
+        color qué hace cada cosa, y con un solo vistazo eso no se distingue.
+
+        Va en su propia banda, a la izquierda, con el mismo carril gris que las vistas de una ficha:
+        dos posiciones, la marcada rellena con el color de la empresa. Es el mismo lenguaje que el
+        resto del producto, y ya no compite con nada.
+      */}
+      <div
+        role="radiogroup"
+        aria-label="Modo de la pantalla"
+        className="mb-4 inline-flex items-center gap-1 self-start rounded-full border border-line bg-paper p-1 shadow-btn-flat"
+      >
+        {(
+          [
+            ['EDITAR', 'Editar', Pencil],
+            ['PREVIA', 'Vista del aprendiz', Eye],
+          ] as Array<['EDITAR' | 'PREVIA', string, typeof Pencil]>
+        ).map(([clave, rotulo, Icono]) => {
+          const marcado = vista === clave;
+          return (
+            <button
+              key={clave}
+              type="button"
+              role="radio"
+              aria-checked={marcado}
+              onClick={() => setVista(clave)}
+              className={cn(
+                'focus-ring inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm transition-all duration-150 ease-pulse',
+                marcado ? 'font-medium text-white shadow-btn' : 'text-ink-500 hover:bg-surface hover:text-ink-900',
+              )}
+              style={marcado ? { backgroundColor: 'var(--brand-primary)' } : undefined}
+            >
+              <Icono size={15} strokeWidth={marcado ? 2 : 1.75} />
+              {rotulo}
+            </button>
+          );
+        })}
+      </div>
+
       {error ? (
         <p role="alert" className="mb-3 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger">
           {error}
         </p>
       ) : null}
       {assessment.enUso ? (
-        <p className="mb-3 rounded-lg border border-line-strong bg-paper px-4 py-2.5 text-sm text-ink-700">
+        <p className="mb-3 rounded-lg bg-paper px-4 py-2.5 text-sm text-ink-700">
           Esta evaluacion ya esta dentro de formaciones publicadas. Lo que cambies aqui NO toca a quien las esta
           cursando: cada formacion se quedo con una copia congelada al publicarse. Los cambios entran cuando se
           publique una version nueva de esa formacion.
         </p>
       ) : null}
       {sucio ? (
-        <p className="mb-3 rounded-lg border border-line-strong bg-paper px-4 py-2.5 text-sm text-ink-700">
+        <p className="mb-3 rounded-lg bg-paper px-4 py-2.5 text-sm text-ink-700">
           Hay cambios sin guardar. Si sales ahora se pierden.
         </p>
       ) : null}
@@ -591,9 +634,27 @@ export default function EvaluacionEditorPage() {
         <div className="grid flex-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_19rem] lg:items-start">
           {/* ─────────────── RAIL: la secuencia ─────────────── */}
           <nav className="card flex flex-col overflow-hidden lg:sticky lg:top-4 lg:max-h-[calc(100vh-9rem)]">
-            <p className="shrink-0 border-b border-line px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-500">
-              La secuencia
-            </p>
+            {/*
+              LOS TEMAS DEL BANCO, EN LA CABECERA DE LA SECUENCIA (2026-09-09, pedido del cliente).
+
+              Primero fue un enlace de texto bajo el bloque al azar; después, un icono en la cabecera
+              de la pantalla — y ahí acabó *«mezclado con los demás botones, que hay muchos»*: al
+              lado de Guardar y de Eliminar, que son acciones sobre la evaluación. Administrar los
+              temas no lo es: es una herramienta del BANCO, que es de donde salen las preguntas de
+              esta columna. Aquí está a un palmo de donde se usa y no compite con nada.
+            */}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">La secuencia</p>
+              <button
+                type="button"
+                onClick={() => setTemasAbierto(true)}
+                aria-label="Temas del banco"
+                title="Temas del banco"
+                className="focus-ring flex h-7 w-7 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+              >
+                <Tags size={15} />
+              </button>
+            </div>
 
             <ol className="scroll-hidden min-h-0 flex-1 overflow-y-auto p-2">
               {pasos.length === 0 ? (
@@ -816,7 +877,6 @@ export default function EvaluacionEditorPage() {
                 onChange={(cambio) =>
                   tocar(pasos.map((p) => (p.localId === pasoActivo.localId ? { ...pasoActivo, ...cambio } : p)))
                 }
-                onAdministrarTemas={() => setTemasAbierto(true)}
               />
             ) : (
               <QuestionCanvas
@@ -826,17 +886,6 @@ export default function EvaluacionEditorPage() {
               />
             )}
           </div>
-
-          {/*
-            EL GESTOR DE TEMAS, montado una vez para toda la pantalla: se abre desde el campo Tema de
-            una pregunta y desde el bloque al azar, que son los dos sitios donde un tema significa algo.
-          */}
-          <AdministrarTemas
-            open={temasAbierto}
-            onOpenChange={setTemasAbierto}
-            categories={categories}
-            onCambio={recargarTemas}
-          />
 
           {/* ─────────────── AJUSTES DE LA PREGUNTA ─────────────── */}
           {pasoActivo?.kind === 'Q' ? (
@@ -894,6 +943,17 @@ export default function EvaluacionEditorPage() {
           casos se dira cual de las dos cosas lo impide.
         </p>
       </Drawer>
+      {/*
+        EL GESTOR DE TEMAS, montado para TODA la pantalla y no dentro de la vista de editar: se
+        abre con el icono de la cabecera, que esta siempre — antes vivia dentro del bloque al azar
+        y solo existia si ese bloque era el paso activo.
+      */}
+      <AdministrarTemas
+        open={temasAbierto}
+        onOpenChange={setTemasAbierto}
+        categories={categories}
+        onCambio={recargarTemas}
+      />
     </div>
   );
 }
@@ -1053,8 +1113,8 @@ function AjustesPregunta({
         campos para encontrar cual es el que falta.
       */}
       {falta.length > 0 ? (
-        <div className="mb-4 rounded-lg border border-warn bg-warn-soft px-3 py-2.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-warn">Falta esto</p>
+        <div className="mb-4 rounded-lg bg-paper px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Falta esto</p>
           <ul className="mt-1 space-y-0.5">
             {falta.map((linea) => (
               <li key={linea} className="text-sm text-ink-700">
@@ -1066,21 +1126,26 @@ function AjustesPregunta({
       ) : null}
 
       <div className="space-y-4">
+        {/*
+          LOS DOS SELECTORES DE ESTE PANEL SON `Combo`, NO `<select>` (2026-09-09, pedido del
+          cliente: *«nada genérico, como el normal de la ficha»*). El desplegable nativo lo pinta el
+          sistema operativo: ni respeta el tipo de letra del producto, ni el radio, ni el color de la
+          marca, y en Windows sale gris con una flecha azul. Con nueve tipos de pregunta y una lista
+          de temas que crece, además, `Combo` trae su buscador solo cuando hace falta.
+        */}
         <Field htmlFor="ap-tipo" label="Tipo de pregunta" hint={QTYPE_HINT[paso.payload.qtype]}>
-          <Select
+          <Combo
             id="ap-tipo"
             value={paso.payload.qtype}
             disabled={disabled}
-            onChange={(event) => cambiarTipo(event.target.value as QuestionType)}
-          >
-            {(Object.keys(QTYPE_LABEL) as QuestionType[]).map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {QTYPE_LABEL[tipo]}
-              </option>
-            ))}
-          </Select>
+            options={(Object.keys(QTYPE_LABEL) as QuestionType[]).map((tipo) => ({
+              id: tipo,
+              label: QTYPE_LABEL[tipo],
+              meta: QTYPE_HINT[tipo],
+            }))}
+            onChange={(id) => cambiarTipo(id as QuestionType)}
+          />
         </Field>
-
         <Field htmlFor="ap-puntos" label="Puntaje">
           <Input
             id="ap-puntos"
@@ -1133,26 +1198,29 @@ function AjustesPregunta({
               </Button>
             </div>
           ) : (
-            <Select
+            <Combo
               id="ap-tema"
               value={paso.categoryId ?? ''}
               disabled={disabled}
-              onChange={(event) => {
-                if (event.target.value === '__nuevo__') {
+              placeholder="Sin tema"
+              searchPlaceholder="Buscar un tema..."
+              options={[
+                { id: '', label: 'Sin tema', meta: 'No entra en ningún bloque al azar' },
+                ...categories.map((categoria) => ({
+                  id: categoria.id,
+                  label: categoria.name,
+                  meta: `${categoria._count.questions} ${categoria._count.questions === 1 ? 'pregunta' : 'preguntas'}`,
+                })),
+                { id: '__nuevo__', label: '+ Tema nuevo...', meta: 'Se crea escribiendo su nombre' },
+              ]}
+              onChange={(id) => {
+                if (id === '__nuevo__') {
                   setCreandoTema(true);
                   return;
                 }
-                void onTema(event.target.value || null);
+                void onTema(id || null);
               }}
-            >
-              <option value="">Sin tema</option>
-              {categories.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.name}
-                </option>
-              ))}
-              <option value="__nuevo__">+ Tema nuevo...</option>
-            </Select>
+            />
           )}
         </Field>
 
@@ -1206,13 +1274,11 @@ function BloqueAlAzar({
   categories,
   disabled,
   onChange,
-  onAdministrarTemas,
 }: {
   bloque: Extract<Paso, { kind: 'RANDOM' }>;
   categories: QuestionCategory[];
   disabled: boolean;
   onChange: (cambio: Partial<Extract<Paso, { kind: 'RANDOM' }>>) => void;
-  onAdministrarTemas: () => void;
 }) {
   const disponibles = categories.find((c) => c.id === bloque.categoryId)?._count.questions ?? 0;
   const corto = bloque.pickCount > disponibles;
@@ -1240,18 +1306,18 @@ function BloqueAlAzar({
           label="Del tema"
           ayuda="Un tema es una etiqueta que se le pone a las preguntas: no cambia la pregunta ni sale en el examen. Sirve justo para esto — que el bloque pueda decir «saca 10 de este montón». El número entre paréntesis es cuántas preguntas hay etiquetadas con él."
         >
-          <Select
+          <Combo
             id="ba-tema"
             value={bloque.categoryId}
             disabled={disabled}
-            onChange={(event) => onChange({ categoryId: event.target.value })}
-          >
-            {categories.map((categoria) => (
-              <option key={categoria.id} value={categoria.id}>
-                {categoria.name} ({categoria._count.questions})
-              </option>
-            ))}
-          </Select>
+            searchPlaceholder="Buscar un tema..."
+            options={categories.map((categoria) => ({
+              id: categoria.id,
+              label: categoria.name,
+              meta: `${categoria._count.questions} ${categoria._count.questions === 1 ? 'pregunta' : 'preguntas'}`,
+            }))}
+            onChange={(id) => onChange({ categoryId: id })}
+          />
         </Field>
         <Field htmlFor="ba-cuantas" label="Cuantas">
           <Input
@@ -1276,21 +1342,6 @@ function BloqueAlAzar({
           ? `Solo hay ${disponibles} preguntas en ese tema: no alcanza y no se podra publicar.`
           : `Hay ${disponibles} preguntas en ese tema. Cada persona recibira ${bloque.pickCount}, distintas entre si.`}
       </p>
-
-      {/*
-        LA SALIDA CUANDO EL TEMA NO ES EL QUE HACE FALTA (2026-09-09).
-
-        Aqui es donde se descubre que el tema esta mal escrito, que sobra o que falta uno — y hasta
-        hoy no habia por donde arreglarlo sin salirse de la evaluacion. El boton no compite con nada:
-        va debajo del aviso, en texto, porque es la excepcion y no el camino.
-      */}
-      <button
-        type="button"
-        className="focus-ring mt-3 rounded-md text-sm text-ink-500 underline underline-offset-2 hover:text-ink-900"
-        onClick={onAdministrarTemas}
-      >
-        Crear, renombrar o borrar temas
-      </button>
     </div>
   );
 }
@@ -1348,14 +1399,22 @@ function ElegirDelBanco({
             aria-label="Buscar en el banco"
           />
         </div>
-        <Select value={categoria} onChange={(event) => onCategoria(event.target.value)} className="w-52">
-          <option value="">Todos los temas</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c._count.questions})
-            </option>
-          ))}
-        </Select>
+        <div className="w-52 shrink-0">
+          <Combo
+            value={categoria}
+            onChange={onCategoria}
+            placeholder="Todos los temas"
+            searchPlaceholder="Buscar un tema..."
+            options={[
+              { id: '', label: 'Todos los temas' },
+              ...categories.map((c) => ({
+                id: c.id,
+                label: c.name,
+                meta: `${c._count.questions} ${c._count.questions === 1 ? 'pregunta' : 'preguntas'}`,
+              })),
+            ]}
+          />
+        </div>
       </div>
 
       {!banco ? (
@@ -1365,7 +1424,7 @@ function ElegirDelBanco({
         </div>
       ) : disponibles.length === 0 ? (
         <p className="mt-8 text-center text-sm text-ink-500">
-          {query.trim() ? `Ninguna coincide con "${query.trim()}".` : 'No hay preguntas que traer todavia.'}
+          {query.trim() ? `Ninguna coincide con "${query.trim()}".` : 'No hay preguntas que traer todavía.'}
         </p>
       ) : (
         <ul className="mt-5 space-y-2">
@@ -1384,7 +1443,7 @@ function ElegirDelBanco({
                 >
                   <p className="text-sm text-ink-900">{pregunta.stem}</p>
                   <p className="mt-1 text-xs text-ink-500">
-                    {pregunta.qtype ? QTYPE_LABEL[pregunta.qtype] : 'Sin version'} · {pregunta.points}{' '}
+                    {pregunta.qtype ? QTYPE_LABEL[pregunta.qtype] : 'Sin versión'} · {pregunta.points}{' '}
                     {pregunta.points === 1 ? 'punto' : 'puntos'}
                     {pregunta.categoryName ? ` · ${pregunta.categoryName}` : ' · sin tema'}
                   </p>
@@ -1445,10 +1504,23 @@ function ComoSeCalifica({
       <p className="mt-1 text-sm text-ink-500">Lo que decide si alguien aprueba y cuantas veces puede intentarlo.</p>
 
       <div className="mt-7 space-y-5">
+        {/*
+          LA HERENCIA, A LA VISTA (2026-09-09, decidido con el cliente).
+
+          Estos dos numeros se piden en DOS sitios —aqui y en «Reglas de la versión» de la ficha— y
+          el cliente preguntó, con razón, cuál manda. No son redundantes: son una CASCADA de tres
+          pisos —empresa → formación → examen— y el vacío significa «lo que diga el piso de arriba».
+          Lo que fallaba era que eso no se veía: una caja vacía no dice con qué nota se aprueba.
+
+          Ahora el hueco del campo lleva el número que se aplicaría, y el rótulo dice para qué sirve
+          rellenarlo: **solo para exigir MÁS** que la formación —un piso legal, tipo «alturas siempre
+          90 %»—. Se enseña el de la EMPRESA y no el de la formación porque una evaluación puede
+          estar en varias, cada una con su nota: el de la empresa es el único que siempre es cierto.
+        */}
         <Field
           htmlFor="cc-score"
           label="Nota mínima (%)"
-          hint="Vacio = la que tenga la formación. Ponla solo si esta evaluación debe exigir mas."
+          ayuda="Déjalo vacío y se aplica la nota de cada formación que use esta evaluación —que nace de la de la empresa—. Ponle un número solo si ESTE examen tiene que exigir más que la formación, como un piso legal."
         >
           <Input
             id="cc-score"
@@ -1456,22 +1528,15 @@ function ComoSeCalifica({
             min={1}
             max={100}
             disabled={disabled}
+            placeholder={`${assessment.heredado.passingScore} (de la empresa)`}
             value={assessment.passingScore ?? ''}
             onChange={(event) => onChange({ passingScore: event.target.value ? Number(event.target.value) : null })}
           />
         </Field>
-        {/*
-          LOS TRES CAMPOS DE ARRIBA HEREDAN, y el vacio no es "sin limite": es "lo que diga la
-          formacion". La cadena real es `evaluacion ?? formacion`, y la formacion a su vez nace
-          del valor por defecto del tenant. Decirlo aqui importa porque el numero se puede poner
-          en dos sitios y desde este no se ve el otro: dejarlo vacio es lo NORMAL, y poner un
-          numero solo tiene sentido cuando esta evaluacion tiene que ser mas estricta que la
-          formacion que la use —un piso legal, tipo "alturas siempre 90%"—.
-        */}
         <Field
           htmlFor="cc-attempts"
           label="Intentos maximos"
-          ayuda="Vacio = los que tenga la formación. Al agotarlos, la formación queda bloqueada y se avisa."
+          ayuda="Cuántas veces puede presentar el examen la misma persona. Al agotarlos, la formación queda bloqueada y se avisa. Vacío = los que diga la formación."
         >
           <Input
             id="cc-attempts"
@@ -1479,6 +1544,7 @@ function ComoSeCalifica({
             min={1}
             max={10}
             disabled={disabled}
+            placeholder={`${assessment.heredado.maxAttempts} (de la empresa)`}
             value={assessment.maxAttempts ?? ''}
             onChange={(event) => onChange({ maxAttempts: event.target.value ? Number(event.target.value) : null })}
           />
@@ -1495,18 +1561,16 @@ function ComoSeCalifica({
           />
         </Field>
         <Field htmlFor="cc-policy" label="Con varios intentos, cuenta">
-          <Select
+          <Combo
             id="cc-policy"
             value={assessment.gradingPolicy}
             disabled={disabled}
-            onChange={(event) => onChange({ gradingPolicy: event.target.value as AssessmentDetail['gradingPolicy'] })}
-          >
-            {(Object.keys(POLITICA_NOTA) as Array<AssessmentDetail['gradingPolicy']>).map((clave) => (
-              <option key={clave} value={clave}>
-                {POLITICA_NOTA[clave]}
-              </option>
-            ))}
-          </Select>
+            options={(Object.keys(POLITICA_NOTA) as Array<AssessmentDetail['gradingPolicy']>).map((clave) => ({
+              id: clave,
+              label: POLITICA_NOTA[clave],
+            }))}
+            onChange={(id) => onChange({ gradingPolicy: id as AssessmentDetail['gradingPolicy'] })}
+          />
         </Field>
 
         <div className="space-y-2 border-t border-line pt-5">

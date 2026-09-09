@@ -98,7 +98,7 @@ export default function PlataformaPage() {
               <ShieldCheck className="h-5 w-5" strokeWidth={1.75} />
             </span>
             <div className="min-w-0">
-              <p className="truncate font-display text-base font-bold leading-tight text-ink-900">NEO PULSE</p>
+              <p className="truncate font-display text-base font-bold leading-tight text-ink-900">Ascent</p>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">Plataforma</p>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function PlataformaPage() {
             <Skeleton className="h-40 w-full" />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field htmlFor="ps-name" label="Como te presentas" hint="Ej.: Soporte NEO PULSE.">
+              <Field htmlFor="ps-name" label="Como te presentas" hint="Ej.: Soporte Ascent.">
                 <Input
                   id="ps-name"
                   maxLength={120}
@@ -173,7 +173,7 @@ export default function PlataformaPage() {
         </section>
 
         <p className="mt-6 text-sm leading-relaxed text-ink-500">
-          Cuando un cliente configura su propio contacto en Configuracion, el suyo manda y esto deja
+          Cuando un cliente configura su propio contacto en Configuración, el suyo manda y esto deja
           de verse en esa empresa. Es lo deseable: quien puede restablecer una contraseña de verdad
           es quien administra alli.
         </p>

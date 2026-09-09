@@ -132,8 +132,8 @@ export default function AprobacionesPage() {
             title={tab === 'PENDING' ? 'Sin solicitudes pendientes' : 'Sin solicitudes'}
             description={
               tab === 'PENDING'
-                ? 'Cuando un analista proponga un cambio sobre contenido publicado, aparecera aqui.'
-                : 'Todavia no hay solicitudes registradas en esta vista.'
+                ? 'Cuando un analista proponga un cambio sobre contenido publicado, aparecera aquí.'
+                : 'Todavía no hay solicitudes registradas en esta vista.'
             }
           />
         </div>

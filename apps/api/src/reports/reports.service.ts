@@ -553,6 +553,174 @@ export class ReportsService {
   }
 
   /**
+   * LA EVOLUCION EN EL TIEMPO (2026-09-09).
+   *
+   * ─── LA PREGUNTA QUE NINGUN INFORME CONTESTABA ───
+   *
+   * Todo lo que hay —seguimiento, analitica, vencimientos— es una FOTO DE HOY. Sirve para «¿como
+   * vamos?» y no sirve para «¿vamos mejor que en enero?», que es la que se hace en el comite
+   * mensual y la que decide si lo que se hizo funciono.
+   *
+   * ─── QUE SE MIDE, EXACTAMENTE, Y QUE NO ───
+   *
+   * Cada mes cuenta **las obligaciones que VENCIAN en ese mes** y cuantas de ellas se cumplieron.
+   * No es un historico del indicador: nadie guardo cual era el porcentaje el 1 de marzo, y
+   * reconstruirlo seria inventarlo. Es la pregunta de al lado, y es la util: «de lo que habia que
+   * hacer en marzo, ¿cuanto se hizo?».
+   *
+   * **Y se separa lo cumplido A TIEMPO de lo cumplido tarde.** Las dos cosas son cumplimiento, pero
+   * solo la primera es cumplimiento del PLAZO — y en una auditoria esa distincion es justo la que
+   * preguntan. Juntarlas deja un numero mas bonito y menos cierto.
+   *
+   * Un mes SIN obligaciones que venzan sale con `pct: null` y no con cero: no haber tenido nada que
+   * hacer no es haberlo hecho mal, y pintarlo como cero dibuja un valle que no existio.
+   */
+  async evolucion(year: number) {
+    const desde = new Date(Date.UTC(year, 0, 1));
+    const hasta = new Date(Date.UTC(year + 1, 0, 1));
+
+    const asignaciones = await this.prisma.scoped.assignment.findMany({
+      where: {
+        targetType: 'ACTIVITY',
+        user: { active: true, deletedAt: null },
+        status: { notIn: [...ESTADOS_RETIRADOS] },
+        dueAt: { gte: desde, lt: hasta },
+      },
+      select: { dueAt: true, completedAt: true, status: true },
+    });
+
+    const meses = Array.from({ length: 12 }, (_, indice) => {
+      const delMes = asignaciones.filter((fila) => fila.dueAt && fila.dueAt.getUTCMonth() === indice);
+      const cumplidas = delMes.filter((fila) => fila.completedAt !== null);
+      const aTiempo = cumplidas.filter((fila) => fila.dueAt && fila.completedAt! <= fila.dueAt);
+      return {
+        mes: indice + 1,
+        vencian: delMes.length,
+        cumplidas: cumplidas.length,
+        aTiempo: aTiempo.length,
+        /** Porcentaje de lo que vencia ese mes que se cumplio. `null` = ese mes no vencia nada. */
+        pct: delMes.length === 0 ? null : Math.round((cumplidas.length / delMes.length) * 100),
+      };
+    });
+
+    const vencian = asignaciones.length;
+    const cumplidas = asignaciones.filter((fila) => fila.completedAt !== null).length;
+    return {
+      year,
+      meses,
+      resumen: {
+        vencian,
+        cumplidas,
+        aTiempo: asignaciones.filter((fila) => fila.completedAt !== null && fila.dueAt && fila.completedAt <= fila.dueAt)
+          .length,
+        pct: vencian === 0 ? null : Math.round((cumplidas / vencian) * 100),
+      },
+    };
+  }
+
+  /**
+   * EN QUE FALLA LA GENTE (2026-09-09).
+   *
+   * ─── LA PREGUNTA QUE FALTABA ───
+   *
+   * Los informes dicen cuantos aprobaron. Ninguno dice **que fallaron**, que es lo unico de todo
+   * esto que se convierte directamente en una formacion: «el 68 % falla lo de alturas» es un
+   * renglon del plan; «el 91 % aprobo» no es nada que hacer.
+   *
+   * ─── COMO SE CUENTA, Y QUE SE DEJA FUERA ───
+   *
+   * Por PUNTOS y no por preguntas acertadas: una pregunta de cinco puntos y una de uno no pesan
+   * igual en el examen, y contarlas iguales aqui diria algo distinto de lo que dijo la nota.
+   *
+   * - **Lo anulado no cuenta.** Una pregunta anulada y recalificada no mide conocimiento, mide que
+   *   la pregunta estaba mal.
+   * - **Lo no calificado tampoco.** Una abierta esperando a que alguien la lea no es un cero: es
+   *   una respuesta que todavia no se ha mirado.
+   * - **Las preguntas sin tema salen aparte, no se reparten.** Son la mayoria al principio —el tema
+   *   es opcional (#84)— y esconderlas daria un cuadro falso de cobertura.
+   *
+   * ─── EL COSTE ───
+   *
+   * Se agrupa en la BASE (`groupBy` por version de pregunta) y no en memoria: con 900 personas y
+   * diez preguntas por examen, traerse las respuestas una a una serian decenas de miles de filas
+   * para calcular veinte promedios.
+   */
+  async conocimiento() {
+    const porVersion = await this.prisma.scoped.attemptQuestion.groupBy({
+      by: ['questionVersionId'],
+      where: { invalidated: false, pointsAwarded: { not: null } },
+      _sum: { pointsPossible: true, pointsAwarded: true },
+      _count: { _all: true },
+    });
+    if (porVersion.length === 0) return { porTema: [], peoresPreguntas: [] };
+
+    const versiones = await this.prisma.scoped.questionVersion.findMany({
+      where: { id: { in: porVersion.map((fila) => fila.questionVersionId) } },
+      select: {
+        id: true,
+        stem: true,
+        question: { select: { category: { select: { id: true, name: true } } } },
+      },
+    });
+    const datosDe = new Map(versiones.map((version) => [version.id, version]));
+
+    const filas = porVersion.map((fila) => {
+      const version = datosDe.get(fila.questionVersionId);
+      const posibles = Number(fila._sum.pointsPossible ?? 0);
+      const obtenidos = Number(fila._sum.pointsAwarded ?? 0);
+      return {
+        questionVersionId: fila.questionVersionId,
+        stem: version?.stem ?? '',
+        categoryId: version?.question.category?.id ?? null,
+        categoryName: version?.question.category?.name ?? null,
+        respuestas: fila._count._all,
+        posibles,
+        obtenidos,
+        aciertoPct: posibles === 0 ? null : Math.round((obtenidos / posibles) * 100),
+      };
+    });
+
+    const temas = [...new Set(filas.map((fila) => fila.categoryId))].map((categoryId) => {
+      const suyas = filas.filter((fila) => fila.categoryId === categoryId);
+      const posibles = suyas.reduce((suma, fila) => suma + fila.posibles, 0);
+      const obtenidos = suyas.reduce((suma, fila) => suma + fila.obtenidos, 0);
+      return {
+        categoryId,
+        name: suyas[0]?.categoryName ?? 'Sin tema',
+        preguntas: suyas.length,
+        respuestas: suyas.reduce((suma, fila) => suma + fila.respuestas, 0),
+        aciertoPct: posibles === 0 ? null : Math.round((obtenidos / posibles) * 100),
+      };
+    });
+
+    /*
+      LAS PREGUNTAS MAS FALLADAS, con un SUELO de cinco respuestas.
+      Sin ese suelo, la peor pregunta del informe seria siempre una que contesto una sola persona
+      —un 0 % sobre una respuesta— y el informe mandaria a formar a toda la empresa por eso.
+
+      Y la lectura de esta lista es doble, por eso va con su numero de respuestas al lado: una
+      pregunta que falla casi todo el mundo o no se enseño, o esta mal redactada. Las dos cosas hay
+      que arreglarlas, en sitios distintos.
+    */
+    const peoresPreguntas = filas
+      .filter((fila) => fila.respuestas >= 5 && fila.aciertoPct !== null)
+      .sort((a, b) => (a.aciertoPct ?? 100) - (b.aciertoPct ?? 100))
+      .slice(0, 8)
+      .map((fila) => ({
+        questionVersionId: fila.questionVersionId,
+        stem: fila.stem,
+        categoryName: fila.categoryName,
+        respuestas: fila.respuestas,
+        aciertoPct: fila.aciertoPct,
+      }));
+
+    return {
+      porTema: temas.sort((a, b) => (a.aciertoPct ?? 100) - (b.aciertoPct ?? 100)),
+      peoresPreguntas,
+    };
+  }
+
+  /**
    * QUE SE VENCE EN LOS PROXIMOS N MESES, persona por persona (Decision #126; eje y fuentes
    * corregidos el 2026-09-08, `PENDIENTES` 3.1 y 3.2).
    *
@@ -764,7 +932,7 @@ export class ReportsService {
       where: { id: this.prisma.currentTenantId },
       select: { name: true },
     });
-    return tenant?.name ?? 'NEO PULSE';
+    return tenant?.name ?? 'Ascent';
   }
 
   async ejecucionGeneralXlsx(estado: EstadoEjecucion | null): Promise<Buffer> {

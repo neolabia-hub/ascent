@@ -8,6 +8,7 @@ import type { AuthUser } from '../common/types.js';
 import { libroDeConsolidado } from './performance-xlsx.js';
 import {
   calcularNota,
+  notaDeRespuesta,
   planificarEvaluaciones,
   problemasDeReparto,
   repartirFormularios,
@@ -265,8 +266,24 @@ export class PerformanceService {
 
   // ─────────────────────────────  CICLOS  ─────────────────────────────
 
-  listCycles() {
-    return this.prisma.scoped.performanceCycle.findMany({
+  /**
+   * LAS CAMPAÑAS, CON SUS CIFRAS DENTRO (2026-09-09).
+   *
+   * Antes devolvia solo `_count.reviews` —cuantas evaluaciones se generaron— y las cifras que de
+   * verdad se miran —cuantas se entregaron y con que promedio— vivian **solo** dentro del
+   * consolidado, detras de un boton. El cliente lo dijo asi: *«ya se ejecuto, pero donde se ve
+   * seguimiento, datos, metricas»*. Estaban; no estaban A LA VISTA, que para el que mira es lo
+   * mismo que no estar.
+   *
+   * Se cuentan con `resumirEvaluaciones`, el MISMO metodo del consolidado y del Excel: tres sitios
+   * que dicen cuantas van entregadas tienen que decir el mismo numero, y la unica forma de
+   * garantizarlo es que lo calcule uno solo.
+   *
+   * El coste es una consulta agregada por campaña, no traerse las evaluaciones: con 900 personas,
+   * cargar la lista de ciclos no puede significar cargar 900 filas por cada una.
+   */
+  async listCycles() {
+    const cycles = await this.prisma.scoped.performanceCycle.findMany({
       orderBy: { startsAt: 'desc' },
       include: {
         forms: {
@@ -276,6 +293,17 @@ export class PerformanceService {
         _count: { select: { reviews: true } },
       },
     });
+    if (cycles.length === 0) return [];
+
+    const reviews = await this.prisma.scoped.performanceReview.findMany({
+      where: { cycleId: { in: cycles.map((cycle) => cycle.id) } },
+      select: { cycleId: true, status: true, score: true, signedAt: true },
+    });
+
+    return cycles.map((cycle) => ({
+      ...cycle,
+      cifras: resumirEvaluaciones(reviews.filter((review) => review.cycleId === cycle.id)),
+    }));
   }
 
   /**
@@ -778,12 +806,39 @@ export class PerformanceService {
   }
 
   /**
-   * El consolidado de un ciclo, para quien lo gestiona.
+   * EL RESULTADO DE LA CAMPAÑA: seguimiento Y analisis (2026-09-09).
    *
-   * Va ENTERO y POR FORMULARIO (Decision #139). Tener el de conductores y el de analistas en la
-   * misma campaña existe justamente para poder mirar las dos cosas: la campaña completa, y cada
-   * grupo por separado sin sumar a mano. La nota se puede promediar entre formularios distintos
-   * porque esta normalizada a 100 — un 4 sobre 5 y un "cumple" valen 80 y 100 en las dos.
+   * ─── LO QUE FALTABA, Y POR QUE IMPORTA ───
+   *
+   * Esto contestaba solo «cuantas van entregadas y con que promedio», que es seguimiento de la
+   * campaña. El cliente pidio la otra mitad: *«un resultado por competencia... por cargo, area, los
+   * diferentes analisis que se puedan sacar, que la informacion le sirva para tomar decisiones...
+   * para el plan»*. Y tiene razon en el orden: sin eso la campaña se cierra, se archiva el Excel, y
+   * en enero nadie sabe que formacion pedir — que es justo la costura que este modulo existe para
+   * coser (`PerformanceCompetency.suggestedActivityId`).
+   *
+   * ─── LOS TRES CORTES, Y QUE PREGUNTA CONTESTA CADA UNO ───
+   *
+   *   porCompetencia   «¿en QUE estamos flojos?»          -> que formacion hace falta
+   *   porArea          «¿DONDE?»                          -> a que area llevarla
+   *   porCargo         «¿a QUIEN?»                        -> con que formulario y a que cargo
+   *
+   * Y dentro de cada competencia, su propio corte por area y por cargo: la media de la empresa
+   * esconde justo lo que se necesita saber. «Seguridad vial: 71 %» no dice nada; «Seguridad vial:
+   * 71 %, y en Logistica 52 %» dice a quien hay que formar primero.
+   *
+   * ─── LAS REGLAS DEL CALCULO, QUE NO SON NEUTRALES ───
+   *
+   * - Cada respuesta se lleva a **su porcentaje de escala** antes de promediar, igual que
+   *   `calcularNota`: un 4 de 5 vale 80 y un «cumple» vale 100. Promediar los numeros crudos haria
+   *   que una competencia de si/no hundiera a las de 1 a 5.
+   * - **Solo cuentan las evaluaciones ENTREGADAS.** Una a medio llenar todavia no es una opinion.
+   * - **Lo que dijo el jefe y lo que dijo la persona van separados.** Es el analisis que se usa en
+   *   la reunion: donde el jefe puntua por debajo de la autoevaluacion hay una conversacion
+   *   pendiente; donde puntua por encima, alguien que se subestima. Mezclarlos borra las dos.
+   * - Las competencias de **solo texto no tienen nota**: salen con `promedio: null`, no con cero.
+   * - Todo se ordena **de lo mas flojo a lo mas fuerte**, porque la lista se lee para decidir en
+   *   que reforzar, y lo que hay que decidir va primero.
    */
   async cycleSummary(id: string) {
     const cycle = await this.prisma.scoped.performanceCycle.findUnique({
@@ -801,6 +856,73 @@ export class PerformanceService {
       where: { cycleId: id },
       orderBy: { createdAt: 'asc' },
     });
+    const items = await this.conNombres(reviews);
+    const entregadas = items.filter((review) => review.status === 'SUBMITTED');
+
+    const respuestas = entregadas.length
+      ? await this.prisma.scoped.performanceAnswer.findMany({
+          where: { reviewId: { in: entregadas.map((review) => review.id) } },
+          select: { reviewId: true, competencyId: true, competencyName: true, value: true },
+        })
+      : [];
+
+    const competencias = respuestas.length
+      ? await this.prisma.scoped.performanceCompetency.findMany({
+          where: { id: { in: [...new Set(respuestas.map((fila) => fila.competencyId))] } },
+          select: {
+            id: true,
+            scale: true,
+            displayOrder: true,
+            suggestedActivity: { select: { id: true, name: true } },
+          },
+        })
+      : [];
+    const porId = new Map(competencias.map((competencia) => [competencia.id, competencia]));
+    /** De la respuesta a su evaluacion: de ahi salen el rol, el area y el cargo de quien fue evaluado. */
+    const evaluacionDe = new Map(entregadas.map((review) => [review.id, review]));
+
+    const porCompetencia = [...new Set(respuestas.map((fila) => fila.competencyId))]
+      .map((competencyId) => {
+        const suyas = respuestas.filter((fila) => fila.competencyId === competencyId);
+        const escala = (porId.get(competencyId)?.scale ?? 'ONE_TO_FIVE') as EscalaCompetencia;
+        const media = (filas: typeof suyas) => promediarRespuestas(escala, filas);
+        const cortar = (campo: 'subjectArea' | 'subjectJobTitle') =>
+          [...new Set(suyas.map((fila) => evaluacionDe.get(fila.reviewId)?.[campo] ?? null))]
+            .filter((nombre): nombre is string => Boolean(nombre))
+            .map((nombre) => ({
+              nombre,
+              promedio: media(suyas.filter((fila) => evaluacionDe.get(fila.reviewId)?.[campo] === nombre)),
+            }))
+            .filter((corte) => corte.promedio !== null)
+            .sort((a, b) => (a.promedio ?? 0) - (b.promedio ?? 0));
+
+        return {
+          competencyId,
+          name: suyas[0]?.competencyName ?? '',
+          escala,
+          respuestas: suyas.filter((fila) => fila.value !== null).length,
+          promedio: media(suyas),
+          promedioJefe: media(
+            suyas.filter((fila) => evaluacionDe.get(fila.reviewId)?.reviewerRole === 'MANAGER'),
+          ),
+          promedioAuto: media(suyas.filter((fila) => evaluacionDe.get(fila.reviewId)?.reviewerRole === 'SELF')),
+          /** QUE FORMACION LA REFUERZA: es la costura hacia el plan del año siguiente. */
+          formacion: porId.get(competencyId)?.suggestedActivity ?? null,
+          porArea: cortar('subjectArea'),
+          porCargo: cortar('subjectJobTitle'),
+          displayOrder: porId.get(competencyId)?.displayOrder ?? 0,
+        };
+      })
+      .sort(ordenarPorPromedio);
+
+    const agrupar = (campo: 'subjectArea' | 'subjectJobTitle') =>
+      [...new Set(items.map((review) => review[campo] ?? null))]
+        .filter((nombre): nombre is string => Boolean(nombre))
+        .map((nombre) => ({
+          nombre,
+          ...resumirEvaluaciones(items.filter((review) => review[campo] === nombre)),
+        }))
+        .sort(ordenarPorPromedio);
 
     return {
       cycle,
@@ -810,7 +932,10 @@ export class PerformanceService {
         name: cycleForm.form.name,
         ...resumirEvaluaciones(reviews.filter((review) => review.cycleFormId === cycleForm.id)),
       })),
-      items: await this.conNombres(reviews),
+      porCompetencia,
+      porArea: agrupar('subjectArea'),
+      porCargo: agrupar('subjectJobTitle'),
+      items,
     };
   }
 
@@ -835,7 +960,7 @@ export class PerformanceService {
 
     const archivo = await libroDeConsolidado(
       {
-        empresa: tenant?.name ?? 'NEO PULSE',
+        empresa: tenant?.name ?? 'Ascent',
         cicloNombre: datos.cycle.name,
         generadoEn: new Date(),
         abre: datos.cycle.startsAt,
@@ -914,4 +1039,33 @@ function resumirEvaluaciones(reviews: { status: string; score: Prisma.Decimal | 
         ? null
         : Math.round((conNota.reduce((suma, review) => suma + Number(review.score), 0) / conNota.length) * 10) / 10,
   };
+}
+
+/**
+ * EL PROMEDIO DE UN MONTON DE RESPUESTAS DE LA MISMA COMPETENCIA, en porcentaje de su escala.
+ *
+ * Comparte regla con `calcularNota` y por eso vive al lado: lo que no se respondio **no cuenta como
+ * cero** —se sale del promedio y del denominador—, y una competencia de solo texto no tiene nota.
+ * Si las dos funciones divergieran, la nota de una persona y el promedio de su competencia dirian
+ * cosas distintas sobre los mismos numeros.
+ */
+function promediarRespuestas(escala: EscalaCompetencia, filas: { value: number | null }[]): number | null {
+  const notas = filas
+    .map((fila) => notaDeRespuesta(escala, fila.value))
+    .filter((nota): nota is number => nota !== null);
+  if (notas.length === 0) return null;
+  return Math.round((notas.reduce((suma, nota) => suma + nota, 0) / notas.length) * 10) / 10;
+}
+
+/**
+ * DE LO MAS FLOJO A LO MAS FUERTE, y lo que no tiene nota al final.
+ *
+ * Es el orden de una lista que se lee para DECIDIR: lo que hay que reforzar primero, primero. Lo
+ * que no tiene nota —solo texto, o nadie respondio— no compite en un orden que no tiene, y ponerlo
+ * arriba como si fuera un cero seria acusar de algo que nadie evaluo.
+ */
+function ordenarPorPromedio(a: { promedio: number | null }, b: { promedio: number | null }): number {
+  if (a.promedio === null) return b.promedio === null ? 0 : 1;
+  if (b.promedio === null) return -1;
+  return a.promedio - b.promedio;
 }

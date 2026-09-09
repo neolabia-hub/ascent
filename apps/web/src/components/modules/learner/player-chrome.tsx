@@ -177,7 +177,7 @@ function PlayerRail() {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        aria-label={expanded ? 'Plegar el menu' : 'Desplegar el menu'}
+        aria-label={expanded ? 'Plegar el menú' : 'Desplegar el menú'}
         className={cn(
           'focus-ring m-3 flex h-10 items-center rounded-[10px] text-xs transition-colors duration-150',
           expanded ? 'gap-2 px-3' : 'justify-center',
@@ -274,7 +274,7 @@ export function PlayerShell({
             <button
               type="button"
               onClick={onToggleIndex}
-              aria-label={indexOpen ? 'Ocultar el contenido de la formacion' : 'Ver el contenido de la formacion'}
+              aria-label={indexOpen ? 'Ocultar el contenido de la formación' : 'Ver el contenido de la formación'}
               aria-pressed={indexOpen}
               className="focus-ring hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-500 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:text-ink-900 hover:shadow-card-hover lg:flex"
               style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}

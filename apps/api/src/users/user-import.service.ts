@@ -79,7 +79,7 @@ export class UserImportService {
    */
   async buildTemplateXlsx(): Promise<Buffer> {
     const libro = new ExcelJS.Workbook();
-    libro.creator = 'NEO PULSE';
+    libro.creator = 'Ascent';
 
     const hoja = libro.addWorksheet('Personas');
     hoja.addRow([...IMPORT_HEADERS]);

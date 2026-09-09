@@ -11,7 +11,7 @@ import { agregarEvaluacion, loginAsAdmin, unique } from './helpers';
  * Lo que de verdad se comprueba es que la regla OBLIGA: no basta con que la pantalla diga que se
  * guardo, tienen que aparecer las personas de ese cargo en "quienes la tienen que hacer".
  */
-test.describe('Quienes, desde la ficha de la formacion', () => {
+test.describe('Quiénes, desde la ficha de la formacion', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
   });
@@ -34,7 +34,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.getByRole('button', { name: 'Crear actividad' }).click();
     await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
-    await page.getByRole('button', { name: 'Quienes', exact: true }).click();
+    await page.getByRole('tab', { name: 'Quiénes', exact: true }).click();
 
     // La induccion especifica pregunta por CARGOS y nada mas: no ofrece areas ni regionales,
     // porque en este tipo quien decide es la matriz de competencia.
@@ -72,11 +72,11 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
       Y lo que de verdad importa: hay FILAS de obligacion, nacidas de la regla y no a mano.
 
       Se buscaban por la palabra "Requisito", que era la columna de ORIGEN. La tabla se rehizo el
-      2026-09-03 y ya no la trae: ahora se titula "Quienes la tienen que hacer" y cuelga de la regla
+      2026-09-03 y ya no la trae: ahora se titula "Quiénes la tienen que hacer" y cuelga de la regla
       que se acaba de guardar, asi que el origen es el encabezado y no una celda. Se ancla en el
       ESTADO, que es lo que de verdad se quiere comprobar aqui y sobrevive al siguiente rediseno.
     */
-    await expect(page.getByRole('heading', { name: 'Quienes la tienen que hacer' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Quiénes la tienen que hacer' })).toBeVisible();
     const pendientes = page.locator('tbody tr').filter({ hasText: 'PENDIENTE' });
     await expect(pendientes.first()).toBeVisible({ timeout: 20_000 });
 
@@ -103,7 +103,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.locator('#a-process').selectOption({ index: 1 });
     await page.getByRole('button', { name: 'Crear actividad' }).click();
     await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
-    await page.getByRole('button', { name: 'Quienes', exact: true }).click();
+    await page.getByRole('tab', { name: 'Quiénes', exact: true }).click();
 
     // No hay listas que marcar: marcar a mano a la empresa entera solo puede salir mal.
     await expect(page.getByText('Es para toda la empresa')).toBeVisible();
@@ -135,7 +135,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.getByRole('button', { name: 'Crear actividad' }).click();
     await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
-    await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+    await page.getByRole('tab', { name: 'Contenido', exact: true }).click();
     await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
     await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
     await page.locator('#c-title').fill('Bienvenida');
@@ -157,7 +157,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.getByRole('button', { name: 'Publicar y congelar' }).click();
     await expect(page.getByText('Versión 1 publicada')).toBeVisible({ timeout: 20_000 });
 
-    await page.getByRole('button', { name: 'Quienes', exact: true }).click();
+    await page.getByRole('tab', { name: 'Quiénes', exact: true }).click();
     await expect(page.getByText('Ya se le exige a toda la empresa')).toBeVisible({ timeout: 20_000 });
     // Y el boton de confirmar lo obvio ya no esta: lo que queda es retirarla.
     await expect(page.getByRole('button', { name: 'Exigirla a toda la empresa' })).toHaveCount(0);
@@ -200,7 +200,7 @@ test('la capacitacion del plan solo pregunta a quienes: ni plazo, ni recurrencia
   await page.getByRole('button', { name: 'Crear actividad' }).click();
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'Quienes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Quiénes', exact: true }).click();
 
   // 1. El alcance SI se pregunta: en el plan, a quienes lo decide el analista.
   await expect(page.locator('#q-jobs')).toBeVisible();

@@ -13,10 +13,16 @@ test.describe('Sprint 1 — administracion del tenant', () => {
   test('acceso: sesion, marca del tenant y navegacion del panel', async ({ page }) => {
     await loginAsAdmin(page);
 
-    // El panel carga con el nombre del tenant y el saludo. El saludo depende de la hora
-    // —"Buenos dias" / "Buenas tardes" / "Buenas noches"— asi que se comprueba lo que no cambia:
-    // que saluda por el nombre. Antes decia "Hola" y el rediseno del inicio lo dejo en rojo.
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Buenos dias|Buenas tardes|Buenas noches/);
+    // El panel carga con el nombre del tenant y el saludo, que depende de la hora.
+    //
+    // SE MIRA LA BARRA DE ARRIBA Y NO EL TITULO (2026-09-09): Inicio dejo de saludar —lo decia dos
+    // veces en la misma pantalla— y su titulo dice ahora el estado del dia, que cambia con los
+    // datos. Lo estable es el saludo de la barra, que sale en todas las pantallas.
+    //
+    // Y LA TILDE VA EN LA PRUEBA: la pantalla dice "Buenos días" desde la pasada de tildes y esta
+    // espera se quedo pidiendo "Buenos dias". No la cazo ninguna herramienta porque las dos leen
+    // CADENAS y esto es una EXPRESION REGULAR. Es el hueco que tenian, y ya esta tapado.
+    await expect(page.locator('header')).toContainText(/Buenos días|Buenas tardes|Buenas noches/);
     await expect(page.locator('aside')).toContainText('TRANSPRENSA');
 
     // Navegacion a las secciones del sprint.

@@ -221,9 +221,9 @@ function tieneFacetas(scope: AudienceRule): boolean {
 export function loQueFaltaEnLaConvocatoria(value: OfferingFormValue): string[] {
   const falta: string[] = [];
   const conFecha = value.kind !== 'PERMANENT';
-  if (conFecha && !value.scheduledDate) falta.push('La sesion necesita fecha.');
+  if (conFecha && !value.scheduledDate) falta.push('La sesión necesita fecha.');
   if (conFecha && value.modality !== 'VIRTUAL' && !value.location.trim()) {
-    falta.push('Indica el lugar: una sesion presencial sin lugar no se puede convocar.');
+    falta.push('Indica el lugar: una sesión presencial sin lugar no se puede convocar.');
   }
   if (conFecha && value.startTime && value.endTime && value.startTime >= value.endTime) {
     falta.push('La hora de fin debe ser posterior a la de inicio.');
@@ -232,7 +232,7 @@ export function loQueFaltaEnLaConvocatoria(value: OfferingFormValue): string[] {
     falta.push('La ventana se cierra antes de abrirse.');
   }
   if (conFecha && esExterna(value.executedBy) && !value.executedByOther.trim()) {
-    falta.push('Indica quien la dicta: "la ARL" sin decir cual no se puede medir despues.');
+    falta.push('Indica quien la dicta: "la ARL" sin decir cual no se puede medir después.');
   }
   return falta;
 }
@@ -708,7 +708,7 @@ export function OfferingForm({
  */
 function loQueProyecta(preview: ProjectedPreview): string {
   if (preview.source === 'NONE') {
-    return 'Nadie esta obligado a esta formacion todavia: se exige en "Quienes". Al publicar habra que ajustar los proyectados con justificacion.';
+    return 'Nadie esta obligado a esta formación todavía: se exige en "Quiénes". Al publicar habra que ajustar los proyectados con justificación.';
   }
   const gente = (n: number) => `${n} ${n === 1 ? 'persona obligada' : 'personas obligadas'}`;
   const origen =

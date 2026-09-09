@@ -218,7 +218,7 @@ export function ActivityInfoTab({
     <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
       <div className="space-y-6">
         <section className="card p-6">
-          <h2 className="font-display text-lg font-semibold text-ink-900">Información basica</h2>
+          <h2 className="font-display text-lg font-semibold text-ink-900">Información básica</h2>
           <p className="mb-5 mt-1 text-sm text-ink-500">Que se aprende y de quien depende. Se llena una vez.</p>
 
           <div className="space-y-4">
@@ -296,8 +296,8 @@ export function ActivityInfoTab({
                 label="Responsable"
                 hint={
                   hayBorrador
-                    ? 'Se hereda del proceso al crear la formacion. Recibe los avisos de incumplimiento, y al publicar queda congelado en la version.'
-                    : 'Congelado en la version publicada: es quien respondia cuando se dicto. Para cambiarlo, crea una version nueva.'
+                    ? 'Se hereda del proceso al crear la formación. Recibe los avisos de incumplimiento, y al publicar queda congelado en la versión.'
+                    : 'Congelado en la versión publicada: es quien respondia cuando se dicto. Para cambiarlo, crea una versión nueva.'
                 }
               >
                 <PersonPicker
@@ -382,7 +382,7 @@ export function ActivityInfoTab({
                 ayuda="Si emite su propio certificado, la lista de asistencia pedira su número y su vencimiento, y esa fecha manda. QUIEN lo expide no se dice aquí: sale de cada convocatoria, porque la misma formación la puede dictar la ARL en marzo y un centro en septiembre."
                 hint={
                   certExternoEsExplicito
-                    ? 'Decidido en esta formacion, distinto de lo que diga su tipo.'
+                    ? 'Decidido en esta formación, distinto de lo que diga su tipo.'
                     : `Lo que dice su tipo${nombreDelTipo ? ` (${nombreDelTipo})` : ''}.`
                 }
               >
@@ -393,7 +393,7 @@ export function ActivityInfoTab({
                     value={certExternoVisible}
                     onChange={(valor) => setForm({ ...form, tracksExternalCertificate: valor })}
                     options={[
-                      { value: 'true', label: 'Si' },
+                      { value: 'true', label: 'Sí', tone: 'ok' },
                       { value: 'false', label: 'No' },
                     ]}
                   />
@@ -431,7 +431,7 @@ export function ActivityInfoTab({
                 ayuda="De otra empresa, obtenida antes de entrar. Solo tiene sentido cuando la norma hace el papel transferible —alturas, montacargas, espacios confinados—, donde repetir el curso es gastar dos veces en lo mismo. En NO, quien llega certificado la hace igual, que es lo correcto en todo lo que trate sobre procedimientos propios. Y aun en SI, aceptar cada papel concreto sigue siendo una decision de quien lo registra, con su motivo."
                 hint={
                   convalidacionEsExplicita
-                    ? 'Decidido en esta formacion, distinto de lo que diga su tipo.'
+                    ? 'Decidido en esta formación, distinto de lo que diga su tipo.'
                     : `Lo que dice su tipo${nombreDelTipo ? ` (${nombreDelTipo})` : ''}.`
                 }
               >
@@ -442,7 +442,7 @@ export function ActivityInfoTab({
                     value={convalidacionVisible}
                     onChange={(valor) => setForm({ ...form, admiteConvalidacion: valor })}
                     options={[
-                      { value: 'true', label: 'Si' },
+                      { value: 'true', label: 'Sí', tone: 'ok' },
                       { value: 'false', label: 'No' },
                     ]}
                   />
@@ -577,7 +577,7 @@ export function ActivityInfoTab({
               <dd className="text-ink-500">Las lecciones, videos, documentos y la evaluación.</dd>
             </div>
             <div>
-              <dt className="font-medium text-ink-900">En Quienes</dt>
+              <dt className="font-medium text-ink-900">En Quiénes</dt>
               <dd className="text-ink-500">
                 A quienes se les exige: cargos, areas, regionales y servicios, con su plazo. Es el unico sitio donde se
                 marca.

@@ -86,7 +86,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
 
     // 3. Contenido: una leccion. La formacion es una ficha con pestanas; el contenido vive en la
     // suya (reestructuracion de la autoria, 2026-08-27).
-    await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+    await page.getByRole('tab', { name: 'Contenido', exact: true }).click();
     await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
     // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
     await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
@@ -123,12 +123,12 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await expect(page.getByText('Versión 2 creada en borrador')).toBeVisible();
 
     // El historial de versiones vive en su pestana desde la reestructuracion de la autoria.
-    await page.getByRole('button', { name: 'Versiones', exact: true }).click();
+    await page.getByRole('tab', { name: 'Versiones', exact: true }).click();
     await expect(page.getByText('Versión 2').first()).toBeVisible();
 
     // 7. La version 1 sigue publicada y con su contenido intacto.
-    await page.getByText('Version 1', { exact: true }).click();
-    await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+    await page.getByText('Versión 1', { exact: true }).click();
+    await page.getByRole('tab', { name: 'Contenido', exact: true }).click();
     await expect(page.getByText(/inmutable/)).toBeVisible();
     await expect(page.getByText('Bienvenida')).toBeVisible();
   });
@@ -181,12 +181,15 @@ test('una evaluacion se arma en el lienzo, con huecos, y se ve como la vera el e
   // El rail la muestra ya, con su tipo y su puntaje, sin tener que guardar para verla.
   const rail = page.getByRole('navigation');
   await expect(rail.getByText(`Ante un derrame ${suffix}, que se hace primero?`)).toBeVisible();
-  await expect(rail.getByText(/Seleccion unica · 1 pto/)).toBeVisible();
+  await expect(rail.getByText(/Selección única · 1 pto/)).toBeVisible();
 
   // ── 2. Una de COMPLETAR HUECOS (Decision #86) ──
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   await page.getByRole('button', { name: 'Escribir pregunta' }).click();
-  await page.locator('#ap-tipo').selectOption('FILL_BLANK');
+  // El tipo de pregunta ya no es un `<select>` nativo sino el `Combo` del producto (2026-09-09,
+  // «nada generico»): se abre y se elige la opcion por su rotulo, como haria una persona.
+  await page.getByRole('combobox', { name: /Tipo de pregunta|Selección única/ }).click();
+  await page.getByRole('option', { name: 'Completar huecos' }).click();
   await page.getByLabel('Enunciado de la pregunta').fill(`El arnes ${suffix} se inspecciona cada {{1}}.`);
   await page.getByLabel('Respuesta 1 valida para el hueco 1').fill('seis meses');
 

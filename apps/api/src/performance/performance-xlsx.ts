@@ -58,7 +58,7 @@ export async function libroDeConsolidado(
   evaluaciones: FilaDeEvaluacion[],
 ): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
-  libro.creator = 'NEO PULSE';
+  libro.creator = 'Ascent';
   libro.created = cabecera.generadoEn;
 
   const contexto = [

@@ -106,7 +106,7 @@ export class ActaDeSesionService {
     filas.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
     const base = {
-      empresa: tenant?.name ?? 'NEO PULSE',
+      empresa: tenant?.name ?? 'Ascent',
       formacion: offering.activityVersion.activity.name,
       jornada: offering.code,
       fecha: offering.scheduledDate ? enBogota(offering.scheduledDate).slice(0, 10) : 'sin fecha',

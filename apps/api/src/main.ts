@@ -45,7 +45,7 @@ async function bootstrap(): Promise<void> {
 
   const port = Number(process.env.PORT ?? 3002);
   await app.listen(port);
-  console.log(`NEO PULSE API en http://localhost:${port}/v1 (health: /v1/health)`);
+  console.log(`Ascent API en http://localhost:${port}/v1 (health: /v1/health)`);
 }
 
 void bootstrap();

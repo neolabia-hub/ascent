@@ -86,15 +86,15 @@ const CONTENT_META: Record<ContentType, { label: string; icon: typeof FileText }
 
 const MIGRATION_LABEL: Record<MigrationPolicy, { title: string; detail: string }> = {
   MOVE_NOT_STARTED: {
-    title: 'Solo quienes no han empezado pasan a la versión nueva',
+    title: 'Solo quiénes no han empezado pasan a la versión nueva',
     detail: 'Recomendado. Quien va a mitad termina con el contenido que ya conocia.',
   },
   FINISH_OLD: {
     title: 'Todos los inscritos terminan en la versión anterior',
-    detail: 'La version nueva solo aplica a inscripciones futuras.',
+    detail: 'La versión nueva solo aplica a inscripciones futuras.',
   },
   RESTART_NEW: {
-    title: 'Quienes van a mitad reinician en la versión nueva',
+    title: 'Quiénes van a mitad reinician en la versión nueva',
     detail: 'Uselo cuando el cambio es tan importante que lo anterior ya no sirve.',
   },
 };
@@ -112,7 +112,7 @@ type TabKey = 'info' | 'contenido' | 'quienes' | 'programacion' | 'versiones';
 const TABS: Array<{ key: TabKey; label: string; icon: typeof FileText }> = [
   { key: 'info', label: 'Ficha', icon: FileText },
   { key: 'contenido', label: 'Contenido', icon: Layers },
-  { key: 'quienes', label: 'Quienes', icon: Users },
+  { key: 'quienes', label: 'Quiénes', icon: Users },
   { key: 'programacion', label: 'Convocatorias', icon: CalendarDays },
   { key: 'versiones', label: 'Versiones', icon: Package },
 ];
@@ -342,7 +342,7 @@ export default function ActividadDetallePage() {
       if (result.executed) {
         showToast({
           kind: 'success',
-          title: `Version ${version.versionNumber} publicada`,
+          title: `Versión ${version.versionNumber} publicada`,
           description: 'El contenido quedo congelado: lo que se cursa ya no puede cambiar.',
         });
       } else {
@@ -358,11 +358,11 @@ export default function ActividadDetallePage() {
         // el mapa, asi que una seccion aleatoria que pedia mas preguntas de las que hay salia con
         // el mensaje crudo del servidor.
         const map: Record<string, string> = {
-          VERSION_EMPTY: 'La version necesita al menos un contenido.',
+          VERSION_EMPTY: 'La versión necesita al menos un contenido.',
           CONTENT_INCOMPLETE: 'Hay contenidos sin material asignado. Completalos antes de publicar.',
           NOT_ENOUGH_QUESTIONS:
-            'Una seccion del examen pide mas preguntas de las que hay en su categoria. Agrega preguntas o baja cuantas pide.',
-          VERSION_NOT_DRAFT: 'Esta version ya esta publicada. Para cambiar algo, crea una nueva.',
+            'Una seccion del examen pide mas preguntas de las que hay en su categoría. Agrega preguntas o baja cuantas pide.',
+          VERSION_NOT_DRAFT: 'Esta versión ya esta publicada. Para cambiar algo, crea una nueva.',
         };
         setPublishError(map[error.code] ?? `No se pudo publicar (${error.code}).`);
       } else {
@@ -382,7 +382,7 @@ export default function ActividadDetallePage() {
       setTab('contenido');
       showToast({
         kind: 'success',
-        title: `Version ${draft.versionNumber} creada en borrador`,
+        title: `Versión ${draft.versionNumber} creada en borrador`,
         description: 'La versión publicada no se modifico.',
       });
     } catch (error) {
@@ -390,8 +390,8 @@ export default function ActividadDetallePage() {
         kind: 'danger',
         title:
           error instanceof ApiError && error.code === 'DRAFT_ALREADY_EXISTS'
-            ? 'Ya existe una version en borrador.'
-            : 'No se pudo crear la version.',
+            ? 'Ya existe una versión en borrador.'
+            : 'No se pudo crear la versión.',
       });
     } finally {
       setBusy(false);
@@ -409,7 +409,7 @@ export default function ActividadDetallePage() {
         kind: 'danger',
         title:
           error instanceof ApiError && error.code === 'LAST_VERSION'
-            ? 'No se puede descartar la unica version.'
+            ? 'No se puede descartar la única versión.'
             : 'No se pudo descartar.',
       });
     }
@@ -491,9 +491,9 @@ export default function ActividadDetallePage() {
           <p className="mt-1 text-xs text-ink-500">
             {publishedVersion
               ? hasDraft
-                ? 'La gente cursa la version publicada. Los cambios en curso no la afectan hasta publicarlos.'
+                ? 'La gente cursa la versión publicada. Los cambios en curso no la afectan hasta publicarlos.'
                 : 'La gente ya puede cursarla y se puede programar en convocatorias.'
-              : 'Todavia no la ve nadie y no se puede programar. Se publica cuando este lista.'}
+              : 'Todavía no la ve nadie y no se puede programar. Se publica cuando este lista.'}
           </p>
           </div>
         </div>
@@ -519,8 +519,15 @@ export default function ActividadDetallePage() {
             // se pasa el raton por encima y no pasa nada. Se deja pulsable y el dialogo dice
             // exactamente que falta —"Bienvenida no tiene su material asignado"—, que es la
             // informacion que hace falta para arreglarlo.
+            // EN EL COLOR PRINCIPAL DEL TENANT, NO EN EL DE ACENTO (2026-09-09).
+            //
+            // Llevo un dia en acento —"la accion que lleva el trabajo a su siguiente estado"— y el
+            // cliente lo tumbo mirandolo: en TRANSPRENSA el acento es verde (#367d17) y un boton
+            // verde entre botones neutros no se lee como "el siguiente paso", se lee como otra cosa.
+            // El verde de esta empresa se queda para los si/no de la ficha, que es donde el color SI
+            // significa algo. Decision #166, retirada.
             <Button onClick={() => setPublishOpen(true)}>
-              {canPublish ? 'Publicar cambios' : 'Enviar a aprobacion'}
+              {canPublish ? 'Publicar cambios' : 'Enviar a aprobación'}
             </Button>
           ) : null}
           <Button variant="ghost" className="text-danger" onClick={() => setBorrarOpen(true)} disabled={busy}>
@@ -544,16 +551,21 @@ export default function ActividadDetallePage() {
       />
 
       {/*
-        ARMAR UNA FORMACION TIENE ORDEN, Y AHORA SE VE (2026-09-09).
+        LAS CINCO VISTAS, EN PASTILLAS Y EN SU PROPIA FILA (2026-09-09).
 
-        Eran cinco pestañas subrayadas con un trazo de 2 px, al lado de los botones de accion — y el
-        cliente dijo lo que se veia: *"el boton se parece a esos selectores"*. Ahora son ETAPAS
-        numeradas: ficha, contenido, a quienes, convocatorias, versiones, que es el orden real en que
-        se arma. La activa va rellena con el color de la empresa; lo ya recorrido, mas oscuro que lo
-        que falta.
+        Cuarta forma en tres días, y la decisión de fondo no era el dibujo: era DÓNDE estaban. Las
+        tres primeras —subrayadas, pastilla suelta, recorrido por etapas— compartían fila con
+        Publicar y Eliminar, y la queja del cliente fue siempre la misma: *«el botón se parece a esos
+        selectores»*. Con el selector en su propia banda, encima del contenido y separado de las
+        acciones, esa confusión no puede darse.
+
+        Y la forma vuelve a la PASTILLA rellena, que es la del resto del producto —el plan,
+        Seguimiento, los informes—: una fila de vistas hermanas se contesta con área de color, y el
+        recorrido por etapas afirmaba un orden que ninguna otra pantalla afirma. La banda gris que
+        las contiene es lo que las hace legibles como UN control y no como cinco botones sueltos.
       */}
-      <div className="mb-6 rounded-xl border border-line bg-surface p-1">
-        <ViewTabs tabs={TABS} value={tab} onChange={setTab} forma="etapas" />
+      <div className="mb-6 overflow-x-auto">
+        <ViewTabs tabs={TABS} value={tab} onChange={setTab} />
       </div>
 
       {tab === 'info' ? <ActivityInfoTab activity={activity} onSaved={loadActivity} canEdit /> : null}
@@ -683,7 +695,7 @@ export default function ActividadDetallePage() {
                             )
                           }
                         >
-                          {isDraft ? 'Armar preguntas' : 'Ver evaluacion'}
+                          {isDraft ? 'Armar preguntas' : 'Ver evaluación'}
                         </Button>
                       ) : null}
                       {isDraft ? (
@@ -740,7 +752,7 @@ export default function ActividadDetallePage() {
                     )}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-ink-900">Version {row.versionNumber}</p>
+                      <p className="font-medium text-ink-900">Versión {row.versionNumber}</p>
                       <p className="text-xs text-ink-500">
                         {row.publishedAt ? `Publicada el ${new Date(row.publishedAt).toLocaleDateString('es-CO')}` : 'Sin publicar'}
                         {row._count ? ` · ${row._count.contents} contenidos` : ''}
@@ -758,8 +770,17 @@ export default function ActividadDetallePage() {
 
           <aside className="card h-fit p-5">
             <h3 className="font-display text-sm font-semibold text-ink-900">Reglas de la versión</h3>
-            <p className="mb-4 mt-1 text-xs text-ink-500">
-              Se congelan al publicar: cambiar el ajuste de la empresa no reinterpreta evaluaciones ya presentadas.
+            {/*
+              QUE ES ESTO Y QUE RELACION TIENE CON LA EVALUACION (2026-09-09).
+
+              El cliente vio nota e intentos aqui y otra vez dentro de la evaluacion y pregunto cual
+              manda. Manda esta, salvo que un examen concreto pida mas. Se dice aqui con esas
+              palabras, porque quien abre esta ficha no tiene la otra pantalla delante.
+            */}
+            <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-500">
+              Con esto se aprueba <strong className="font-medium text-ink-700">todo examen de esta formación</strong>,
+              salvo que alguno exija más por su cuenta. Nacen de los valores por defecto de la empresa y se
+              congelan al publicar: cambiar el ajuste de la empresa no reinterpreta evaluaciones ya presentadas.
             </p>
             {version ? (
               <div className="space-y-3">
@@ -813,7 +834,7 @@ export default function ActividadDetallePage() {
       <Drawer
         open={publishOpen}
         onOpenChange={setPublishOpen}
-        title={canPublish ? `Publicar version ${version?.versionNumber ?? ''}` : 'Enviar a aprobacion'}
+        title={canPublish ? `Publicar version ${version?.versionNumber ?? ''}` : 'Enviar a aprobación'}
         description={
           canPublish
             ? 'Publicar congela el contenido. No se puede deshacer.'
@@ -853,9 +874,9 @@ export default function ActividadDetallePage() {
               </p>
               <p className="mt-1 text-sm text-ink-700">
                 {esInduccionDeIngreso
-                  ? 'Es una induccion de ingreso: cada persona que entre a partir de hoy la tendra automaticamente, y vencera el dia antes de su fecha de ingreso. A quien ya lleva tiempo en la empresa NO se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada año es la reinduccion, que es otra formacion.'
-                  : 'Se le exige a todo el mundo, tambien a quien ya esta, y a quien entre despues. A la plantilla actual se le dan 30 dias de plazo.'}{' '}
-                Se puede ajustar o retirar en Quienes.
+                  ? 'Es una inducción de ingreso: cada persona que entre a partir de hoy la tendrá automaticamente, y vencerá el día antes de su fecha de ingreso. A quien ya lleva tiempo en la empresa NO se le exige, porque no esta ingresando: su inducción se hizo cuando entró. Lo que le toca cada año es la reinducción, que es otra formación.'
+                  : 'Se le exige a todo el mundo, también a quien ya esta, y a quien entre después. A la plantilla actual se le dan 30 días de plazo.'}{' '}
+                Se puede ajustar o retirar en Quiénes.
               </p>
             </div>
           ) : null}

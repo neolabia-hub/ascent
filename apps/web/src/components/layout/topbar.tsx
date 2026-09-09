@@ -368,12 +368,7 @@ export function Topbar({ userFullName }: TopbarProps) {
         una persona de la empresa igual que el resto, y esta es la unica linea de la barra que le
         habla a ella. Las dos superficies dejan de sentirse dos productos.
       */}
-      <p className="min-w-0 shrink-0 truncate">
-        <span className="text-sm text-ink-500">{saludoDe()}, </span>
-        <span className="font-display text-base font-semibold text-ink-900">
-          {profile.fullName.trim().split(/\s+/)[0]}
-        </span>
-      </p>
+      <SaludoEscrito nombre={profile.fullName.trim().split(/\s+/)[0] ?? ''} />
 
       {/*
         Buscar es la accion mas repetida de quien administra: con doscientas formaciones y
@@ -422,5 +417,86 @@ export function Topbar({ userFullName }: TopbarProps) {
         placeholder="Buscar una formación, una persona o ir a una pantalla"
       />
     </header>
+  );
+}
+
+/**
+ * EL SALUDO, ESCRIBIENDOSE — UNA VEZ (2026-09-09, pedido del cliente).
+ *
+ * ─── CUANDO SE ANIMA, QUE ES TODA LA DECISION ───
+ *
+ * El cliente lo pidio «sutil: solo al iniciar sesion, o cuando cambia el saludo». Es exactamente la
+ * regla que lo hace soportable. Esta barra sale en TODAS las pantallas del panel: animar el texto en
+ * cada carga serian decenas de animaciones al dia delante de la misma persona, y lo que la primera
+ * vez es simpatico a la quinta es un retraso para leer.
+ *
+ * Asi que se escribe cuando hay algo nuevo que decir:
+ *   1. al entrar a la sesion, y
+ *   2. cuando el saludo CAMBIA de verdad —al cruzar el mediodia o las siete—, que pasa dos veces al
+ *      dia y es justo cuando la frase dejo de ser la de antes.
+ *
+ * Lo recuerda `sessionStorage` y no `localStorage` a proposito: la memoria dura lo que la sesion, y
+ * "iniciar sesion" es precisamente el momento en que toca volver a verlo.
+ *
+ * Y NO SE ANIMA si el sistema pide menos movimiento (`prefers-reduced-motion`): eso no es una
+ * preferencia estetica, es una necesidad de quien la activo.
+ */
+function SaludoEscrito({ nombre }: { nombre: string }) {
+  const saludo = saludoDe();
+  const completo = nombre ? `${saludo}, ${nombre}` : saludo;
+  const corte = nombre ? saludo.length + 2 : completo.length;
+  // Entero por defecto: si algo falla o no toca animar, lo que se ve es la frase, no un hueco.
+  const [visible, setVisible] = useState(completo.length);
+
+  useEffect(() => {
+    const quietud = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    let yaEscrito: string | null = null;
+    try {
+      yaEscrito = window.sessionStorage.getItem('saludo-escrito');
+    } catch {
+      // Navegador con el almacenamiento cerrado: se comporta como si no hubiera nada escrito, y
+      // como mucho se anima una vez de mas.
+    }
+    if (quietud || yaEscrito === completo) {
+      setVisible(completo.length);
+      return;
+    }
+    try {
+      window.sessionStorage.setItem('saludo-escrito', completo);
+    } catch {
+      /* sin memoria, pero la animacion sigue valiendo */
+    }
+
+    setVisible(0);
+    // 38 ms por letra: "Buenos días, Miguel" tarda tres cuartos de segundo. Lo justo para notarlo
+    // sin que nadie espere a que termine para leerlo.
+    const reloj = window.setInterval(() => {
+      setVisible((n) => {
+        if (n >= completo.length) {
+          window.clearInterval(reloj);
+          return n;
+        }
+        return n + 1;
+      });
+    }, 38);
+    return () => window.clearInterval(reloj);
+  }, [completo]);
+
+  const escrito = completo.slice(0, visible);
+  const escribiendo = visible < completo.length;
+
+  return (
+    <p className="min-w-0 shrink-0 truncate" aria-label={completo}>
+      <span aria-hidden className="text-sm text-ink-500">
+        {escrito.slice(0, Math.min(escrito.length, corte))}
+      </span>
+      <span aria-hidden className="font-display text-base font-semibold text-ink-900">
+        {escrito.slice(Math.min(escrito.length, corte))}
+      </span>
+      {/* El cursor solo existe mientras se escribe: parado seria un adorno que parpadea. */}
+      {escribiendo ? (
+        <span aria-hidden className="ml-px inline-block h-4 w-px translate-y-0.5 bg-ink-300" />
+      ) : null}
+    </p>
   );
 }

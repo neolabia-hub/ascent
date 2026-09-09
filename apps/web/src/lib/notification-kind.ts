@@ -35,8 +35,8 @@ export function notificationKind(eventType: string): NotificationKind | null {
 }
 
 export const KIND_LABEL: Record<NotificationKind, string> = {
-  formacion: 'Tu formacion',
-  gestion: 'Gestion',
+  formacion: 'Tu formación',
+  gestion: 'Gestión',
 };
 
 /**

@@ -138,7 +138,7 @@ function Notifications() {
             <p className="px-4 py-8 text-center text-sm text-ink-500">Cargando...</p>
           ) : visibles.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-ink-500">
-              {verLeidas ? 'No tienes avisos.' : 'Nada sin leer. Aqui llegan los recordatorios de lo que vence.'}
+              {verLeidas ? 'No tienes avisos.' : 'Nada sin leer. Aquí llegan los recordatorios de lo que vence.'}
             </p>
           ) : (
             <ul className="max-h-[60vh] overflow-y-auto">

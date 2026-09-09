@@ -35,7 +35,7 @@ export function monthName(month: number): string {
  * no "vence en 0 dias", y una de ayer es "vencio hace 1 dia" aunque falten horas para las 24.
  */
 export function describeDueDate(value: string | null | undefined, now: Date = new Date()): string {
-  if (!value) return 'Sin fecha limite';
+  if (!value) return 'Sin fecha límite';
 
   const startOfDay = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   const due = new Date(value);
@@ -43,14 +43,14 @@ export function describeDueDate(value: string | null | undefined, now: Date = ne
 
   if (days === 0) return 'Vence hoy';
   if (days === 1) return 'Vence mañana';
-  if (days > 1) return `Vence en ${days} dias`;
-  if (days === -1) return 'Vencio ayer';
-  return `Vencio hace ${Math.abs(days)} dias`;
+  if (days > 1) return `Vence en ${days} días`;
+  if (days === -1) return 'Venció ayer';
+  return `Venció hace ${Math.abs(days)} días`;
 }
 
 /** Dias respecto al disparador, dicho como lo diria una persona. */
 export function describeDueOffset(days: number | null | undefined): string {
-  if (days === null || days === undefined || days === 0) return 'el mismo dia';
-  if (days < 0) return `${Math.abs(days)} ${Math.abs(days) === 1 ? 'dia' : 'dias'} antes`;
-  return `${days} ${days === 1 ? 'dia' : 'dias'} despues`;
+  if (days === null || days === undefined || days === 0) return 'el mismo día';
+  if (days < 0) return `${Math.abs(days)} ${Math.abs(days) === 1 ? 'día' : 'días'} antes`;
+  return `${days} ${days === 1 ? 'día' : 'días'} después`;
 }

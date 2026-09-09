@@ -152,7 +152,7 @@ const loQueVe = async (momento) => {
 };
 if (testigo) {
   console.log(`   ... testigo: ${unoDelCargo.fullName} (${unoDelCargo.documentNumber}), cargo "${elegido.c.name}"`);
-  const trasPublicarYExigir = await loQueVe('tras PUBLICAR la formacion y EXIGIRLA en Quienes');
+  const trasPublicarYExigir = await loQueVe('tras PUBLICAR la formacion y EXIGIRLA en Quiénes');
   comprobar(
     trasPublicarYExigir === 0,
     'publicar y exigir NO le muestran nada: en una del plan la regla solo guarda a quienes',

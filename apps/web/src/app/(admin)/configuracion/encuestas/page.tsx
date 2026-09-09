@@ -97,7 +97,7 @@ export default function EncuestasPage() {
     <div className="max-w-3xl">
       <Link href="/configuracion" className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700">
         <ArrowLeft size={14} />
-        Configuracion
+        Configuración
       </Link>
       <h1 className="font-display text-[28px] font-semibold text-ink-900">Encuestas</h1>
       <p className="mt-1 text-sm leading-relaxed text-ink-500">
@@ -516,7 +516,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
                 <p className="mt-1 text-xs leading-relaxed text-ink-500">
                   {plantilla.kind === 'EFFICACY'
                     ? 'Son treinta segundos. Responde sobre como aplica lo aprendido.'
-                    : 'Son treinta segundos y es anonima para quien dicta la formacion.'}
+                    : 'Son treinta segundos y es anónima para quien dicta la formación.'}
                 </p>
               </div>
               <SurveyRunner questions={preguntas} value={ensayo} onChange={setEnsayo} readOnly />
@@ -532,7 +532,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
         <Button
           variant="outline"
           disabled={preguntas.length >= 12}
-          title={preguntas.length >= 12 ? 'Doce es el maximo: mas larga, se responde a la ligera' : undefined}
+          title={preguntas.length >= 12 ? 'Doce es el máximo: mas larga, se responde a la ligera' : undefined}
           onClick={() =>
             setPreguntas((previas) => [
               ...previas,

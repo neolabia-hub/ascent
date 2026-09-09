@@ -1,9 +1,28 @@
 'use client';
 
-import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react';
+import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties } from 'react';
 import { cn } from './cn';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'outline' | 'danger';
+/**
+ * `acento` USA EL SEGUNDO COLOR DE LA EMPRESA, Y TIENE UN SIGNIFICADO, NO UN GUSTO.
+ *
+ * El tenant configura dos colores (Preferencias → Marca): `primaryColor`, que es la estructura —la
+ * barra lateral, el sitio donde estas, las etapas del recorrido— y `accentColor`, que hasta hoy
+ * solo vivia en el lado del aprendiz, siempre diciendo lo mismo: **algo avanza**. La barra de
+ * progreso de una leccion, el porcentaje de cobertura del plan, el boton de continuar.
+ *
+ * `acento` extiende esa idea a la administracion: **la accion que lleva el trabajo a su siguiente
+ * estado** —publicar una version, convocar una jornada, cerrar una lista—. No es "el boton bonito":
+ * si se pinta con ella un Guardar cualquiera, el color deja de significar avance y pasa a significar
+ * "boton", que es lo que ya dice ser un boton.
+ *
+ * **Una por pantalla.** La misma regla que `glow` y por el mismo motivo: si destacan dos, no destaca
+ * ninguna.
+ *
+ * Lo pidio el cliente —*"usar el color secundario del tenant, algunos botones podrian ser de ese
+ * color, sin tener muchos colores"*— y la ultima parte es la que fija el criterio.
+ */
+export type ButtonVariant = 'primary' | 'acento' | 'ghost' | 'outline' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -41,6 +60,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
     'bg-primary text-white border border-transparent shadow-btn hover:-translate-y-px hover:shadow-btn-hover hover:[filter:brightness(1.06)] active:translate-y-0 active:shadow-btn-active active:[filter:brightness(0.94)]',
+  // El color va en linea y no en una clase porque lo pone el tenant en tiempo de ejecucion.
+  acento:
+    'text-white border border-transparent shadow-btn hover:-translate-y-px hover:shadow-btn-hover hover:[filter:brightness(1.06)] active:translate-y-0 active:shadow-btn-active active:[filter:brightness(0.94)]',
   ghost: 'bg-transparent text-ink-700 border border-transparent hover:bg-primary-soft hover:text-ink-900',
   outline:
     'bg-surface text-ink-700 border border-line-strong shadow-btn-flat hover:-translate-y-px hover:border-line-strong hover:shadow-btn hover:bg-paper active:translate-y-0 active:shadow-none',
@@ -112,7 +134,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         locked && 'bg-transparent text-primary shadow-btn-flat disabled:opacity-100',
         className,
       )}
-      style={locked ? { backgroundColor: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)' } : undefined}
+      style={
+        locked
+          ? { backgroundColor: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)' }
+          : variant === 'acento'
+            ? // El halo, si lo lleva, tiene que ser del MISMO color que el relleno: un boton naranja
+              // con resplandor azul se ve como un error de pintura, no como un realce.
+              ({ backgroundColor: 'var(--brand-accent)', '--glow-color': 'var(--brand-accent)' } as CSSProperties)
+            : undefined
+      }
       {...props}
     >
       {/*

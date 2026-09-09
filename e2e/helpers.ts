@@ -81,7 +81,7 @@ export async function limpiarPlanDelAno(page: Page, year: number): Promise<void>
    * cierto cuando la respuesta ya llego.
    */
   await page
-    .locator('[role="region"][aria-label="Planes de capacitacion"][aria-busy="false"]')
+    .locator('[role="region"][aria-label="Planes de capacitación"][aria-busy="false"]')
     .waitFor({ timeout: 20_000 });
 
   const borrar = page.getByRole('button', { name: `Eliminar el plan de ${year}` });
@@ -145,17 +145,36 @@ export async function elegirEnCombo(page: Page, comboId: string, nombre: string)
  * Eso no era un descuido de las pruebas: era la señal, escrita en su dia, de que la regla no estaba
  * acordada. Ahora lo esta, y las pruebas se ponen al dia.
  *
- * Usa el ATAJO del cajon —un bloque de N preguntas al azar del banco— porque aqui la evaluacion no
- * es lo que se prueba: es el requisito para poder publicar. Quien quiera probar el constructor de
- * preguntas tiene `sprint-2.spec.ts`.
+ * ─── POR QUE AHORA PASA POR EL EDITOR (2026-09-09) ───
+ *
+ * Crear una evaluacion desde la formacion ya no pide tema ni cuantas al azar: nace VACIA y se abre
+ * su editor. Asi que el requisito para publicar —que tenga preguntas— se cumple aqui.
+ *
+ * Se ESCRIBE una pregunta en vez de poner un bloque al azar, y no es un capricho: el bloque saca N
+ * del primer tema con preguntas, asi que depende de CUANTAS tenga ese tema en la base del momento.
+ * En la primera corrida el primer tema era uno que dejo otra prueba, con una sola pregunta: el
+ * bloque pedia 3, no alcanzaba, y Guardar se quedaba deshabilitado. Escribir la pregunta no depende
+ * de nada de fuera. Sigue sin ser lo que se prueba: quien quiera el constructor tiene `sprint-2`.
  */
 export async function agregarEvaluacion(page: import('@playwright/test').Page, titulo: string) {
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   await page.getByRole('button', { name: 'Evaluación' }).click();
   await page.locator('#c-title').fill(titulo);
-  // El banco por defecto: el primero con preguntas. Sin categorias no hay examen posible, y eso lo
-  // cubre la semilla.
-  await page.locator('#c-category').selectOption({ index: 0 });
   await page.getByRole('button', { name: 'Agregar', exact: true }).click();
-  await expect(page.getByText('Contenido agregado')).toBeVisible({ timeout: 20_000 });
+
+  // Se entra al editor de la evaluacion recien creada, como al crear una leccion.
+  await expect(page.getByRole('heading', { name: titulo })).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+  await page.getByRole('button', { name: 'Escribir pregunta' }).click();
+  await page.getByLabel('Enunciado de la pregunta').fill(`Pregunta de ${titulo}`);
+  await page.getByLabel('Texto de la opción A').fill('Si');
+  await page.getByLabel('Texto de la opción B').fill('No');
+  await page.getByRole('button', { name: 'Marcar la opción A como correcta' }).click();
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByText('Evaluación guardada')).toBeVisible({ timeout: 20_000 });
+
+  // Y de vuelta a la formacion, que es donde sigue la prueba.
+  await page.getByRole('link', { name: 'Volver a la formación' }).click();
+  await expect(page.getByRole('button', { name: 'Agregar contenido' }).first()).toBeVisible({ timeout: 20_000 });
 }

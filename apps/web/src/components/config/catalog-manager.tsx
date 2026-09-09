@@ -62,7 +62,7 @@ interface FormState {
 const EMPTY_FORM: FormState = { code: '', name: '', extra: {} };
 
 const ERROR_MESSAGES: Record<string, string> = {
-  DUPLICATE_CODE: 'Ya existe un registro con ese codigo.',
+  DUPLICATE_CODE: 'Ya existe un registro con ese código.',
   CATALOG_IN_USE: 'No se puede eliminar: esta en uso. Desactivalo en su lugar.',
   SYSTEM_CATALOG: 'Los registros del sistema no se pueden eliminar.',
   VALIDATION_ERROR: 'Revisa los campos del formulario.',

@@ -376,7 +376,7 @@ export default function PlanDetallePage() {
       await load();
       showToast({
         kind: 'success',
-        title: result.executed ? 'Jornada cancelada' : 'Solicitud enviada a aprobacion',
+        title: result.executed ? 'Jornada cancelada' : 'Solicitud enviada a aprobación',
         description: result.executed
           ? 'El renglon queda CANCELADA, se retiran sus obligaciones y se avisa a los convocados.'
           : undefined,
@@ -700,7 +700,7 @@ export default function PlanDetallePage() {
                 }
               >
                 <Sparkles size={16} />
-                Crear capacitacion
+                Crear capacitación
               </Button>
               <Button variant="outline" onClick={() => setAttachOpen(true)}>
                 <Link2 size={16} />
@@ -991,7 +991,7 @@ export default function PlanDetallePage() {
                     }
                   >
                     <Sparkles size={16} />
-                    Crear capacitacion
+                    Crear capacitación
                   </Button>
                 </div>
               ) : undefined
@@ -1321,7 +1321,7 @@ export default function PlanDetallePage() {
         description={
           plan.status === 'DRAFT'
             ? 'Esta en borrador: se puede cambiar todo, incluido el año.'
-            : 'El plan ya esta aprobado: se corrige la cabecera, con motivo. Sus renglones no se tocan aqui.'
+            : 'El plan ya esta aprobado: se corrige la cabecera, con motivo. Sus renglones no se tocan aquí.'
         }
         footer={
           <div className="flex justify-end gap-2">

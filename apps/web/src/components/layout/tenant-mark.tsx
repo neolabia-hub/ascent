@@ -64,11 +64,11 @@ export function TenantMark({ collapsed = false }: { collapsed?: boolean }) {
           <p className="truncate font-display text-sm font-semibold leading-tight text-ink-900">{name}</p>
           {/*
             EL NOMBRE DEL PRODUCTO, pequeño y debajo del de la empresa. Ese es el orden correcto
-            dentro de la aplicacion: la persona que entra trabaja en su empresa, no en NEO PULSE.
+            dentro de la aplicacion: la persona que entra trabaja en su empresa, no en Ascent.
             Pero tiene que estar, porque si no, nadie sabe como se llama la herramienta que usa
             todos los dias —y es lo que escribe en el asunto cuando pide ayuda—.
           */}
-          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">NEO PULSE</p>
+          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Ascent</p>
         </div>
       ) : null}
     </div>

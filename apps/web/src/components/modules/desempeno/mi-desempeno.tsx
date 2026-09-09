@@ -92,7 +92,7 @@ function LoMio({ filas, onCambio }: { filas: Evaluacion[]; onCambio: () => void 
         <div className="min-w-0">
           <h2 className="font-display text-base font-semibold text-ink-900">Lo tuyo</h2>
           <p className="text-xs text-ink-700">
-            {sinFirmar ? 'Tu evaluacion esta lista y te falta firmarla.' : 'Como te evaluaron, y lo que escribiste tu.'}
+            {sinFirmar ? 'Tu evaluación esta lista y te falta firmarla.' : 'Como te evaluaron, y lo que escribiste tu.'}
           </p>
         </div>
       </div>

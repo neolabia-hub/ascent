@@ -458,7 +458,7 @@ function PlanCard({
             <p className="mt-1.5 text-sm font-medium text-ink-900">{plan.name}</p>
             <p className="mt-0.5 text-xs text-ink-500">
               {plan.itemCount === 0
-                ? 'Sin renglones todavia'
+                ? 'Sin renglones todavía'
                 : `${plan.itemCount} ${plan.itemCount === 1 ? 'jornada programada' : 'jornadas programadas'}`}
               {plan.approvedAt ? ` · aprobado el ${formatDate(plan.approvedAt)}` : ''}
             </p>

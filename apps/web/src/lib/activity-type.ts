@@ -162,12 +162,12 @@ export function loQueExigeElTipo(
 
   if (config.requiresAssessment && !tipos.has('ASSESSMENT')) {
     faltan.push(
-      'Este tipo de formacion se evalua: agrega una evaluacion antes de publicar. Sin nota no hay nada que ensenarle a un auditor.',
+      'Este tipo de formación se evalúa: agrega una evaluación antes de publicar. Sin nota no hay nada que enseñarle a un auditor.',
     );
   }
   if (config.requiresSurvey && !tipos.has('SURVEY')) {
     faltan.push(
-      'Este tipo de formacion pide encuesta de satisfaccion: agregala antes de publicar. Es la evaluacion de reaccion que revisan BASC e ISO.',
+      'Este tipo de formación pide encuesta de satisfacción: agregala antes de publicar. Es la evaluación de reaccion que revisan BASC e ISO.',
     );
   }
 

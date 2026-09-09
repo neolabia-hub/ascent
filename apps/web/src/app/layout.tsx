@@ -33,10 +33,10 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'NEO PULSE',
-  description: 'Plataforma de formación corporativa NEO PULSE',
+  title: 'Ascent',
+  description: 'Plataforma de formación corporativa Ascent',
   // iOS no lee el manifiesto: para que "Anadir a inicio" se vea bien hace falta decirselo aparte.
-  appleWebApp: { capable: true, title: 'NEO PULSE', statusBarStyle: 'black-translucent' },
+  appleWebApp: { capable: true, title: 'Ascent', statusBarStyle: 'black-translucent' },
   icons: {
     icon: [
       { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

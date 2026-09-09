@@ -78,7 +78,7 @@ export default function VerificarPage({ params }: { params: { codigo: string } }
           <Resultado datos={datos} />
         ) : null}
 
-        <p className="mt-6 text-center text-xs text-ink-300">NEO PULSE</p>
+        <p className="mt-6 text-center text-xs text-ink-300">Ascent</p>
       </div>
     </main>
   );

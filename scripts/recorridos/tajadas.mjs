@@ -41,7 +41,7 @@ const proyectadosDe = async (id) => (await admin.get(`/offerings/${id}/projected
 
 paso(1, 'QUE FACETAS TIENEN DATOS PARA PARTIR EN DOS');
 const FACETAS = [
-  { clave: 'areaIds', nombre: 'Area', valores: (await catalogo('areas')).map((f) => ({ id: f.id, etiqueta: f.name })) },
+  { clave: 'areaIds', nombre: 'Área', valores: (await catalogo('areas')).map((f) => ({ id: f.id, etiqueta: f.name })) },
   { clave: 'jobTitleIds', nombre: 'Cargo', valores: (await catalogo('job-titles')).map((f) => ({ id: f.id, etiqueta: f.name })) },
   { clave: 'regionalIds', nombre: 'Regional', valores: (await catalogo('regionals')).map((f) => ({ id: f.id, etiqueta: f.name })) },
   { clave: 'serviceIds', nombre: 'Servicio', valores: (await catalogo('services')).map((f) => ({ id: f.id, etiqueta: f.name })) },

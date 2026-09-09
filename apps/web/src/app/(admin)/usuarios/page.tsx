@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Copy,
   Download,
+  FolderOpen,
   KeyRound,
   Pencil,
   Plus,
@@ -34,6 +35,7 @@ import {
 } from '@/lib/admin-api';
 import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
 import { ConstanciasDePersona } from '@/components/modules/admin/constancias-de-persona';
+import { ExpedienteDePersona } from '@/components/modules/admin/expediente-de-persona';
 import { PapelesDePersona } from '@/components/modules/admin/papeles-de-persona';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
@@ -116,6 +118,12 @@ export default function UsuariosPage() {
     primer gesto, asi que la descarga tiene que estar donde se acaba de encontrar a Juan.
   */
   const [constanciasDe, setConstanciasDe] = useState<UserRow | null>(null);
+  /*
+    EL EXPEDIENTE (2026-09-09): la vista de LECTURA con todo junto —obligaciones, constancias y
+    papeles de terceros—, que es lo que pide un auditor. No sustituye a los dos cajones de al lado:
+    esos son para HACER (emitir, revocar, registrar) y este no cambia nada.
+  */
+  const [expedienteDe, setExpedienteDe] = useState<UserRow | null>(null);
   /*
     Y LOS PAPELES DE UN TERCERO, en la misma pantalla y por el mismo motivo que las constancias: la
     peticion llega con un NOMBRE delante —"acaba de llegar el certificado de alturas de Juan"— y
@@ -453,6 +461,20 @@ export default function UsuariosPage() {
                     </Td>
                     <Td>
                       <div className="flex items-center justify-end gap-1">
+                        {/*
+                          EL EXPEDIENTE: lo primero de la fila porque es lo que mas se abre —«¿que
+                          tiene Juan?»— y porque es la unica que no cambia nada. Las que editan van
+                          detras: en una fila de iconos, el orden dice cual es la accion normal.
+                        */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExpedienteDe(user)}
+                          aria-label={`Expediente de ${user.fullName}`}
+                          title="Expediente: todo lo de esta persona"
+                        >
+                          <FolderOpen size={14} />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => openEdit(user)} aria-label={`Editar ${user.fullName}`}>
                           <Pencil size={14} />
                         </Button>
@@ -523,6 +545,10 @@ export default function UsuariosPage() {
         }}
       />
 
+
+      {expedienteDe ? (
+        <ExpedienteDePersona persona={expedienteDe} onCerrar={() => setExpedienteDe(null)} />
+      ) : null}
       <ConstanciasDePersona
         userId={constanciasDe?.id ?? null}
         nombre={constanciasDe?.fullName ?? ''}
@@ -537,7 +563,7 @@ export default function UsuariosPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         title={editing ? 'Editar persona' : 'Nueva persona'}
-        description={editing ? `Documento: ${editing.documentNumber}` : 'La contrasena inicial se genera automaticamente (cedula + caracteres).'}
+        description={editing ? `Documento: ${editing.documentNumber}` : 'La contraseña inicial se genera automaticamente (cedula + caracteres).'}
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setDrawerOpen(false)}>Cancelar</Button>

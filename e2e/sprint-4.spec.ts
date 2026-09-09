@@ -40,7 +40,7 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
   // Cada opcion es una fila "radio + campo de texto": se llega al campo desde su propio radio,
   // que es lo unico con nombre accesible estable en esa fila.
   const optionText = (position: number) =>
-    page.getByRole('radio', { name: `Marcar opcion ${position} como correcta` }).locator('xpath=following-sibling::input[1]');
+    page.getByRole('radio', { name: `Marcar opción ${position} como correcta` }).locator('xpath=following-sibling::input[1]');
   await optionText(1).fill('Que la carga este centrada');
   await optionText(2).fill('Nada, se mueve directo');
   await page.getByRole('radio', { name: 'Marcar opción 1 como correcta' }).check();
@@ -59,7 +59,7 @@ async function publishedPill(page: Page, suffix: string, pillName: string): Prom
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
   // La formacion es una ficha con pestanas: el contenido vive en la suya.
-  await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+  await page.getByRole('tab', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
   await page.getByRole('button', { name: 'Lección en tarjetas' }).click();

@@ -40,7 +40,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   catalog: 'Contenido formativo',
   lessons: 'Lecciones',
   offerings: 'Convocatorias',
-  enrollments: 'Ejecucion y progreso',
+  enrollments: 'Ejecución y progreso',
   attendance: 'Asistencia',
   assignments: 'Asignaciones y audiencias',
   plans: 'Plan anual',
@@ -50,7 +50,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   reports: 'Seguimiento y reportes',
   users: 'Usuarios',
   roles: 'Roles',
-  config: 'Configuracion',
+  config: 'Configuración',
   approvals: 'Aprobaciones',
   audit: 'Auditoria',
   ai: 'Generacion asistida',
@@ -161,7 +161,7 @@ export default function RolesPage() {
         href="/configuracion"
         className="focus-ring mb-4 inline-block text-sm text-ink-500 hover:text-ink-700"
       >
-        Configuracion
+        Configuración
       </Link>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">

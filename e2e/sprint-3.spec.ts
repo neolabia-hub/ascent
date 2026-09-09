@@ -60,7 +60,7 @@ async function publishedActivity(
   await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });
 
   // La formacion es una ficha con pestanas: el contenido vive en la suya.
-  await page.getByRole('button', { name: 'Contenido', exact: true }).click();
+  await page.getByRole('tab', { name: 'Contenido', exact: true }).click();
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   // Paso 1: se elige el TIPO en el selector de tarjetas (autoria reestructurada, 2026-08-27).
   await page.getByRole('button', { name: 'Lección en tarjetas' }).click();
@@ -346,7 +346,9 @@ test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan',
   // de este no existe o esta cerrado. Cual sea depende de lo que haya en la base —si alguien
   // creo el plan de este año mientras corre la suite, y esta bien que la ficha apunte a ese—.
   // Clavarlo hacia fallar la prueba por un comportamiento correcto.
-  await expect(page.getByText(/^Esta capacitacion no esta en el plan de \d{4}\.$/)).toBeVisible();
+  // El aviso es ahora UNA LINEA y dice solo lo que pasa; la explicacion se fue detras del icono de
+  // ayuda (2026-09-09, «ocupa mucho espacio»).
+  await expect(page.getByText(/^No está en el plan de \d{4}\.$/)).toBeVisible();
   // Sin contenido publicado no se ofrece programarla: solo se convoca lo publicado.
   await expect(page.getByText('Publica el contenido para poder programarla.')).toBeVisible();
 

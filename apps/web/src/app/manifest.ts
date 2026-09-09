@@ -10,8 +10,8 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'NEO PULSE',
-    short_name: 'NEO PULSE',
+    name: 'Ascent',
+    short_name: 'Ascent',
     description: 'Tu formación, en el bolsillo.',
     start_url: '/hoy',
     scope: '/',

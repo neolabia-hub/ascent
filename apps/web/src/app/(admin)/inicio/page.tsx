@@ -99,17 +99,55 @@ export default function InicioPage() {
   const reprogramar = (vencimientos?.items ?? []).filter((fila) => fila.clase === 'REPROGRAMAR').length;
   const perseguir = (vencimientos?.items ?? []).filter((fila) => fila.clase === 'PERSEGUIR').length;
 
+  /*
+    EL TITULAR DE HOY. `null` mientras no se sabe —con permiso para verlos y las cifras todavia sin
+    llegar—, para no afirmar "todo al dia" un segundo antes de que aparezcan tres vencidas.
+
+    Quien no tiene permiso para ver informes no se queda sin titulo: para esa persona el estado de la
+    empresa no es el asunto, asi que se le da la bienvenida y ya.
+  */
+  const vencido = puedeVerReportes ? vencimientos?.resumen.vencido : 0;
+  const atrasadas = puedeVerReportes ? resumen?.atrasadas : 0;
+  const porAprobar = puedeAprobar ? pendientes : 0;
+  const cargando =
+    (puedeVerReportes && (vencido === undefined || atrasadas === undefined)) ||
+    (puedeAprobar && porAprobar === null);
+  const plural = (n: number, una: string, varias: string) => (n === 1 ? una : varias);
+  const titular = cargando
+    ? null
+    : (vencido ?? 0) > 0
+      ? `${vencido} ${plural(vencido ?? 0, 'acreditación vencida', 'acreditaciones vencidas')}`
+      : (atrasadas ?? 0) > 0
+        ? `${atrasadas} ${plural(atrasadas ?? 0, 'obligación se quedó atrás', 'obligaciones se quedaron atrás')}`
+        : (porAprobar ?? 0) > 0
+          ? `${porAprobar} ${plural(porAprobar ?? 0, 'decisión espera', 'decisiones esperan')} tu aprobación`
+          : !puedeVerReportes && perfil
+            ? `Hola, ${perfil.fullName.split(' ')[0]}`
+            : 'Todo al día';
+
   return (
     <div className="space-y-8">
       <div>
-        {perfil ? (
-          <h1 className="font-display text-[28px] font-semibold text-ink-900">
-            {saludo()}, {perfil.fullName.split(' ')[0]}
-          </h1>
+        {/*
+          AQUI YA NO SE SALUDA (2026-09-09, lo vio el cliente): la barra de arriba dice «Buenos días,
+          Miguel» en TODAS las pantallas, asi que en Inicio el saludo salia dos veces con las mismas
+          palabras y a dos centimetros. Repetir no es dar la bienvenida, es ocupar el titulo.
+
+          Lo que va en su sitio es LO QUE PASA HOY. Es el titular que contesta «¿en que voy?» antes de
+          leer una sola tarjeta, y cambia solo —cada dia dice otra cosa porque la empresa esta en otro
+          punto—, que es de donde sale de verdad la sensacion de que el sistema esta vivo: de decir
+          algo cierto y distinto, no de tutear.
+
+          El orden es el mismo de las tarjetas de abajo y no es alfabetico: lo vencido ya se cayo, lo
+          atrasado todavia se puede recuperar, y una aprobacion espera a una persona. Se nombra UNA
+          sola cosa —la primera que importa— porque un titular con tres cifras no es un titular.
+        */}
+        {titular ? (
+          <h1 className="font-display text-[28px] font-semibold text-ink-900">{titular}</h1>
         ) : (
           <Skeleton className="h-8 w-64" />
         )}
-        <p className="mt-1 text-sm text-ink-500">Esto es lo que pide una decision hoy.</p>
+        <p className="mt-1 text-sm text-ink-500">Esto es lo que pide una decisión hoy.</p>
       </div>
 
       {/* 1. LO QUE SE ESTA CAYENDO AHORA. Va primero porque es lo unico que no puede esperar. */}
@@ -246,13 +284,6 @@ export default function InicioPage() {
       ) : null}
     </div>
   );
-}
-
-function saludo(): string {
-  const hora = new Date().getHours();
-  if (hora < 12) return 'Buenos dias';
-  if (hora < 19) return 'Buenas tardes';
-  return 'Buenas noches';
 }
 
 function Alerta({

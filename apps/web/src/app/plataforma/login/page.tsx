@@ -60,7 +60,7 @@ export default function PlatformLoginPage() {
             <ShieldCheck className="h-5 w-5" strokeWidth={1.75} />
           </span>
           <div>
-            <p className="font-display text-base font-bold leading-tight text-ink-900">NEO PULSE</p>
+            <p className="font-display text-base font-bold leading-tight text-ink-900">Ascent</p>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">Plataforma</p>
           </div>
         </div>

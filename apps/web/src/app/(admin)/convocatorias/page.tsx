@@ -34,7 +34,7 @@ const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string
 };
 
 const KIND_LABEL: Record<OfferingKind, string> = {
-  EVENT: 'Sesion programada',
+  EVENT: 'Sesión programada',
   // "Autoservicio" suena a opcional y NO lo es: la obligacion sigue existiendo y venciendo. Lo
   // unico que cambia es quien pulsa el boton de inscribir.
   PERMANENT: 'Disponible: la hace cuando pueda',
@@ -138,8 +138,8 @@ export default function ConvocatoriasPage() {
             title="Sin convocatorias todavía"
             description={
               versions.length === 0
-                ? 'Primero publica una version de una actividad formativa: solo se convoca contenido publicado.'
-                : 'Programa la primera jornada: una sesion con fecha e instructor, o una virtual permanente.'
+                ? 'Primero publica una versión de una actividad formativa: solo se convoca contenido publicado.'
+                : 'Programa la primera jornada: una sesión con fecha e instructor, o una virtual permanente.'
             }
             action={
               versions.length > 0 ? (

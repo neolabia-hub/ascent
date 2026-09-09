@@ -42,8 +42,8 @@ export function PendingCard({ item, featured = false }: { item: PendingItem; fea
     } catch (error) {
       const message =
         error instanceof ApiError && error.code === 'OFFERING_WINDOW_CLOSED'
-          ? 'Esta formacion no esta disponible hoy.'
-          : 'No se pudo empezar la formacion. Intenta de nuevo.';
+          ? 'Esta formación no esta disponible hoy.'
+          : 'No se pudo empezar la formación. Intenta de nuevo.';
       showToast({ kind: 'danger', title: message });
       setStarting(false);
     }

@@ -113,12 +113,12 @@ function Lectura({ metrics, ejecucion }: { metrics: PlanMetrics; ejecucion: Resu
   const frases: string[] = [];
 
   if (metrics.programmed === 0) {
-    frases.push('El plan todavia no tiene jornadas programadas, asi que no hay nada que medir.');
+    frases.push('El plan todavía no tiene jornadas programadas, así que no hay nada que medir.');
   } else {
     const brecha = metrics.compliancePct - metrics.coveragePct;
     if (metrics.projected === 0) {
       frases.push(
-        'Las jornadas estan programadas pero ningun renglon tiene proyectados congelados: hasta aprobarlos, la cobertura no significa nada.',
+        'Las jornadas estan programadas pero ningún renglon tiene proyectados congelados: hasta aprobarlos, la cobertura no significa nada.',
       );
     } else if (brecha >= 15) {
       frases.push(

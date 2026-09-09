@@ -67,7 +67,7 @@ export function Analitica({ planId }: { planId?: string | null }) {
         description={
           planId
             ? 'Este plan aun no ha generado obligaciones: se crean al aprobar sus renglones.'
-            : 'Cuando se asignen formaciones, aqui se vera como va cada area, cargo, regional y norma.'
+            : 'Cuando se asignen formaciones, aquí se vera como va cada área, cargo, regional y norma.'
         }
       />
     );
@@ -94,7 +94,7 @@ export function Analitica({ planId }: { planId?: string | null }) {
             <p className="mt-1 text-xs text-ink-500">
               {planId
                 ? 'Solo lo nacido de este plan'
-                : 'Toda la formacion viva: plan, inducciones, pildoras y extraordinarias'}
+                : 'Toda la formación viva: plan, inducciones, píldoras y extraordinarias'}
             </p>
           </div>
           <p className="text-sm text-ink-500">

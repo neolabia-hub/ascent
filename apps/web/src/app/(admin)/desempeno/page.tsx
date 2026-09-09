@@ -2,7 +2,20 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
-import { CalendarRange, ClipboardCheck, Copy, Download, Info, ListChecks, Play, Plus, Square, X } from 'lucide-react';
+import {
+  CalendarRange,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  Copy,
+  Download,
+  Info,
+  ListChecks,
+  Play,
+  Plus,
+  Square,
+  X,
+} from 'lucide-react';
 import {
   ESCALAS,
   descargarConsolidadoXlsx,
@@ -22,6 +35,9 @@ import {
   type Ciclo,
   type Competencia,
   type Consolidado,
+  type CortePorCompetencia,
+  type GrupoDeCiclo,
+  type ResultadoDeCompetencia,
   type EscalaCompetencia,
   type Formulario,
 } from '@/lib/performance-api';
@@ -258,8 +274,45 @@ function Ciclos() {
                     {ciclo.forms.map((cicloForm) => cicloForm.form.name).join(' + ')} ·{' '}
                     {new Date(ciclo.startsAt).toLocaleDateString('es-CO')} al{' '}
                     {new Date(ciclo.endsAt).toLocaleDateString('es-CO')}
-                    {ciclo._count.reviews > 0 ? ` · ${ciclo._count.reviews} evaluaciones` : ''}
                   </p>
+                  {/*
+                    CÓMO VA LA CAMPAÑA, EN LA PROPIA FILA (2026-09-09, lo pidió el cliente:
+                    *«ya se ejecutó, pero dónde se ve seguimiento, datos, métricas»*).
+
+                    Estaban —dentro del consolidado, detrás de un botón fantasma llamado «Ver como
+                    va»— y para quien mira eso es lo mismo que no estar. Lo que contesta la pregunta
+                    «¿cómo va?» son dos números: **cuántas se han entregado de cuántas**, y el
+                    **promedio** de las que ya tienen nota. Van aquí, y la barra los dice sin leer.
+
+                    El promedio se calla mientras no haya ninguna entregada: un promedio de cero
+                    evaluaciones no es un cero, es una cifra que todavía no existe.
+                  */}
+                  {ciclo.status !== 'DRAFT' && ciclo.cifras.total > 0 ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-paper">
+                          <div
+                            className="h-full rounded-full bg-ok transition-[width] duration-500 ease-pulse"
+                            style={{ width: `${Math.round((ciclo.cifras.entregadas / ciclo.cifras.total) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-ink-700">
+                          <strong className="font-semibold tabular-nums">{ciclo.cifras.entregadas}</strong> de{' '}
+                          <span className="tabular-nums">{ciclo.cifras.total}</span> entregadas
+                        </span>
+                      </div>
+                      {ciclo.cifras.promedio !== null ? (
+                        <span className="text-xs text-ink-500">
+                          promedio <span className="font-semibold tabular-nums text-ink-700">{ciclo.cifras.promedio}%</span>
+                        </span>
+                      ) : null}
+                      {ciclo.requiresSignature && ciclo.cifras.firmadas > 0 ? (
+                        <span className="text-xs text-ink-500">
+                          <span className="tabular-nums">{ciclo.cifras.firmadas}</span> firmadas
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <p className="mt-1 text-[11px] text-ink-300">
                     {ciclo.selfEvaluation ? 'Con autoevaluacion' : 'Solo el jefe califica'} ·{' '}
                     {ciclo.visibleToEmployee ? 'la persona ve su resultado' : 'el resultado no se le muestra'} ·{' '}
@@ -273,13 +326,20 @@ function Ciclos() {
                       Abrir
                     </Button>
                   ) : null}
+                  {/*
+                    «VER RESULTADOS» Y NO «Ver como va» (2026-09-09). El cliente no encontro los
+                    resultados —*«ya se ejecuto, pero donde se ve seguimiento, datos, metricas»*—
+                    y estaban justo aqui: detras de un boton FANTASMA con un nombre que suena a
+                    estado de la campaña, no a analisis. Un texto gris al lado de dos botones
+                    llenos no se lee como la puerta principal, y era la puerta principal.
+                  */}
                   {ciclo.status !== 'DRAFT' ? (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => void getConsolidado(ciclo.id).then(setConsolidado)}
                     >
-                      Ver como va
+                      Ver resultados
                     </Button>
                   ) : null}
                   {ciclo.status === 'OPEN' ? (
@@ -326,15 +386,15 @@ function porQueNoSePudo(error: unknown): string | undefined {
 
   switch (error.code) {
     case 'JOB_TITLES_OVERLAP':
-      return 'Dos formularios del ciclo se reparten el mismo cargo. Se quita ese cargo de uno de los dos en «Que se evalua».';
+      return 'Dos formularios del ciclo se reparten el mismo cargo. Se quita ese cargo de uno de los dos en «Que se evalúa».';
     case 'TOO_MANY_GENERAL_FORMS':
       return 'El ciclo lleva dos formularios sin cargos, y solo puede haber uno general.';
     case 'CYCLE_WITHOUT_FORMS':
-      return 'El ciclo no tiene ningun formulario.';
+      return 'El ciclo no tiene ningún formulario.';
     case 'FORM_EMPTY':
       return `«${formulario}» no tiene ninguna competencia, asi que no preguntaria nada.`;
     case 'NO_EVALUATIONS':
-      return 'No se genero ninguna evaluacion: ningun cargo de la empresa encaja con los formularios elegidos, o nadie tiene responsable de area y el ciclo no lleva autoevaluacion.';
+      return 'No se genero ninguna evaluación: ningún cargo de la empresa encaja con los formularios elegidos, o nadie tiene responsable de área y el ciclo no lleva autoevaluacion.';
     case 'NO_PEOPLE':
       return 'No hay personas activas a las que evaluar.';
     case 'FORM_NOT_FOUND':
@@ -543,7 +603,7 @@ function NuevoCiclo({
             </ul>
             <p className="mt-3 text-xs text-ink-500">
               {formulario.jobTitles.length === 0
-                ? 'Recoge a quien no encaje en ningun otro formulario del ciclo.'
+                ? 'Recoge a quien no encaje en ningún otro formulario del ciclo.'
                 : `Solo a: ${formulario.jobTitles.map((fila) => fila.jobTitle.name).join(', ')}.`}
             </p>
           </div>
@@ -798,7 +858,51 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-x-auto">
+      {/*
+        EL ANALISIS, ANTES DE LA LISTA DE PERSONAS (2026-09-09, pedido del cliente: *«un resultado
+        por competencia... por cargo, area, los diferentes analisis que se puedan sacar, que la
+        informacion le sirva para tomar decisiones... para el plan»*).
+
+        Va ARRIBA y la tabla nominal debajo, y ese orden es la decision: quien abre esto una vez al
+        año no viene a leer 900 filas, viene a contestar «¿que formacion pido para el año que
+        viene?». La lista persona por persona sigue estando —es la evidencia— pero deja de ser lo
+        primero, porque como diagnostico no sirve: nadie saca un patron de 900 notas sueltas.
+      */}
+      {datos.porCompetencia.length > 0 ? (
+        <section className="mt-6">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+            En qué estamos flojos
+          </h3>
+          <p className="mt-1 text-xs text-ink-500">
+            De la competencia más floja a la más fuerte, sobre las evaluaciones entregadas. Despliega una
+            para ver en qué área y en qué cargo está peor.
+          </p>
+
+          <ul className="mt-3 space-y-1.5">
+            {datos.porCompetencia.map((competencia) => (
+              <Competencia key={competencia.competencyId} datos={competencia} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/*
+        Y LOS DOS CORTES DE LA CAMPAÑA ENTERA. Contestan otra pregunta que la de arriba: no «que
+        competencia falla» sino «que area o que cargo va peor en conjunto», que es lo que decide a
+        quien se le lleva primero la formacion.
+      */}
+      {datos.porArea.length > 1 || datos.porCargo.length > 1 ? (
+        <section className="mt-6 grid gap-4 sm:grid-cols-2">
+          {datos.porArea.length > 1 ? <Corte titulo="Por área" grupos={datos.porArea} /> : null}
+          {datos.porCargo.length > 1 ? <Corte titulo="Por cargo" grupos={datos.porCargo} /> : null}
+        </section>
+      ) : null}
+
+      <section className="mt-6">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+          Persona por persona
+        </h3>
+      <div className="mt-3 overflow-x-auto">
         <Table>
           <THead>
             <Tr>
@@ -839,10 +943,185 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
       {datos.items.length > 100 ? (
         <p className="mt-3 text-center text-xs text-ink-500">Se muestran 100 de {datos.items.length}.</p>
       ) : null}
+      </section>
     </Modal>
   );
 }
 
+
+/**
+ * UNA COMPETENCIA EN EL ANALISIS: la nota, la brecha, y dónde está peor.
+ *
+ * ─── LA BARRA ES LO QUE SE LEE, EL NUMERO LO QUE SE CITA ───
+ *
+ * Doce competencias con doce porcentajes en una columna se leen de una en una; con barra, el
+ * patrón se ve sin leer ninguna. El número se queda al lado porque es lo que se escribe después en
+ * el acta del comité.
+ *
+ * ─── EL COLOR DICE SI HAY QUE HACER ALGO, Y NO ES DECORACION ───
+ *
+ * Por debajo de 60 hay un problema, entre 60 y 80 hay margen, por encima está bien. No se inventa
+ * aquí: es la misma banda que usa el resto del producto para el cumplimiento. Sin umbral, un 58 %
+ * y un 88 % se ven igual de largos y hay que compararlos a mano.
+ *
+ * ─── LA BRECHA ENTRE EL JEFE Y LA AUTOEVALUACION ───
+ *
+ * Solo se enseña cuando la campaña tuvo autoevaluación y hay las dos notas. Es el dato que más se
+ * usa en la reunión: si el jefe puntúa por debajo, hay una conversación pendiente; si por encima,
+ * alguien que se subestima. Se dice en puntos y con signo, que es como se cuenta.
+ */
+function Competencia({ datos }: { datos: ResultadoDeCompetencia }) {
+  const [abierta, setAbierta] = useState(false);
+  const sinNota = datos.promedio === null;
+  const brecha =
+    datos.promedioJefe !== null && datos.promedioAuto !== null
+      ? Math.round((datos.promedioJefe - datos.promedioAuto) * 10) / 10
+      : null;
+  const tono =
+    datos.promedio === null
+      ? 'bg-line'
+      : datos.promedio < 60
+        ? 'bg-danger'
+        : datos.promedio < 80
+          ? 'bg-warn'
+          : 'bg-ok';
+
+  return (
+    <li className="rounded-lg bg-paper">
+      <button
+        type="button"
+        onClick={() => setAbierta((valor) => !valor)}
+        aria-expanded={abierta}
+        disabled={sinNota}
+        className="focus-ring flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left disabled:cursor-default"
+      >
+        {sinNota ? (
+          <span className="w-4 shrink-0" />
+        ) : abierta ? (
+          <ChevronDown className="h-4 w-4 shrink-0 text-ink-500" aria-hidden />
+        ) : (
+          <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" aria-hidden />
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm text-ink-900">{datos.name}</span>
+        {sinNota ? (
+          <span className="shrink-0 text-xs text-ink-500">solo texto</span>
+        ) : (
+          <>
+            <span className="hidden h-1.5 w-32 shrink-0 overflow-hidden rounded-full bg-surface sm:block">
+              <span className={cn('block h-full rounded-full', tono)} style={{ width: `${datos.promedio}%` }} />
+            </span>
+            <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-ink-900">
+              {datos.promedio}%
+            </span>
+          </>
+        )}
+      </button>
+
+      {abierta && !sinNota ? (
+        <div className="border-t border-line px-3 py-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-500">
+            <span>
+              sobre <span className="tabular-nums text-ink-700">{datos.respuestas}</span> respuestas
+            </span>
+            {datos.promedioJefe !== null ? (
+              <span>
+                el jefe: <span className="font-semibold tabular-nums text-ink-700">{datos.promedioJefe}%</span>
+              </span>
+            ) : null}
+            {datos.promedioAuto !== null ? (
+              <span>
+                se autoevalúan: <span className="font-semibold tabular-nums text-ink-700">{datos.promedioAuto}%</span>
+              </span>
+            ) : null}
+            {brecha !== null && brecha !== 0 ? (
+              <span className={brecha < 0 ? 'text-warn' : 'text-info'}>
+                {brecha < 0
+                  ? `el jefe puntúa ${Math.abs(brecha)} puntos por debajo`
+                  : `el jefe puntúa ${brecha} puntos por encima`}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <ListaDeCorte titulo="Peor en estas áreas" cortes={datos.porArea} />
+            <ListaDeCorte titulo="Peor en estos cargos" cortes={datos.porCargo} />
+          </div>
+
+          {/*
+            Y AQUI SE CIERRA EL CIRCULO CON EL PLAN. La competencia declara qué formación la
+            refuerza (`suggestedActivityId`), y ese dato existía en el catálogo sin que lo leyera
+            nadie. Con una nota baja delante, es la frase que convierte un diagnóstico en un renglón
+            del plan del año que viene.
+          */}
+          {datos.formacion ? (
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-ink-500">
+              La refuerza:
+              <Link
+                href={`/contenido-formativo/${datos.formacion.id}`}
+                className="focus-ring font-medium text-ink-700 underline underline-offset-2 hover:text-ink-900"
+              >
+                {datos.formacion.name}
+              </Link>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** Las tres peores de un corte. Más de tres es una tabla, y esto se lee de un vistazo. */
+function ListaDeCorte({ titulo, cortes }: { titulo: string; cortes: CortePorCompetencia[] }) {
+  if (cortes.length === 0) return null;
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">{titulo}</p>
+      <ul className="mt-1 space-y-0.5">
+        {cortes.slice(0, 3).map((corte) => (
+          <li key={corte.nombre} className="flex items-baseline justify-between gap-2 text-sm">
+            <span className="min-w-0 truncate text-ink-700">{corte.nombre}</span>
+            <span className="shrink-0 font-semibold tabular-nums text-ink-900">{corte.promedio}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * UN CORTE DE LA CAMPAÑA ENTERA: por área o por cargo, de peor a mejor.
+ *
+ * Contesta otra pregunta que la lista de competencias: no «qué falla» sino «quién va peor», que es
+ * lo que decide a quién se le lleva primero la formación. Se dice también cuántas entregaron,
+ * porque un promedio sobre tres evaluaciones de veinte no es el promedio del área: es el de tres
+ * personas, y confundirlo lleva a decidir sobre humo.
+ */
+function Corte({ titulo, grupos }: { titulo: string; grupos: GrupoDeCiclo[] }) {
+  return (
+    <div>
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">{titulo}</h3>
+      <ul className="mt-2 overflow-hidden rounded-xl bg-paper">
+        {grupos.map((grupo) => (
+          <li
+            key={grupo.nombre}
+            className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-3 py-2 last:border-0"
+          >
+            <span className="min-w-0 truncate text-sm text-ink-900">{grupo.nombre}</span>
+            <span className="shrink-0 text-xs text-ink-500">
+              <span className="tabular-nums">{grupo.entregadas}</span> de{' '}
+              <span className="tabular-nums">{grupo.total}</span> ·{' '}
+              {grupo.promedio === null ? (
+                'sin nota'
+              ) : (
+                <span className="font-semibold tabular-nums text-ink-900">{grupo.promedio}%</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 function Cifra({ valor, etiqueta }: { valor: number | string; etiqueta: string }) {
   return (
     <div className="rounded-xl bg-paper p-4">
@@ -1059,7 +1338,7 @@ function EditarCompetencia({
       const codigo = (fallo as { code?: string }).code;
       setError(
         codigo === 'DUPLICATE_CODE'
-          ? 'Ya existe una competencia con ese codigo.'
+          ? 'Ya existe una competencia con ese código.'
           : codigo === 'SCALE_LOCKED'
             ? 'No se puede cambiar la escala: ya hay evaluaciones respondidas con ella, y un 4 sobre 5 no significa lo mismo que un 4 sobre 10.'
             : 'No se pudo guardar.',
@@ -1285,7 +1564,7 @@ function ArmarFormulario({
       title={duplicando ? 'Copia del formulario' : formulario ? 'Editar formulario' : 'Nuevo formulario'}
       description={
         soloLectura
-          ? 'Ya lo uso un ciclo, asi que no se puede cambiar. Puedes duplicarlo y editar la copia.'
+          ? 'Ya lo uso un ciclo, así que no se puede cambiar. Puedes duplicarlo y editar la copia.'
           : 'Marca las competencias, ajusta cuanto pesa cada una y di a quien se le hace.'
       }
       footer={
@@ -1294,7 +1573,7 @@ function ArmarFormulario({
             {elegidas.length + heredadas.length === 0
               ? 'Marca al menos una competencia.'
               : faltaElegirCargo
-                ? 'Elige al menos un cargo, o cambialo a toda la empresa.'
+                ? 'Elige al menos un cargo, o cámbialo a toda la empresa.'
                 : `${elegidas.length + heredadas.length} competencia${
                     elegidas.length + heredadas.length === 1 ? '' : 's'
                   }${heredadas.length > 0 ? ` (${heredadas.length} comunes)` : ''} en ${resumen}`}
@@ -1380,7 +1659,7 @@ function ArmarFormulario({
               label="Competencias comunes"
               hint={
                 esBaseDeOtros
-                  ? 'De este formulario ya cuelgan otros, asi que el no puede colgar de ninguno.'
+                  ? 'De este formulario ya cuelgan otros, así que el no puede colgar de ninguno.'
                   : 'Las que se le preguntan a todo el mundo. Se escriben UNA vez y se heredan.'
               }
             >
@@ -1555,7 +1834,7 @@ function ArmarFormulario({
                   ))}
                   {candidatos.length === 0 ? (
                     <p className="text-xs text-ink-300">
-                      {termino ? 'Ningun cargo coincide.' : 'Ya estan todos elegidos.'}
+                      {termino ? 'Ningún cargo coincide.' : 'Ya estan todos elegidos.'}
                     </p>
                   ) : null}
                 </div>

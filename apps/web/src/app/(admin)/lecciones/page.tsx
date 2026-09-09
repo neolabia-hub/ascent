@@ -96,7 +96,7 @@ export default function LeccionesPage() {
         </div>
         <Button onClick={openCreate}>
           <Plus size={16} />
-          Nueva leccion
+          Nueva lección
         </Button>
       </div>
 
@@ -111,7 +111,7 @@ export default function LeccionesPage() {
             action={
               <Button onClick={openCreate}>
                 <Plus size={16} />
-                Nueva leccion
+                Nueva lección
               </Button>
             }
           />

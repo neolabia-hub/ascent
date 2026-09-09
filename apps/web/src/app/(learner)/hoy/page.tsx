@@ -730,8 +730,8 @@ function useAbrir(item: PendingItem) {
         kind: 'danger',
         title:
           error instanceof ApiError && error.code === 'OFFERING_WINDOW_CLOSED'
-            ? 'Esta formacion no esta disponible hoy.'
-            : 'No se pudo empezar la formacion.',
+            ? 'Esta formación no esta disponible hoy.'
+            : 'No se pudo empezar la formación.',
       });
       setCargando(false);
     }

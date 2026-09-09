@@ -593,7 +593,7 @@ export function ListaDeAsistencia({
           title="Nadie inscrito todavía"
           description={
             puedeInscribir
-              ? 'Inscribe a quienes ya tienen la obligacion de esta actividad en la sede de la convocatoria.'
+              ? 'Inscribe a quiénes ya tienen la obligación de esta actividad en la sede de la convocatoria.'
               : 'Publica la convocatoria para poder inscribir personas.'
           }
         />
@@ -1048,6 +1048,11 @@ export function ListaDeAsistencia({
               <Button variant="ghost" onClick={() => setTomando(false)}>
                 Cancelar
               </Button>
+              {/*
+                EN EL COLOR PRINCIPAL Y NO EN EL DE ACENTO (2026-09-09). Iba en el acento del tenant
+                por ser "lo que de verdad avanza aqui", y el cliente lo tumbo: con el acento verde de
+                esta empresa el boton se leia como un semaforo y no como el paso siguiente.
+              */}
               <Button
                 onClick={guardar}
                 loading={busy}

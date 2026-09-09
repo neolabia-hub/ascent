@@ -73,15 +73,15 @@ export default function LearnerActivityPage() {
   return (
     <EmptyState
       icon={GraduationCap}
-      title={hecha ? 'Esta formacion ya la hiciste' : 'Esta formacion ya no esta entre tus pendientes'}
+      title={hecha ? 'Esta formación ya la hiciste' : 'Esta formación ya no esta entre tus pendientes'}
       description={
         hecha
           ? 'Esta en tu historial, con su nota y su fecha.'
-          : 'El aviso quedo como registro de lo que paso, pero la obligacion se retiro despues: ocurre cuando alguien deja de pertenecer a la audiencia a la que se le exigia.'
+          : 'El aviso quedo como registro de lo que paso, pero la obligación se retiro después: ocurre cuando alguien deja de pertenecer a la audiencia a la que se le exigia.'
       }
       action={
         <Link href="/mi-formacion">
-          <Button variant="outline">{hecha ? 'Ver mi historial' : 'Ver mi formacion'}</Button>
+          <Button variant="outline">{hecha ? 'Ver mi historial' : 'Ver mi formación'}</Button>
         </Link>
       }
     />
