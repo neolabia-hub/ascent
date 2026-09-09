@@ -185,7 +185,7 @@ if (unPlan && creado.offeringId) {
   comprobar(
     colar.estado === 409 && colar.cuerpo?.code === 'ACTIVITY_NOT_PLANNABLE',
     `una pildora no entra al plan (${colar.estado} ${colar.cuerpo?.code ?? ''})`,
-    `la dejo entrar (${colar.estado}), y eso mueve el cumplimiento del ano con un refuerzo de tres minutos`,
+    `la dejo entrar (${colar.estado}), y eso mueve el cumplimiento del año con un refuerzo de tres minutos`,
   );
 } else {
   console.log('   ... no hay ningun plan abierto; se salta');

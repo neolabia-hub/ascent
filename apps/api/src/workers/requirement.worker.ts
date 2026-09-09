@@ -7,7 +7,7 @@ import { RequirementEngineService } from '../assignments/requirement-engine.serv
  * Vigilante de las obligaciones (CLAUDE.md 5, colas: RequirementWorker + AudienceWorker).
  *
  * El motor ya corre en caliente cuando alguien entra o cambia de cargo; este ciclo cubre lo que
- * pasa SOLO por el paso del tiempo y nadie dispara: la reinduccion que cumple su ano, el carne
+ * pasa SOLO por el paso del tiempo y nadie dispara: la reinduccion que cumple su año, el carne
  * que vence, la obligacion que se pasa de fecha.
  *
  * Corre cada hora, no cada minuto: las fechas de vencimiento son DIAS, y un ciclo barato que

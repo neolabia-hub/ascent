@@ -41,7 +41,7 @@ describe('planVersionMigration', () => {
 
   it('MOVE_NOT_STARTED mira el HECHO, no el estado: con avance no se mueve aunque diga ENROLLED', () => {
     // Guardar avance no siempre mueve el estado a IN_PROGRESS (un envio perdido por falta de
-    // senal, por ejemplo). Fiarse del rotulo le borraria el avance a alguien que si empezo.
+    // señal, por ejemplo). Fiarse del rotulo le borraria el avance a alguien que si empezo.
     const plan = planVersionMigration([person({ id: 'a', status: 'ENROLLED', started: true })], V2, 'MOVE_NOT_STARTED');
     expect(plan.moving).toHaveLength(0);
   });

@@ -35,7 +35,7 @@ export const tenantSettingsSchema = z
     /**
      * CUANTOS DIAS ANTES DEL CIERRE se le recuerda el ciclo de desempeno a quien no ha respondido.
      *
-     * Estaba escrito en el codigo y no es una constante tecnica: en una empresa donde la campana
+     * Estaba escrito en el codigo y no es una constante tecnica: en una empresa donde la campaña
      * dura seis semanas, tres dias de aviso llegan tarde; en una de dos semanas, avisar con diez
      * es avisar el primer dia. Es la misma clase de decision que `efficacyDaysDefault`, y la toma
      * quien conoce a su gente.
@@ -43,6 +43,20 @@ export const tenantSettingsSchema = z
      * 0 apaga el recordatorio: hay empresas que prefieren que lo lleve el jefe por su cuenta.
      */
     performanceReminderDays: z.number().int().min(0).max(30).default(3),
+
+    /**
+     * CUANTOS DIAS HACIA ADELANTE mira el aviso semanal de vencimientos (`PENDIENTES` 3.3).
+     *
+     * No es una constante tecnica: lo que se tarda en conseguir un cupo de alturas con la ARL no se
+     * parece a lo que se tarda en programar una charla propia, y avisar con quince dias de algo que
+     * necesita dos meses de gestion es avisar tarde. Por defecto 45, que es un mes y medio: cabe la
+     * ventana de 60 dias en la que el motor hace nacer la ronda siguiente sin llenar el aviso de
+     * cosas del año que viene.
+     *
+     * 0 lo apaga. Hay empresas que prefieren llevarlo por su cuenta, y un aviso que no se quiere es
+     * el que enseña a ignorar todos los demas.
+     */
+    expirationDigestDays: z.number().int().min(0).max(180).default(45),
 
     // Rotulos de UI (Decision #31: fijos en F1; previstos aqui, sin UI de edicion todavia).
     labels: z
@@ -68,7 +82,7 @@ export const tenantSettingsSchema = z
      * personal de nadie: cualquiera que sepa el subdominio lo puede leer. La UI lo advierte donde
      * se escribe.
      *
-     * Vacio es un estado legitimo y frecuente el primer dia: entonces la pantalla ensena el
+     * Vacio es un estado legitimo y frecuente el primer dia: entonces la pantalla enseña el
      * contacto de la plataforma, que se configura por variable de entorno y no lo toca el cliente.
      */
     support: z

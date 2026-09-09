@@ -72,12 +72,12 @@ export class CertificateTemplatesService {
     /*
       NO SE PUEDE ACTIVAR SIN ARTE. Una plantilla activa es la que se usa al emitir, y sin fondo
       saldrian constancias en hoja blanca con cuatro lineas de texto sueltas. Es mejor no emitir
-      —que queda registrado y se ve— que emitir un papel que nadie querria ensenar.
+      —que queda registrado y se ve— que emitir un papel que nadie querria enseñar.
     */
     if (input.active && !input.backgroundKey) {
       throw new BadRequestException({
         code: 'TEMPLATE_WITHOUT_BACKGROUND',
-        message: 'Sube el diseno de la constancia antes de activarla.',
+        message: 'Sube el diseño de la constancia antes de activarla.',
       });
     }
 
@@ -113,7 +113,7 @@ export class CertificateTemplatesService {
 
       La emision coge "la activa mas reciente"; con dos activas, cual gana dependeria del orden de
       actualizacion, y dos personas que terminan la misma formacion el mismo dia podrian recibir
-      constancias con disenos distintos. Se resuelve aqui y no con una restriccion en la base de
+      constancias con diseños distintos. Se resuelve aqui y no con una restriccion en la base de
       datos porque una restriccion obligaria a apagar la anterior en una peticion aparte, y entre
       las dos peticiones no habria ninguna activa.
     */

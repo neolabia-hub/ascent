@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../common/audit.service.js';
 import { SequenceService } from '../common/sequence.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { vencimientoDe } from './certificate-policy.js';
+import { vencimientoDe, vigenciaMasCorta } from './certificate-policy.js';
 import type { CertificateSnapshot } from './certificate-snapshot.js';
 
 /**
@@ -107,13 +107,21 @@ export class CertificatesService {
       seria pedir el mismo dato dos veces y garantizar que algun dia no coincidan — y entonces
       habria un papel diciendo "vigente" sobre algo que el sistema ya reclama vencido.
     */
-    const requisito = await this.prisma.forTenant(tenantId).assignmentRule.findFirst({
+    /*
+      TODAS las reglas vivas, no la primera que devuelva la base (corregido el 2026-09-08).
+
+      Puede haber varias sobre la misma formacion —publicar una induccion crea sola la suya de "toda
+      la empresa", y ademas se la puede exigir a un cargo— y con `findFirst` la vigencia dependia del
+      orden de las filas: si tocaba la que no tiene recurrencia, la constancia salia SIN vencimiento y
+      la persona desaparecia del informe de Vencimientos. Lo destapo `vencimientos.mjs`.
+    */
+    const requisitos = await this.prisma.forTenant(tenantId).assignmentRule.findMany({
       // `targetId` es la ACTIVIDAD, no la version: el requisito obliga a la formacion, y cambiar de
       // version no crea una obligacion nueva.
       where: { targetType: 'ACTIVITY', targetId: enrollment.activityVersion.activityId, active: true },
       select: { recurrence: true },
     });
-    const vigenciaMeses = mesesDeRecurrencia(requisito?.recurrence ?? null);
+    const vigenciaMeses = vigenciaMasCorta(requisitos.map((fila) => fila.recurrence));
 
     const snapshot: CertificateSnapshot = {
       schemaVersion: 1,
@@ -340,7 +348,7 @@ export class CertificatesService {
   /**
    * La plantilla que rige hoy en esta empresa.
    *
-   * Se coge la ACTIVA mas reciente. Si manana se activa otra, las ya emitidas no cambian: cada
+   * Se coge la ACTIVA mas reciente. Si mañana se activa otra, las ya emitidas no cambian: cada
    * constancia guarda `templateId` y `templateVersion`, asi que se puede reimprimir exactamente
    * como se entrego.
    */
@@ -377,16 +385,3 @@ function enmascarar(documento: string): string {
   return `${documento.slice(0, 3)}***${documento.slice(-4)}`;
 }
 
-/**
- * Los meses de una recurrencia, o `null` si no la tiene.
- *
- * `recurrence` es JSON con dos formas posibles (`{everyMonths}` o `{fixedDate}`) y solo la primera
- * se traduce a una vigencia en meses. La de fecha fija —"cada 31 de enero"— no: ahi el vencimiento
- * es un dia del calendario y no un plazo desde que se curso, y mezclarlas daria una vigencia
- * inventada. Se deja fuera a proposito hasta que exista un caso real que la pida.
- */
-function mesesDeRecurrencia(recurrence: unknown): number | null {
-  if (!recurrence || typeof recurrence !== 'object') return null;
-  const valor = (recurrence as Record<string, unknown>).everyMonths;
-  return typeof valor === 'number' && valor > 0 ? valor : null;
-}

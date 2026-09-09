@@ -47,7 +47,7 @@ const offeringBaseSchema = z.object({
   windowStart: dateOnly.nullable().optional(),
   windowEnd: dateOnly.nullable().optional(),
 
-  // Desglose SIEMPRE separado (Decision #30): PESV Paso 10 lo exige y BPM suma 10 h/ano.
+  // Desglose SIEMPRE separado (Decision #30): PESV Paso 10 lo exige y BPM suma 10 h/año.
   intensityTheoryHours: z.number().min(0).max(999).nullable().optional(),
   intensityPracticeHours: z.number().min(0).max(999).nullable().optional(),
 
@@ -163,7 +163,7 @@ export type PublishOfferingInput = z.infer<typeof publishOfferingSchema>;
  * siete personas al area en marzo, asi que el 100% de cobertura seria mentira.
  *
  * El motivo es OBLIGATORIO y no tiene valor por defecto: si nadie escribe por que, dentro de un
- * ano nadie va a saber si el numero se corrigio o se maquillo.
+ * año nadie va a saber si el numero se corrigio o se maquillo.
  */
 export const adjustProjectedSchema = z.object({
   projectedCount: z.number().int().min(0).max(100000),
@@ -202,8 +202,8 @@ export type EnrollOfferingInput = z.infer<typeof enrollOfferingSchema>;
  * emite ese papel — lo REGISTRA, porque quien necesita saber cuando vence es la empresa.
  *
  * `validUntil` es el unico campo con consecuencias sobre el motor: **manda sobre la vigencia que
- * calcula la recurrencia**. Si la ARL certifica por tres anos y el tipo dice doce meses, reclamarla
- * al ano seria inventar un incumplimiento sobre alguien con su habilitacion vigente y el papel para
+ * calcula la recurrencia**. Si la ARL certifica por tres años y el tipo dice doce meses, reclamarla
+ * al año seria inventar un incumplimiento sobre alguien con su habilitacion vigente y el papel para
  * probarlo. Por eso se copia a la obligacion (`valid_until_override`) y no se queda solo aqui.
  *
  * ─── EL EMISOR NO SE TECLEA POR PERSONA (2026-09-06) ───
@@ -252,7 +252,7 @@ export type CertificadoExternoInput = z.infer<typeof certificadoExternoSchema>;
  * propio motivo y su propia auditoria.
  *
  * Lo que se escribe es un `AttendanceRecord` —la tabla que ya estaba en el esquema desde el Sprint
- * 5— con `method: INSTRUCTOR`. Los otros dos metodos que preve el diseno (QR de sesion y firma en
+ * 5— con `method: INSTRUCTOR`. Los otros dos metodos que preve el diseño (QR de sesion y firma en
  * pantalla) comparten esa misma tabla cuando se construyan.
  */
 export const asistenciaEstadoSchema = z.enum(['PRESENT', 'ABSENT', 'JUSTIFIED']);

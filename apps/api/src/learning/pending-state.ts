@@ -45,7 +45,7 @@ export interface PendingStateResult {
  * La contradiccion existia porque el servidor mandaba BANDERAS SUELTAS (`overdue`, `enrollmentId`,
  * `selfServiceOfferingId`) y dejaba que cada pantalla las reconciliara. Basta que una se despiste
  * para que vuelva. Resuelto aqui, el estado es UNO y viaja ya decidido: ninguna pantalla —ni la
- * web de hoy, ni la aplicacion movil de manana— puede contradecirse, porque no tiene con que.
+ * web de hoy, ni la aplicacion movil de mañana— puede contradecirse, porque no tiene con que.
  *
  * ─── LA REGLA ───
  *

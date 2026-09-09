@@ -85,7 +85,7 @@ export function decideNudge(input: NudgeInput): NudgeDecision {
 
 /**
  * Franja horaria de estudio de la persona: la hora en la que MAS veces ha aprendido algo.
- * Sin historia se usa la de la manana, que es cuando arranca el turno en una bodega.
+ * Sin historia se usa la de la mañana, que es cuando arranca el turno en una bodega.
  */
 export const DEFAULT_NUDGE_HOUR = 8;
 

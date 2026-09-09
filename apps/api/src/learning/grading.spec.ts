@@ -150,7 +150,7 @@ describe('completar huecos', () => {
   });
 
   it('con credito parcial cada hueco suma por separado', () => {
-    expect(gradeQuestion(pregunta, { blanks: { '1': 'arnes', '2': 'un ano' } })).toMatchObject({
+    expect(gradeQuestion(pregunta, { blanks: { '1': 'arnes', '2': 'un año' } })).toMatchObject({
       pointsAwarded: 2,
       correct: false,
     });
@@ -158,7 +158,7 @@ describe('completar huecos', () => {
 
   it('sin credito parcial, un hueco mal anula la pregunta entera', () => {
     const estricta = { ...pregunta, correct: { ...pregunta.correct, partialCredit: false } };
-    expect(gradeQuestion(estricta, { blanks: { '1': 'arnes', '2': 'un ano' } })).toMatchObject({
+    expect(gradeQuestion(estricta, { blanks: { '1': 'arnes', '2': 'un año' } })).toMatchObject({
       pointsAwarded: 0,
       correct: false,
     });

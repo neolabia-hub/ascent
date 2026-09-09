@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 export type SequenceEntity = 'OFFERING' | 'CERTIFICATE' | 'PLAN';
 
 /**
- * Numeracion visible por tenant y ano (CONV-2026-000001, CERT-2026-000123).
+ * Numeracion visible por tenant y año (CONV-2026-000001, CERT-2026-000123).
  *
  * El UUID es la llave real; este numero es el identificador legal y humano, y por eso no puede
  * saltarse ni repetirse. Se reserva con un UPSERT que devuelve el valor incrementado: Postgres

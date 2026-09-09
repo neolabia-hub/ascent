@@ -10,7 +10,7 @@
  * Cuantos dias antes del cierre se avisa, POR DEFECTO.
  *
  * Lo que manda es `performanceReminderDays` de los ajustes del tenant, que es donde se cambia sin
- * tocar codigo: seis semanas de campana y dos semanas de campana no se recuerdan con el mismo
+ * tocar codigo: seis semanas de campaña y dos semanas de campaña no se recuerdan con el mismo
  * plazo. Esto es solo el valor con el que arranca una empresa nueva. Y es UN aviso, no varios: dos
  * recordatorios se leen como acoso.
  */
@@ -19,7 +19,7 @@ export const DIAS_DE_AVISO = 3;
 /**
  * DIAS COMPLETOS que faltan para el cierre, contando por FECHA y no por horas.
  *
- * Si se restaran milisegundos, un ciclo que cierra manana a las 8 de la manana daria "0 dias" a las
+ * Si se restaran milisegundos, un ciclo que cierra mañana a las 8 de la mañana daria "0 dias" a las
  * 9 de esta noche y el aviso saldria hoy; y uno que cierra hoy a las 23:59 daria "0" desde el
  * mediodia. Lo que la gente entiende por "faltan 3 dias" es la diferencia entre dos fechas.
  */
@@ -32,7 +32,7 @@ export function diasHastaElCierre(cierre: Date, ahora: Date): number {
  * SI HOY TOCA AVISAR.
  *
  * Se avisa en la VENTANA que va desde `diasDeAviso` hasta el dia del cierre, y no exactamente el
- * dia N: el worker corre una vez al dia y un servidor caido esa manana —o un ciclo creado dentro de
+ * dia N: el worker corre una vez al dia y un servidor caido esa mañana —o un ciclo creado dentro de
  * la ventana— dejaria a todo el mundo sin recordatorio para siempre. Que no se repita lo garantiza
  * el propio aviso ya enviado, no el calendario.
  *
@@ -44,9 +44,9 @@ export function tocaRecordar(cierre: Date, ahora: Date, diasDeAviso: number = DI
   return faltan >= 0 && faltan <= diasDeAviso;
 }
 
-/** El texto, que depende de cuanto falta: "manana" y "hoy" no se dicen con un numero. */
+/** El texto, que depende de cuanto falta: "mañana" y "hoy" no se dicen con un numero. */
 export function cuandoCierra(faltan: number): string {
   if (faltan <= 0) return 'cierra hoy';
-  if (faltan === 1) return 'cierra manana';
+  if (faltan === 1) return 'cierra mañana';
   return `cierra en ${faltan} dias`;
 }

@@ -109,7 +109,7 @@ describe('reconocer la misma audiencia', () => {
 
   it('la misma lista en facetas distintas NO es la misma audiencia', () => {
     // "los del area de Logistica" y "los de la regional de Neiva" pueden dar la misma gente hoy
-    // y gente distinta manana: lo que se compara es la regla, nunca su resultado.
+    // y gente distinta mañana: lo que se compara es la regla, nunca su resultado.
     expect(sameAudienceRule(rule({ areaIds: [AREA_LOGISTICA] }), rule({ regionalIds: [AREA_LOGISTICA] }))).toBe(false);
   });
 

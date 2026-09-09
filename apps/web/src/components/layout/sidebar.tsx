@@ -52,7 +52,7 @@ interface NavGroup {
  * Antes el orden seguia el ciclo de vida del producto —primero se crea la formacion, luego se
  * convoca, luego se asigna— y por eso Seguimiento quedaba en el octavo puesto. Pero ese es el orden
  * en que se CONSTRUYE una vez, no el orden en que se TRABAJA todos los dias: el catalogo se toca
- * unas semanas al ano y el seguimiento se mira cada manana. Lo que se abre a diario va primero.
+ * unas semanas al año y el seguimiento se mira cada mañana. Lo que se abre a diario va primero.
  *
  * ─── LAS SECCIONES SON PREGUNTAS, NO CATEGORIAS ───
  *
@@ -265,7 +265,7 @@ export function Sidebar() {
  *
  * ─── EL PADRE SIGUE SIENDO UN ENLACE ───
  *
- * Configuracion abre su propia pantalla Y despliega. La flecha es un boton aparte, pequeno y a la
+ * Configuracion abre su propia pantalla Y despliega. La flecha es un boton aparte, pequeño y a la
  * derecha: si pulsar el nombre solo desplegara, quien quiere ir a Configuracion tendria que
  * desplegar y volver a pulsar — dos gestos para lo que antes era uno.
  *
@@ -295,7 +295,7 @@ function ItemDeMenu({
     Primera version: al entrar en Configuracion se abria sola, "porque es cuando se necesita". El
     efecto real es que la barra crecia seis renglones de golpe sin que nadie lo pidiera y empujaba
     el resto del menu fuera de la vista — justo al llegar, que es cuando uno se esta ubicando. Un
-    menu que cambia de tamano solo desorienta mas de lo que ayuda.
+    menu que cambia de tamaño solo desorienta mas de lo que ayuda.
   */
   const desplegado = tieneHijos && abierto;
 

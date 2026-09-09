@@ -9,7 +9,7 @@ import { cn } from './cn';
  *
  * Sustituye al `<select>` donde lo que se elige no cabe en una linea de texto. Una convocatoria
  * no es "CONV-2026-000420": es esa formacion, de ese tipo, en ese estado y en esa fecha — y un
- * desplegable nativo solo sabe ensenar lo primero, en gris, sin poder mirar dos a la vez.
+ * desplegable nativo solo sabe enseñar lo primero, en gris, sin poder mirar dos a la vez.
  *
  * Cuando ademas la lista viene FILTRADA, un `<select>` miente por omision: se busca algo, no
  * aparece, y no hay forma de saber si es que no existe o que no se ofrece. Aqui el vacio tiene

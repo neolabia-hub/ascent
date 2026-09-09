@@ -41,7 +41,7 @@ acuerdo de firma electronica.
 
 ### Datos semilla
 Tenant Transprensa con sus catalogos, 34 permisos, 3 roles, 6 tipos de actividad formativa,
-4 politicas de retencion (incluida la de 20 anos para SST) y el usuario administrador.
+4 politicas de retencion (incluida la de 20 años para SST) y el usuario administrador.
 
 ## 3. Decisiones tomadas
 

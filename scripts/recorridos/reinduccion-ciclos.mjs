@@ -7,7 +7,7 @@
 // decision mas delicada del tipo: **que hacer con la ronda que no se hizo**.
 //
 // Hasta hoy eso estaba probado solo con unitarias (`next-cycle.spec.ts`, diez casos) y el modulo
-// lo decia con todas las letras: *"no ejercida de punta a punta — haria falta esperar un ano o
+// lo decia con todas las letras: *"no ejercida de punta a punta — haria falta esperar un año o
 // manipular fechas en la base"*. Ninguna de las dos cosas hace falta.
 //
 // ─── EL TRUCO, Y POR QUE ES LEGITIMO ───
@@ -18,11 +18,11 @@
 // en que nace la ronda 1 —60 dias de ventana sobre un periodo de 30—, asi que el motor abre la
 // siguiente en la pasada siguiente.
 //
-// Es EL MISMO CODIGO que correra en la campana de 2027: `generateForRule` no sabe si la
-// recurrencia es de un mes o de un ano, solo compara `now` con `cycleOpensAt`. No se toca ninguna
+// Es EL MISMO CODIGO que correra en la campaña de 2027: `generateForRule` no sabe si la
+// recurrencia es de un mes o de un año, solo compara `now` con `cycleOpensAt`. No se toca ninguna
 // fecha en la base ni se simula ningun reloj.
 //
-// Y de paso mide una cosa que nadie habia mirado: **que ensena el Seguimiento de una ronda cerrada
+// Y de paso mide una cosa que nadie habia mirado: **que enseña el Seguimiento de una ronda cerrada
 // como NO REALIZADA**, que es lo que el auditor acaba leyendo.
 //
 // OJO AL CORRERLO: publicar una reinduccion obliga a la plantilla entera un instante. El paso 5
@@ -76,7 +76,7 @@ paso(3, 'CONTENIDO Y EXAMEN');
 const leccion = await admin.post('/lessons', { title: `Repaso ${SUFIJO}`, estimatedMinutes: 5 });
 creado.lessonId = leccion.cuerpo?.id;
 await admin.pedir(`/lessons/${creado.lessonId}/cards`, { method: 'PUT', body: JSON.stringify({
-  cards: [{ payload: { cardType: 'TEXT_IMAGE', title: 'Lo que cambio', body: 'Novedades del ano.' } }],
+  cards: [{ payload: { cardType: 'TEXT_IMAGE', title: 'Lo que cambio', body: 'Novedades del año.' } }],
 }) });
 const contLeccion = await admin.post(`/activities/versions/${versionId}/contents`, {
   type: 'LESSON', title: 'Repaso', isRequired: true, config: { minSeconds: 1 }, lessonId: creado.lessonId,
@@ -121,7 +121,7 @@ paso(5, 'EL REQUISITO ACOTADO: un cargo, y se repite CADA MES');
 /*
   UN MES NO ES UN ATAJO: ES LA MISMA REGLA CON OTRO NUMERO.
 
-  El motor no distingue "un mes" de "un ano": calcula el vencimiento siguiente y lo compara con la
+  El motor no distingue "un mes" de "un año": calcula el vencimiento siguiente y lo compara con la
   ventana. Lo unico que cambia es cuanto hay que esperar a que la ventana se abra — y con la
   ventana fijada en 60 dias, un periodo de 30 la tiene abierta desde el primer dia.
 */
@@ -190,7 +190,7 @@ paso(8, 'LO QUE VE EL APRENDIZ: una sola, no dos');
 const suPendiente = (await admin.get(`/assignments?targetId=${creado.activityId}&userId=${creado.userId}&status=PENDING`)).cuerpo;
 comprobar(
   (suPendiente?.total ?? 0) === 1,
-  'debe UNA sola: la del periodo en curso. La del ano pasado ya no se le puede pedir',
+  'debe UNA sola: la del periodo en curso. La del año pasado ya no se le puede pedir',
   `tiene ${suPendiente?.total} pendientes vivas`,
 );
 
@@ -224,16 +224,16 @@ comprobar(
   lecturas se defienden:
 
     Un renglon por RONDA (lo de hoy). El informe es el historial de la formacion, y el
-      incumplimiento del ano pasado se ve. Precio: mezcla periodos, y quien lleve tres campanas sin
-      hacerla arrastra el numero del ano en curso hacia abajo con historia vieja.
-    Un renglon por PERSONA, la ronda vigente. El informe responde "¿como va la campana de ESTE
+      incumplimiento del año pasado se ve. Precio: mezcla periodos, y quien lleve tres campañas sin
+      hacerla arrastra el numero del año en curso hacia abajo con historia vieja.
+    Un renglon por PERSONA, la ronda vigente. El informe responde "¿como va la campaña de ESTE
       ano?", que es como pregunta el auditor. Precio: el incumplimiento cerrado desaparece de esta
       pantalla y hace falta un informe por periodo, que hoy no existe (Sprint 6).
 
   No se elige aqui: cambia lo que lee quien audita. Queda anotado en el modulo y en el HANDOFF.
 */
 console.log(`   ... ABIERTO: la persona sale ${suyas.length} veces (una por ronda) y cuenta ${suyas.length} en el denominador.`);
-console.log('   ... Decidir con el cliente: un renglon por ronda (historial) o por persona (campana en curso).');
+console.log('   ... Decidir con el cliente: un renglon por ronda (historial) o por persona (campaña en curso).');
 
 paso(10, 'DOS REGLAS SOBRE LA MISMA PERSONA: ¿se pisan los ciclos?');
 /*
@@ -330,7 +330,7 @@ console.log(`   ... sale ${suyasB.length} vez/veces: ${suyasB.map((f) => `#${f.c
 comprobar(
   suyasB.length === trasVuelta.length,
   'una fila por obligacion viva o cerrada, ni una mas',
-  `tiene ${trasVuelta.length} obligaciones y el informe ensena ${suyasB.length} filas`,
+  `tiene ${trasVuelta.length} obligaciones y el informe enseña ${suyasB.length} filas`,
 );
 
 paso(12, 'LIMPIEZA');

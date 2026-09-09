@@ -1,6 +1,6 @@
 # Arquitectura tecnica — NEO PULSE
 
-Referencia VIVA del sistema: como esta construido HOY. Se corrige cuando cambia el diseno; no es
+Referencia VIVA del sistema: como esta construido HOY. Se corrige cuando cambia el diseño; no es
 un historico (para eso estan `docs/sprints/`).
 
 Para el significado de los conceptos de negocio, ver `docs/glosario.md`.
@@ -150,7 +150,7 @@ puede ir despacio.
 una sola IP, asi que "por IP" significa "por toda la empresa a la vez". Se probo con 30/min y rompio
 el uso normal —cargar una pantalla del aprendiz son cinco peticiones—; lo cazo la suite e2e con ocho
 fallos. Un limite bajo no para al atacante, que viene solo y de fuera; deja fuera al turno de las 6
-de la manana.
+de la mañana.
 
 **Inyeccion SQL:** todo el SQL crudo del proyecto usa plantillas etiquetadas de Prisma
 (`Prisma.sql`, `$executeRaw\`\``), que parametrizan. No hay una sola concatenacion de cadenas. El
@@ -191,7 +191,7 @@ respuestas —el nombre de la madre, la ciudad de nacimiento— las sabe media o
 #### "No puedo entrar" (Decision #97) — construido
 
 En su lugar hay **dos caminos, para dos personas distintas**. Quien tiene al jefe de SST a diez
-metros solo necesitaba su extension; quien entra a las cinco de la manana desde una bodega no va a
+metros solo necesitaba su extension; quien entra a las cinco de la mañana desde una bodega no va a
 llamar a nadie y lo unico que quiere es dejar constancia. Con uno solo de los dos, la mitad de la
 operacion se queda fuera.
 
@@ -237,7 +237,7 @@ pasa a ser el respaldo para quien no tenga correo — que en operacion es mucha 
 
 Hasta aqui el producto solo conocia UNA clase de persona: alguien que pertenece a una empresa. Eso
 cubre todo lo que pasa DENTRO de un cliente y se queda corto para lo que esta POR ENCIMA de todos:
-hoy los datos de contacto del proveedor, manana listar, dar de alta y suspender clientes.
+hoy los datos de contacto del proveedor, mañana listar, dar de alta y suspender clientes.
 
 **Tres tablas SIN `tenant_id` y SIN RLS**, a proposito: no pertenecen a ninguna empresa, asi que no
 hay nada de un cliente que proteger de otro. Lo que las protege es el token.
@@ -337,7 +337,7 @@ area **y de sus subareas** (`areas.parent_id`, recorrido en memoria). En la sesi
 | Forma | Que alcanza | Para quien |
 |---|---|---|
 | Por **PROCESO** | exactamente ese | quien lleva SARLAFT, trabaje donde trabaje |
-| Por **AREA** | todos los procesos de esa area y sus subareas, **incluidos los que se creen manana** | la jefatura de un area con varios procesos |
+| Por **AREA** | todos los procesos de esa area y sus subareas, **incluidos los que se creen mañana** | la jefatura de un area con varios procesos |
 
 Por eso `processes.area_id` **no es decoracion**: es lo unico que da contenido al alcance por area.
 Un proceso sin area no lo ve ninguna jefatura de area y nada lo avisaba, asi que desde el
@@ -430,7 +430,7 @@ originales.
 
 **Publicar la version nueva no arrastra a nadie por su cuenta.** La convocatoria sigue colgada de
 la version que entregaba, y se apunta a la nueva con un acto deliberado (`migrate-version`) que
-avisa en pantalla, ensena a cuantos afecta y pasa por la misma compuerta que publicar. Entonces
+avisa en pantalla, enseña a cuantos afecta y pasa por la misma compuerta que publicar. Entonces
 —y solo entonces— se aplica la **politica de migracion** que se eligio al publicar esa version:
 
 | Politica | Quien pasa a la version nueva |
@@ -511,7 +511,7 @@ momentos y cada uno lo dispara algo distinto:
 
 | Momento | Cuando | Que pasa |
 |---|---|---|
-| **Aparece** | ocurre el hecho (te asignan, te aprueban, alguien agota intentos) | sin leer; cuenta en la campana |
+| **Aparece** | ocurre el hecho (te asignan, te aprueban, alguien agota intentos) | sin leer; cuenta en la campaña |
 | **Se apaga** | lo abres · marcas todo leido · **la obligacion se cumple** · **la obligacion se retira** | leido: sale de la vista, sigue bajo "Ver leidas" |
 | **Se borra** | 30 dias despues de leido · 90 sin que nadie lo abriera | desaparece de la base (`NotificationRetentionWorker`, diario a las 3) |
 
@@ -519,7 +519,7 @@ momentos y cada uno lo dispara algo distinto:
 - **Cumplida** (`completion.service.ts`): terminar la formacion apaga el aviso que la anunciaba.
 - **Retirada** (`requirement-engine.service.ts`): quien sale de la audiencia deja de estar
   obligado, y el aviso que se le mando deja de reclamarle algo que ya no se le exige. Este es el
-  caso que se veia como "la campana dice que tengo X y X no esta en mis pendientes".
+  caso que se veia como "la campaña dice que tengo X y X no esta en mis pendientes".
 
 **EMPEZARLA NO lo apaga, a proposito.** Un aviso puede estar pidiendo que la TERMINES; apagarlo al
 abrir la formacion silenciaria justo el recordatorio que hacia falta.
@@ -528,11 +528,11 @@ abrir la formacion silenciaria justo el recordatorio que hacia falta.
 `audit_logs` y en `enrollments`; lo que caduca es el recordatorio, no el registro. Por eso el
 ciclo no toca los avisos de correo pendientes de enviar: esos todavia no cumplieron su funcion.
 
-**El contador cuenta PENDIENTES, no avisos.** Son dos senales distintas y estan a dos centimetros
-una de otra en la barra: la campana cuenta lo que no has leido y se apaga al leerlo; el conmutador
+**El contador cuenta PENDIENTES, no avisos.** Son dos señales distintas y estan a dos centimetros
+una de otra en la barra: la campaña cuenta lo que no has leido y se apaga al leerlo; el conmutador
 cuenta lo que te falta por HACER y no se apaga hasta que lo haces. Si contara avisos, bajaria a
 cero sin que nadie se hubiera capacitado. **Cifra solo cuando algo esta VENCIDO**; con pendientes al dia, un punto y nada mas. Con numero
-siempre quedaba pegado al numero de la campana y los dos se leian como el mismo dato: tener
+siempre quedaba pegado al numero de la campaña y los dos se leian como el mismo dato: tener
 formacion pendiente es lo normal, tenerla vencida es lo que hay que mirar hoy, y solo eso merece
 una cifra. El rojo va en el contador, nunca en el boton entero.
 
@@ -540,7 +540,7 @@ una cifra. El rojo va en el contador, nunca en el boton entero.
 
 ## 4.5 El motor de obligaciones
 
-Es el unico componente que **crea trabajo por su cuenta**, asi que su diseno se rige por tres
+Es el unico componente que **crea trabajo por su cuenta**, asi que su diseño se rige por tres
 propiedades, en este orden:
 
 **1. Idempotente.** Un indice unico de (requisito, persona, ronda) y `skipDuplicates` en la
@@ -551,7 +551,7 @@ vivo.
 
 **2. En caliente donde importa, en frio donde alcanza.** Al dar de alta a alguien o cambiarle el
 cargo, sus obligaciones se recalculan en el acto: la matriz de competencia no puede mentir hasta
-el proximo ciclo. Lo que solo cambia con el paso del tiempo —la reinduccion que cumple su ano, lo
+el proximo ciclo. Lo que solo cambia con el paso del tiempo —la reinduccion que cumple su año, lo
 que se paso de fecha— lo cubre un ciclo por hora. Si el enganche en caliente falla, no tumba el
 alta: lo registra y el ciclo lo recupera.
 
@@ -631,15 +631,15 @@ obligaba a marcar a mano a las 116 personas de la empresa. Ahora lo lee un solo 
 | `requiresBeforeHire` | ancla el vencimiento en la fecha de INGRESO (D1072) en vez de en "desde ahora" |
 | `issuesCertificate`, `requiresAssessment`, `participatesInPlan` | se enuncian al elegir el tipo, antes de crear nada |
 
-Al elegir el tipo, el alta ENUMERA lo que implica. La primera senal de que "induccion general"
+Al elegir el tipo, el alta ENUMERA lo que implica. La primera señal de que "induccion general"
 obliga a la empresa entera no puede ser que ya la obligo.
 
 **La trampa del anclaje, que la pantalla ahora avisa:** `ON_HIRE` cuenta desde la fecha de ingreso
-de cada persona. Para quien lleva cuatro anos en la empresa esa fecha ya paso y **la obligacion
-nace VENCIDA**. Es lo correcto para quien entra manana y un desastre para estrenar un requisito con
+de cada persona. Para quien lleva cuatro años en la empresa esa fecha ya paso y **la obligacion
+nace VENCIDA**. Es lo correcto para quien entra mañana y un desastre para estrenar un requisito con
 la plantilla actual, y en pantalla las dos opciones se parecen demasiado como para no decirlo.
 
-Quedan dos semillas sin aplicar: `norms.annual_hours_required` (las 10 h/ano de BPM: la intensidad
+Quedan dos semillas sin aplicar: `norms.annual_hours_required` (las 10 h/año de BPM: la intensidad
 de las convocatorias se guarda y se muestra, pero no se suma contra nada) y las opciones de
 `ejecutada por`, que hoy son un enum del codigo y deberian ser catalogo del tenant.
 
@@ -652,9 +652,9 @@ metas, aprobacion, indicadores y un ciclo de vida. Sus renglones REFERENCIAN con
 no posee las capacitaciones, de modo que reprogramar una jornada o partirla en dos sedes no
 reescribe el plan.
 
-### Uno por ano
+### Uno por año
 
-`UNIQUE(tenant_id, year)`. Lo que identifica al plan es el **ano**; el nombre es un rotulo y se
+`UNIQUE(tenant_id, year)`. Lo que identifica al plan es el **año**; el nombre es un rotulo y se
 corrige. Hasta el 2026-08-31 la clave incluia el nombre, asi que la misma empresa podia tener
 "Plan 2026", "Plan anual 2026" y "Plan SST 2026" a la vez, cada uno con su aprobacion, sus
 proyectados congelados y su propio cumplimiento (Decision #71).
@@ -672,7 +672,7 @@ al mismo sitio:
 |---|---|
 | El plan → "Agregar al plan" | crea la convocatoria y el renglon en un acto |
 | El plan → "Usar una que ya existe" | engancha una convocatoria creada desde Convocatorias |
-| **La ficha de la formacion** | dice si esta o no en el plan del ano, y ofrece programarla ahi |
+| **La ficha de la formacion** | dice si esta o no en el plan del año, y ofrece programarla ahi |
 
 El ultimo es el que cierra el agujero que reporto el cliente: `activity_types.config` trae
 `participates_in_plan`, la pantalla promete "Cuenta para los indicadores del plan anual" y eso solo
@@ -684,7 +684,7 @@ paso dejara de ser mudo (`components/modules/delivery/activity-plan-card.tsx`).
 
 | Tabla | Que guarda |
 |---|---|
-| `training_plans` | El programa del ano: `year`, `name`, objetivo, `goal_pct` (la META), alcance, `status`, quien y cuando aprobo |
+| `training_plans` | El programa del año: `year`, `name`, objetivo, `goal_pct` (la META), alcance, `status`, quien y cuando aprobo |
 | `plan_items` | Cada renglon: a que `offering` apunta, `planned_month`, su `status` y el `projected_snapshot` congelado |
 
 Un renglon **no** guarda a quien obliga: eso son `assignments` con `plan_item_id` apuntando al
@@ -711,7 +711,7 @@ todo el mundo capacitado porque la inscripcion se ataba a la otra.
 BORRADOR ──aprobar──> APROBADO ──activar──> EN EJECUCION ──cerrar──> CERRADO
    │                      │                      │                      │
    se compone        ya obliga              ya obliga            es la evidencia
-   libremente        a personas             a personas           del ano (final)
+   libremente        a personas             a personas           del año (final)
 ```
 
 - **BORRADOR**: se arma. Agregar, quitar y reordenar renglones no tiene consecuencias para nadie.
@@ -723,11 +723,11 @@ BORRADOR ──aprobar──> APROBADO ──activar──> EN EJECUCION ──c
   No se aprueba un plan vacio ni uno con convocatorias en borrador: sin publicar no hay proyectados
   que congelar.
 - **EN EJECUCION** es el mismo plan, marcado como el que esta corriendo.
-- **CERRADO**: el ano termino. No admite renglones nuevos ni se edita: es lo que se le ensena al
+- **CERRADO**: el año termino. No admite renglones nuevos ni se edita: es lo que se le enseña al
   auditor. Pero **si se REABRE** (CERRADO -> EN EJECUCION, con motivo auditado) y, si nunca obligo
   a nadie, **tambien se borra**. La regla anterior —"cerrado no se borra ni se reabre"— era correcta
-  cuando podian convivir varios planes del mismo ano; con UNO POR ANO se volvio una trampa, porque
-  un plan cerrado por error se queda con el ano y no deja planear (Decision #72).
+  cuando podian convivir varios planes del mismo año; con UNO POR ANO se volvio una trampa, porque
+  un plan cerrado por error se queda con el año y no deja planear (Decision #72).
 
 ### Materializar: la operacion central
 
@@ -749,7 +749,7 @@ Cobertura    = personas CAPACITADAS / proyectado CONGELADO       ← ¿llego a q
 Ambos se calculan **exclusivamente** sobre las obligaciones del propio plan (`source = PLAN` +
 `plan_item_id`), nunca sobre las inscripciones de la convocatoria. Es la regla de oro 2: lo que se
 asigne por fuera del plan —una inscripcion voluntaria, una obligacion manual— **no mueve** sus
-numeros. Sin eso, el cumplimiento del ano cambiaria solo porque alguien se inscribio por su cuenta.
+numeros. Sin eso, el cumplimiento del año cambiaria solo porque alguien se inscribio por su cuenta.
 
 El denominador se congela al aprobar por la misma razon: si se recalculara en vivo, contratar gente
 en octubre bajaria el cumplimiento de una jornada que se hizo bien en marzo.
@@ -770,13 +770,13 @@ renglones": abre los suyos, y las metricas se calculan sobre los renglones VISIB
 | Cambiar el ANO | si | **no** (#63) | no |
 | **Borrar el plan** | si | **solo si nadie EMPEZO** (#62) | no |
 
-**Por que el ano no.** Identifica al plan junto al nombre (`@@unique [tenant, year, name]`) y ancla
+**Por que el año no.** Identifica al plan junto al nombre (`@@unique [tenant, year, name]`) y ancla
 el vencimiento de cada renglon al ultimo dia de su mes: cambiarlo despues de aprobar moveria la
 fecha limite de gente que ya tiene la obligacion encima.
 
 **Por que "quien empezo" y no el estado, para borrar** (Decision #62). Lo que hay que proteger no es
 el plan: es lo que la GENTE ya hizo contra el. Un plan aprobado por error el viernes y detectado el
-lunes es un error, no historia, y arrastrarlo todo el ano ensucia el cumplimiento de la empresa
+lunes es un error, no historia, y arrastrarlo todo el año ensucia el cumplimiento de la empresa
 entera. Pero en cuanto una sola persona abrio una de sus formaciones, ese avance es suyo y borrarlo
 seria borrarselo. La regla vive pura y probada en `plans/plan-deletion.ts`:
 
@@ -791,7 +791,7 @@ el plan. No pueden quedar huerfanas —apuntan al renglon por clave foranea— n
 sin plan que la explique es justo lo que el plan existe para evitar. Los renglones caen solos
 (`ON DELETE CASCADE`). Las capacitaciones y convocatorias que el plan referenciaba **no se tocan**.
 
-Exige `plans:approve` y no `plans:manage`: borrar el plan del ano es al menos tan grave como
+Exige `plans:approve` y no `plans:manage`: borrar el plan del año es al menos tan grave como
 aprobarlo.
 
 ### Los archivos
@@ -802,7 +802,7 @@ aprobarlo.
 | `api/src/plans/plan-metrics.ts` | Cumplimiento y cobertura, puro |
 | `api/src/plans/plan-deletion.ts` | Que plan se puede borrar y que revoca, puro |
 | `web/app/(admin)/plan/page.tsx` | Listado, crear y eliminar |
-| `web/app/(admin)/plan/[id]/page.tsx` | El plan del ano: cronograma, renglones, indicadores, editar |
+| `web/app/(admin)/plan/[id]/page.tsx` | El plan del año: cronograma, renglones, indicadores, editar |
 
 ---
 
@@ -831,12 +831,12 @@ apps/api/src/
   workers/       Tareas programadas: obligaciones y avisos de pildora
 
 apps/web/
-  public/sw.js   Service worker propio: cache sin senal y cola de reenvio
+  public/sw.js   Service worker propio: cache sin señal y cola de reenvio
   public/icons/  Iconos de la PWA (se generan con scripts/generate-icons.mjs)
   src/app/(admin)/    Panel de administracion (escritorio)
   src/app/(learner)/  Superficie del aprendiz (movil, barra inferior)
   src/app/(player)/   Reproductor y examenes (pantalla completa, sin chrome)
-  src/components/ui/  Biblioteca del sistema de diseno "Pulso"
+  src/components/ui/  Biblioteca del sistema de diseño "Pulso"
   src/components/layout/  Estructura: barra lateral, barra superior, sesion
   src/lib/            Clientes HTTP tipados
 
@@ -915,9 +915,9 @@ Lo que ve quien cursa en escritorio, desde el 2026-08-28 (Decision #49):
 | `learning/progress-rules.ts` | Cuando una pieza cuenta como cumplida y que queda escrito de ella. Funcion pura, probada aparte |
 | `web: modules/learner/player-chrome.tsx` | El armazon del reproductor: carril plegable, barra superior y contencion del desplazamiento |
 | `web: modules/learner/course-index.tsx` | El indice de la formacion y las reglas de a donde se puede saltar |
-| `apps/web/public/sw.js` | Que se guarda en el telefono y que se reintenta sin senal |
+| `apps/web/public/sw.js` | Que se guarda en el telefono y que se reintenta sin señal |
 | `prisma/sql/rls.sql` | Las politicas de la base de datos |
-| `.claude/skills/pulse-ui/SKILL.md` | El contrato de diseno de toda la interfaz |
+| `.claude/skills/pulse-ui/SKILL.md` | El contrato de diseño de toda la interfaz |
 
 ---
 
@@ -933,7 +933,7 @@ Lo que ve quien cursa en escritorio, desde el 2026-08-28 (Decision #49):
 | Saltarse la secuencia por API | Las validaciones viven en el servidor, no en la interfaz |
 | Enumerar certificados | El codigo publico de verificacion es aleatorio, nunca el consecutivo |
 | Filtrar datos personales a terceros | Sentry configurado sin datos personales |
-| Leer la formacion de otro en un telefono compartido | Al cerrar sesion se borran el cache sin senal y la cola pendiente del dispositivo |
+| Leer la formacion de otro en un telefono compartido | Al cerrar sesion se borran el cache sin señal y la cola pendiente del dispositivo |
 | Perder el avance de alguien por un token vencido | La cola de reenvio usa el token vigente que le pasa la pagina, no el que se guardo horas antes; un rechazo por sesion caducada CONSERVA el envio en vez de descartarlo |
 | Que alguien lea los archivos de otra empresa | Los archivos se sirven por URL FIRMADA: pedirla exige sesion y comprueba el tenant; usarla no, porque una etiqueta `<img>` o `<video>` no puede autenticarse. La firma ata clave + caducidad + secreto del servidor, y se compara en tiempo constante |
 | Servir un archivo cualquiera acertando una clave bajo la carpeta de una presentacion | Las diapositivas no estan registradas una a una: se autorizan comprobando que el paquete padre existe, es de esta empresa y que esa imagen figura DE VERDAD en su manifiesto. Una clave inventada bajo esa carpeta no se sirve |
@@ -1006,20 +1006,20 @@ Honesta y priorizada:
 
 | Deuda | Impacto | Cuando resolverla |
 |---|---|---|
-| **El aprendiz no ve NADA de la jornada a la que lo convocan** | Alta para el uso real: se le inscribe en la sesion del 12 de marzo a las 8 a. m. en el Auditorio Norte, y en su tarjeta solo aparece el titulo y la fecha limite. Ni fecha de sesion, ni hora, ni lugar, ni instructor —tampoco en el correo de inscripcion, que solo lleva el codigo de la convocatoria—. Para una formacion presencial eso significa que la persona no sabe cuando ni donde presentarse | Con la asistencia (Sprint 5): son los mismos datos que hay que ensenar para que alguien se presente y firme |
+| **El aprendiz no ve NADA de la jornada a la que lo convocan** | Alta para el uso real: se le inscribe en la sesion del 12 de marzo a las 8 a. m. en el Auditorio Norte, y en su tarjeta solo aparece el titulo y la fecha limite. Ni fecha de sesion, ni hora, ni lugar, ni instructor —tampoco en el correo de inscripcion, que solo lleva el codigo de la convocatoria—. Para una formacion presencial eso significa que la persona no sabe cuando ni donde presentarse | Con la asistencia (Sprint 5): son los mismos datos que hay que enseñar para que alguien se presente y firme |
 | ~~Adaptador de almacenamiento en la nube~~ | **Hecho el 2026-09-01.** R2 cableado con @aws-sdk/client-s3. Con R2 los bytes NO pasan por la API: el controlador de medios redirige a una URL prefirmada, que es lo que evita que cada video viaje dos veces y que el ancho de banda del servidor sea el techo de cuanta gente ve una formacion a la vez | — |
 | El despachador de correo recorre todas las empresas cada 30 segundos | Irrelevante con una empresa; con decenas conviene una cola real | Cuando haya varias empresas |
 | La integracion continua nunca se ha ejecutado de verdad (no hay repositorio remoto) | El flujo esta escrito pero no probado | Al publicar el repositorio |
 | Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo y el motor de obligaciones usan tareas programadas en proceso | Cuando el volumen lo pida |
 | El ciclo de obligaciones recorre requisito por requisito y persona por persona | Correcto y legible, pero con miles de personas y decenas de requisitos conviene resolverlo por lotes en la base | Cuando una pasada tarde mas de unos segundos |
 | Un requisito solo puede exigir una **actividad** (no rutas ni certificaciones) | El modelo ya las soporta; el motor no. Devuelve un error explicito en vez de fingir | Sprints 4-5 |
-| El cache sin senal guarda lo que la persona **ya visito**; no descarga por adelantado las lecciones que tiene asignadas | Quien nunca abrio la pildora con senal no puede cursarla sin senal | Cuando se sepa el peso real del contenido de Transprensa: es una precarga al entrar a los pendientes |
-| Los videos y documentos no se cachean para uso sin senal | Un video de 3 minutos multiplica lo que se guarda en el telefono. La leccion de tarjetas —el formato principal— si funciona sin senal | Segun el peso del contenido real |
+| El cache sin señal guarda lo que la persona **ya visito**; no descarga por adelantado las lecciones que tiene asignadas | Quien nunca abrio la pildora con señal no puede cursarla sin señal | Cuando se sepa el peso real del contenido de Transprensa: es una precarga al entrar a los pendientes |
+| Los videos y documentos no se cachean para uso sin señal | Un video de 3 minutos multiplica lo que se guarda en el telefono. La leccion de tarjetas —el formato principal— si funciona sin señal | Segun el peso del contenido real |
 | Sin notificaciones push: el aviso de pildora sale por correo y bandeja in-app | El recordatorio llega, pero no al bloqueo de pantalla | Exige claves VAPID y permiso del usuario; se decide con el cliente |
 | Un video de **Vimeo o de cualquier otro enlace** que no sea YouTube no se puede verificar: queda como declaracion de la persona | Baja: YouTube —el caso real del cliente— ya se mide desde el 2026-08-27; para el resto, la pantalla lo dice y la recomendacion es subir el archivo | Cada plataforma exige su propio SDK. Se cierra cuando exista una formacion que de verdad viva en Vimeo |
 | Al migrar una convocatoria a la version nueva, un examen **ya aprobado sigue aprobado**: la version N+1 hereda el mismo `assessment_version_id` | Baja: es lo correcto mientras el examen no cambie. Si cambia, es otra version de evaluacion y hay que volver a rendirlo | Nada que hacer hoy; se documenta para que nadie lo lea como un fallo de `RESTART_NEW` |
 | La franja horaria del aviso se deduce en cada pasada de los ultimos 60 dias de eventos (tope 5.000) | Suficiente para el piloto | Con miles de personas, materializar la hora en una columna |
-| Las **diapositivas** de una presentacion no se cachean para uso sin senal, como los videos y documentos | Una presentacion de 20 diapositivas en WebP pesa poco comparada con un video, pero sigue siendo peso en el telefono | Con el mismo criterio que el video: segun el peso del contenido real |
+| Las **diapositivas** de una presentacion no se cachean para uso sin señal, como los videos y documentos | Una presentacion de 20 diapositivas en WebP pesa poco comparada con un video, pero sigue siendo peso en el telefono | Con el mismo criterio que el video: segun el peso del contenido real |
 | La imagen de produccion de la API todavia no incluye LibreOffice | Sin el, PPT/PPTX/ODP se rechazan con un mensaje que dice que suban el PDF. No rompe nada, limita | Al definir los contenedores de produccion |
 | No hay prueba de navegador que cubra una PRESENTACION | Baja: se verifico a mano de punta a punta el 2026-08-28 (subir, convertir, publicar, migrar y reproducir 6 diapositivas), pero nada impide que una regresion pase sin que salte | Exige un PDF de prueba en el repositorio; el generador esta escrito y cabe en un script del seed |
 | La LECCION de tarjetas no lleva las pestanas de Resumen y Material: la pila ocupa el alto de la pantalla | Baja: la descripcion de una leccion no tiene donde mostrarse hoy | Cuando se decida donde va sin pelear con la lectura de la pila: probablemente un desplegable en la barra superior, no una franja debajo |
@@ -1049,12 +1049,12 @@ El estado nuevo cae solo de todas las consultas porque lo abierto se pide siempr
 ### La META, y por que es un numero
 
 `training_plans.goal_pct` (1..100) es el porcentaje de CUMPLIMIENTO que la empresa se compromete a
-alcanzar en el ano. Antes era `goals`, texto libre, y por eso el plan ensenaba "62% de cumplimiento"
+alcanzar en el año. Antes era `goals`, texto libre, y por eso el plan enseñaba "62% de cumplimiento"
 sin nada contra que compararlo: un indicador sin meta deja al lector sin saber si eso esta bien, que
 es exactamente lo que el auditor viene a preguntar.
 
 Se mide contra el CUMPLIMIENTO (ejecutadas / programadas) y no contra la cobertura porque es el
-indicador del item 1.2.1 de la Res. 0312 —"¿se hizo el programa anual?"—. La cobertura se ensena al
+indicador del item 1.2.1 de la Res. 0312 —"¿se hizo el programa anual?"—. La cobertura se enseña al
 lado, sin meta: son dos preguntas distintas y darles una sola meta las confundiria.
 
 Es opcional: un plan puede armarse antes de que la meta este acordada, y la tarjeta lo dice ("Sin
@@ -1062,9 +1062,9 @@ meta definida") en vez de inventarse un 100%.
 
 ### Salir de un plan CERRADO
 
-Cerrar convierte el plan en la evidencia del ano, asi que durante meses fue un estado terminal:
+Cerrar convierte el plan en la evidencia del año, asi que durante meses fue un estado terminal:
 ni se editaba, ni se borraba, ni se reabria. Con UNO POR ANO (Decision #71) eso dejo de ser
-estricto y paso a ser una TRAMPA — el ano queda ocupado por un plan que no admite nada—, y por eso
+estricto y paso a ser una TRAMPA — el año queda ocupado por un plan que no admite nada—, y por eso
 hay dos salidas, cada una para un caso distinto:
 
 | Situacion | Salida | Por que |
@@ -1073,7 +1073,7 @@ hay dos salidas, cada una para un caso distinto:
 | Cerrado y **ya obligo a gente** | **se reabre** (`POST /plans/:id/reopen`, motivo obligatorio) | Reabrir deja rastro en la auditoria; borrar no dejaria ninguno |
 
 Reabrir devuelve el plan a **EN EJECUCION**, no a BORRADOR: sus renglones ya materializaron
-obligaciones reales, y marcarlo como no aprobado diria que el ano esta sin aprobar mientras hay
+obligaciones reales, y marcarlo como no aprobado diria que el año esta sin aprobar mientras hay
 gente con la formacion encima. Va con `plans:approve`, el mismo permiso que cerrarlo.
 
 ### Como entra la gente a una capacitacion del plan, y por que no es como en las demas
@@ -1134,7 +1134,7 @@ esa es la unica puerta que se cierra antes de tiempo:
 
 El invariante que se defiende es **nadie queda citado a contenido que todavia puede cambiar**, y lo
 sostiene `publish()` —que ya lo comprobaba— no `create()`. La validacion al crear solo imponia un
-orden: primero termina el contenido, despues planea. Y el ano se planea al reves: en enero se
+orden: primero termina el contenido, despues planea. Y el año se planea al reves: en enero se
 aparta "Manejo defensivo, marzo, Cali" y el contenido se arma en febrero.
 
 En la pantalla, la pestana Convocatorias de una formacion sin publicar ya no es un muro: programa y

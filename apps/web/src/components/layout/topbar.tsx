@@ -112,7 +112,7 @@ function NotificationsMenu() {
   const [loading, setLoading] = useState(false);
   /**
    * LA CAMPANA ENSENA LO NO LEIDO. Un aviso leido se va de la vista: eso es lo que significa una
-   * campana, y sin ello la lista era un registro que no se vaciaba nunca —el aviso de una
+   * campaña, y sin ello la lista era un registro que no se vaciaba nunca —el aviso de una
    * obligacion retirada hace tres semanas seguia ahi, delante de lo de hoy—.
    *
    * Pero NO se borra: sigue estando bajo "Ver leidas", porque a veces es la unica traza que
@@ -393,7 +393,7 @@ export function Topbar({ userFullName }: TopbarProps) {
         */
         /*
           ANCHO ACOTADO, no todo el sobrante. Con `flex-1` a secas se estiraba hasta ochocientos
-          pixeles en un monitor ancho: un campo de buscar de ese tamano promete que ahi se escribe
+          pixeles en un monitor ancho: un campo de buscar de ese tamaño promete que ahi se escribe
           mucho, cuando lo que se teclea es un apellido. Con un maximo de 420 la barra respira y el
           saludo se queda pegado a su esquina en vez de flotar en medio.
         */
@@ -406,7 +406,7 @@ export function Topbar({ userFullName }: TopbarProps) {
 
       <div className="flex items-center gap-2">
         {/*
-          QUIEN ADMINISTRA TAMBIEN SE FORMA. Va antes de la campana y de la cuenta porque es
+          QUIEN ADMINISTRA TAMBIEN SE FORMA. Va antes de la campaña y de la cuenta porque es
           navegacion —lleva a otro sitio— y no un desplegable de la barra.
         */}
         <SpaceSwitcher to="learner" />

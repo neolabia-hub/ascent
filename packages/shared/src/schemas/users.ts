@@ -59,7 +59,7 @@ export const listUsersQuerySchema = z.object({
 });
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 
-/** Columnas de la plantilla de carga masiva (CSV/XLSX). Encabezados EXACTOS en espanol. */
+/** Columnas de la plantilla de carga masiva (CSV/XLSX). Encabezados EXACTOS en español. */
 export const IMPORT_HEADERS = [
   'documento',
   'nombre_completo',

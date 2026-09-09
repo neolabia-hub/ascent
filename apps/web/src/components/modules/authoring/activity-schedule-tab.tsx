@@ -62,7 +62,7 @@ export function ActivityScheduleTab({
   publishedVersionId: string | null;
   /**
    * La version en BORRADOR, si la hay. Se programa sobre ella cuando todavia no hay ninguna
-   * publicada (Decision #77): planear el ano en enero es reservar el sitio en el calendario,
+   * publicada (Decision #77): planear el año en enero es reservar el sitio en el calendario,
    * y el contenido se termina despues.
    */
   draftVersionId: string | null;
@@ -101,7 +101,7 @@ export function ActivityScheduleTab({
   /*
     PROGRAMAR AQUI ENTRA AL PLAN, TAMBIEN CON EL PLAN APROBADO (2026-09-04).
 
-    La Decision #75 ya metia la jornada en el plan del ano al programarla... pero solo si ese plan
+    La Decision #75 ya metia la jornada en el plan del año al programarla... pero solo si ese plan
     estaba en BORRADOR. Con el plan aprobado la jornada quedaba fuera: se dicta, la gente asiste, y
     no cuenta para el cumplimiento de nadie. Eso obligaba a tener un SEGUNDO boton en la ficha —el
     de la tarjeta del plan— que si sabia pedir el motivo, y a que el usuario adivinara cual usar.
@@ -238,7 +238,7 @@ export function ActivityScheduleTab({
    *
    * Sin convocatoria no se puede ejecutar NADA: los obligados ven la formacion en sus pendientes
    * con un candado y "todavia no esta abierta". Para una induccion o una pildora —que son de
-   * autoservicio y solo necesitan UNA convocatoria permanente que dura anos— rellenar el
+   * autoservicio y solo necesitan UNA convocatoria permanente que dura años— rellenar el
    * formulario entero era ceremonia pura: no hay fecha, ni lugar, ni instructor, ni cupo que
    * decidir.
    *
@@ -274,7 +274,7 @@ export function ActivityScheduleTab({
   /**
    * Antes esto era un muro: "primero publica una version". Y sobraba, porque la compuerta de
    * verdad esta al PUBLICAR la convocatoria —ahi es donde se cita a la gente y se congelan los
-   * proyectados—, no al crearla. Obligaba a publicar contenido vacio para poder planear el ano.
+   * proyectados—, no al crearla. Obligaba a publicar contenido vacio para poder planear el año.
    */
   if (!versionId) {
     return (
@@ -487,7 +487,7 @@ export function ActivityScheduleTab({
 
           {/*
             LA NOVEDAD DEL PLAN, aqui y no en otra pantalla. Solo al CREAR y solo con el plan vivo:
-            en borrador el renglon entra solo y pedir un motivo por cada jornada del ano seria ruido.
+            en borrador el renglon entra solo y pedir un motivo por cada jornada del año seria ruido.
           */}
           {planVivo && !editing ? (
             <div className="mt-4">
@@ -495,7 +495,7 @@ export function ActivityScheduleTab({
                 htmlFor="prog-motivo"
                 label={`Por que entra al plan ${planVivo.year}`}
                 required
-                hint="El plan ya esta aprobado: una jornada nueva obliga a gente real y queda en el registro."
+                hint="El plan ya esta aprobado: una jornada nueva obliga a personas reales y queda en el registro."
               >
                 <Textarea
                   id="prog-motivo"

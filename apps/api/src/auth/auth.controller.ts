@@ -139,7 +139,7 @@ export class AuthController {
    * El perfil de quien pregunta, con su ALCANCE.
    *
    * `scopeProcessIds` viaja aqui porque las pantallas tienen que ofrecer solo lo que la persona
-   * puede usar. Sin el, el alta de una formacion ensenaba los 13 procesos de la empresa a un
+   * puede usar. Sin el, el alta de una formacion enseñaba los 13 procesos de la empresa a un
    * analista que solo puede crear en el suyo, y el servidor rechazaba el guardado con un generico
    * "revisa los campos": ofrecer una opcion que va a fallar es peor que no ofrecerla.
    *
@@ -160,7 +160,7 @@ export class AuthController {
    * deba poder cambiar su jefe.
    *
    * Recibe la clave de un fichero YA SUBIDO por `/media/upload`, que es donde vive la validacion
-   * de tipo real (magic bytes) y de tamano. Aqui solo se guarda a quien pertenece.
+   * de tipo real (magic bytes) y de tamaño. Aqui solo se guarda a quien pertenece.
    */
   @Put('me/avatar')
   @HttpCode(200)

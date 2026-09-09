@@ -10,6 +10,8 @@ import { ApiError, motivoDelError } from '@/lib/api';
 import { frasearUso, leerEnUso, type EnUso } from '@/lib/catalog-en-uso';
 import { createCatalogRow, deleteCatalogRow, listCatalog, updateCatalogRow, type CatalogRow } from '@/lib/admin-api';
 import { listSurveys, type SurveyTemplate } from '@/lib/surveys-api';
+import type { LucideIcon } from 'lucide-react';
+import { Ayuda } from '@/components/ui/ayuda';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
 import { Field } from '@/components/ui/field';
@@ -56,12 +58,14 @@ interface TipoConfig {
   tracksExternalCertificate?: boolean;
   /** Punto de partida de la eficacia. Cada formacion puede desviarse (Decision #118). */
   requiresEfficacy?: boolean;
+  /** Se puede dar por cumplida con el papel de otro empleo (via C). Por defecto NO. */
+  admiteConvalidacion?: boolean;
   /** CUAL encuesta usa este tipo. Se engancha sola al final al publicar (Decision #116). */
   surveyTemplateId?: string | null;
   isMicro?: boolean;
   /**
    * CADA CUANTO VUELVE. Las dos son excluyentes y con las dos puestas manda la fecha:
-   * "cada ano antes del 31 de marzo" (campana) o "cada N meses desde que cada quien la hizo".
+   * "cada año antes del 31 de marzo" (campaña) o "cada N meses desde que cada quien la hizo".
    */
   defaultAnnualDate?: string | null;
   defaultRecurrenceMonths?: number | null;
@@ -79,9 +83,9 @@ interface TipoDeFormacion extends CatalogRow {
 /**
  * QUE CLASE DE OBLIGACION CREA CADA FORMA DE REPETIR (2026-09-05).
  *
- * Una palabra, no una explicacion. "Cada ano en una fecha fija" y "cada N meses" se leen igual de
+ * Una palabra, no una explicacion. "Cada año en una fecha fija" y "cada N meses" se leen igual de
  * bien y crean cosas muy distintas: una hace que todos venzan el mismo dia —lo que el auditor
- * pregunta como "¿hicieron la de este ano?"— y la otra le da a cada quien su aniversario, que es lo
+ * pregunta como "¿hicieron la de este año?"— y la otra le da a cada quien su aniversario, que es lo
  * que necesita una recertificacion por norma.
  */
 const COMO_SE_REPITE: Record<string, string> = {
@@ -90,8 +94,27 @@ const COMO_SE_REPITE: Record<string, string> = {
   MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que la completo.',
 };
 
-/** Las tres reglas, con lo que significa cada una de verdad y no con su nombre tecnico. */
-const REGLAS = [
+/**
+ * Las reglas, con lo que significa cada una de verdad y no con su nombre tecnico.
+ *
+ * `detalle` es el renglon que se lee siempre y tiene que caber en uno; `ayuda` es el desarrollo,
+ * detras del icono de informacion. La regla la pidio el cliente el 2026-09-06 para toda la
+ * aplicacion —*nada de textos largos a la vista*— y aqui pesa el doble: son cinco interruptores
+ * seguidos, y con tres renglones cada uno el cajon deja de leerse de un vistazo.
+ */
+const REGLAS: ReadonlyArray<{
+  clave:
+    | 'requiresAssessment'
+    | 'requiresSurvey'
+    | 'issuesCertificate'
+    | 'requiresEfficacy'
+    | 'tracksExternalCertificate'
+    | 'admiteConvalidacion';
+  icono: LucideIcon;
+  titulo: string;
+  detalle: string;
+  ayuda?: string;
+}> = [
   {
     clave: 'requiresAssessment' as const,
     icono: FileCheck2,
@@ -125,8 +148,9 @@ const REGLAS = [
       ficha. Dentro del mismo tipo conviven alturas —donde importa si usa el arnes— y una
       actualizacion documental, donde preguntarle al jefe a los 30 dias no dice nada.
     */
-    detalle:
-      'A los 30 dias, el jefe del area responde si la persona aplica lo aprendido. Es el punto de partida: cada formacion puede desviarse desde su ficha.',
+    detalle: 'A los 30 dias, el jefe del area responde si la persona aplica lo aprendido.',
+    ayuda:
+      'Es el punto de partida, no la decision final: cada formacion puede desviarse desde su ficha. Dentro del mismo tipo conviven una de alturas —donde importa si usa el arnes— y una actualizacion documental, donde preguntarle al jefe a los 30 dias no dice nada.',
   },
   {
     clave: 'tracksExternalCertificate' as const,
@@ -161,6 +185,16 @@ const REGLAS = [
     // largo la partia en tres lineas. Lo que hace falta saber para decidir cabe en una frase; el
     // resto vive en la ficha, que es donde de verdad se elige.
     detalle: 'Punto de partida de sus formaciones. Cada una puede decir otra cosa desde su ficha.',
+    ayuda:
+      'Aqui no se configura ningun certificado: se dice que esta CLASE de formacion normalmente la acredita alguien de fuera, y con ese valor nacen sus formaciones. QUIEN lo expide no se dice ni aqui ni en la ficha, sino en cada convocatoria: la misma habilitacion la puede dictar la ARL en marzo y un centro de entrenamiento en septiembre.',
+  },
+  {
+    clave: 'admiteConvalidacion' as const,
+    icono: FileCheck2,
+    titulo: 'Acepta certificacion previa de otra empresa',
+    detalle: 'Quien llega ya certificado no la repite: se registra su papel y queda cumplida.',
+    ayuda:
+      'Solo tiene sentido cuando el papel es TRANSFERIBLE por norma —alturas, montacargas, espacios confinados—, donde la ley ya da por hecha la formacion y repetirla es gastar dinero dos veces. Apagado significa que hay que hacerla AQUI aunque traiga papel, que es lo correcto en una induccion o en cualquier formacion sobre procedimientos propios: ningun certificado ajeno enseña como se trabaja en esta empresa. Y aun encendido, aceptar cada papel concreto sigue siendo una decision de quien lo registra, con su motivo y su nombre.',
   },
 ];
 
@@ -588,7 +622,7 @@ function Tarjeta({
         Estaban las cuatro casillas con su explicacion, el selector de encuesta que aparece al
         encender una de ellas, y la linea de "cada cuanto vuelve" con su propio boton. Por tipo. Con
         siete tipos eran siete pantallas de alto de formulario para algo que se decide una vez y se
-        queda anos, y lo que uno viene a hacer aqui casi siempre es MIRAR que exige cada clase.
+        queda años, y lo que uno viene a hacer aqui casi siempre es MIRAR que exige cada clase.
 
         Ahora la tarjeta dice en una linea lo que el tipo exige y entrega, y todo lo que se toca esta
         detras de "Configurar". Es la regla del sistema de diseno: si tiene campos, cajon; si es para
@@ -638,6 +672,19 @@ function Tarjeta({
                   <span className="block text-xs leading-relaxed text-ink-500">{regla.detalle}</span>
                 </span>
               </label>
+              {/*
+                EL DESARROLLO, DETRAS DEL ICONO — y FUERA del <label> (2026-09-06).
+
+                Dentro heredaria su comportamiento y pulsarlo encenderia ademas el interruptor: se
+                pediria una explicacion y se cambiaria la configuracion del tipo. Va en una fila
+                aparte, sangrada hasta debajo del texto, para que se lea como parte de esta regla y
+                no de la siguiente.
+              */}
+              {regla.ayuda ? (
+                <div className="ml-10 mt-1">
+                  <Ayuda sobre={regla.titulo}>{regla.ayuda}</Ayuda>
+                </div>
+              ) : null}
 
               {/*
                 CUAL encuesta, justo debajo de la casilla que la enciende. Aparte seria una lista
@@ -678,7 +725,7 @@ function Tarjeta({
       {/*
         CADA CUANTO VUELVE, Y QUE PASA SI NO LA HIZO (2026-09-04).
 
-        Vivia solo en la semilla, y la consecuencia era doble: la reinduccion decia "cada ano antes
+        Vivia solo en la semilla, y la consecuencia era doble: la reinduccion decia "cada año antes
         del 31 de marzo" y esa fecha no se podia cambiar desde ninguna pantalla, y un cliente que NO
         trabaje por campana —que los hay: "cada 12 meses desde que cada quien la hizo"— no tenia
         forma de decirlo sin tocar la base.
@@ -691,13 +738,13 @@ function Tarjeta({
         PLEGADO, Y DICIENDO LO QUE HACE (2026-09-04).
 
         Tres campos desplegados en cada una de las siete tarjetas eran cuatro pantallas de alto de
-        controles que casi nunca se tocan: la repeticion se decide una vez y se queda anos. Y los
+        controles que casi nunca se tocan: la repeticion se decide una vez y se queda años. Y los
         cuatro tipos que NO se repiten ensenaban un desplegable en "No se repite" para no decir
         nada.
 
-        Ahora la tarjeta dice en una linea lo que hace —"Cada ano antes del 31 de marzo · si no la
+        Ahora la tarjeta dice en una linea lo que hace —"Cada año antes del 31 de marzo · si no la
         hizo, se cierra y nace la nueva"— y los campos salen al pulsar Ajustar. Es lo mismo que hace
-        la encuesta debajo de su casilla: se ensena la decision, no el formulario.
+        la encuesta debajo de su casilla: se enseña la decision, no el formulario.
       */}
       <div className="mt-6 border-t border-line pt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Cada cuanto vuelve</p>
@@ -710,7 +757,7 @@ function Tarjeta({
               onChange={(e) => cambiarRepeticion(e.target.value)}
             >
               <option value="NO">No se repite</option>
-              <option value="ANUAL">Cada ano, antes de una fecha fija</option>
+              <option value="ANUAL">Cada año, antes de una fecha fija</option>
               <option value="MESES">Cada N meses, desde que cada quien la hizo</option>
             </Select>
           </Field>
@@ -719,14 +766,14 @@ function Tarjeta({
             <Field
               htmlFor={`t-fecha-${tipo.id}-mes`}
               label="Antes de que fecha"
-              hint="Todos vencen el mismo dia: es una campana, no un aniversario por persona."
+              hint="Todos vencen el mismo dia: es una campaña, no un aniversario por persona."
             >
               {/*
                 DOS LISTAS, NO UN CAMPO DE TEXTO (2026-09-04).
 
                 Aqui se escribia "03-31" a mano, y el tenant acabo con la reinduccion en `09-31`.
                 Septiembre tiene 30 dias: la fecha se desbordaba al mes siguiente en silencio y la
-                campana vencia el 1 de octubre mientras esta pantalla seguia diciendo 09-31.
+                campaña vencia el 1 de octubre mientras esta pantalla seguia diciendo 09-31.
                 Con los dias saliendo del mes, el 31 de septiembre no existe para elegirlo.
               */}
               <MesDia
@@ -771,7 +818,7 @@ function Tarjeta({
               label="Si llega la siguiente y no hizo la anterior"
               hint={
                 (tipo.config.defaultOnExpiry ?? 'ESPERA') === 'ESPERA'
-                  ? 'Ojo: quien nunca la hace deja de contar en los anos siguientes, y la cobertura sale mejor de lo que es.'
+                  ? 'Ojo: quien nunca la hace deja de contar en los años siguientes, y la cobertura sale mejor de lo que es.'
                   : undefined
               }
             >
@@ -794,7 +841,7 @@ function Tarjeta({
           {/*
             A QUIEN ACABA DE ENTRAR NO SE LE PIDE (2026-09-04).
 
-            El motor ya lo respetaba desde esta manana, pero el campo no estaba en ninguna pantalla:
+            El motor ya lo respetaba desde esta mañana, pero el campo no estaba en ninguna pantalla:
             solo se podia poner en la semilla. El cliente pregunto "¿desde donde se configura?" y la
             respuesta honesta era "desde ningun sitio". Una opcion que existe y no se puede tocar es
             una opcion que no existe.
@@ -805,7 +852,7 @@ function Tarjeta({
             <Field
               htmlFor={`t-recien-${tipo.id}`}
               label="No se le exige a quien entro hace menos de"
-              hint="Su induccion es su actualizacion de ese ano. En cero, se le exige a todo el mundo."
+              hint="Su induccion es su actualizacion de ese año. En cero, se le exige a todo el mundo."
             >
               <Select
                 id={`t-recien-${tipo.id}`}
@@ -858,7 +905,7 @@ function resumenDelTipo(config: TipoConfig, encuestas: SurveyTemplate[]): string
 /**
  * LO QUE HACE LA REPETICION, en una linea.
  *
- * La tarjeta ensena la DECISION y no el formulario: "cada ano antes del 31 de marzo · si no la
+ * La tarjeta enseña la DECISION y no el formulario: "cada año antes del 31 de marzo · si no la
  * hizo, se cierra y nace la nueva" se lee de un vistazo, y tres desplegables en siete tarjetas no.
  */
 function comoSeRepite(config: TipoConfig): string {
@@ -869,7 +916,7 @@ function comoSeRepite(config: TipoConfig): string {
   if (config.defaultAnnualDate) {
     const [mes, dia] = config.defaultAnnualDate.split('-').map(Number);
     const cuando = MESES[(mes ?? 1) - 1] ? `${dia} de ${MESES[(mes ?? 1) - 1]}` : config.defaultAnnualDate;
-    return `Cada ano antes del ${cuando} · ${alVencer(config)}`;
+    return `Cada año antes del ${cuando} · ${alVencer(config)}`;
   }
   if (config.defaultRecurrenceMonths) {
     return `Cada ${config.defaultRecurrenceMonths} meses desde que cada quien la hizo · ${alVencer(config)}`;

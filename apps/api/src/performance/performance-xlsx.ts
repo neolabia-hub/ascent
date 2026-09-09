@@ -6,9 +6,9 @@ import { encabezadoDeTabla, escribirCabecera } from '../common/xlsx.js';
  *
  * ─── POR QUE, SI LA PANTALLA YA LO ENSENA ───
  *
- * La pantalla contesta "¿como va la campana?" mirando, y se queda en las 100 primeras filas. Lo que
+ * La pantalla contesta "¿como va la campaña?" mirando, y se queda en las 100 primeras filas. Lo que
  * se pide despues es otra cosa: el universo completo con fecha, para ordenar por nota, cruzar por
- * area y guardarlo como evidencia del ano. Es el mismo motivo que el export de Seguimiento.
+ * area y guardarlo como evidencia del año. Es el mismo motivo que el export de Seguimiento.
  *
  * ─── DOS HOJAS, Y NO UNA ───
  *

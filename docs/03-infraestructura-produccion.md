@@ -30,7 +30,7 @@ Costo aproximado: USD 0,015 por GB almacenado al mes, egress USD 0. Verificar ta
 
 ## Decision 2 — Computo: VPS dedicado, no nube gestionada
 
-Un LMS de este tamano (miles de usuarios, un tenant grande) corre comodo en 4-8 vCPU y 16 GB.
+Un LMS de este tamaño (miles de usuarios, un tenant grande) corre comodo en 4-8 vCPU y 16 GB.
 El stack completo va en Docker Compose sobre un solo VPS: API NestJS, web Next.js, PostgreSQL,
 Redis y el worker.
 
@@ -40,7 +40,7 @@ Comparacion honesta (verificar precios vigentes antes de contratar):
 |---|---|---|---|
 | **Hetzner** (Ashburn, EE.UU.) | ~EUR 30 por 8 vCPU / 16 GB / 240 GB | La mejor relacion precio-potencia del mercado; 20 TB de trafico incluidos | Latencia a Colombia ~80-110 ms (aceptable, no optima) |
 | **Vultr o DigitalOcean** (Miami) | ~USD 48-60 por 4-8 vCPU / 16 GB | Latencia a Colombia ~40-60 ms, la mejor; panel simple; snapshots | 2-3 veces mas caro por recurso que Hetzner |
-| **AWS EC2 / Lightsail** | ~USD 80-150 equivalente | Ecosistema completo si algun dia se necesita | Sobreprecio claro para este tamano; el egress de S3 castiga el video; complejidad que hoy no aporta |
+| **AWS EC2 / Lightsail** | ~USD 80-150 equivalente | Ecosistema completo si algun dia se necesita | Sobreprecio claro para este tamaño; el egress de S3 castiga el video; complejidad que hoy no aporta |
 | **Contabo** | ~USD 15-25 | El mas barato | Rendimiento inconsistente; no recomendable con un cliente en produccion |
 
 **Recomendacion:** si la prioridad es que se sienta instantaneo para Transprensa (Colombia),

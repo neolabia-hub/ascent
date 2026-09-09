@@ -28,6 +28,7 @@ import { useCan } from '@/components/providers/session-provider';
 import { Analitica } from '@/components/modules/admin/analitica';
 import { Vencimientos } from '@/components/modules/admin/vencimientos';
 import { motivoDelError } from '@/lib/api';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /**
  * SEGUIMIENTO DE LA EJECUCION (Decision #122).
@@ -59,7 +60,7 @@ import { motivoDelError } from '@/lib/api';
  *
  *   EJECUCION     "¿como va esta formacion y quien la ha hecho?"  -> para ir detras de alguien.
  *   ANALITICA     "¿donde esta el problema?"                       -> para decidir donde mirar.
- *   VENCIMIENTOS  "¿que se me viene encima?"                       -> para programar el ano.
+ *   VENCIMIENTOS  "¿que se me viene encima?"                       -> para programar el año.
  *
  * Son tres publicos y tres momentos distintos, y por eso son pestanas y no filtros de una misma
  * pantalla: quien entra a decidir no quiere pasar antes por una lista de doscientas formaciones.
@@ -334,8 +335,8 @@ function VistaEjecucion() {
 
                     Antes cambiaba de significado —con "Atrasadas" pasaba a ser cuantas atrasadas— y
                     eso obliga a releer la tarjeta cada vez para saber que se esta mirando: el mismo
-                    sitio, el mismo tamano y dos magnitudes distintas. El % queda de ancla estable y
-                    el conteo del estado va al lado, mas pequeno y con su color, que es donde el ojo
+                    sitio, el mismo tamaño y dos magnitudes distintas. El % queda de ancla estable y
+                    el conteo del estado va al lado, mas pequeño y con su color, que es donde el ojo
                     lo busca cuando ya sabe que filtro puso.
                   */}
                   <div className="flex items-baseline justify-end gap-2">
@@ -413,6 +414,8 @@ function DetalleFormacion({
     });
   }, [datos, filtro, busqueda]);
 
+  const { visibles: personasVisibles, paginador: paginadorPersonas } = usePaginacion(personas);
+
   return (
     <div>
       <button onClick={onCerrar} className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700">
@@ -467,7 +470,7 @@ function DetalleFormacion({
             <Table>
               <THead>
                 <Tr>
-                  <Th>Persona</Th>
+                  <Th>Nombre</Th>
                   <Th>Area</Th>
                   <Th>Estado</Th>
                   <Th>Vence</Th>
@@ -485,10 +488,11 @@ function DetalleFormacion({
                     </Td>
                   </Tr>
                 ) : (
-                  personas.map((persona) => <FilaPersonaTabla key={persona.assignmentId} persona={persona} />)
+                  personasVisibles.map((persona) => <FilaPersonaTabla key={persona.assignmentId} persona={persona} />)
                 )}
               </TBody>
             </Table>
+            {paginadorPersonas}
           </div>
         </>
       )}
@@ -514,7 +518,7 @@ function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
       </Td>
       <Td>
         {/*
-          A quien NO puede entrar no se le ensena fecha limite: es la misma acusacion absurda que se
+          A quien NO puede entrar no se le enseña fecha limite: es la misma acusacion absurda que se
           corrigio en la pantalla del aprendiz —reclamar un plazo a quien nunca pudo empezar—.
         */}
         <span className={cn('text-sm', persona.estado === 'ATRASADA' ? 'font-medium text-warn' : 'text-ink-700')}>

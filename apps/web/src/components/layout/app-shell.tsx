@@ -16,7 +16,7 @@ import { Topbar } from './topbar';
   EL ESQUELETO TIENE QUE SER LA MISMA PANTALLA que va a aparecer despues (Decision #98).
 
   Se quedo dibujando la barra lateral OSCURA y la barra superior con filo que ya no existen, asi
-  que cada carga ensenaba medio segundo del diseno viejo y despues saltaba al nuevo. Un esqueleto
+  que cada carga enseñaba medio segundo del diseño viejo y despues saltaba al nuevo. Un esqueleto
   que no coincide con lo que llega es peor que no tener esqueleto: promete una cosa y entrega otra,
   y ese salto se lee como que la aplicacion se recargo sola.
 */

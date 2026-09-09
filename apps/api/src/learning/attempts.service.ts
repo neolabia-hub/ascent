@@ -72,7 +72,7 @@ export class AttemptsService {
     if (open) return this.view(actor, open.id); // retomar el que quedo a medias, no abrir otro
 
     if (previous.some((attempt) => attempt.passed)) {
-      throw new ConflictException({ code: 'ALREADY_PASSED', message: 'Ya aprobaste esta evaluacion.' });
+      throw new ConflictException({ code: 'ALREADY_PASSED', message: 'Ya aprobaste esta evaluación.' });
     }
 
     const maxAttempts = version.maxAttempts ?? enrollment.activityVersion.maxAttempts;
@@ -172,7 +172,7 @@ export class AttemptsService {
     };
   }
 
-  /** Guarda una respuesta sin calificar: permite responder por partes y sin senal estable. */
+  /** Guarda una respuesta sin calificar: permite responder por partes y sin señal estable. */
   async saveAnswer(actor: AuthUser, attemptId: string, attemptQuestionId: string, answer: unknown) {
     const attempt = await this.requireOwnAttempt(actor, attemptId);
     if (attempt.status !== 'IN_PROGRESS') throw new ConflictException({ code: 'ATTEMPT_CLOSED' });

@@ -165,11 +165,54 @@ El diseño (CLAUDE.md §3.7) prevé tres formas de marcar a alguien, combinables
 | # | Mecanismo | Estado |
 |---|---|---|
 | 1 | **Lista del instructor** — presente / ausente / justificado | **Construido** (`method: INSTRUCTOR`) |
-| 2 | **QR de sesión** rotativo: la persona lo escanea y queda su sello de tiempo | Diseñado. `offerings.session_code` y `method: QR` esperan |
-| 3 | **Firma en pantalla** + acta PDF con hash | Diseñado. `SessionAct` y `method: SIGNATURE` esperan |
+| 2 | **QR de sesión** rotativo: la persona lo escanea y queda su sello de tiempo | **Construido** el 2026-09-08 (`method: QR`) |
+| 3 | **Firma en pantalla** + acta PDF con hash | **Construido** el 2026-09-08 (`method: SIGNATURE`, `SessionAct`) |
 
-Los tres escriben en la **misma tabla** y solo cambian de `method`, que es lo que permite construir
-el segundo y el tercero sin tocar lo que ya funciona.
+Los tres escriben en la **misma tabla** y solo cambian de `method`, que es lo que permitió construir
+el segundo y el tercero sin tocar lo que ya funcionaba. Cerrar una formación sigue pasando por el
+mismo sitio (`completion.cerrarPorAsistencia`): el informe, la constancia y la obligación **no se
+enteran de por qué puerta entró la marca**, y eso es la prueba de que no hay una segunda verdad.
+
+### Lo que decide cada mecanismo, y lo que no
+
+| | Qué resuelve | Qué NO resuelve |
+|---|---|---|
+| Lista | Es la vía normal y funciona sin teléfonos ni señal | Deja una marca puesta después, de memoria |
+| QR | El sello de tiempo de cada quien, y diez minutos de la jornada de cuarenta | Que alguien escanee por otro |
+| Firma | El trazo que un auditor pide ver, y con él el acta | Tampoco sustituye a un instructor mirando la sala |
+
+**Tres decisiones del QR que son de diseño, no de implementación:**
+
+1. **Rota cada 90 segundos.** Un código fijo se fotografía y se manda al grupo de WhatsApp: quien
+   está en su casa marca asistencia a una jornada a la que no fue, y eso convierte la evidencia en
+   lo contrario de evidencia. 90 segundos es el punto entre las dos formas de que esto no se use:
+   más corto y la gente del fondo no alcanza a escanear —y a la tercera vez que falla, el instructor
+   vuelve al papel—; más largo y la foto compartida vale para toda la sesión.
+2. **Se puede dictar en voz alta.** Seis caracteres sin parecidos: nada de 0/O, 1/I/L, 5/S ni 8/B.
+   Siempre hay alguien con la cámara rota, sin datos o con una funda que no deja enfocar, y ese es
+   exactamente el que se queda sin constar.
+3. **Solo entra quien está convocado.** Quien llega sin convocar existe y es normal, pero
+   inscribirlo es un acto del instructor: si bastara con el código, cualquiera con la foto entraría
+   a la lista de una jornada a la que no fue citado.
+
+**Y el acta:** se genera **a petición** y no sola al cerrar la jornada, porque la lista se corrige
+—alguien llega tarde, alguien se apuntó mal— y un acta que se genera sola diría una cosa mientras la
+lista dice otra. Volver a generarla **no pisa la anterior**: un acta es un documento con fecha, y la
+que se entregó en marzo tiene que seguir existiendo. Su **huella** es SHA-256 de lo que el acta
+afirma, no de los bytes del PDF —que cambian con la fecha de generación—, así que dos copias del
+mismo contenido tienen la misma huella y se puede decir «este papel es el que generó el sistema» sin
+tener que confiar en el papel.
+
+**La firma es un dato biométrico** (habeas data): entra por una puerta propia —`POST /media/firma`,
+bajo `attendance:sign`, **solo PNG y 300 KB**, que es lo que produce un lienzo de navegador— y no se
+devuelve en ninguna lista ni se pinta en ninguna pantalla. Donde aparece es dentro del acta.
+
+**Y ahora la evidencia se puede volver a abrir.** Hasta el 2026-09-08 solo se servían los archivos
+registrados como `ContentPackage`, así que el certificado escaneado, el acta y la firma **se subían
+y no había forma de verlos**: quedaban en el disco y ninguna pantalla podía enseñarlos. Una evidencia
+que no se puede volver a ver no es evidencia. La regla no se relajó —se sirve un archivo si **alguna
+fila del dominio apunta a él**, nunca una clave suelta— solo se completó con las cinco columnas que
+faltaban.
 
 ## 5 bis. Quién puede tomarla
 
@@ -276,6 +319,46 @@ aceptando el papel si la formación lo lleva. Hay tenants —un centro de entren
 para los que «propios» y «certificado oficial» conviven, y poner ahí un rechazo sería convertir una
 suposición nuestra sobre cómo trabajan las empresas en una regla del producto.
 
+### Las dos puertas dicen lo mismo — cerrado el 2026-09-08 (tarde)
+
+La regla de arriba nació **dentro de la lista de asistencia**, y la otra puerta —*Papeles de un
+tercero*, en la ficha de la persona— no se enteró: filtraba solo por la cascada tipo → ficha y no
+miraba quién dictó la jornada, aunque lo tenía a mano y de hecho lo enseñaba.
+
+Lo vio el cliente: una *Inducción específica* pidiendo papel de un tercero y diciendo, en la misma
+fila, **«la dictó PROPIOS»**. Las dos mitades eran coherentes por separado y juntas se contradecían.
+
+**Qué se hizo, y el orden importa:**
+
+1. **El criterio se sacó a `certificate-policy.ts`** (`laDictaUnTercero`) y las dos puertas lo
+   IMPORTAN. No se copió el código de una a otra: un criterio copiado se separa el día que alguien
+   corrige uno de los dos, que es exactamente lo que había pasado.
+2. **Sigue sin ser una compuerta.** Con `PROPIOS` la fila no pide el número —pero **se explica en vez
+   de esconderse**, con un «registrarlo de todos modos» al lado. La fila sigue saliendo porque la
+   formación sí lleva papel, y hacerla desaparecer dejaría a quien la busca sin saber si es que no
+   existe o si es que el sistema la escondió. El servidor lo sigue aceptando: hay tenants —un centro
+   de entrenamiento acreditado— donde «propios» y «certificado oficial» conviven.
+3. **Y si ya hay un papel guardado, se enseña siempre**, se dictara quien se dictara. Esconder un dato
+   que alguien registró es peor que no haberlo pedido: no se puede ni ver ni corregir.
+
+**Y la fila dice ahora de dónde sale.** `origen` distingue si el papel lo pide la **ficha** de esa
+formación o su **tipo**, y con eso la pregunta «¿y esta por qué aparece aquí?» se contesta leyendo, en
+vez de abriendo cuatro pantallas —ficha, ver que está en `null`, Configuración, tipo—. Además dice
+dónde se cambia si sobra.
+
+**Y se puede abrir lo que la fila nombra**, que el cliente pidió expreso: la formación y la
+convocatoria, en pestaña nueva —esto es una gaveta con borradores a medio escribir, y navegar la
+cerraría perdiendo lo tecleado—. Sin esto, quien sospecha que una fila está de más no tiene cómo
+comprobarlo, que fue justo lo que pasó.
+
+Lo que sigue abierto es de otro orden y **es del cliente**: que el tipo `INDUCCION_ESPECIFICA` lleve
+`tracksExternalCertificate: true` es configuración suya. Una inducción la dicta la propia empresa por
+definición, así que casi seguro sobra — pero apagarla por nuestra cuenta sería decidir en su nombre
+(#159). Se apaga en Configuración → Tipos de formación. Ver `PENDIENTES` 2.6.
+
+La matriz completa —jornada propia o de un tercero × papel heredado del tipo o puesto en la ficha ×
+con papel guardado o sin él— la corre `dos-puertas-del-papel.mjs`.
+
 ### Y el emisor no se teclea
 
 Lo que cambia por persona es **el número** de su certificado, y su vencimiento. La **entidad sale de
@@ -352,21 +435,31 @@ cuando llega.
 
 ## 10. Lo que falta
 
-1. **El archivo escaneado no se sube todavía.** Las columnas están (`ext_cert_file_key`,
-   `offerings.attendance_sheet_key`) y la API las acepta, pero no hay pantalla que suba el PDF ni el
-   acta firmada. Es lo siguiente natural y lo que completa la evidencia.
-2. **La segunda puerta**, para cuando el papel llega después de la jornada — que es lo normal: la
-   ARL manda los certificados a los quince días. Hoy hay que volver a la jornada; falta poder
-   hacerlo desde la ficha de la persona.
-3. **Quien llega con un certificado de otro empleo** (vía C sola, sin jornada) no tiene por dónde
-   registrarse.
-4. **El QR de sesión y la firma en pantalla**: los mecanismos 2 y 3, diseñados y con su sitio en el
-   modelo. Con ellos llega `attendance:sign`, que CLAUDE.md nombra y `permissions.ts` todavía no
-   tiene.
-5. **El informe de Vencimientos sigue leyendo `certification_grants`**, una tabla que nadie escribe,
-   así que su serie de «Certificación» sale en cero. Ahora que existe `valid_until_override` y que
-   `certificates.valid_until` ya se escribía, tiene con qué llenarse. Ver `seguimiento.md` §7 quater.
-6. **La constancia propia y el papel del tercero llevan fechas de vigencia distintas**, y es
+**Hecho el 2026-09-08** — los tres primeros de esta lista, que eran el bloque de evidencia:
+
+1. ~~El archivo escaneado no se sube todavía.~~ Puerta propia `POST /media/evidencia` con
+   `attendance:take` (`media.controller.ts`), tipo comprobado por los bytes y no por el nombre. El
+   **acta** cuelga de la jornada, una sola; el **certificado**, de cada persona. Los dos opcionales:
+   la lista marcada ya es evidencia, y exigir el escaneo dejaria jornadas sin cerrar.
+2. ~~La segunda puerta.~~ `GET/PATCH /enrollments/:id/papel-de-tercero` desde la ficha de la
+   persona (`papel-de-tercero.{controller,service}.ts`). Puerta propia y no la de asistencia: desde
+   la ficha no se esta tomando ninguna lista, y reusarla obligaria a mandar un estado de asistencia
+   solo para que el certificado llegara de rebote.
+3. ~~Quien llega con un certificado de otro empleo.~~ **Via C sola**, en la OBLIGACION y no en una
+   inscripcion —`enrollments.offering_id` es obligatorio— con bandera `admiteConvalidacion` en
+   cascada tipo → ficha y por defecto NO. Decisiones **#160** y **#161**;
+   `convalidacion.{controller,service}.ts`.
+
+Lo que sigue abierto:
+
+1. **Las dos puertas no aplican el mismo criterio** sobre quien dicto la jornada — ver §8. Es lo
+   unico de esta lista que es un fallo nuestro y no trabajo por hacer.
+2. ~~El QR de sesión y la firma en pantalla~~ — **construidos el 2026-09-08**, con `attendance:sign`.
+   Ver §5 y el recorrido `qr-y-firma.mjs`.
+3. ~~El informe de Vencimientos sigue leyendo `certification_grants`~~ — **rehecho el 2026-09-08**:
+   lee las tres fuentes que sí se escriben y su eje pasa a ser el trabajo que genera cada fila. Ver
+   `seguimiento.md` §7 quater y la Decisión #162.
+4. **La constancia propia y el papel del tercero llevan fechas de vigencia distintas**, y es
    coherente pero conviene mirarlo con un caso real delante: la constancia caduca según la
    recurrencia (Decisión #111) y la habilitación según lo que diga el papel
    (`valid_until_override`). Son dos documentos que dicen dos cosas, así que dos fechas no es un

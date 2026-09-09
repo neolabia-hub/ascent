@@ -36,9 +36,9 @@ describe('decidePlanDeletion', () => {
   /**
    * El plan CERRADO que nunca obligo a nadie SI se borra (Decision #71).
    *
-   * La regla anterior lo prohibia siempre, y con un plan por ano eso dejo de ser estricto y paso a
+   * La regla anterior lo prohibia siempre, y con un plan por año eso dejo de ser estricto y paso a
    * ser una trampa: un plan de ensayo que alguien cerro por probar el boton se queda con 2026 y ya
-   * no hay forma de planear el ano. Lo que se protege sigue siendo el registro de PERSONAS, y sin
+   * no hay forma de planear el año. Lo que se protege sigue siendo el registro de PERSONAS, y sin
    * una sola obligacion no hay registro que proteger.
    */
   it('el cerrado que nunca obligo a nadie SI se borra: no es evidencia de nada, es un ensayo', () => {

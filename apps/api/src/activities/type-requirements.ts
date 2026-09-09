@@ -30,7 +30,7 @@ export interface PiezaDeContenido {
  *
  * Cada frase dice **que falta y por que se pide**, no un codigo: "necesita una evaluacion" a secas
  * deja a alguien preguntandose si es un capricho del sistema, y la respuesta —que sin nota no hay
- * nada que ensenar en una auditoria— es la que hace que no se discuta.
+ * nada que enseñar en una auditoria— es la que hace que no se discuta.
  */
 export function loQueExigeElTipo(config: unknown, contenidos: PiezaDeContenido[]): string[] {
   const cfg = (config ?? {}) as Record<string, unknown>;

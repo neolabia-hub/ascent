@@ -24,7 +24,7 @@ import type { QuestionPayload } from '@neo-pulse/shared';
  *               y `R*` a la derecha. Los ids de una columna no dicen nada de la otra —el
  *               emparejamiento vive en `correct.pairs`—, asi que ver la lista no resuelve la
  *               pregunta. Si `L1` emparejara con `R1`, se resolveria leyendo el HTML.
- *   NUMERIC     `options` = vacio. La UNIDAD si sale al cliente (se ensena junto al campo), y por
+ *   NUMERIC     `options` = vacio. La UNIDAD si sale al cliente (se enseña junto al campo), y por
  *               eso `toLearnerView` la copia explicitamente desde `correct`: sin ella, "1,5" y
  *               "150" parecen respuestas distintas a la misma pregunta.
  */

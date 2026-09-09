@@ -46,7 +46,7 @@ Bandeja dentro de la plataforma y correo, sobre un patron de bandeja de salida t
 notificacion se escribe junto al cambio que la origina, y un despachador la envia despues con
 reintentos). Sin clave de correo configurada, en desarrollo simula el envio.
 
-### Sistema de diseno "Pulso"
+### Sistema de diseño "Pulso"
 Documentado en `.claude/skills/pulse-ui/SKILL.md`. Lo esencial:
 - **El cliente pone el color, la plataforma pone la estructura.** Los colores del tenant se
   aplican a botones, enlaces activos y progreso; los fondos, textos y bordes son siempre de la
@@ -61,7 +61,7 @@ Documentado en `.claude/skills/pulse-ui/SKILL.md`. Lo esencial:
 | **Las contrasenas generadas se muestran una sola vez** | Guardarlas recuperables seria guardar contrasenas en claro. Se entregan al administrador en el momento y se exige cambio en el primer ingreso |
 | **La carga masiva no es todo-o-nada** | Un archivo de 200 personas con dos errores de digitacion no puede obligar a repetir las 200. El valor esta en el reporte por fila |
 | **El codigo de un catalogo no se puede cambiar** | Los registros historicos y las reglas lo referencian. Se puede cambiar el nombre visible, nunca el codigo |
-| **Los rotulos de la interfaz quedan fijos en espanol** | Se dejo previsto renombrarlos por cliente, pero sin pantalla: ningun cliente lo ha pedido y construirlo ahora era trabajo sin destino |
+| **Los rotulos de la interfaz quedan fijos en español** | Se dejo previsto renombrarlos por cliente, pero sin pantalla: ningun cliente lo ha pedido y construirlo ahora era trabajo sin destino |
 
 ## 4. Como se verifico
 

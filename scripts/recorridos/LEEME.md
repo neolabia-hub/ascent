@@ -17,7 +17,7 @@ node scripts/recorridos/induccion-general.mjs
 node scripts/recorridos/induccion-especifica.mjs
 node scripts/recorridos/reinduccion.mjs   # OJO: obliga a la plantilla entera y la retira al final
 node scripts/recorridos/reinduccion-ciclos.mjs      # la ronda SIGUIENTE: cierra y abre
-node scripts/recorridos/capacitacion-del-plan.mjs   # crea y APRUEBA un plan en un ano libre
+node scripts/recorridos/capacitacion-del-plan.mjs   # crea y APRUEBA un plan en un año libre
 node scripts/recorridos/varias-convocatorias.mjs    # dos convocatorias de la misma formacion
 node scripts/recorridos/pildora.mjs
 node scripts/recorridos/extraordinaria.mjs          # crea un plan tapadera y lo borra al final
@@ -27,6 +27,10 @@ node scripts/recorridos/proyectados-ajuste.mjs      # congelar, que cambie la pl
 node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia, "el papel manda", 2 reglas y acotamiento
 node scripts/recorridos/asistencia-matriz.mjs       # la asistencia en TODOS los tipos y modalidades, las 5 facetas y el Seguimiento
 node scripts/recorridos/permanente-y-jornada.mjs    # una formacion con convocatoria permanente Y jornada: una sola inscripcion viva
+node scripts/recorridos/qr-y-firma.mjs               # mecanismos 2 y 3: QR de sesion, firma y acta con huella
+node scripts/recorridos/dos-puertas-del-papel.mjs    # el papel de un tercero: las dos puertas dicen lo mismo
+node scripts/recorridos/dos-reglas-una-obligacion.mjs # dos reglas vivas, una sola obligacion
+node scripts/recorridos/vencimientos.mjs             # el informe: tres fuentes, eje nuevo y el aviso a la bandeja
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```
@@ -48,6 +52,14 @@ recorridos no lo llevan ("Bienvenida E2E123456").
 
 ## Lo que ya encontraron
 
+- **La constancia propia se emitia SIN fecha de vencimiento** cuando la formacion tenia mas de una
+  regla viva: la vigencia salia de `findFirst` sobre las reglas, asi que dependia del orden de las
+  filas. Con la regla de "toda la empresa" que se crea sola al publicar una induccion, el papel nacia
+  sin caducidad y la persona desaparecia del informe de Vencimientos (`vencimientos.mjs`).
+- **Dos obligaciones vivas de la misma formacion para la misma persona**, que se creia un caso raro
+  de alcance MANUAL: pasaba con cualquier induccion publicada y ademas exigida a un cargo
+  (`dos-reglas-una-obligacion.mjs`).
+
 - La pestana "A quienes" no se refrescaba al publicar: el requisito automatico nacia y la pantalla
   seguia diciendo que no se le exigia a nadie.
 - "Ajustar" el disparador de una induccion no levantaba el corte de "solo a quien entre desde
@@ -61,7 +73,7 @@ recorridos no lo llevan ("Bienvenida E2E123456").
 - **Con dos convocatorias publicadas, la misma persona se inscribia DOS veces** a la misma
   formacion: al terminar una, la otra inscripcion se quedaba viva para siempre.
 - **El PLAN proyectaba a la misma gente dos veces**: dos jornadas de lo mismo daban 26 proyectados
-  con 13 obligados reales, y la cobertura del ano no podia pasar del 50%.
+  con 13 obligados reales, y la cobertura del año no podia pasar del 50%.
 - **Cualquier formacion entraba al PLAN por la API**: el filtro de la Decision #78 solo vivia en la
   pantalla. Meter una induccion general en un plan subio sus proyectados de 22 a 819.
 - **Cancelar una jornada no cancelaba un renglon REPROGRAMADO**: seguia contando como programado.
@@ -106,12 +118,12 @@ Lo que cambia cuando el alcance lo deciden los cargos y no la empresa entera:
 |---|---|
 | Publicar obliga a **TODA la plantilla** | 791 de 791, **sin** el corte de "solo los nuevos": lo contrario que la general. Y tarda ~2 s |
 | Todas vencen **el mismo dia** | es una CAMPANA anual, no un aniversario por persona |
-| Pero la PRIMERA **no cae el 31 de marzo** | el automatismo pone `ON_JOIN` y la fecha fija solo la usa `SCHEDULED`: la primera vence a los 30 dias de publicarla, y la campana rige desde la 2a ronda |
+| Pero la PRIMERA **no cae el 31 de marzo** | el automatismo pone `ON_JOIN` y la fecha fija solo la usa `SCHEDULED`: la primera vence a los 30 dias de publicarla, y la campaña rige desde la 2a ronda |
 | La ronda siguiente **no se abre al terminar** | solo al entrar en la ventana de la proxima (60 dias antes) |
 
 ### Y de la RONDA SIGUIENTE de la reinduccion (2026-09-04)
 
-Lo que estaba probado solo con unitarias y ahora se ejerce de verdad. **No hace falta esperar un ano
+Lo que estaba probado solo con unitarias y ahora se ejerce de verdad. **No hace falta esperar un año
 ni tocar fechas en la base**: la ventana esta fijada en 60 dias, asi que con una recurrencia de UN
 MES ya esta abierta el dia que nace la ronda 1. Es el mismo codigo que correra en 2027.
 
@@ -121,7 +133,7 @@ MES ya esta abierta el dia que nace la ronda 1. Es el mismo codigo que correra e
 | La ronda 2 | nace PENDING, venciendo despues que la anterior |
 | Lo que debe el aprendiz | **una sola**: la del periodo en curso |
 | Lo que lee el auditor | **"No realizada"**, con su cifra propia en el resumen |
-| **ABIERTO** | quien tiene una cerrada y otra viva sale **dos veces** en el informe. Decision del cliente: un renglon por ronda (historial) o por persona (campana en curso) |
+| **ABIERTO** | quien tiene una cerrada y otra viva sale **dos veces** en el informe. Decision del cliente: un renglon por ronda (historial) o por persona (campaña en curso) |
 
 ### Y de la EXTRAORDINARIA (2026-09-04)
 
@@ -158,8 +170,8 @@ Es la que rompe todas las costumbres de las tres anteriores:
 | Cancelar la jornada | retira lo abierto y cancela el renglon |
 
 **Dos trampas del propio recorrido:** el vencimiento se lee en **hora de Colombia** (el ultimo dia
-del mes a las 23:59 de Bogota es el dia siguiente en UTC), y hay que usar un **ano libre por
-corrida**, porque hay un plan por ano y aprobarlo no se deshace.
+del mes a las 23:59 de Bogota es el dia siguiente en UTC), y hay que usar un **año libre por
+corrida**, porque hay un plan por año y aprobarlo no se deshace.
 
 ### Y de la PILDORA (2026-09-04)
 
@@ -320,16 +332,16 @@ incompleta, no por un fallo.
 
 ## Lo que estos recorridos NO pueden probar, y conviene no fingir que si
 
-El truco que usa todo este directorio para probar "el ano que viene" es **comprimir la recurrencia**
-—poner un mes donde iria un ano— porque la ventana esta fijada en 60 dias y con un periodo de 30 ya
+El truco que usa todo este directorio para probar "el año que viene" es **comprimir la recurrencia**
+—poner un mes donde iria un año— porque la ventana esta fijada en 60 dias y con un periodo de 30 ya
 esta abierta el primer dia. Funciona con `everyMonths`, que es un numero.
 
-**No funciona con una CAMPANA.** Su periodo es el ano del calendario, no un numero que se pueda
+**No funciona con una CAMPANA.** Su periodo es el año del calendario, no un numero que se pueda
 bajar: para que el caso aparezca hacen falta 60 dias reales entre crear la regla y la fecha de
-campana. Ahi es donde se escondio el fallo del 2026-09-05 —la ronda 2 naciendo con el mismo
+campaña. Ahi es donde se escondio el fallo del 2026-09-05 —la ronda 2 naciendo con el mismo
 vencimiento que se acababa de cumplir, y solo para quien cumplia— que ningun recorrido vio ni vera.
 
-La regla: **todo lo que dependa de una FECHA DEL CALENDARIO** —campana anual, ultimo dia del mes de
+La regla: **todo lo que dependa de una FECHA DEL CALENDARIO** —campaña anual, ultimo dia del mes de
 un renglon del plan— se prueba en la logica pura (`due-date.spec.ts`, `next-cycle.spec.ts`), sobre
 las funciones reales. Y se dice aqui, para que nadie lea "12 recorridos en verde" como si cubrieran
 tambien eso.

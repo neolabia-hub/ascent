@@ -36,7 +36,7 @@ import { LearnerTopbar } from '@/components/layout/learner-topbar';
  * barra superior, una linea bajo ella y el anillo del indice— y tres barras no informan el triple:
  * informan menos, porque ninguna se mira. Quedan dos, y responden preguntas DISTINTAS: el anillo
  * del indice dice cuanto llevas de la FORMACION; dentro del escenario, cada tipo de contenido
- * ensena su propio avance en su propia unidad —los tramos de la presentacion, el relleno del boton
+ * enseña su propio avance en su propia unidad —los tramos de la presentacion, el relleno del boton
  * en el video, el contador de tarjetas en una leccion—.
  *
  * El indice va a la DERECHA y no a la izquierda por una razon concreta: al plegarlo, el escenario
@@ -158,7 +158,7 @@ function PlayerRail() {
               {expanded ? <span className="truncate text-sm">{item.label}</span> : null}
               {/*
                 Rotulo emergente cuando esta plegado. Sin el, un carril de iconos obliga a
-                adivinar, y aqui hay gente que entra a la plataforma tres veces al ano.
+                adivinar, y aqui hay gente que entra a la plataforma tres veces al año.
               */}
               {!expanded ? (
                 <span

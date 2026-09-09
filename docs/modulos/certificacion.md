@@ -310,7 +310,7 @@ que falla con error 500 no acredita nada.
 
 | Pendiente | Criticidad | Nota |
 |---|---|---|
-| Las formaciones **presenciales** no emiten constancia | Alta | Una jornada de 8 horas acredita, pero ahí no hay reproductor que marque completado sino asistencia. Depende de la parte de asistencia del Sprint 5 |
+| ~~Las formaciones **presenciales** no emiten constancia~~ **RESUELTO (Sprint 5).** `cerrarPorAsistencia` emite exactamente lo que emitiria cerrar por contenido: lo que diga la cascada. Marcar PRESENT es el equivalente a terminar el contenido | — | — |
 | No hay emisión manual para lo completado **antes** de activar la plantilla | Media | El permiso `certificates:issue` existe y no lo usa ningún endpoint de alta manual todavía |
 | La vigencia por **fecha fija anual** («cada 31 de enero») no se traduce a vigencia | Baja | Solo se traduce `everyMonths`. Con fecha fija el vencimiento es un día del calendario, no un plazo desde que se cursó; mezclarlas daría una vigencia inventada |
 | El campo `horas` se escribe a mano por formación | Baja | No se deduce de la duración del contenido a propósito: una jornada presencial de 8 horas puede tener 20 minutos de contenido virtual |

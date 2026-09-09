@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowUpCircle, CheckCircle2, Send, SlidersHorizontal, UserPlus, XCircle } from 'lucide-react';
+import { ArrowLeft, ArrowUpCircle, CheckCircle2, Search, Send, SlidersHorizontal, UserPlus, XCircle } from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import {
   adjustProjected,
@@ -23,13 +23,19 @@ import {
 } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
 import { ListaDeAsistencia } from '@/components/modules/delivery/lista-de-asistencia';
+import { SesionEnSala } from '@/components/modules/delivery/sesion-en-sala';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/components/ui/cn';
 import { Drawer } from '@/components/ui/drawer';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TablePagination } from '@/components/ui/table';
 import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { useToast } from '@/components/ui/toast';
+
+/** Doce por pagina: lo que cabe sin que la tarjeta empuje a la lista de inscritos fuera de la vista. */
+const FALTAN_POR_PAGINA = 12;
 
 const STATUS_LABEL: Record<OfferingStatus, { kind: StatusPillKind; label: string }> = {
   DRAFT: { kind: 'neutral', label: 'BORRADOR' },
@@ -62,7 +68,7 @@ function Stat({
   label: string;
   value: string | number;
   hint?: string;
-  /** Accion pequena en la esquina, para el numero que se puede corregir. */
+  /** Accion pequeña en la esquina, para el numero que se puede corregir. */
   accion?: React.ReactNode;
 }) {
   return (
@@ -110,6 +116,9 @@ export default function ConvocatoriaDetallePage() {
 
   /** Quien falta por convocar. Se pide junto con lo demas: es parte de la foto, no un extra. */
   const [pendientes, setPendientes] = useState<PendingInvites | null>(null);
+  const [buscaFaltan, setBuscaFaltan] = useState('');
+  const [buscadorFaltanAbierto, setBuscadorFaltanAbierto] = useState(false);
+  const [paginaFaltan, setPaginaFaltan] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -298,6 +307,29 @@ export default function ConvocatoriaDetallePage() {
     }
   };
 
+  /*
+    QUIENES FALTAN, BUSCABLES Y POR PAGINAS. Ver la nota larga en el bloque que los pinta.
+
+    Va ANTES del `return` temprano de abajo a proposito: un `useMemo` detras de un return
+    condicional se salta en el primer render y React lo castiga con "rendered fewer hooks than
+    expected", que es un error que no se parece en nada a su causa.
+  */
+  const faltanFiltrados = useMemo(() => {
+    const todos = pendientes?.faltan ?? [];
+    const q = buscaFaltan.trim().toLowerCase();
+    if (q === '') return todos;
+    return todos.filter(
+      (persona) =>
+        persona.fullName.toLowerCase().includes(q) ||
+        persona.jobTitle.name.toLowerCase().includes(q) ||
+        persona.area.name.toLowerCase().includes(q),
+    );
+  }, [pendientes, buscaFaltan]);
+  const faltanVisibles = faltanFiltrados.slice(
+    paginaFaltan * FALTAN_POR_PAGINA,
+    (paginaFaltan + 1) * FALTAN_POR_PAGINA,
+  );
+
   if (!offering) return <Skeleton className="h-96 w-full" />;
 
   const activity = offering.activityVersion.activity;
@@ -306,7 +338,7 @@ export default function ConvocatoriaDetallePage() {
   const isOpen = offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS';
   /**
    * AUTOSERVICIO: la persona entra sola. Aqui "convocar" no significa nada —nadie cita a nadie— y
-   * ensenar "faltan por convocar" invita a inscribir a mano a gente que iba a entrar sola, lo que
+   * enseñar "faltan por convocar" invita a inscribir a mano a gente que iba a entrar sola, lo que
    * ademas cuenta como inscrita antes de que haya hecho nada.
    */
   /** Por que puerta se entro: la lista de Convocatorias, o la ficha de la formacion. */
@@ -497,45 +529,6 @@ export default function ConvocatoriaDetallePage() {
       </div>
 
 
-      {/*
-        QUIENES FALTAN, con nombre y apellido. El numero solo dice que hay un hueco; la lista dice
-        A QUIEN hay que citar, que es lo que se necesita para actuar. Se ensena solo cuando la
-        jornada esta abierta: en borrador todavia no se puede inscribir a nadie.
-      */}
-      {isOpen && !esAutoservicio && pendientes && pendientes.faltan.length > 0 ? (
-        <section className="card mb-6 p-5">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 className="font-display text-base font-semibold text-ink-900">Faltan por convocar</h2>
-            <span className="text-sm text-ink-500">
-              {pendientes.convocados} de {pendientes.proyectados} ya citados
-            </span>
-          </div>
-          <p className="mb-4 text-sm text-ink-500">
-            Estas personas tienen la formacion exigida y esta jornada las atiende, pero no estan
-            citadas a ninguna. {pendientes.detalle}
-          </p>
-          <ul className="divide-y divide-line">
-            {pendientes.faltan.slice(0, 12).map((persona) => (
-              <li key={persona.id} className="flex items-center justify-between gap-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink-900">{persona.fullName}</p>
-                  <p className="truncate text-xs text-ink-500">
-                    {persona.jobTitle.name} · {persona.area.name}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => void convocarA(persona.id)} disabled={busy}>
-                  Convocar
-                </Button>
-              </li>
-            ))}
-          </ul>
-          {pendientes.faltan.length > 12 ? (
-            <p className="mt-3 text-xs text-ink-500">
-              y {pendientes.faltan.length - 12} mas. El boton de arriba las cita a todas de una vez.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
       <div className="mb-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="card p-5">
           <h2 className="font-display text-base font-semibold text-ink-900">Datos de la jornada</h2>
@@ -547,12 +540,14 @@ export default function ConvocatoriaDetallePage() {
                 {offering.startTime ? ` · ${offering.startTime} a ${offering.endTime ?? ''}` : ''}
               </dd>
             </div>
-            <div>
-              <dt className="text-xs text-ink-500">Modalidad</dt>
-              <dd className="text-sm text-ink-900">
-                {offering.modality === 'PRESENCIAL' ? 'Presencial' : offering.modality === 'VIRTUAL' ? 'Virtual' : 'Hibrida'}
-              </dd>
-            </div>
+            {/*
+              LA MODALIDAD YA NO SE REPITE AQUI (2026-09-07).
+
+              Estaba en estos datos y otra vez en la tarjeta de al lado. El cliente pregunto si era
+              redundante: aqui SI lo era. Vive en "Como se cierra esta jornada", que es donde
+              significa algo —es el primer eslabon de la cadena que acaba en como se da por
+              cumplida— y no un dato suelto entre el lugar y el cupo.
+            */}
             <div>
               <dt className="text-xs text-ink-500">Lugar</dt>
               <dd className="text-sm text-ink-900">{offering.location ?? 'Virtual'}</dd>
@@ -560,6 +555,20 @@ export default function ConvocatoriaDetallePage() {
             <div>
               <dt className="text-xs text-ink-500">Regional</dt>
               <dd className="text-sm text-ink-900">{offering.regional?.name ?? 'Todas'}</dd>
+            </div>
+            {/*
+              EL ACOTAMIENTO — LA TAJADA (Decision #68), que no se veia en ninguna parte.
+
+              Es a QUE PARTE de los obligados atiende esta jornada, y estaba solo en el formulario de
+              crearla. Sin el, el numero de "Faltan por convocar" de aqui arriba no se puede
+              interpretar: no es lo mismo que falten seis de toda la empresa a que falten seis de los
+              conductores de Bogota, que es lo unico que esta jornada atiende.
+            */}
+            <div>
+              <dt className="text-xs text-ink-500">A quien atiende</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.audience?.name ?? 'A todos los obligados de esta formacion'}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-ink-500">Instructor</dt>
@@ -575,7 +584,7 @@ export default function ConvocatoriaDetallePage() {
             </div>
             {/*
               LA INTENSIDAD, DESGLOSADA (Decision #30): el PESV la exige separada y BPM suma las
-              10 h/ano. Estaba en el formulario y no se veia en la ficha, que es donde la busca
+              10 h/año. Estaba en el formulario y no se veia en la ficha, que es donde la busca
               quien prepara una auditoria.
             */}
             <div>
@@ -587,37 +596,18 @@ export default function ConvocatoriaDetallePage() {
               </dd>
             </div>
             {/*
-              COMO SE ACREDITA, que es lo que decide si sale la lista de asistencia. Viene resuelto
-              del servidor y se enseña aqui porque es la pregunta que llega justo despues de "¿por
-              que no me sale el boton?".
-            */}
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-ink-500">Como se acredita</dt>
-              <dd className="text-sm text-ink-900">
-                {offering.admiteAsistencia
-                  ? 'Con la lista de asistencia de la sesion'
-                  : 'Con lo que cada persona complete en la plataforma'}
-                {offering.closesByAttendance !== null ? (
-                  <span className="ml-2 text-xs text-ink-500">(elegido para esta jornada)</span>
-                ) : null}
-              </dd>
-            </div>
-            {/*
-              LO DEL PLAN, EN UNA LINEA CUANDO NO APLICA (2026-09-06).
+              LAS OBSERVACIONES, QUE SE ESCRIBIAN Y NO VOLVIAN A APARECER.
 
-              Tenia una tarjeta entera para decir que no entraba a ningun plan, y ocupaba media
-              pantalla en las seis formaciones de los siete tipos que no pueden entrar. Lo noto el
-              cliente. No desaparece —"¿donde esta lo del plan?" sigue siendo una pregunta legitima
-              cuando la tarjeta si sale en las de al lado— pero pasa a ser un renglon.
+              El campo existe en el modelo y en el formulario de crear la convocatoria desde el
+              principio, y esta pantalla no lo enseñaba: lo que alguien anotaba —"el salon cambio al
+              bloque B", "vienen los de mantenimiento del turno de la noche"— se escribia una vez y
+              se perdia. Es texto libre de quien organiza, asi que va al ancho completo y al final,
+              debajo de los datos con forma.
             */}
-            {!entraAlPlan ? (
+            {offering.observations ? (
               <div className="sm:col-span-2">
-                <dt className="text-xs text-ink-500">Plan anual</dt>
-                <dd className="text-sm text-ink-700">
-                  No aplica: una{' '}
-                  <span className="font-medium text-ink-900">{offering.activityVersion.activity.activityType.name}</span>{' '}
-                  no entra al plan. El cumplimiento del ano solo lo mueve lo que estaba planeado.
-                </dd>
+                <dt className="text-xs text-ink-500">Observaciones</dt>
+                <dd className="whitespace-pre-line text-sm text-ink-700">{offering.observations}</dd>
               </div>
             ) : null}
           </dl>
@@ -632,35 +622,256 @@ export default function ConvocatoriaDetallePage() {
         </div>
 
         {/*
-          LA TARJETA DEL PLAN, SOLO CUANDO PUEDE ENTRAR A UNO.
+          LA COLUMNA DE LA DERECHA: COMO CUENTA ESTA JORNADA (2026-09-06).
 
-          Antes salia siempre, y en los seis tipos que no participan solo servia para decir que no.
-          Eso ahora es un renglon dentro de los datos de la jornada, arriba: la informacion se
-          queda y el espacio se devuelve.
+          ─── QUE PROBLEMA RESUELVE ───
+
+          Aqui solo estaba "En el plan anual", y solo cuando la formacion podia entrar a uno. En los
+          seis tipos que no participan la tarjeta desaparecia y los datos de la jornada se quedaban
+          con dos tercios de ancho y media pantalla vacia al lado. Lo noto el cliente.
+
+          ─── POR QUE UNA TARJETA CON MAS COSAS Y NO SOLO ESTIRAR LA DE LA IZQUIERDA ───
+
+          Porque hay dos clases de dato en esta pantalla y estaban mezcladas. A la izquierda, los
+          HECHOS de la sesion: cuando, donde, quien la dicta, cuantas horas — se leen de un tiron y
+          se comparan con la citacion. A la derecha, lo que se DEDUCE de ellos y gobierna la
+          jornada: como se cierra, si va a pedir el papel de un tercero, y a que plan cuenta.
+
+          Las dos preguntas que mas llegan —"¿por que no me sale el boton de tomar asistencia?" y
+          "¿esto cuenta para el plan del año?"— se contestan las dos aqui, juntas, en vez de una
+          perdida al final de una lista de nueve datos y la otra en una tarjeta que a veces no
+          esta. Y como siempre tiene contenido, la pagina ya no cambia de forma segun el tipo de
+          formacion, que es lo que hacia que se viera rota.
         */}
-        {entraAlPlan ? (
-          <div className="card p-5">
-            <h2 className="font-display text-base font-semibold text-ink-900">En el plan anual</h2>
-            {offering.planItems.length === 0 ? (
-              <p className="mt-2 text-sm text-ink-500">
-                Esta convocatoria no pertenece a ningun plan. Agregala desde el plan si debe contar para el programa anual.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {offering.planItems.map((item) => (
-                  <li key={item.id} className="text-sm">
-                    <Link href={`/plan/${item.plan.id}`} className="focus-ring font-medium text-ink-900 hover:underline">
-                      {item.plan.name} ({item.plan.year})
-                    </Link>
-                    <span className="ml-2 text-xs text-ink-500">mes {item.plannedMonth}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
+        <div className="card h-fit p-5">
+          {/*
+            TRES PREGUNTAS QUE SUENAN IGUAL Y NO LO SON (reescrito el 2026-09-07).
+
+            El cliente pregunto literalmente *"¿que tiene que ver «como se hace» con la modalidad y
+            con «como se acredita»?"*, y la tarjeta tenia la culpa: enseñaba tres rotulos parecidos
+            —modalidad, como se acredita, certificado de un tercero— sin decir que cada uno contesta
+            una pregunta distinta. Puestos en fila y sin explicar, se leen como el mismo dato tres
+            veces.
+
+            Son tres eslabones de una cadena, y ahora se enseñan como tal:
+
+              1. COMO SE DICTA        presencial, virtual o hibrida. Es logistica: donde va la gente.
+              2. COMO SE DA POR       con la hoja firmada de la sesion, o con lo que cada persona
+                 CUMPLIDA             complete en la plataforma. Es la EVIDENCIA, y es lo que decide
+                                      si sale el boton de tomar asistencia.
+              3. QUE PAPEL QUEDA      si ademas de lo anterior hay un certificado de otra entidad
+                                      —la ARL— con su propio numero y su propio vencimiento.
+
+            El 1 casi siempre sugiere el 2, pero **no lo decide**: una capacitacion por videollamada
+            es virtual y tiene lista de quien se conecto; un taller presencial puede acreditarse con
+            lo que cada quien haga despues. Por eso el 2 se pregunta y no se deduce (Decision #158),
+            y por eso viene RESUELTO del servidor (`cierre-de-la-jornada.ts`): la regla cambio dos
+            veces en dos dias y no puede vivir tambien aqui.
+
+            Y el 3 es independiente de los dos: quien no vino no tiene papel, y quien cumplio en la
+            plataforma tampoco — pero una recertificacion presencial deja los dos, la constancia de
+            la empresa y el papel de la ARL, que dicen cosas distintas (Decision #159).
+          */}
+          <h2 className="font-display text-base font-semibold text-ink-900">Como se cierra esta jornada</h2>
+          <dl className="mt-3 space-y-4">
+            <div>
+              <dt className="text-xs text-ink-500">Como se dicta</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.modality === 'PRESENCIAL' ? 'Presencial' : offering.modality === 'VIRTUAL' ? 'Virtual' : 'Hibrida'}
+                <span className="ml-1.5 text-xs text-ink-500">
+                  {offering.modality === 'VIRTUAL' ? '(donde se conecta la gente)' : '(donde va la gente)'}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-500">Como se registra</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.admiteAsistencia ? 'Con la lista de asistencia de la sesion' : 'Automatico, al completar el contenido'}
+                {/*
+                  Y DE DONDE SALIO ESA RESPUESTA, que es la mitad que faltaba: no es lo mismo que
+                  alguien lo eligiera para esta jornada que que lo sugiriera su modalidad. Sin esto,
+                  quien mira no sabe si puede cambiarlo ni por que dice lo que dice.
+                */}
+                <span className="ml-1.5 text-xs text-ink-500">
+                  {offering.closesByAttendance !== null
+                    ? '(elegido para esta jornada)'
+                    : '(lo sugirio la modalidad)'}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-500">Papel de un tercero</dt>
+              <dd className="text-sm text-ink-900">
+                {offering.registraCertificadoExterno
+                  ? `Si, lo expide ${offering.quienLaDicto}`
+                  : 'No lleva'}
+                {/*
+                  Y DONDE SE ESCRIBE, QUE ES DONDE LA PANTALLA MENTIA (2026-09-08).
+
+                  Decia siempre "la lista pedira su numero y su vencimiento". Pero **llevar papel y
+                  cerrarse por lista son dos condiciones independientes**: `registraCertificadoExterno`
+                  sale de la formacion y `admiteAsistencia` de como se dicto esta jornada. Si una
+                  formacion lleva papel y su jornada se cierra al completar el contenido —un curso en
+                  linea de la ARL que emite certificado— **no hay ninguna lista**, y por tanto hoy no
+                  hay donde escribirlo.
+
+                  Lo cazo el cliente preguntando justo por ese cruce. Es raro y no se inventa una
+                  pantalla para el ahora —esa es la segunda puerta, `PENDIENTES` 2.2 y 2.3— pero
+                  prometer una lista que no va a aparecer es peor que no decir nada: quien lo lee
+                  cierra la jornada esperando que le pregunten, y no le preguntan.
+                */}
+                <span className="ml-1.5 text-xs text-ink-500">
+                  {!offering.registraCertificadoExterno
+                    ? '(solo queda la constancia de la empresa)'
+                    : offering.admiteAsistencia
+                      ? '(la lista pedira su numero y su vencimiento)'
+                      : '(esta jornada no lo pide: se cierra al completar el contenido)'}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-500">En el plan anual</dt>
+              {!entraAlPlan ? (
+                <dd className="text-sm text-ink-700">
+                  No aplica: una{' '}
+                  <span className="font-medium text-ink-900">{offering.activityVersion.activity.activityType.name}</span>{' '}
+                  no entra al plan. El cumplimiento del año solo lo mueve lo que estaba planeado.
+                </dd>
+              ) : offering.planItems.length === 0 ? (
+                <dd className="text-sm text-ink-500">
+                  No pertenece a ningun plan. Agregala desde el plan si debe contar para el programa anual.
+                </dd>
+              ) : (
+                <dd>
+                  <ul className="space-y-1">
+                    {offering.planItems.map((item) => (
+                      <li key={item.id} className="text-sm">
+                        <Link href={`/plan/${item.plan.id}`} className="focus-ring font-medium text-ink-900 hover:underline">
+                          {item.plan.name} ({item.plan.year})
+                        </Link>
+                        <span className="ml-2 text-xs text-ink-500">mes {item.plannedMonth}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              )}
+            </div>
+          </dl>
+        </div>
       </div>
 
+      {/*
+        QUIENES FALTAN, con nombre y apellido. El numero solo dice que hay un hueco; la lista dice
+        A QUIEN hay que citar, que es lo que se necesita para actuar. Se enseña solo cuando la
+        jornada esta abierta: en borrador todavia no se puede inscribir a nadie.
+      */}
+      {isOpen && !esAutoservicio && pendientes && pendientes.faltan.length > 0 ? (
+        <section className="card mb-6 p-5">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-base font-semibold text-ink-900">Faltan por convocar</h2>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-ink-500">
+                {pendientes.convocados} de {pendientes.proyectados} ya citados
+              </span>
+              {/*
+                EL BUSCADOR, DETRAS DE SU LUPA (2026-09-06).
+
+                Aqui SI se esconde —al reves que en la lista de asistencia, donde se queda a la
+                vista— porque son dos usos distintos. En la asistencia se busca a alguien concreto
+                cada vez que se abre; aqui lo normal es leer los doce primeros o pulsar "convocar a
+                todos", y buscar es la excepcion de cuando falta una persona concreta entre ciento
+                cuarenta. Un buscador siempre visible para un uso excepcional es una caja vacia
+                permanente encima de la lista.
+              */}
+              {pendientes.faltan.length > FALTAN_POR_PAGINA ? (
+                <button
+                  type="button"
+                  aria-expanded={buscadorFaltanAbierto}
+                  aria-label="Buscar entre quienes faltan por convocar"
+                  onClick={() => {
+                    const abrir = !buscadorFaltanAbierto;
+                    setBuscadorFaltanAbierto(abrir);
+                    if (!abrir) { setBuscaFaltan(''); setPaginaFaltan(0); }
+                  }}
+                  className={cn(
+                    'focus-ring flex h-8 w-8 items-center justify-center rounded-lg border border-line-strong transition-colors duration-150',
+                    buscadorFaltanAbierto ? 'bg-paper text-ink-900' : 'bg-surface text-ink-500 hover:bg-paper hover:text-ink-900',
+                  )}
+                >
+                  <Search size={15} strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <p className="mb-4 text-sm text-ink-500">
+            Estas personas tienen la formacion exigida y esta jornada las atiende, pero no estan
+            citadas a ninguna. {pendientes.detalle}
+          </p>
+          {/*
+            BUSCADOR Y PAGINAS, PORQUE CON CIENTO CUARENTA NO SERVIA (2026-09-06).
+
+            Enseñaba doce y remataba con "y 132 mas. El boton de arriba las cita a todas de una vez",
+            y ahi se acababa la pantalla. Lo cazo el cliente, y el problema no era la cifra: era que
+            **a las otras 132 no habia forma de llegar**. Quien entra aqui casi nunca quiere citarlas
+            a todas —para eso ya esta el boton de arriba— sino a una concreta que sabe que falta, y
+            esa persona podia estar en cualquier sitio de una lista invisible.
+
+            Buscador por nombre, cargo o area, y paginas de doce. `TablePagination` se reutiliza tal
+            cual aunque esto no sea una tabla: es la misma pregunta —"¿por donde voy de cuantos?"— y
+            dos formas de pasar pagina en el mismo modulo se aprenden dos veces.
+
+            La pagina se reinicia al escribir: quedarse en la pagina 4 de un resultado de tres es la
+            forma mas rapida de que una lista parezca vacia.
+          */}
+          {buscadorFaltanAbierto ? (
+            <div className="relative mb-3 w-full sm:w-80">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
+              <Input
+                autoFocus
+                className="h-9 rounded-lg pl-9"
+                placeholder="Buscar por nombre, cargo o area"
+                aria-label="Buscar entre quienes faltan por convocar"
+                value={buscaFaltan}
+                onChange={(event) => {
+                  setBuscaFaltan(event.target.value);
+                  setPaginaFaltan(0);
+                }}
+              />
+            </div>
+          ) : null}
+          <ul className="divide-y divide-line">
+            {faltanVisibles.map((persona) => (
+              <li key={persona.id} className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink-900">{persona.fullName}</p>
+                  <p className="truncate text-xs text-ink-500">
+                    {persona.jobTitle.name} · {persona.area.name}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => void convocarA(persona.id)} disabled={busy}>
+                  Convocar
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {faltanFiltrados.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-500">
+              Ninguna de las {pendientes.faltan.length} personas que faltan coincide con la busqueda.
+            </p>
+          ) : null}
+          {faltanFiltrados.length > FALTAN_POR_PAGINA ? (
+            <TablePagination
+              from={paginaFaltan * FALTAN_POR_PAGINA + 1}
+              to={Math.min((paginaFaltan + 1) * FALTAN_POR_PAGINA, faltanFiltrados.length)}
+              total={faltanFiltrados.length}
+              canPrevious={paginaFaltan > 0}
+              canNext={(paginaFaltan + 1) * FALTAN_POR_PAGINA < faltanFiltrados.length}
+              onPrevious={() => setPaginaFaltan((p) => Math.max(0, p - 1))}
+              onNext={() => setPaginaFaltan((p) => p + 1)}
+            />
+          ) : null}
+        </section>
+      ) : null}
       {/*
         LOS INSCRITOS Y SU ASISTENCIA, EN UNA SOLA TARJETA (2026-09-06).
 
@@ -673,6 +884,23 @@ export default function ConvocatoriaDetallePage() {
         Y el boton no sale en una jornada que no se dicto —CANCELADA o en BORRADOR—: el servidor ya
         lo rechazaba, pero un boton que solo falla al pulsarlo no es una compuerta, es una trampa.
       */}
+      {/*
+        LA SALA VA ENCIMA DE LA LISTA (2026-09-08).
+
+        Es lo que se usa MIENTRAS pasa la jornada —se proyecta el codigo y la gente escanea— y la
+        lista es lo que se repasa despues. Ponerlo debajo obligaria a bajar la pagina entera con el
+        salon esperando.
+
+        Se enseña con la misma condicion que la lista: si esta jornada no se cierra por asistencia,
+        un QR no acredita nada.
+      */}
+      <SesionEnSala
+        offeringId={offering.id}
+        activa={
+          offering.admiteAsistencia &&
+          (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED')
+        }
+      />
       <ListaDeAsistencia
         offeringId={offering.id}
         roster={roster}
@@ -720,7 +948,7 @@ export default function ConvocatoriaDetallePage() {
             htmlFor="a-reason"
             label="Motivo del ajuste"
             required
-            hint="Minimo 10 caracteres. Queda en la auditoria y visible en la convocatoria: es lo que lee quien audita."
+            ayuda="Minimo 10 caracteres. Queda en la auditoria y visible en la convocatoria: es lo que lee quien audita."
           >
             <Input id="a-reason" value={ajusteReason} onChange={(event) => setAjusteReason(event.target.value)} maxLength={500} />
           </Field>
@@ -757,7 +985,7 @@ export default function ConvocatoriaDetallePage() {
       </Drawer>
 
       {/*
-        Antes de mover a nadie se ensena A CUANTOS mueve y a cuantos no, en numeros que suman el
+        Antes de mover a nadie se enseña A CUANTOS mueve y a cuantos no, en numeros que suman el
         total de inscritos. Autorizar un cambio sobre gente citada sin ver a cuantos afecta es
         firmar en blanco.
       */}

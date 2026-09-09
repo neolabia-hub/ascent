@@ -32,42 +32,42 @@ export function unique(): string {
 /**
  * UN PLAN POR ANO (Decision #71), y las pruebas tienen que convivir con eso.
  *
- * Antes cada prueba creaba "Plan S3 <sufijo>" en el ano en curso y el sufijo las mantenia
- * separadas: la base de desarrollo acabo con 168 planes de 2026. Ahora el ano ES la clave, asi que
- * dos pruebas del mismo ano chocan entre si y con el plan de verdad.
+ * Antes cada prueba creaba "Plan S3 <sufijo>" en el año en curso y el sufijo las mantenia
+ * separadas: la base de desarrollo acabo con 168 planes de 2026. Ahora el año ES la clave, asi que
+ * dos pruebas del mismo año chocan entre si y con el plan de verdad.
  *
- * Cada prueba trabaja en SU ano y empieza BORRANDO el suyo. Limpiar al empezar y no solo al
+ * Cada prueba trabaja en SU año y empieza BORRANDO el suyo. Limpiar al empezar y no solo al
  * terminar es a proposito: una corrida interrumpida deja el plan puesto, y si la limpieza viviera
  * solo al final la siguiente corrida no arrancaria.
  *
- * Los anos se CALCULAN desde el actual y no se clavan: el selector del formulario solo ofrece de
- * dos anos atras a uno adelante —fuera de eso no hay opcion que elegir—, asi que unas constantes
- * fijas dejarian de existir en el desplegable al cambiar de ano. Y el ANO EN CURSO se deja libre a
+ * Los años se CALCULAN desde el actual y no se clavan: el selector del formulario solo ofrece de
+ * dos años atras a uno adelante —fuera de eso no hay opcion que elegir—, asi que unas constantes
+ * fijas dejarian de existir en el desplegable al cambiar de año. Y el ANO EN CURSO se deja libre a
  * proposito: es el que usa la empresa de verdad.
  */
 const ANO_ACTUAL = new Date().getFullYear();
 export const ANO_PLAN_DOD = ANO_ACTUAL - 2;
 export const ANO_PLAN_DESECHABLE = ANO_ACTUAL - 1;
 /**
- * El de "ida y vuelta" va al ano SIGUIENTE, no a uno pasado, porque esa prueba comprueba que la
+ * El de "ida y vuelta" va al año SIGUIENTE, no a uno pasado, porque esa prueba comprueba que la
  * ficha de una capacitacion del plan dice en que plan esta: la tarjeta de la ficha solo mira
- * planes del ano en curso o posteriores —en 2026 nadie programa dentro de 2024— y con un ano
+ * planes del año en curso o posteriores —en 2026 nadie programa dentro de 2024— y con un año
  * pasado diria, con razon, que no hay ningun plan abierto al que agregarla.
  */
 export const ANO_PLAN_IDA_Y_VUELTA = ANO_ACTUAL + 1;
 
 /**
- * Borra el plan de ese ano si existe. Sirve en borrador, aprobado (pide motivo) y cerrado sin
+ * Borra el plan de ese año si existe. Sirve en borrador, aprobado (pide motivo) y cerrado sin
  * obligaciones (Decision #72).
  *
  * Se localiza por el rotulo accesible del boton —"Eliminar el plan de 2027"— y no por la fila de
- * una tabla: el listado son TARJETAS desde que dejo de ser una tabla, y ese rotulo lleva el ano
+ * una tabla: el listado son TARJETAS desde que dejo de ser una tabla, y ese rotulo lleva el año
  * dentro, que es justo lo que hace falta para no borrar el de al lado.
  */
 export async function limpiarPlanDelAno(page: Page, year: number): Promise<void> {
   await page.goto('/plan');
   /**
-   * Se espera a que la LISTA llegue, y se espera por una senal POSITIVA.
+   * Se espera a que la LISTA llegue, y se espera por una señal POSITIVA.
    *
    * Dos intentos fallaron antes, y los dos por la misma razon de fondo:
    *   - esperar el TITULO no espera nada: es estatico y esta desde el primer render;
@@ -98,10 +98,10 @@ export async function limpiarPlanDelAno(page: Page, year: number): Promise<void>
 }
 
 /**
- * Deja creado y abierto el plan de ese ano, partiendo de cero. Devuelve su ruta.
+ * Deja creado y abierto el plan de ese año, partiendo de cero. Devuelve su ruta.
  *
- * El boton lleva el ano en el texto ("Crear el plan de 2026") porque propone el primer ano libre,
- * asi que se busca por prefijo. Y el ano se ELIGE en un selector: escribirlo dejo de ser posible
+ * El boton lleva el año en el texto ("Crear el plan de 2026") porque propone el primer año libre,
+ * asi que se busca por prefijo. Y el año se ELIGE en un selector: escribirlo dejo de ser posible
  * cuando dejo de tener sentido teclear 2062.
  */
 export async function crearPlanDelAno(page: Page, year: number, nombre: string): Promise<string> {
@@ -142,7 +142,7 @@ export async function elegirEnCombo(page: Page, comboId: string, nombre: string)
  * `publishedActivity` de la suite dejaron de poder publicar: los tipos que usan —induccion general,
  * capacitacion del plan, extraordinaria— piden evaluacion, y ninguno la anadia.
  *
- * Eso no era un descuido de las pruebas: era la senal, escrita en su dia, de que la regla no estaba
+ * Eso no era un descuido de las pruebas: era la señal, escrita en su dia, de que la regla no estaba
  * acordada. Ahora lo esta, y las pruebas se ponen al dia.
  *
  * Usa el ATAJO del cajon —un bloque de N preguntas al azar del banco— porque aqui la evaluacion no

@@ -2,7 +2,7 @@
  * El saludo segun la hora. Vive aqui porque lo usan LAS DOS barras superiores (Decision #109) y
  * estaba escrito solo en la del aprendiz.
  *
- * Sin franja para la madrugada a proposito: quien entra a las cuatro de la manana en esta empresa
+ * Sin franja para la madrugada a proposito: quien entra a las cuatro de la mañana en esta empresa
  * es el turno que arranca, y "buenas noches" a alguien que empieza su jornada se lee como una
  * despedida. Antes de las doce, buenos dias.
  */

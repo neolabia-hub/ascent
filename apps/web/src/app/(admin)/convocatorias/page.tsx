@@ -231,7 +231,7 @@ export default function ConvocatoriasPage() {
       */}
       {/*
         `autoPlan`: programar aqui significa lo mismo que programar desde la ficha. Si es una
-        capacitacion del plan y el plan del ano ya esta APROBADO, el cajon pide el motivo y mete el
+        capacitacion del plan y el plan del año ya esta APROBADO, el cajon pide el motivo y mete el
         renglon; con el plan en borrador lo hace el servidor solo (Decision #75). Sin esto, una
         jornada creada desde aqui con el plan vivo quedaba fuera del plan: se dicta, la gente
         asiste, y no cuenta para el cumplimiento de nadie.

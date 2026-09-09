@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 /**
  * CREAR UNA CONVOCATORIA, desde donde haga falta.
  *
- * Vivia dentro de la pantalla de Convocatorias, y por eso planear el ano obligaba a salirse del
+ * Vivia dentro de la pantalla de Convocatorias, y por eso planear el año obligaba a salirse del
  * plan: crear la actividad, publicarla, ir a Convocatorias, crear la jornada y volver al plan a
  * buscarla en un desplegable de cien. Cuatro pantallas para un renglon.
  *
@@ -61,7 +61,7 @@ interface PublishedVersionOption {
  * Las formaciones que se pueden convocar: la version PUBLICADA si la hay, y si no, el BORRADOR.
  *
  * Antes solo se ofrecian las publicadas, y eso obligaba a publicar contenido para poder planear
- * el ano — en enero, cuando el contenido de marzo todavia no existe (Decision #77). La
+ * el año — en enero, cuando el contenido de marzo todavia no existe (Decision #77). La
  * convocatoria puede quedar PROGRAMADA sobre un borrador; lo que no se puede es publicarla, y de
  * eso se encarga el servidor.
  *
@@ -124,7 +124,7 @@ export interface NewOfferingDrawerProps {
   askJustification?: boolean;
   /**
    * DESDE UNA PANTALLA QUE NO ES EL PLAN (el modulo de Convocatorias): si la formacion elegida es
-   * del plan y el plan del ano YA ESTA APROBADO, el cajon pide el motivo y mete el renglon por su
+   * del plan y el plan del año YA ESTA APROBADO, el cajon pide el motivo y mete el renglon por su
    * cuenta.
    *
    * Existe porque programar tiene que significar lo mismo se entre por donde se entre. Con el plan
@@ -148,7 +148,7 @@ export function NewOfferingDrawer({
   onCreated,
 }: NewOfferingDrawerProps) {
   const [justification, setJustification] = useState('');
-  /** El plan del ano si ya esta APROBADO. Solo se busca cuando `autoPlan`. */
+  /** El plan del año si ya esta APROBADO. Solo se busca cuando `autoPlan`. */
   const [planAprobado, setPlanAprobado] = useState<{ id: string; year: number } | null>(null);
   const [versions, setVersions] = useState<PublishedVersionOption[]>([]);
   const [people, setPeople] = useState<PickableUser[]>([]);
@@ -175,7 +175,7 @@ export function NewOfferingDrawer({
    *   - el MES del plan es contra que mes se mide el cumplimiento, y se queda quieto.
    * Es lo que permite distinguir "se hizo en su mes" de "se movio" (RESCHEDULED). Si el mes se
    * derivara siempre de la fecha, correr una jornada de marzo a junio reescribiria el plan en
-   * silencio y el cumplimiento saldria perfecto todos los anos.
+   * silencio y el cumplimiento saldria perfecto todos los años.
    *
    * Ademas hay jornadas SIN fecha —las permanentes, que es como se dicta casi todo el
    * autoservicio—: ahi se propone desde "disponible desde" y, si tampoco la hay, no hay nada de
@@ -193,7 +193,7 @@ export function NewOfferingDrawer({
     setActivityVersionId(lockedVersion?.id ?? '');
     setPlannedMonth(String(defaultMonth ?? new Date().getMonth() + 1));
     setMonthTouched(false);
-    // El plan del ano, si esta APROBADO: es el unico caso en que el renglon no entra solo.
+    // El plan del año, si esta APROBADO: es el unico caso en que el renglon no entra solo.
     if (autoPlan) {
       void listPlans()
         .then((filas) => {
@@ -224,7 +224,19 @@ export function NewOfferingDrawer({
         }),
       )
       .catch(() => undefined);
-  }, [open, lockedVersion?.id, defaultMonth]);
+    /*
+      `autoPlan` VA EN LAS DEPENDENCIAS, aunque hoy no cambie nunca (2026-09-07).
+
+      Era el unico aviso de lint que arrastraba el proyecto. Se omitia porque quien abre este cajon
+      le pasa siempre el mismo valor —la pantalla del plan `true`, la de convocatorias `false`— asi
+      que el efecto no podia perderse un cambio.
+
+      El problema es que eso es una promesa de quien LLAMA, y no hay nada que la sostenga. El dia
+      que alguien lo calcule —`autoPlan={hayPlanVivo}`— el cajon se quedaria con el plan de la
+      apertura anterior y no pediria el motivo cuando toca: un fallo mudo en la unica compuerta que
+      exige justificacion. Incluirla no cuesta ningun render de mas hoy, y quita esa trampa.
+    */
+  }, [open, lockedVersion?.id, defaultMonth, autoPlan]);
 
   /**
    * Al elegir la formacion, el formulario se REARMA con lo que su tipo propone: una pildora no
@@ -267,8 +279,8 @@ export function NewOfferingDrawer({
 
   /*
     ¿HAY QUE PEDIR EL MOTIVO DEL PLAN? Solo si esta pantalla lo gestiona (`autoPlan`), la formacion
-    elegida es del plan, y el plan del ano ya esta APROBADO. Con el plan en borrador el renglon
-    entra solo y pedir un motivo por cada jornada del ano seria ruido.
+    elegida es del plan, y el plan del año ya esta APROBADO. Con el plan en borrador el renglon
+    entra solo y pedir un motivo por cada jornada del año seria ruido.
   */
   const entraAlPlanAprobado = autoPlan && planAprobado !== null && elegida?.config.participatesInPlan === true;
   const pideMotivo = askJustification || entraAlPlanAprobado;

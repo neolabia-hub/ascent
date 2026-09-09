@@ -34,7 +34,7 @@ describe('resolverContactoDeAyuda', () => {
   });
 
   it('devuelve null cuando no hay ninguno de los dos', () => {
-    // La pantalla no debe ensenar una tarjeta de contacto vacia: queda solo el boton de avisar.
+    // La pantalla no debe enseñar una tarjeta de contacto vacia: queda solo el boton de avisar.
     expect(resolverContactoDeAyuda({}, {})).toBeNull();
   });
 

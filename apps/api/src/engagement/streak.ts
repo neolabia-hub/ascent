@@ -9,7 +9,7 @@ import { formatCalendarDate, fromDateOnly, toBogotaDate, type CalendarDate } fro
  * haber abierto la aplicacion.
  *
  * Los "protectores" (2 por defecto) cubren un dia perdido. Existen porque un conductor en
- * carretera puede no tener senal un dia, y perder 60 dias de racha por eso hace que no vuelva.
+ * carretera puede no tener señal un dia, y perder 60 dias de racha por eso hace que no vuelva.
  */
 
 export interface StreakState {

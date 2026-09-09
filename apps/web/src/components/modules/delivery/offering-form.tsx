@@ -266,6 +266,7 @@ export function OfferingForm({
 }) {
   /** La tajada arranca plegada: en la mayoria de las jornadas no se toca. */
   const [tajadaAbierta, setTajadaAbierta] = useState(tieneFacetas(value.scope));
+
   /**
    * A CUANTOS OBLIGADOS ALCANZA EL CORTE, mientras se marca.
    *
@@ -313,10 +314,10 @@ export function OfferingForm({
    * LOS SELECTORES, ACOTADOS A LO QUE HAY DENTRO.
    *
    * Ofrecer los cuarenta cargos del catalogo en una formacion que obliga a tres invita a cortar
-   * por uno que da cero, y ese error solo se ve despues de publicar. Se ensena lo que existe
+   * por uno que da cero, y ese error solo se ve despues de publicar. Se enseña lo que existe
    * ENTRE LOS OBLIGADOS, con cuantos hay de cada uno.
    *
-   * Si todavia no hay ningun obligado —o no se sabe que version es— se ensena el catalogo
+   * Si todavia no hay ningun obligado —o no se sabe que version es— se enseña el catalogo
    * entero: acotar antes de que nazcan las obligaciones es legitimo, y una lista vacia seria un
    * callejon sin salida.
    */
@@ -372,27 +373,45 @@ export function OfferingForm({
       </div>
 
       {/*
-        COMO SE CIERRA ESTA JORNADA — SE PREGUNTA, NO SE ADIVINA (2026-09-06).
+        COMO SE REGISTRA QUE LA HICIERON — SE PREGUNTA, NO SE ADIVINA (2026-09-06, rehecho el 08).
+
+        ─── POR QUE SE PREGUNTA ───
 
         La regla derivada cambio dos veces en dos dias, las dos por un caso real que la anterior no
         cubria: una capacitacion del plan con fecha pero virtual y con contenido (no lleva lista) y
         una que dicta la ARL por videollamada en vivo (si la lleva, y es virtual). La respuesta
         depende de como se dicto ESA sesion, y eso solo lo sabe quien la esta programando.
 
-        No sale en las PERMANENTES: ahi no hay sesion a la que asistir, y ofrecer la opcion invita a
-        marcarla para que despues no haga nada.
+        ─── POR QUE LA MODALIDAD SUGIERE Y NO DECIDE ───
+
+        Lo pregunto el cliente y la respuesta esta arriba: son dos hechos distintos. La modalidad es
+        LOGISTICA —donde va la gente— y esto es EVIDENCIA —que queda escrito de que la hizo—. Se
+        parecen tanto que invitan a deducir uno del otro, y por eso se intento dos veces y fallo dos
+        veces. Sugerir sin decidir deja pasar los dos casos raros sin obligar a pensarlo en los
+        cuarenta normales.
+
+        ─── TRES OPCIONES, Y CADA UNA DICE LO QUE ES ───
+
+        Estuvieron a punto de ser dos. Se volvio atras el 2026-09-08 porque el cliente pregunto lo
+        unico que importaba: *"¿donde queda la opcion de registro automatico por contenido?"*. Con
+        dos, la heredada y la automatica se pisaban en el mismo boton y no se veia cual era cual.
+
+        Ahora son tres y ninguna esconde nada:
+
+          · la HEREDADA dice a que resuelve —"lo que sugiere su modalidad: lista de asistencia"—,
+            que es lo que le faltaba a "lo que diga su modalidad": no decia QUE decia.
+          · "Con lista de asistencia": alguien la toma en la sesion.
+          · "Al completar el contenido": no hay nada que marcar. La plataforma lo anota sola cuando
+            la persona termina el temario y, si su tipo los pide, la evaluacion y la encuesta.
+
+        Se dice "al completar el contenido" y no "automatico" a secas por lo mismo: "automatico" no
+        dice QUE lo dispara, y lo que la gente necesita saber es que se cierra sola al terminar.
       */}
       {value.kind !== 'PERMANENT' ? (
         <Field
           htmlFor="o-cierre"
-          label="Como se acredita"
-          hint={
-            value.closesByAttendance === ''
-              ? value.modality === 'VIRTUAL'
-                ? 'Por defecto, al ser virtual: con lo que cada persona complete en la plataforma.'
-                : 'Por defecto, al haber sesion: con la lista de asistencia.'
-              : 'Elegido a mano para esta jornada, por encima de lo que diria su modalidad.'
-          }
+          label="Como se registra"
+          ayuda="Que queda escrito de que la persona la hizo. Con LISTA, alguien la toma en la sesion y esa marca es la que cierra la formacion. AL COMPLETAR EL CONTENIDO no hay nada que marcar: la plataforma la cierra sola cuando la persona termina el temario y, si su tipo los pide, la evaluacion y la encuesta. Lo sugiere la modalidad, pero manda lo que se elija aqui."
         >
           <Select
             id="o-cierre"
@@ -400,9 +419,13 @@ export function OfferingForm({
             value={value.closesByAttendance}
             onChange={(event) => set({ closesByAttendance: event.target.value })}
           >
-            <option value="">Lo que diga su modalidad</option>
+            <option value="">
+              {value.modality === 'VIRTUAL'
+                ? 'Lo que sugiere su modalidad: al completar el contenido'
+                : 'Lo que sugiere su modalidad: con lista de asistencia'}
+            </option>
             <option value="true">Con lista de asistencia</option>
-            <option value="false">Con lo que hagan en la plataforma</option>
+            <option value="false">Al completar el contenido</option>
           </Select>
         </Field>
       ) : null}
@@ -586,7 +609,7 @@ export function OfferingForm({
       {/*
         LA TAJADA, PLEGADA. Cuatro selectores mas en un formulario que ya es largo asustan, y en la
         inmensa mayoria de los casos no se tocan: la jornada atiende a todos los obligados, o a los
-        de la sede que ya se eligio arriba. Se ensena en una linea lo que hace ahora mismo y se
+        de la sede que ya se eligio arriba. Se enseña en una linea lo que hace ahora mismo y se
         abre solo cuando de verdad hay que partir el reparto.
 
         Ademas resuelve la confusion de "dos regionales": arriba se elige la sede, y esa misma

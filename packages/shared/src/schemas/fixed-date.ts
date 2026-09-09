@@ -13,13 +13,13 @@ import { z } from 'zod';
  * Se encontro el 2026-09-04 leyendo la configuracion real del tenant, que tenia justo esa: `09-31`.
  * Un patron copiado en tres sitios es un patron que se corrige en dos.
  *
- * Se valida contra un ano BISIESTO a proposito: `02-29` es una fecha legitima para una campana
- * —cae en 28 los anos que no lo son, y de eso se encarga `nextFixedDate`—, y rechazarla obligaria
+ * Se valida contra un año BISIESTO a proposito: `02-29` es una fecha legitima para una campaña
+ * —cae en 28 los años que no lo son, y de eso se encarga `nextFixedDate`—, y rechazarla obligaria
  * a explicar por que el 29 de febrero no se puede elegir.
  */
 export const FIXED_DATE_PATTERN = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-/** Cuantos dias tiene el mes, en un ano bisiesto (para admitir el 29 de febrero). */
+/** Cuantos dias tiene el mes, en un año bisiesto (para admitir el 29 de febrero). */
 function diasDelMes(month: number): number {
   return new Date(Date.UTC(2024, month, 0)).getUTCDate();
 }
@@ -34,5 +34,5 @@ export const fixedDateSchema = z
     },
     // El mensaje dice el numero, no la regla: "el 31 de septiembre no existe" se entiende sin saber
     // nada del sistema; "dia invalido para el mes" hace pensar en un error del programa.
-    { message: 'Ese dia no existe en ese mes. Revisa la fecha de la campana.' },
+    { message: 'Ese dia no existe en ese mes. Revisa la fecha de la campaña.' },
   );

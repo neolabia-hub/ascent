@@ -55,7 +55,7 @@ export interface DecisionDeConstancia {
  *
  * POR DEFECTO NO EMITE cuando el tipo no dice nada. Es la direccion segura, y al reves que
  * `requiresAssessment` —que por defecto SI exige— porque los riesgos son opuestos: alli, un tipo
- * mal configurado que no pidiera examen dejaria formacion sin nota que ensenar; aqui, un tipo mal
+ * mal configurado que no pidiera examen dejaria formacion sin nota que enseñar; aqui, un tipo mal
  * configurado que emitiera de mas llenaria el expediente de papeles que nadie pidio y devaluaria
  * los que si importan. En los dos casos gana lo que protege el registro.
  */
@@ -138,4 +138,109 @@ export function decidirCertificadoExterno(
 ): boolean {
   const cfg = (tipo?.config ?? {}) as Record<string, unknown>;
   return actividad.tracksExternalCertificate ?? cfg.tracksExternalCertificate === true;
+}
+
+/**
+ * ¿SE PUEDE DAR POR CUMPLIDA CON UNA CERTIFICACION PREVIA DE OTRA EMPRESA? (via C, 2.3).
+ *
+ * Misma cascada que la de arriba y por el mismo motivo: dentro de la MISMA clase conviven las dos
+ * cosas. Una recertificacion de alturas es transferible porque lo dice la norma; una recertificacion
+ * interna sobre el procedimiento de un equipo propio no lo es, y las dos son "Recertificacion".
+ *
+ * `null` en la formacion = hereda del tipo. Y el defecto del tipo es `false`: lo raro es que un papel
+ * ajeno valga, no al reves. Una induccion no la exime nada — por definicion enseña los
+ * procedimientos de ESTA empresa.
+ *
+ * OJO, no confundir con `decidirCertificadoExterno`, que esta tres lineas arriba y suena parecido:
+ *
+ *   · aquella dice "cuando la hagamos AQUI, ademas queda un papel de un tercero"
+ *   · esta dice "un papel que ya traia de OTRA empresa nos vale en lugar de hacerla"
+ *
+ * Son independientes: una formacion puede llevar papel de tercero y no admitir convalidacion (la
+ * dicta la ARL, pero exigimos nuestra propia sesion), y al reves es raro pero posible.
+ */
+export function decidirConvalidacion(
+  tipo: TipoDeFormacion | null,
+  actividad: { admiteConvalidacion: boolean | null },
+): boolean {
+  const cfg = (tipo?.config ?? {}) as Record<string, unknown>;
+  return actividad.admiteConvalidacion ?? cfg.admiteConvalidacion === true;
+}
+
+/**
+ * CUANTO VALE LA CONSTANCIA CUANDO HAY VARIAS REGLAS VIVAS (2026-09-08).
+ *
+ * La vigencia sale de la recurrencia del requisito —si hay que repetirla cada 12 meses, el papel
+ * vale 12 meses— y eso funcionaba mientras hubiera UNA regla. Pero puede haber varias: publicar una
+ * induccion crea sola su regla de "toda la empresa", y ademas se la puede exigir a un cargo con
+ * recurrencia propia.
+ *
+ * Con dos, la consulta cogia la que devolviera primero la base de datos. Si esa era la que NO tiene
+ * recurrencia, la constancia se emitia **sin fecha de vencimiento**, y una constancia sin vencimiento
+ * es una acreditacion que el informe de Vencimientos no puede ver: la persona sale del radar hasta
+ * que alguien se acuerde. El resultado dependia del orden de las filas, que es la peor clase de
+ * fallo — no falla siempre y no se parece a su causa.
+ *
+ * SE QUEDA LA MAS CORTA. Si una regla dice que hay que repetirla cada 12 meses y otra no dice nada,
+ * la acreditacion deja de valer a los 12: la obligacion mas exigente es la que manda, y equivocarse
+ * hacia el lado de avisar antes es un error que se corrige mirando, mientras que el otro se descubre
+ * en una auditoria.
+ *
+ * Las reglas de FECHA FIJA —"cada 31 de enero"— no cuentan: ahi el vencimiento es un dia del
+ * calendario y no un plazo desde que se curso, y mezclarlas daria una vigencia inventada.
+ */
+export function vigenciaMasCorta(recurrencias: unknown[]): number | null {
+  const meses = recurrencias
+    .map((recurrencia) => {
+      if (!recurrencia || typeof recurrencia !== 'object') return null;
+      const valor = (recurrencia as Record<string, unknown>).everyMonths;
+      return typeof valor === 'number' && valor > 0 ? valor : null;
+    })
+    .filter((valor): valor is number => valor !== null);
+
+  return meses.length === 0 ? null : Math.min(...meses);
+}
+
+/**
+ * ¿DE DONDE SALE que esta formacion lleve papel de un tercero: de su ficha o de su tipo?
+ *
+ * No cambia ninguna decision — la toma `decidirCertificadoExterno` — pero la pantalla necesita poder
+ * DECIRLO, y esa es la mitad que faltaba: el 2026-09-08 el cliente vio una *Induccion especifica*
+ * pidiendo papel de un tercero y no tuvo como averiguar por que. Enseñar el nombre de la formacion
+ * sin decir quien lo pide obliga a abrir la ficha, comprobar que esta en `null`, ir a Configuracion
+ * y mirar el tipo — cuatro pantallas para responder una pregunta que el servidor ya sabe.
+ *
+ * `HEREDADO` significa que la ficha no dice nada y manda su clase; `PROPIO`, que alguien lo decidio
+ * para ESTA formacion. La diferencia es la que dice donde hay que ir a cambiarlo.
+ */
+export function origenDelCertificadoExterno(actividad: {
+  tracksExternalCertificate: boolean | null;
+}): 'PROPIO' | 'HEREDADO' {
+  return actividad.tracksExternalCertificate === null ? 'HEREDADO' : 'PROPIO';
+}
+
+/**
+ * SI LA DICTA LA EMPRESA, NO HAY TERCERO QUE CERTIFIQUE (2026-09-06, extraido aqui el 2026-09-08).
+ *
+ * Un certificado **externo** es por definicion el de alguien de fuera. Con `executedBy: PROPIOS` no
+ * hay fuera, asi que pedir su numero es pedir un dato que no existe — y un campo que no se puede
+ * llenar se aprende a saltar.
+ *
+ * ─── POR QUE VIVE AQUI Y NO EN LA PANTALLA QUE LO USA ───
+ *
+ * Porque nacio dentro de la lista de asistencia y la segunda puerta —*Papeles de un tercero* en la
+ * ficha de la persona— no se entero: filtraba solo por la cascada tipo → ficha y enseñaba filas
+ * diciendo *"la dicto PROPIOS"* al lado de un campo para el numero del certificado, contradiciendose
+ * en la misma linea (`PENDIENTES` 2.5). Un criterio copiado a mano en dos pantallas se separa; uno
+ * importado de un sitio, no.
+ *
+ * ─── Y NO ES UNA COMPUERTA ───
+ *
+ * Decide QUE PIDE la pantalla, no que se pueda guardar. La compuerta sigue siendo la de la formacion
+ * (409 `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`). Hay tenants —un centro de entrenamiento acreditado—
+ * donde «propios» y «certificado oficial» conviven, y rechazarlo aqui seria convertir una suposicion
+ * nuestra sobre como trabajan las empresas en una regla del producto.
+ */
+export function laDictaUnTercero(executedBy: string | null | undefined): boolean {
+  return (executedBy ?? 'PROPIOS') !== 'PROPIOS';
 }

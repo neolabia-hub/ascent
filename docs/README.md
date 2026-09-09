@@ -14,7 +14,7 @@ Lo único de esta carpeta escrito para quien usa el producto, no para quien lo c
 | [`guia-desempeno.html`](guia-desempeno.html) | **El paso a paso** de la evaluación de desempeño: qué es cada opción, qué significa firmar y cómo, cómo se calcula la nota, y qué pasa después con el resultado |
 
 > Se mantiene a mano y a proposito: si cambia lo que significa un numero, esta guia se corrige en el
-> mismo cambio. Una guia de usuario desactualizada hace mas dano que no tenerla, porque se cita.
+> mismo cambio. Una guia de usuario desactualizada hace mas daño que no tenerla, porque se cita.
 
 ---
 

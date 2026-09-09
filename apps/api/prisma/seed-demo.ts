@@ -15,7 +15,7 @@ import * as argon2 from 'argon2';
  *   - la obligacion de ambas para todas las personas activas,
  *   - y una historia corta y FABRICADA (una formacion completada la semana pasada con dos
  *     preguntas falladas) para que la sesion de repaso tenga algo que mostrar HOY. Sin ella esa
- *     pantalla solo puede ensenar su estado vacio.
+ *     pantalla solo puede enseñar su estado vacio.
  *
  * Es idempotente: si ya existe la pildora de demostracion, no hace nada.
  *
@@ -217,7 +217,7 @@ async function main(): Promise<void> {
       stem: 'Cuales de estas situaciones se reportan el mismo turno?',
       options: [
         { id: 'a', text: 'Una estiba mal armada' },
-        { id: 'b', text: 'Un companero sin casco' },
+        { id: 'b', text: 'Un compañero sin casco' },
         { id: 'c', text: 'Un cliente que llamo molesto' },
         { id: 'd', text: 'Un derrame, aunque ya lo hayan limpiado' },
       ],
@@ -226,7 +226,7 @@ async function main(): Promise<void> {
     },
     {
       qtype: 'TRUE_FALSE',
-      stem: 'Reportar a un companero que trabaja sin equipo de proteccion puede acarrearle una sancion a quien reporta.',
+      stem: 'Reportar a un compañero que trabaja sin equipo de proteccion puede acarrearle una sancion a quien reporta.',
       correct: { value: false },
       explanation: 'Falso, y es importante: si reportar costara algo, nadie reportaria y los accidentes seguirian pasando en silencio.',
     },
@@ -235,7 +235,7 @@ async function main(): Promise<void> {
       stem: 'Cada cuanto se repite la induccion en Transprensa?',
       options: [
         { id: 'a', text: 'Una sola vez, al entrar' },
-        { id: 'b', text: 'Cada ano (reinduccion)' },
+        { id: 'b', text: 'Cada año (reinduccion)' },
         { id: 'c', text: 'Solo si cambias de cargo' },
       ],
       correct: { optionId: 'b' },
@@ -258,7 +258,7 @@ async function main(): Promise<void> {
       shuffleQuestions: false,
       shuffleOptions: true,
       // Se deja ver la explicacion desde el primer intento (y NO la respuesta correcta): con un
-      // banco reutilizado, ensenar la correcta a todo el mundo equivale a publicar el examen.
+      // banco reutilizado, enseñar la correcta a todo el mundo equivale a publicar el examen.
       reviewPolicy: { showScore: true, showCorrectAnswers: false, showExplanations: true, onlyAfterLastAttempt: false },
       sections: {
         create: [

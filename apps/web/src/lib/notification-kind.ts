@@ -47,7 +47,7 @@ export const KIND_LABEL: Record<NotificationKind, string> = {
  * (evento, referencia) en un destino.
  *
  * Devuelve `null` cuando no hay un sitio honesto al que ir. Es mejor que un enlace que aterriza
- * en una lista donde hay que volver a buscar: un enlace que no cumple ensena a no pulsarlos.
+ * en una lista donde hay que volver a buscar: un enlace que no cumple enseña a no pulsarlos.
  */
 export function notificationHref(item: {
   eventType: string;
@@ -61,7 +61,7 @@ export function notificationHref(item: {
     return `/aprender/${referenceId}`;
   }
   if (eventType === 'ASSIGNMENT_CREATED' && referenceType === 'activities' && referenceId) {
-    // A la formacion misma: si ya esta empezada entra a ella, si no ensena su tarjeta, y si la
+    // A la formacion misma: si ya esta empezada entra a ella, si no enseña su tarjeta, y si la
     // obligacion se retiro despues del aviso lo DICE, en vez de dejar a la persona pulsando.
     return `/formacion/${referenceId}`;
   }

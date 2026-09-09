@@ -19,7 +19,7 @@ import { cn } from '@/components/ui/cn';
  *   62% con el resto ATRASADO      -> hay que perseguir a treinta personas.
  *   62% con el resto ESPERANDO     -> no hay a quien perseguir: falta programar la jornada.
  *
- * La barra ensena las dos de un vistazo y sin leer numeros. Es la diferencia entre un indicador que
+ * La barra enseña las dos de un vistazo y sin leer numeros. Es la diferencia entre un indicador que
  * se mira y uno que se usa.
  *
  * ─── EL ORDEN DE LOS TRAMOS NO ES ARBITRARIO ───

@@ -55,7 +55,7 @@ function Notifications() {
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<InboxItem[] | null>(null);
-  /** Ver arriba (barra del panel): la campana ensena lo no leido; lo leido no se borra, se pliega. */
+  /** Ver arriba (barra del panel): la campaña enseña lo no leido; lo leido no se borra, se pliega. */
   const [verLeidas, setVerLeidas] = useState(false);
   const ref = useOutsideClick(() => setOpen(false));
 
@@ -173,7 +173,7 @@ function Notifications() {
                         href={destino}
                         /*
                           ABRIRLO ES HABERLO LEIDO. Aqui faltaba: se podia entrar al aviso y el
-                          contador seguia contandolo, asi que la campana marcaba tres cuando ya se
+                          contador seguia contandolo, asi que la campaña marcaba tres cuando ya se
                           habian visto los tres. No se BORRA —un aviso es el registro de algo que
                           paso y es la unica traza que explica por que alguien creia tener esa
                           formacion— pero deja de reclamar atencion.
@@ -450,7 +450,7 @@ export function LearnerTopbar({
         {/*
           LA RACHA SOLO EN TELEFONO (Decision #90). En escritorio vive en la barra lateral, junto a
           los puntos y las congelaciones: aqui era una pastilla suelta —un numero con una llama al
-          lado no dice que es una racha ni que se pierde manana— y ademas quedaba DUPLICADA con el
+          lado no dice que es una racha ni que se pierde mañana— y ademas quedaba DUPLICADA con el
           bloque de la barra. En telefono no hay barra lateral, asi que ahi si se queda.
           Sigue siendo PRIVADA (Decision #23): es la propia, jamas la de otro.
         */}

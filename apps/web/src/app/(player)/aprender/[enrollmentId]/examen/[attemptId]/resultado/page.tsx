@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 /**
  * RESULTADO del intento. Lo que se muestra aqui NO lo decide esta pantalla: lo decide la politica
  * de revision de la evaluacion, que el servidor aplica antes de responder (con un banco de
- * preguntas reutilizado, ensenar las correctas a todo el mundo equivale a publicar el examen).
+ * preguntas reutilizado, enseñar las correctas a todo el mundo equivale a publicar el examen).
  * Por eso `detail` puede llegar vacio y `score` en null: se dibuja lo que haya.
  */
 

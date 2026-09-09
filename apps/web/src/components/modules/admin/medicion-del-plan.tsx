@@ -12,7 +12,7 @@ import { cn } from '@/components/ui/cn';
  * El plan tenia tres porcentajes repartidos por la pantalla y los tres sonaban igual —"cumplimiento",
  * "cobertura", "avance"—. Nadie sabia cual citar en un comite, y dos personas discutian con dos
  * numeros distintos creyendo que hablaban del mismo. Un indicador que hay que explicar cada vez que
- * se ensena no se usa: se ignora.
+ * se enseña no se usa: se ignora.
  *
  * Miden cosas DISTINTAS y por eso ninguno sobra:
  *
@@ -54,7 +54,7 @@ export function MedicionDelPlan({
           meta={goalPct}
         />
         <Indicador
-          pregunta="¿Llego la gente que dijimos?"
+          pregunta="¿Asistieron las personas que dijimos?"
           nombre="Cobertura"
           valor={metrics.coveragePct}
           detalle={`${metrics.trained} capacitados de ${metrics.projected} proyectados`}

@@ -5,7 +5,7 @@
 ## 1. Objetivo
 
 El Sprint 2 construyo **el contenido**. Este construye **la entrega**: a quien se le exige cada
-formacion, cuando, donde se dicta y como se mide el programa del ano.
+formacion, cuando, donde se dicta y como se mide el programa del año.
 
 **Criterio de aceptacion (el que define el sprint):** que entre una persona nueva y **sin que
 nadie la asigne** le nazca su induccion general con vencimiento **antes de su fecha de ingreso**,
@@ -69,7 +69,7 @@ por su nombre: renombrar una audiencia no desconecta la matriz, y una audiencia 
 
 ### Convocatorias con proyectados congelados
 Una convocatoria cuelga siempre de una version **publicada** —convocar un borrador seria prometer
-un contenido que aun puede cambiar— y toma numero por ano (`CONV-2026-000001`).
+un contenido que aun puede cambiar— y toma numero por año (`CONV-2026-000001`).
 
 Al publicarla, el sistema **deriva** los proyectados de los requisitos que exigen esa actividad
 (o, en su defecto, de los cargos a los que va dirigida) y los **congela**. Ajustarlos a mano se

@@ -34,7 +34,7 @@ import { estadoVisual } from './estado-visual';
  * ─── LOS FILTROS PASARON A SER POR TIPO (Decision #103) ───
  *
  * Estaban por ESTADO —en curso, vence pronto, sin empezar— y el razonamiento era bueno: la
- * pregunta de quien entra a las seis de la manana es "¿que hago hoy?", no "¿de que tema es?".
+ * pregunta de quien entra a las seis de la mañana es "¿que hago hoy?", no "¿de que tema es?".
  * Se probo y falla por una razon practica que el razonamiento no veia: **las filas ya responden a
  * esa pregunta**. La primera es "Sigue donde ibas" y la segunda "Para esta semana", asi que el
  * filtro de estado no llevaba a ninguna parte nueva — solo escondia el resto de la pantalla.
@@ -148,7 +148,7 @@ export default function TodayPage() {
     ahora mismo?"**. Solo dos cosas la contestan de verdad, y por eso solo dos entran:
 
       1. LO QUE YA EMPEZO. Terminar cuesta menos que arrancar, y una formacion abandonada a medias
-         es el patron que mas mata la constancia. Ademas se puede ensenar cuanto lleva, que es el
+         es el patron que mas mata la constancia. Ademas se puede enseñar cuanto lleva, que es el
          unico argumento que de verdad convence: "te faltan tres piezas".
       2. LO QUE APRIETA POR FECHA —atrasado o a punto de vencer—. Tiene consecuencia real: queda
          en el expediente que mira el auditor.
@@ -196,7 +196,7 @@ export default function TodayPage() {
     <div className="min-h-screen bg-paper pb-16">
       {/*
         SIN HEROE cuando no hay nada empezado ni nada por vencer. No se rellena con la primera de
-        la lista: un sitio reservado a lo que apremia, ocupado por algo que no apremia, ensena a la
+        la lista: un sitio reservado a lo que apremia, ocupado por algo que no apremia, enseña a la
         gente a ignorarlo. Sin el, la biblioteca empieza arriba y la pantalla se lee igual de bien.
       */}
       {protagonistas.length > 0 ? <Protagonista items={protagonistas} /> : null}
@@ -385,7 +385,7 @@ function Heroe({ item }: { item: PendingItem }) {
       {/*
         LOS DOS DEGRADADOS, ALIGERADOS (Decision #107). Estaban en 85% y 70% y entre los dos se
         comian la foto: quedaba una imagen apagada de la que no se distinguia el asunto, que es
-        justo lo que el heroe existe para ensenar.
+        justo lo que el heroe existe para enseñar.
 
         Bajan a 72% y 45%, y el vertical arranca mas arriba (`via-black/25` al 45% de la altura)
         para que la parte de en medio —donde la foto tiene su tema— quede casi limpia y lo oscuro

@@ -21,13 +21,13 @@ import { motivoDelError } from '@/lib/api';
  * manda) y sin manera de saltarse la correccion: aqui solo se recogen respuestas.
  *
  * Cada respuesta se guarda al avanzar, pero la ENTREGA vuelve a mandarlas TODAS. Es a proposito:
- * si el telefono perdio senal a mitad del examen, los guardados intermedios fallaron y solo la
+ * si el telefono perdio señal a mitad del examen, los guardados intermedios fallaron y solo la
  * entrega final salva el intento. El contrato del backend acepta justo eso.
  *
  * LO QUE SE VE lo pone `ExamStage`, que es la MISMA pieza que usa la vista previa del
  * administrador (Decision #85). Esta pantalla se queda con lo que solo puede hacer ella: pedir el
  * intento, guardar, contar el tiempo contra la hora del servidor y entregar. Antes tenia tambien
- * la maquetacion, y por eso la pantalla de armado no podia ensenar lo que iba a pasar de verdad.
+ * la maquetacion, y por eso la pantalla de armado no podia enseñar lo que iba a pasar de verdad.
  *
  * `wide` no lo decide un punto de ruptura de CSS sino esta pantalla, midiendo la ventana: el
  * escenario tiene que poder pintarse tambien dentro de un marco de telefono de 390 px sin creerse

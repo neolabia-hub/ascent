@@ -16,9 +16,9 @@ export const createTrainingPlanSchema = z.object({
   name: z.string().min(3).max(160),
   objective: z.string().max(4000).nullable().optional(),
   /**
-   * LA META, en porcentaje: cuanto del programa se compromete la empresa a ejecutar este ano.
+   * LA META, en porcentaje: cuanto del programa se compromete la empresa a ejecutar este año.
    *
-   * Era `goals`, texto libre, y por eso el plan ensenaba "62% de cumplimiento" sin nada contra
+   * Era `goals`, texto libre, y por eso el plan enseñaba "62% de cumplimiento" sin nada contra
    * que compararlo. Se mide contra el CUMPLIMIENTO (ejecutadas / programadas), que es el indicador
    * que revisa el item 1.2.1 de la Res. 0312.
    */
@@ -32,7 +32,7 @@ export type CreateTrainingPlanInput = z.infer<typeof createTrainingPlanSchema>;
  *
  * Se puede con el plan YA APROBADO, con motivo. Son texto descriptivo —lo que obliga a la gente
  * son los renglones, no el objetivo redactado en enero—, asi que congelarlos no protegia ninguna
- * obligacion: solo obligaba a convivir todo el ano con un nombre mal escrito.
+ * obligacion: solo obligaba a convivir todo el año con un nombre mal escrito.
  *
  * El ANO si es estructural: identifica el plan junto al nombre y ancla el vencimiento de cada
  * renglon al ultimo dia de su mes. Por eso solo se cambia en borrador.
@@ -64,7 +64,7 @@ export const addPlanItemSchema = z.object({
    * OBLIGATORIA si el plan ya esta aprobado o en ejecucion (Decision #55).
    *
    * En borrador no se pide: el plan todavia no obliga a nadie y pedir un motivo por cada renglon
-   * mientras se arma el ano seria ruido. Despues de aprobado si, porque agregar una jornada crea
+   * mientras se arma el año seria ruido. Despues de aprobado si, porque agregar una jornada crea
    * obligaciones reales para personas reales y el auditor va a preguntar de donde salio.
    */
   justification: z.string().min(10).max(500).optional(),
@@ -94,10 +94,10 @@ export type ApprovePlanInput = z.infer<typeof approvePlanSchema>;
 /**
  * REABRIR un plan CERRADO. Exige motivo, siempre.
  *
- * Cerrar es lo que convierte al plan en la evidencia del ano, asi que reabrirlo no puede ser un
- * clic mas: el auditor tiene derecho a saber por que un ano que estaba cerrado volvio a moverse.
- * Pero tampoco puede ser imposible — desde que hay un plan por ano (Decision #71), un plan cerrado
- * por error bloquea el ano entero y no queda forma de planear.
+ * Cerrar es lo que convierte al plan en la evidencia del año, asi que reabrirlo no puede ser un
+ * clic mas: el auditor tiene derecho a saber por que un año que estaba cerrado volvio a moverse.
+ * Pero tampoco puede ser imposible — desde que hay un plan por año (Decision #71), un plan cerrado
+ * por error bloquea el año entero y no queda forma de planear.
  *
  * Reabrir deja rastro; borrar no. Por eso esta es la salida para un plan que SI obligo a gente, y
  * borrar se reserva al que nunca obligo a nadie.

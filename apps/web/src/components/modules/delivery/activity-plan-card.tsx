@@ -41,10 +41,10 @@ export function ActivityPlanCard({ activityId, typeConfig, publishedVersion }: A
   const load = useCallback(async () => {
     try {
       /**
-       * EL PLAN AL QUE SE PROGRAMA es el del ano en curso... salvo que ya este cerrado.
+       * EL PLAN AL QUE SE PROGRAMA es el del año en curso... salvo que ya este cerrado.
        *
-       * Hay uno por ano (Decision #71), asi que no hay que elegir entre varios del mismo ano. Lo
-       * que si pasa de verdad es que en noviembre se planea el ano SIGUIENTE, y que el del ano en
+       * Hay uno por año (Decision #71), asi que no hay que elegir entre varios del mismo año. Lo
+       * que si pasa de verdad es que en noviembre se planea el año SIGUIENTE, y que el del año en
        * curso ya se cerro —cerrarlo es lo que lo convirtio en evidencia, y no admite renglones—.
        * Ofrecer ese seria ofrecer algo que el servidor rechaza.
        */

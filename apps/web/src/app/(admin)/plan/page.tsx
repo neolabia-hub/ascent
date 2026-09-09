@@ -24,13 +24,13 @@ import { useCan } from '@/components/providers/session-provider';
 /**
  * LOS PLANES, UNO POR ANO.
  *
- * Esto era una tabla de seis columnas —nombre, ano, renglones, aprobado, estado, accion— y no
+ * Esto era una tabla de seis columnas —nombre, año, renglones, aprobado, estado, accion— y no
  * respondia la pregunta por la que alguien entra aqui, que no es "¿que planes hay?" sino **"¿como
  * vamos?"**. Para saberlo habia que abrir el plan. Con la Decision #71 la lista es cortisima (una
- * fila por ano, y normalmente una o dos), asi que la tabla estaba gastando toda la pantalla en
- * repetir el ano en seis celdas.
+ * fila por año, y normalmente una o dos), asi que la tabla estaba gastando toda la pantalla en
+ * repetir el año en seis celdas.
  *
- * Ahora cada ano es una TARJETA que trae sus indicadores ya calculados, y la del ano en curso
+ * Ahora cada año es una TARJETA que trae sus indicadores ya calculados, y la del año en curso
  * viene en grande: es la que se mira. Los numeros son los mismos que dentro del plan —el servidor
  * los calcula con el alcance de quien pregunta—, asi que no hay dos verdades.
  *
@@ -45,15 +45,15 @@ const STATUS: Record<PlanStatus, { kind: StatusPillKind; label: string }> = {
   CLOSED: { kind: 'neutral', label: 'CERRADO' },
 };
 
-/** El rotulo por defecto del plan de un ano. Se puede cambiar; ya no identifica al plan. */
+/** El rotulo por defecto del plan de un año. Se puede cambiar; ya no identifica al plan. */
 function nombrePropuesto(year: number): string {
   return `Plan anual de capacitacion ${year}`;
 }
 
 /**
- * Los anos que se pueden abrir: dos atras (cargar el plan del ano pasado como evidencia) y uno
+ * Los años que se pueden abrir: dos atras (cargar el plan del año pasado como evidencia) y uno
  * adelante (en noviembre se planea el siguiente). Los que YA tienen plan no se ofrecen, porque
- * hay uno por ano y elegirlos solo lleva a un rechazo.
+ * hay uno por año y elegirlos solo lleva a un rechazo.
  */
 function anosDisponibles(plans: PlanRow[] | null): number[] {
   const enCurso = new Date().getFullYear();
@@ -69,7 +69,7 @@ export default function PlanPage() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   /**
-   * Se pide LO MISMO que al editar. El alta preguntaba ano, nombre y objetivo, y la meta y el
+   * Se pide LO MISMO que al editar. El alta preguntaba año, nombre y objetivo, y la meta y el
    * alcance —que son parte del documento que revisa el auditor— habia que acordarse de anadirlos
    * despues desde "Editar". Un campo que solo existe en una de las dos pantallas se queda vacio.
    */
@@ -103,12 +103,12 @@ export default function PlanPage() {
     void load();
   }, [load]);
 
-  /** Al abrir el cajon, el ano propuesto es el primero libre — normalmente el que corre. */
+  /** Al abrir el cajon, el año propuesto es el primero libre — normalmente el que corre. */
   const abrirNuevo = () => {
     const libres = anosDisponibles(plans);
     const year = libres.includes(new Date().getFullYear()) ? new Date().getFullYear() : libres[0];
     if (year === undefined) {
-      showToast({ kind: 'info', title: 'Todos los anos a la vista ya tienen su plan' });
+      showToast({ kind: 'info', title: 'Todos los años a la vista ya tienen su plan' });
       return;
     }
     setForm({
@@ -186,14 +186,25 @@ export default function PlanPage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-[28px] font-semibold text-ink-900">Plan de capacitacion</h1>
+          {/*
+            LO QUE HACE EL PLAN, EN DOS FRASES (reescrito el 2026-09-07).
+
+            Tenia una tercera —"los planes de SST, PESV o BASC no son planes aparte: son la vista por
+            proceso de este"— que el cliente marco como **falsa**. Era una afirmacion sobre como
+            trabaja SU empresa colada en el rotulo de una pantalla, y encima en el sitio donde nadie
+            la va a leer con espiritu critico.
+
+            La regla que deja: aqui se dice QUE HACE la pantalla, no como deberia organizarse el
+            trabajo de nadie.
+          */}
           <p className="mt-1 max-w-2xl text-sm text-ink-500">
-            Un plan por ano, con su meta e indicadores. Al aprobarlo se congelan los proyectados y nacen sus
-            obligaciones. Los planes de SST, PESV o BASC no son planes aparte: son la vista por proceso de este.
+            Un plan por año, con su meta y sus indicadores. Al aprobarlo se congelan los proyectados y nacen las
+            obligaciones de quienes lo tienen que cumplir.
           </p>
         </div>
         {/*
           NO se ofrece hasta saber que anos estan libres. Mientras la lista viaja, `libres` los da
-          todos por libres, asi que el boton proponia un ano ya ocupado y —peor— si alguien abria
+          todos por libres, asi que el boton proponia un año ya ocupado y —peor— si alguien abria
           el cajon en ese medio segundo, las opciones del desplegable CAMBIABAN debajo de su mano
           al llegar la respuesta.
         */}
@@ -220,7 +231,7 @@ export default function PlanPage() {
           <EmptyState
             icon={ClipboardList}
             title={`Todavia no existe el plan de ${enCurso}`}
-            description="El plan del ano es donde se programa lo que se va a dictar y de donde salen el cumplimiento y la cobertura que revisa el auditor."
+            description="El plan del año es donde se programa lo que se va a dictar y de donde salen el cumplimiento y la cobertura que revisa el auditor."
             action={
               <Button onClick={abrirNuevo}>
                 <Plus size={16} />
@@ -279,7 +290,7 @@ export default function PlanPage() {
                 htmlFor="d-reason"
                 label="Por que se elimina"
                 required
-                hint="Queda en la auditoria: hubo gente a la que ya se le anuncio esta formacion."
+                hint="Queda en la auditoria: hubo personas a las que ya se les anuncio esta formacion."
               >
                 <Textarea
                   id="d-reason"
@@ -300,7 +311,7 @@ export default function PlanPage() {
         open={open}
         onOpenChange={setOpen}
         title="Nuevo plan de capacitacion"
-        description="Hay un plan por ano. Queda en borrador: puedes armar sus renglones antes de aprobarlo."
+        description="Hay un plan por año. Queda en borrador: puedes armar sus renglones antes de aprobarlo."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setOpen(false)}>
@@ -316,15 +327,15 @@ export default function PlanPage() {
           {/*
             EL ANO SE ELIGE, no se teclea. Es lo que identifica al plan, solo hay un punado de
             valores posibles y los que ya tienen plan no son opciones: escribirlo a mano permitia
-            teclear 2062 sin que nada lo notara, y proponia un ano ocupado para rechazarlo despues.
+            teclear 2062 sin que nada lo notara, y proponia un año ocupado para rechazarlo despues.
           */}
-          <Field htmlFor="p-year" label="Ano" required hint="Es lo que identifica al plan: hay uno por ano.">
+          <Field htmlFor="p-year" label="Año" required hint="Es lo que identifica al plan: hay uno por año.">
             <Select
               id="p-year"
               value={form.year}
               onChange={(event) => {
                 const year = event.target.value;
-                // El nombre sigue al ano mientras nadie lo haya tocado: cambiar 2026 por 2027 y
+                // El nombre sigue al año mientras nadie lo haya tocado: cambiar 2026 por 2027 y
                 // dejar puesto "Plan anual de capacitacion 2026" es un error que nadie relee.
                 setForm({
                   ...form,
@@ -342,7 +353,7 @@ export default function PlanPage() {
             </Select>
           </Field>
 
-          <Field htmlFor="p-name" label="Nombre" hint="Solo el rotulo. Lo que identifica al plan es el ano.">
+          <Field htmlFor="p-name" label="Nombre" hint="Solo el rotulo. Lo que identifica al plan es el año.">
             <Input
               id="p-name"
               value={form.name}
@@ -360,7 +371,7 @@ export default function PlanPage() {
           <Field
             htmlFor="p-goal"
             label="Meta de cumplimiento (%)"
-            hint="Cuanto del programa se compromete la empresa a ejecutar este ano. Lo habitual es 90."
+            hint="Cuanto del programa se compromete la empresa a ejecutar este año. Lo habitual es 90."
           >
             <Input
               id="p-goal"
@@ -398,8 +409,8 @@ export default function PlanPage() {
 }
 
 /**
- * Una tarjeta por ano. La del ano en curso viene DESTACADA: es la que se mira, y las de los otros
- * anos estan por consulta.
+ * Una tarjeta por año. La del año en curso viene DESTACADA: es la que se mira, y las de los otros
+ * años estan por consulta.
  *
  * La tarjeta entera es un enlace al plan. No hay boton "Abrir": con una accion principal, tener
  * ademas un boton que hace lo mismo solo reparte la atencion.

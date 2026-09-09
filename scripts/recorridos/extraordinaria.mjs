@@ -44,7 +44,7 @@ comprobar(
 comprobar(
   tipo.config?.participatesInPlan !== true,
   'y NO participa del plan: es justo lo contrario de la capacitacion del plan',
-  'el tipo dice que participa del plan, y entonces moveria el cumplimiento del ano',
+  'el tipo dice que participa del plan, y entonces moveria el cumplimiento del año',
 );
 
 const procesos = (await admin.get('/catalogs/processes')).cuerpo;
@@ -88,7 +88,7 @@ const pregunta = await admin.post('/questions', {
   payload: {
     qtype: 'SINGLE',
     stem: 'Desde cuando aplica el procedimiento nuevo...',
-    options: [{ id: 'a', text: 'Desde su publicacion' }, { id: 'b', text: 'El ano que viene' }],
+    options: [{ id: 'a', text: 'Desde su publicacion' }, { id: 'b', text: 'El año que viene' }],
     correctOptionId: 'a',
     points: 1,
   },
@@ -156,7 +156,7 @@ comprobar(convocatoria.ok, `jornada programada para el ${fecha} (${convocatoria.
 creado.offeringId = convocatoria.cuerpo?.id;
 
 /*
-  LA DIFERENCIA CON LA DEL PLAN, EN UNA LINEA. Alli programar la jornada CREA el renglon del ano
+  LA DIFERENCIA CON LA DEL PLAN, EN UNA LINEA. Alli programar la jornada CREA el renglon del año
   (Decision #75). Aqui no puede: `participatesInPlan: false`, y un renglon nuevo moveria el
   cumplimiento del plan con algo que por la regla de oro 2 no debe tocarlo.
 */
@@ -187,7 +187,7 @@ if (creado.planId) {
   comprobar(
     colar.estado === 409 && colar.cuerpo?.code === 'ACTIVITY_NOT_PLANNABLE',
     'el servidor la rechaza: una extraordinaria no entra al plan',
-    `dejo meterla (${colar.estado} ${colar.cuerpo?.code ?? ''}), y eso mueve el cumplimiento del ano con algo que no le toca`,
+    `dejo meterla (${colar.estado} ${colar.cuerpo?.code ?? ''}), y eso mueve el cumplimiento del año con algo que no le toca`,
   );
   // El motivo viaja en `title`: el filtro global mueve alli el `message` de la excepcion y no
   // reenvia `message` crudo (`global-exception.filter.ts`). Leerlo por `message` da vacio.
@@ -295,9 +295,9 @@ paso(11, 'NO SE REPITE: una extraordinaria es de una vez');
 const rondas = (await admin.get(`/assignments?targetId=${creado.activityId}&userId=${creado.userId}&pageSize=50`)).cuerpo;
 const cuantas = (rondas?.items ?? []).length;
 console.log(`   ... la persona tiene ${cuantas} ronda(s): ${(rondas?.items ?? []).map((a) => `#${a.cycleNumber} ${a.status}`).join(', ')}`);
-comprobar(cuantas === 1, 'una sola ronda: no hay campana ni aniversario que la traiga de vuelta', `tiene ${cuantas} rondas`);
+comprobar(cuantas === 1, 'una sola ronda: no hay campaña ni aniversario que la traiga de vuelta', `tiene ${cuantas} rondas`);
 
-paso(12, 'Y NO MOVIO EL PLAN de ningun ano');
+paso(12, 'Y NO MOVIO EL PLAN de ningun año');
 let renglonesTras = 0;
 for (const p of (planesAhora.items ?? planesAhora)) {
   const detalle = (await admin.get(`/plans/${p.id}`)).cuerpo;

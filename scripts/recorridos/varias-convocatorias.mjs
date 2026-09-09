@@ -2,7 +2,7 @@
 //
 // Los cuatro recorridos por tipo prueban el camino con UNA convocatoria. Este prueba lo que pasa
 // cuando hay varias, que es el caso real —dos sedes, dos turnos, una que se cancela y se reprograma—
-// y donde estan los danos mas caros, porque son de CONTAR:
+// y donde estan los daños mas caros, porque son de CONTAR:
 //
 //   - la obligacion es de la FORMACION, no de la convocatoria: tener dos jornadas no puede crear
 //     dos obligaciones a la misma persona;

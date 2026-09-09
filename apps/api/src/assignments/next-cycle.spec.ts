@@ -9,8 +9,8 @@ const enBogota = (fecha: Date | null): string | null => (fecha ? formatCalendarD
  *
  * Lo destapo la pregunta del cliente sobre la reinduccion: "si no la terminó, no le aparece la
  * otra; ¿qué debe pasar?". Lo que pasaba —no abrir nada— tiene un efecto que casi nadie quiere:
- * quien nunca la hace desaparece del denominador de los anos siguientes, asi que el peor
- * incumplidor sale de la cuenta y la cobertura del ano que viene se ve mejor de lo que es.
+ * quien nunca la hace desaparece del denominador de los años siguientes, asi que el peor
+ * incumplidor sale de la cuenta y la cobertura del año que viene se ve mejor de lo que es.
  */
 describe('la ronda siguiente de una obligacion que se repite', () => {
   const ventana = { ventanaAbierta: true };
@@ -40,7 +40,7 @@ describe('la ronda siguiente de una obligacion que se repite', () => {
     });
   });
 
-  describe('CIERRA — cada campana es su periodo', () => {
+  describe('CIERRA — cada campaña es su periodo', () => {
     it('cierra la que no se hizo y abre la nueva', () => {
       expect(decidirRondaSiguiente({ estadoAnterior: 'OVERDUE', politica: 'CIERRA', ...ventana })).toEqual({
         abrir: true,
@@ -104,7 +104,7 @@ describe('la PRIMERA ronda de quien ya hizo esa formacion por otra regla', () =>
   const cada12 = { everyMonths: 12, windowDays: 60, onExpiry: 'ESPERA' as const, exemptRecentHiresMonths: 0 };
   const campana = { fixedDate: '03-31', windowDays: 60, onExpiry: 'CIERRA' as const, exemptRecentHiresMonths: 0 };
 
-  /** Lo hecho el dia D, a media manana en Bogota, con el vencimiento que satisfizo. */
+  /** Lo hecho el dia D, a media mañana en Bogota, con el vencimiento que satisfizo. */
   const hizoEl = (dia: string, vencia: string) => ({
     completedAt: new Date(`${dia}T15:00:00Z`),
     dueAt: new Date(`${vencia}T23:59:59-05:00`),
@@ -148,8 +148,8 @@ describe('la PRIMERA ronda de quien ya hizo esa formacion por otra regla', () =>
     ).toEqual({ abrir: true, venceEl: null });
   });
 
-  it('en una campana la vigencia va hasta la ocurrencia siguiente, no hasta la que ya cumplio', () => {
-    // Hizo la campana de 2026 el 20 de marzo, once dias antes de que venciera. Su siguiente es la
+  it('en una campaña la vigencia va hasta la ocurrencia siguiente, no hasta la que ya cumplio', () => {
+    // Hizo la campaña de 2026 el 20 de marzo, once dias antes de que venciera. Su siguiente es la
     // de 2027: cambiar de cargo en septiembre no le puede volver a pedir la de 2026.
     expect(
       decidirPrimeraRonda({ cumplida: hizoEl('2026-03-20', '2026-03-31'), recurrencia: campana, ahora }),

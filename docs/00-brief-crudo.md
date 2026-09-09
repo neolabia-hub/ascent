@@ -176,7 +176,7 @@ Esto es así.
 
 ## Bloque 4 — 2026-08-25 (nueva capacidad: evaluacion de desempeno)
 
-Hay una seccion importante de EVALUACION DE DESEMPENO donde se realiza cada ano o cierto tiempo,
+Hay una seccion importante de EVALUACION DE DESEMPENO donde se realiza cada año o cierto tiempo,
 donde se evalua al usuario en su cargo o como persona (no se). Son evaluaciones que se debe
 permitir crear desde UI, muy parametrizables: tipos de preguntas y mas. Consultar como se debe
 hacer y lo mejor, y que sea por tenant tambien.

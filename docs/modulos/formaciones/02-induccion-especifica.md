@@ -110,7 +110,7 @@ al cron:
 2. Le **nace** la obligación del cargo nuevo. La deduplicación es *por regla*, no por formación, así
    que tener la otra no la frena.
 3. La del cargo viejo pasa a `WITHDRAWN_LEFT_AUDIENCE` —**no se borra**: el auditor pregunta por qué
-   dejó de deberla— y se marcan leídos sus avisos, para que la campana no siga reclamando algo que
+   dejó de deberla— y se marcan leídos sus avisos, para que la campaña no siga reclamando algo que
    ya no debe.
 
 Medido: `PENDING` → `PENDING + WITHDRAWN_LEFT_AUDIENCE`. Dos filas, **una sola viva**, y en "Mi

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import {
   ESTADOS_RETIRADOS,
   inscripcionDeCadaRonda,
@@ -10,6 +10,7 @@ import {
 import { DIMENSIONES, agrupar, type Dimension, type HechoAnalitica } from './analytics.js';
 import {
   calendario as calendarioDeVencimientos,
+  consolidar as consolidarVencimientos,
   resumir as resumirVencimientos,
   type HechoVencimiento,
 } from './expirations.js';
@@ -140,7 +141,7 @@ export class ReportsService {
 
       MEDIDO el 2026-09-05 con el recorrido de asistencia: 5 obligaciones, 3 pendientes de verdad,
       y el informe decia 4 terminadas. En produccion es la reinduccion de 796 personas figurando
-      hecha el 2 de enero de cada ano.
+      hecha el 2 de enero de cada año.
 
       Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como "sin empezar"—
       pero al reves: aquel inflaba el incumplimiento y este infla el CUMPLIMIENTO, que es el que no
@@ -304,7 +305,7 @@ export class ReportsService {
    * Aquella resuelve UNA formacion con cinco consultas cortas, y para un plan de treinta renglones
    * eso son ciento cincuenta: se nota poco y la regla vive en un sitio. Aqui hay entre cien y
    * doscientas formaciones con obligaciones vivas, y ciento cincuenta pasa a ser mil. Esta pantalla
-   * es la primera que se abre cada manana; si tarda cuatro segundos, deja de abrirse.
+   * es la primera que se abre cada mañana; si tarda cuatro segundos, deja de abrirse.
    *
    * Asi que se traen los datos UNA vez y se agrupan en memoria. Lo que NO se duplica es la regla de
    * estados: se sigue llamando a `resolverEstadoEjecucion`, que es lo unico que no puede tener dos
@@ -387,7 +388,7 @@ export class ReportsService {
 
       Un plan tiene entre diez y treinta renglones, asi que son treinta consultas cortas contra una
       gigante con cuatro `LEFT JOIN` y un `GROUP BY` que habria que reescribir cada vez que cambie
-      un estado. Con este tamano la diferencia no se nota, y lo que se gana es que la regla de
+      un estado. Con este tamaño la diferencia no se nota, y lo que se gana es que la regla de
       estados viva en UN sitio (`execution-state.ts`) y no repartida entre SQL y TypeScript.
 
       El dia que un plan tenga trescientos renglones esto se materializa; hoy seria optimizar algo
@@ -537,7 +538,7 @@ export class ReportsService {
   /**
    * TODAS las dimensiones de una pasada.
    *
-   * La pantalla las ensena juntas —quien decide compara "el area X va mal" con "la regional Y va
+   * La pantalla las enseña juntas —quien decide compara "el area X va mal" con "la regional Y va
    * mal" en el mismo golpe de vista— y pedirlas una a una serian siete viajes que traen exactamente
    * los mismos hechos. Se calculan una vez y se agrupan siete veces, que es gratis al lado de la
    * consulta.
@@ -552,14 +553,23 @@ export class ReportsService {
   }
 
   /**
-   * QUE SE VENCE EN LOS PROXIMOS N MESES, persona por persona (Decision #126).
+   * QUE SE VENCE EN LOS PROXIMOS N MESES, persona por persona (Decision #126; eje y fuentes
+   * corregidos el 2026-09-08, `PENDIENTES` 3.1 y 3.2).
    *
-   * Dos fuentes que no se mezclan (ver `expirations.ts`): certificaciones que caducan y
-   * obligaciones abiertas con fecha limite. Se devuelve la lista nominal ademas del calendario
-   * porque la pregunta siguiente siempre es "¿quienes?", y sin nombres no se puede convocar a
-   * nadie.
+   * El porque del eje —REPROGRAMAR frente a PERSEGUIR, y no «de que tabla salio»— esta escrito en
+   * `expirations.ts`. Aqui esta lo que cuesta: **tres consultas de fechas y una cuarta de historia**,
+   * porque la clase de una obligacion abierta no se puede saber mirandola a ella sola.
+   *
+   * Se devuelve la lista nominal ademas del calendario porque la pregunta siguiente siempre es
+   * "¿quienes?", y sin nombres no se puede convocar a nadie.
+   *
+   * `db` existe para el AVISO SEMANAL (`expiration-digest.worker.ts`), que corre sin peticion y por
+   * tanto sin contexto de tenant: le pasa su cliente atado. Es la misma consulta que pinta la
+   * pantalla a proposito — un calculo paralelo "para el aviso" acabaria diciendo un numero distinto
+   * del que se ve al entrar, y entonces no se creeria ninguno de los dos.
    */
-  async vencimientos(meses: number, hoy = new Date()) {
+  async vencimientos(meses: number, hoy = new Date(), db?: TenantPrisma) {
+    const cliente = db ?? this.prisma.scoped;
     const desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
     const hasta = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + meses, 1));
 
@@ -574,85 +584,161 @@ export class ReportsService {
       },
     } as const;
 
-    const [certificaciones, obligaciones] = await Promise.all([
+    const [porPapel, porConstancia, abiertas] = await Promise.all([
       /*
-        `certification_grants` guarda `user_id` pero NO expone la relacion hacia `users`, asi que la
-        persona no se puede traer en el mismo select ni filtrar por "activa" desde aqui. Se piden
-        los otorgamientos y despues las personas, y quien ya no trabaja se descarta al cruzar: es
-        una consulta mas y ninguna suposicion sobre el esquema.
+        1. LO QUE DICE EL PAPEL DE UN TERCERO (#157).
+
+        Vive en la OBLIGACION y no en la inscripcion —una convalidada no tiene jornada— y manda sobre
+        la vigencia que calcularia la recurrencia. Solo de obligaciones ya cerradas: en una abierta
+        el papel todavia no acredita nada.
       */
-      this.prisma.scoped.certificationGrant.findMany({
-        where: { status: 'ACTIVE', validUntil: { not: null, lt: hasta } },
-        select: { validUntil: true, userId: true, certification: { select: { name: true } } },
+      cliente.assignment.findMany({
+        where: {
+          targetType: 'ACTIVITY',
+          status: 'COMPLETED',
+          validUntilOverride: { not: null, lt: hasta },
+          user: { active: true, deletedAt: null },
+        },
+        select: { validUntilOverride: true, targetId: true, user: persona },
       }),
       /*
-        SOLO LAS OBLIGACIONES ABIERTAS.
+        2. LA CONSTANCIA PROPIA (#111), que caduca cuando toca repetir la formacion.
 
-        Una que ya se cumplio no vence: se volvera a exigir cuando toque la ronda siguiente, y esa
-        obligacion todavia no existe. Incluir las cerradas llenaria el calendario de trabajo que ya
-        esta hecho, que es la forma mas rapida de que nadie vuelva a mirarlo.
+        La formacion se saca por la inscripcion, que es donde vive la version cursada. Una constancia
+        REVOCADA no vence: ya no acredita nada, y sacarla aqui pondria a alguien a reprogramar algo
+        que hay que volver a hacer por otro motivo.
       */
-      this.prisma.scoped.assignment.findMany({
+      /*
+        `certificates` guarda `enrollment_id` pero NO declara la relacion hacia `enrollments` —igual
+        que `certification_grants` con `users`—, asi que la formacion y la persona no se pueden
+        traer en el mismo select. Se piden las constancias y despues sus inscripciones: una consulta
+        mas y ninguna suposicion sobre el esquema.
+      */
+      cliente.certificate.findMany({
+        where: { validUntil: { not: null, lt: hasta }, revokedAt: null, enrollmentId: { not: null } },
+        select: { validUntil: true, enrollmentId: true },
+      }),
+      /*
+        3. LAS OBLIGACIONES ABIERTAS, con su fecha limite.
+
+        Una ya cumplida no vence por aqui: lo que vence es su PAPEL, y de eso se encargan las dos
+        consultas de arriba. Incluir las cerradas llenaria el calendario de trabajo ya hecho, que es
+        la forma mas rapida de que nadie vuelva a mirarlo.
+      */
+      cliente.assignment.findMany({
         where: {
           targetType: 'ACTIVITY',
           status: { in: ['PENDING', 'OVERDUE'] },
           dueAt: { not: null, lt: hasta },
           user: { active: true, deletedAt: null },
         },
-        select: { dueAt: true, targetId: true, user: persona },
+        select: { dueAt: true, targetId: true, userId: true, user: persona },
       }),
     ]);
 
-    const [actividades, personasDeCertificacion] = await Promise.all([
-      this.prisma.scoped.activity.findMany({
-        where: { id: { in: [...new Set(obligaciones.map((fila) => fila.targetId))] } },
+    const actividadesPedidas = [
+      ...new Set([...porPapel.map((fila) => fila.targetId), ...abiertas.map((fila) => fila.targetId)]),
+    ];
+
+    const [actividades, cumplidasAntes, inscripcionesDeConstancia] = await Promise.all([
+      cliente.activity.findMany({
+        where: { id: { in: actividadesPedidas } },
         select: { id: true, name: true },
       }),
-      this.prisma.scoped.user.findMany({
+      /*
+        LA CUARTA CONSULTA: ¿YA LA TUVO ALGUNA VEZ?
+
+        Es la que decide si una obligacion abierta se PERSIGUE o se REPROGRAMA, y no se puede
+        contestar mirando la obligacion: la de este año no sabe nada de la del anterior. Se pregunta
+        por lo CUMPLIDO de esas mismas personas y formaciones.
+
+        `WAIVED` no cuenta y la diferencia importa: eximir es dejarla pasar, no haberla hecho. Quien
+        fue eximido el año pasado y hoy la debe otra vez es alguien a quien PERSEGUIR — nunca la tuvo.
+        Convalidar, en cambio, deja `COMPLETED` (via C) y cuenta: la hizo, en otro empleo.
+      */
+      cliente.assignment.findMany({
         where: {
-          id: { in: [...new Set(certificaciones.map((fila) => fila.userId))] },
-          active: true,
-          deletedAt: null,
+          targetType: 'ACTIVITY',
+          status: 'COMPLETED',
+          userId: { in: [...new Set(abiertas.map((fila) => fila.userId))] },
+          targetId: { in: [...new Set(abiertas.map((fila) => fila.targetId))] },
         },
-        ...persona,
+        select: { userId: true, targetId: true },
+      }),
+      // Las inscripciones de esas constancias: de ahi salen la persona y la formacion que se cursó.
+      // Quien ya no trabaja se descarta al cruzar, igual que en las otras dos fuentes.
+      cliente.enrollment.findMany({
+        where: {
+          id: { in: [...new Set(porConstancia.map((fila) => fila.enrollmentId as string))] },
+          user: { active: true, deletedAt: null },
+        },
+        select: {
+          id: true,
+          user: persona,
+          activityVersion: { select: { activity: { select: { id: true, name: true } } } },
+        },
       }),
     ]);
     const nombreDeActividad = new Map(actividades.map((fila) => [fila.id, fila.name]));
-    const porPersona = new Map(personasDeCertificacion.map((fila) => [fila.id, fila]));
+    const inscripcionDeConstancia = new Map(inscripcionesDeConstancia.map((fila) => [fila.id, fila]));
+    const yaLaTuvo = new Set(cumplidasAntes.map((fila) => `${fila.userId}|${fila.targetId}`));
 
-    const hechos: HechoVencimiento[] = [
-      ...certificaciones.flatMap((fila) => {
-        const quien = porPersona.get(fila.userId);
-        // Sin persona viva no hay vencimiento que atender: se retiro de la empresa.
-        if (!quien) return [];
-        return [
-          {
-            clase: 'CERTIFICACION' as const,
-            fecha: fila.validUntil as Date,
-            personaId: quien.id,
-            personaNombre: quien.fullName,
-            documento: quien.documentNumber,
-            area: quien.area?.name ?? null,
-            cargo: quien.jobTitle?.name ?? null,
-            regional: quien.regional?.name ?? null,
-            formacion: fila.certification.name,
-            actividadId: null,
-          },
-        ];
-      }),
-      ...obligaciones.map((fila) => ({
-        clase: 'OBLIGACION' as const,
-        fecha: fila.dueAt as Date,
-        personaId: fila.user.id,
-        personaNombre: fila.user.fullName,
-        documento: fila.user.documentNumber,
-        area: fila.user.area?.name ?? null,
-        cargo: fila.user.jobTitle?.name ?? null,
-        regional: fila.user.regional?.name ?? null,
+    const dimensionesDe = (quien: {
+      id: string;
+      fullName: string;
+      documentNumber: string;
+      area: { name: string } | null;
+      jobTitle: { name: string } | null;
+      regional: { name: string } | null;
+    }) => ({
+      personaId: quien.id,
+      personaNombre: quien.fullName,
+      documento: quien.documentNumber,
+      area: quien.area?.name ?? null,
+      cargo: quien.jobTitle?.name ?? null,
+      regional: quien.regional?.name ?? null,
+    });
+
+    const candidatos: HechoVencimiento[] = [
+      ...porPapel.map((fila) => ({
+        clase: 'REPROGRAMAR' as const,
+        fuente: 'PAPEL_DE_TERCERO' as const,
+        fecha: fila.validUntilOverride as Date,
+        ...dimensionesDe(fila.user),
         formacion: nombreDeActividad.get(fila.targetId) ?? 'Formacion',
         actividadId: fila.targetId,
       })),
-    ].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+      ...porConstancia.flatMap((fila) => {
+        // Sin inscripcion viva no hay nada que reprogramar: o la persona se retiro, o es una
+        // constancia nacida de una certificacion otorgada —que hoy no las escribe nadie— y no habria
+        // ni formacion que nombrar.
+        const inscripcion = inscripcionDeConstancia.get(fila.enrollmentId as string);
+        if (!inscripcion) return [];
+        return [
+          {
+            clase: 'REPROGRAMAR' as const,
+            fuente: 'CONSTANCIA' as const,
+            fecha: fila.validUntil as Date,
+            ...dimensionesDe(inscripcion.user),
+            formacion: inscripcion.activityVersion.activity.name,
+            actividadId: inscripcion.activityVersion.activity.id,
+          },
+        ];
+      }),
+      ...abiertas.map((fila) => ({
+        clase: yaLaTuvo.has(`${fila.userId}|${fila.targetId}`)
+          ? ('REPROGRAMAR' as const)
+          : ('PERSEGUIR' as const),
+        fuente: 'OBLIGACION_ABIERTA' as const,
+        fecha: fila.dueAt as Date,
+        ...dimensionesDe(fila.user),
+        formacion: nombreDeActividad.get(fila.targetId) ?? 'Formacion',
+        actividadId: fila.targetId,
+      })),
+    ];
+
+    // Y una sola fila por persona y formacion: la ventana de 60 dias las hacia salir dos veces.
+    const hechos = consolidarVencimientos(candidatos);
 
     return {
       resumen: resumirVencimientos(hechos, hoy),

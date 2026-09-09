@@ -19,7 +19,7 @@ import { getSignedUrl as presignS3Url } from '@aws-sdk/s3-request-presigner';
 export interface StorageAdapter {
   put(key: string, body: Buffer, mimeType: string): Promise<void>;
   read(key: string): Promise<Buffer>;
-  /** Tamano en bytes, o null si no existe. Necesario para responder rangos. */
+  /** Tamaño en bytes, o null si no existe. Necesario para responder rangos. */
   size(key: string): Promise<number | null>;
   /** Lectura por TROZOS. Un video no se puede servir de una sola pieza (ver media.controller). */
   stream(key: string, range?: { start: number; end: number }): ReadStream;

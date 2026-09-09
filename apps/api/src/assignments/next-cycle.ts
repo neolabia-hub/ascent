@@ -23,14 +23,14 @@ const VIVA = new Set(['PENDING', 'OVERDUE']);
  *
  *   ESPERA   no nace la siguiente hasta que haga la anterior. Era lo unico que habia, y tiene un
  *            efecto que casi nadie quiere: quien nunca la hace **desaparece del denominador** de
- *            todos los anos siguientes, asi que el peor incumplidor sale de la cuenta y la
- *            cobertura del ano que viene se ve mejor de lo que es.
+ *            todos los años siguientes, asi que el peor incumplidor sale de la cuenta y la
+ *            cobertura del año que viene se ve mejor de lo que es.
  *   ACUMULA  nace la siguiente Y la anterior sigue pendiente: debe las dos. Para quien exige
- *            ponerse al dia antes de seguir. A los tres anos debe tres.
+ *            ponerse al dia antes de seguir. A los tres años debe tres.
  *   CIERRA   la anterior se cierra como NO REALIZADA —que SI cuenta como incumplimiento de ese
  *            periodo, a diferencia de retirada o eximida— y la siguiente nace para todos. Es como
- *            funciona el cumplimiento por CALENDARIO: cada campana es su periodo, y el periodo
- *            cierra. Es lo que pregunta el auditor, ano por ano.
+ *            funciona el cumplimiento por CALENDARIO: cada campaña es su periodo, y el periodo
+ *            cierra. Es lo que pregunta el auditor, año por año.
  *
  * Lo cumplido nunca se cierra: `cerrarAnterior` solo puede ser cierto sobre una ronda VIVA. Una
  * eximida o una retirada ya tienen su explicacion escrita y no se pisan.
@@ -97,7 +97,7 @@ export interface PrimeraRondaDecision {
 export function decidirPrimeraRonda(input: {
   /**
    * La ronda que ya cumplio de esta MISMA formacion, por otra regla. `null` = nunca la hizo.
-   * Van las dos fechas porque el ancla no es la misma en una campana que en un aniversario
+   * Van las dos fechas porque el ancla no es la misma en una campaña que en un aniversario
    * (`cycleAnchor`): quien hizo la reinduccion de 2026 la hizo para el periodo de 2026, y su
    * siguiente es la de 2027 aunque haya cambiado de cargo en septiembre.
    */

@@ -69,6 +69,7 @@ import { Analitica } from '@/components/modules/admin/analitica';
 import { BarraEjecucion } from '@/components/modules/admin/barra-ejecucion';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /**
  * EL PLAN DEL ANO, visto como se piensa.
@@ -77,14 +78,14 @@ import { useToast } from '@/components/ui/toast';
  * uno. Dos cosas fallaban, y las dos las dijo el cliente:
  *
  *  1. **Obligaba a salir del plan para todo.** La convocatoria tenia que existir ANTES, asi que
- *     planear el ano eran cuatro pantallas por linea: crear la actividad, publicarla, ir a
+ *     planear el año eran cuatro pantallas por linea: crear la actividad, publicarla, ir a
  *     Convocatorias, crear la jornada y volver aqui a buscarla.
  *  2. **La tabla plana no se parece a un plan.** Una reinduccion con tres jornadas —Bogota,
  *     Medellin, Barranquilla— salian como tres filas casi identicas, sin que se viera que son la
  *     misma capacitacion.
  *
  * Ahora hay TRES VISTAS del mismo plan, y cada una contesta una pregunta distinta:
- *  - **Por capacitacion**: que se va a dictar este ano y con cuantas jornadas cada cosa.
+ *  - **Por capacitacion**: que se va a dictar este año y con cuantas jornadas cada cosa.
  *  - **Cronograma**: que toca en marzo. Es el Excel de doce columnas que ya tienen, pero vivo:
  *    cada jornada se arrastra de mes y eso queda como REPROGRAMADA.
  *  - **Por sistema de gestion**: lo que pide el auditor —el plan SST, el PESV y el BASC son vistas
@@ -212,7 +213,7 @@ export default function PlanDetallePage() {
   const [fichaAbierta, setFichaAbierta] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
-  /** Reabrir el ano cerrado. Pide motivo siempre: el auditor va a preguntar por que se movio. */
+  /** Reabrir el año cerrado. Pide motivo siempre: el auditor va a preguntar por que se movio. */
   const [reopenOpen, setReopenOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [offerings, setOfferings] = useState<OfferingListItem[]>([]);
@@ -269,8 +270,8 @@ export default function PlanDetallePage() {
   }, [load]);
 
   /**
-   * Los anos que YA tienen plan. Hacen falta para que el selector de ano del cajon de editar no
-   * ofrezca uno ocupado: hay un plan por ano (Decision #71) y elegirlo solo lleva a un rechazo.
+   * Los años que YA tienen plan. Hacen falta para que el selector de año del cajon de editar no
+   * ofrezca uno ocupado: hay un plan por año (Decision #71) y elegirlo solo lleva a un rechazo.
    * Falla en silencio a proposito — si no se pudieron traer, se ofrecen todos y contesta el
    * servidor; un aviso de error aqui seria ruido en una pantalla que se abrio para otra cosa.
    */
@@ -443,7 +444,7 @@ export default function PlanDetallePage() {
       */
       const esConocido = error instanceof ApiError && error.code === 'OFFERING_ALREADY_IN_PLAN';
       // El `message` del servidor viaja como `title` (RFC 9457). Los que NO lo traen se quedan con
-      // el nombre de la excepcion de Nest —"Conflict Exception"— y eso no se le ensena a nadie.
+      // el nombre de la excepcion de Nest —"Conflict Exception"— y eso no se le enseña a nadie.
       const delServidor = error instanceof ApiError ? error.body.title : undefined;
       const util = delServidor && !delServidor.endsWith('Exception') ? delServidor : undefined;
       showToast({
@@ -518,7 +519,7 @@ export default function PlanDetallePage() {
     setBusy(true);
     try {
       await updatePlan(id, {
-        // El ano solo viaja en borrador: despues el servidor lo rechaza, y mandarlo seria
+        // El año solo viaja en borrador: despues el servidor lo rechaza, y mandarlo seria
         // ofrecer en pantalla algo que no va a pasar.
         ...(plan.status === 'DRAFT' ? { year: Number(editForm.year) } : {}),
         name: editForm.name.trim(),
@@ -535,9 +536,9 @@ export default function PlanDetallePage() {
         kind: 'danger',
         title:
           error instanceof ApiError && error.code === 'DUPLICATE_PLAN'
-            ? 'Ya existe un plan con ese nombre para el ano'
+            ? 'Ya existe un plan con ese nombre para el año'
             : error instanceof ApiError && error.code === 'PLAN_YEAR_LOCKED'
-              ? 'El ano de un plan aprobado no se cambia'
+              ? 'El año de un plan aprobado no se cambia'
               : 'No se pudo actualizar el plan',
       });
     } finally {
@@ -621,7 +622,7 @@ export default function PlanDetallePage() {
 
   const isDraft = plan.status === 'DRAFT';
   /**
-   * Los anos que se pueden elegir en el cajon de editar: dos atras y uno adelante, sin los que ya
+   * Los años que se pueden elegir en el cajon de editar: dos atras y uno adelante, sin los que ya
    * tienen plan — pero SIEMPRE con el suyo, porque "dejarlo como esta" tiene que ser una opcion.
    */
   const enCurso = new Date().getFullYear();
@@ -675,7 +676,7 @@ export default function PlanDetallePage() {
             <StatusPill kind={PLAN_STATUS[plan.status].kind} label={PLAN_STATUS[plan.status].label} />
           </div>
           <p className="mt-1 text-sm text-ink-500">
-            Ano {plan.year}
+            Año {plan.year}
             {plan.approvedAt ? ` · aprobado el ${formatDate(plan.approvedAt)}` : ''}
           </p>
         </div>
@@ -729,13 +730,13 @@ export default function PlanDetallePage() {
           ) : null}
           {plan.status === 'ACTIVE' && canApprove ? (
             <Button variant="ghost" onClick={() => changeStatus('CLOSED')} loading={busy}>
-              Cerrar el ano
+              Cerrar el año
             </Button>
           ) : null}
           {/*
-            REABRIR. Cerrar es lo que convierte al plan en la evidencia del ano, asi que durante
+            REABRIR. Cerrar es lo que convierte al plan en la evidencia del año, asi que durante
             meses esto no existia. Con un plan por ano (Decision #71) esa regla paso a ser una
-            trampa: un plan cerrado por error se queda con el ano y ya no se puede planear nada.
+            trampa: un plan cerrado por error se queda con el año y ya no se puede planear nada.
             La salida no es saltarse la regla, es que la operacion EXISTA y deje rastro.
           */}
           {plan.status === 'CLOSED' && canApprove ? (
@@ -747,14 +748,14 @@ export default function PlanDetallePage() {
               }}
             >
               <RotateCcw size={16} />
-              Reabrir el ano
+              Reabrir el año
             </Button>
           ) : null}
           {/*
             CORREGIR Y BORRAR. Editar sigue siendo de los planes vivos: el cerrado es lo que se le
-            ensena al auditor. BORRAR si se ofrece tambien cerrado, porque un plan que se cerro sin
+            enseña al auditor. BORRAR si se ofrece tambien cerrado, porque un plan que se cerro sin
             haber obligado a nadie no es evidencia de nada —es un ensayo— y desde que hay uno por
-            ano dejarlo puesto bloquea el ano entero. Quien no pueda lo sabra por el mensaje del
+            año dejarlo puesto bloquea el año entero. Quien no pueda lo sabra por el mensaje del
             servidor, que dice el motivo real ("ya obligo a gente: reabrelo").
           */}
           {plan.status !== 'CLOSED' ? (
@@ -814,12 +815,12 @@ export default function PlanDetallePage() {
         EL OBJETIVO Y EL ALCANCE, DETRAS DE UN BOTON (Decision #131).
 
         Ocupaban una tarjeta fija en una pantalla que se abre todos los dias para mirar como va el
-        plan — y son un texto que se escribe una vez al ano y se lee una vez al trimestre, casi
+        plan — y son un texto que se escribe una vez al año y se lee una vez al trimestre, casi
         siempre para una auditoria. Empujaban hacia abajo lo que si se consulta a diario.
 
         Se abre en VENTANA CENTRADA y no en el cajon lateral: el cajon es para editar, y aqui no hay
         nada que rellenar. Ademas el alcance no se veia en ninguna parte aunque se pudiera escribir:
-        estaba guardado y nunca se ensenaba.
+        estaba guardado y nunca se enseñaba.
       */}
       {plan.objective || plan.scope || plan.goalPct !== null ? (
         <button
@@ -836,7 +837,7 @@ export default function PlanDetallePage() {
         open={fichaAbierta}
         onOpenChange={setFichaAbierta}
         title={`Plan ${plan.year}`}
-        description="Lo que la empresa se comprometio a hacer este ano"
+        description="Lo que la empresa se comprometio a hacer este año"
         actions={
           /*
             EDITAR VA ARRIBA, JUNTO A CERRAR, y no en un pie.
@@ -939,7 +940,7 @@ export default function PlanDetallePage() {
           ))}
         </Select>
         <Select value={fMonth} onChange={(event) => setFMonth(event.target.value)} aria-label="Filtrar por mes" className="w-[150px]">
-          <option value="">Todo el ano</option>
+          <option value="">Todo el año</option>
           {MONTHS.map((month, index) => (
             <option key={month} value={index + 1}>
               {month}
@@ -975,7 +976,7 @@ export default function PlanDetallePage() {
           <EmptyState
             icon={ClipboardList}
             title="El plan todavia no tiene nada"
-            description="Agrega la primera capacitacion del ano. Puedes crear la jornada aqui mismo, sin salir del plan."
+            description="Agrega la primera capacitacion del año. Puedes crear la jornada aqui mismo, sin salir del plan."
             action={
               canAdd ? (
                 <div className="flex flex-wrap justify-center gap-2">
@@ -1091,7 +1092,7 @@ export default function PlanDetallePage() {
             htmlFor="c-reason"
             label="Por que se cancela"
             required
-            hint="Lo van a leer las personas citadas, y queda en la auditoria. Ejemplo: el instructor externo no confirmo."
+            ayuda="Lo van a leer las personas citadas, y queda en la auditoria. Ejemplo: el instructor externo no confirmo."
           >
             <Textarea
               id="c-reason"
@@ -1192,7 +1193,7 @@ export default function PlanDetallePage() {
             SE BUSCA, NO SE DESPLIEGA.
 
             El desplegable pedia las primeras 100 convocatorias y las pintaba todas. Con 253 en la
-            base —un cliente llega ahi en dos anos— la que se acababa de publicar quedaba FUERA de
+            base —un cliente llega ahi en dos años— la que se acababa de publicar quedaba FUERA de
             la pagina y el plan no podia engancharla: el sintoma es "no aparece", y la causa
             estaba a dos capas. Ya paso una vez con el orden de las fechas (ver RUNBOOK); la
             diferencia es que ahora se pregunta al servidor en vez de traer un trozo y confiar.
@@ -1202,7 +1203,7 @@ export default function PlanDetallePage() {
             SE ELIGE VIENDOLA, no de un desplegable.
 
             Una convocatoria no es "CONV-2026-000420": es esa formacion, de ese tipo, en ese
-            estado y en esa fecha. Un `<select>` solo sabe ensenar lo primero y obliga a abrirlo
+            estado y en esa fecha. Un `<select>` solo sabe enseñar lo primero y obliga a abrirlo
             para comparar dos. Y como la lista ademas viene FILTRADA, el desplegable mentia por
             omision: se buscaba algo, no aparecia, y no habia forma de saber si es que no existe
             o que no se ofrece — que es justo lo que se reporto como "la busqueda no funciona".
@@ -1280,14 +1281,14 @@ export default function PlanDetallePage() {
             </Button>
             <Button onClick={() => void doReopen()} loading={busy} disabled={reopenReason.trim().length < 10}>
               <RotateCcw size={16} />
-              Reabrir el ano
+              Reabrir el año
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
-            Cerrar el ano es lo que convirtio este plan en la evidencia que se le ensena al auditor. Reabrirlo
+            Cerrar el año es lo que convirtio este plan en la evidencia que se le enseña al auditor. Reabrirlo
             no borra nada, pero si queda registrado quien lo hizo, cuando y por que.
           </p>
           <Field
@@ -1319,7 +1320,7 @@ export default function PlanDetallePage() {
         title="Editar el plan"
         description={
           plan.status === 'DRAFT'
-            ? 'Esta en borrador: se puede cambiar todo, incluido el ano.'
+            ? 'Esta en borrador: se puede cambiar todo, incluido el año.'
             : 'El plan ya esta aprobado: se corrige la cabecera, con motivo. Sus renglones no se tocan aqui.'
         }
         footer={
@@ -1344,7 +1345,7 @@ export default function PlanDetallePage() {
               posibles. Los anos que YA tienen plan no se ofrecen (hay uno por ano, Decision #71);
               el suyo si, porque dejarlo como esta tiene que ser una opcion.
             */
-            <Field htmlFor="e-year" label="Ano" required hint="Ancla el vencimiento de cada renglon al ultimo dia de su mes.">
+            <Field htmlFor="e-year" label="Año" required hint="Ancla el vencimiento de cada renglon al ultimo dia de su mes.">
               <Select
                 id="e-year"
                 value={editForm.year}
@@ -1384,7 +1385,7 @@ export default function PlanDetallePage() {
           <Field
             htmlFor="e-goal"
             label="Meta de cumplimiento (%)"
-            hint="Cuanto del programa se compromete la empresa a ejecutar este ano. Lo habitual es 90."
+            hint="Cuanto del programa se compromete la empresa a ejecutar este año. Lo habitual es 90."
           >
             <Input
               id="e-goal"
@@ -1459,8 +1460,8 @@ export default function PlanDetallePage() {
           */}
           {plan.status === 'CLOSED' && metrics.assigned > 0 ? (
             <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
-              Este plan esta CERRADO y creo <strong>{metrics.assigned} obligaciones</strong>: es la evidencia del ano y no
-              se borra. Si hay que corregirlo, cierra esto y usa <strong>Reabrir el ano</strong>.
+              Este plan esta CERRADO y creo <strong>{metrics.assigned} obligaciones</strong>: es la evidencia del año y no
+              se borra. Si hay que corregirlo, cierra esto y usa <strong>Reabrir el año</strong>.
             </p>
           ) : metrics.assigned > 0 ? (
             <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
@@ -1478,7 +1479,7 @@ export default function PlanDetallePage() {
               htmlFor="d-reason"
               label="Por que se elimina"
               required
-              hint="Queda en la auditoria: hubo gente a la que ya se le anuncio esta formacion."
+              hint="Queda en la auditoria: hubo personas a las que ya se les anuncio esta formacion."
             >
               <Textarea
                 id="d-reason"
@@ -1631,7 +1632,7 @@ function ActivityCard({
                       onClick={() => onRemove(item.id)}
                       disabled={busy}
                       aria-label={`Quitar del plan la convocatoria ${item.offering.code}`}
-                      title="Quitar del plan: saca este renglon del programa del ano. La convocatoria NO se borra ni se cancela, sigue existiendo. Solo mientras el plan es un borrador."
+                      title="Quitar del plan: saca este renglon del programa del año. La convocatoria NO se borra ni se cancela, sigue existiendo. Solo mientras el plan es un borrador."
                     >
                       <Unlink size={15} />
                     </Button>
@@ -1680,7 +1681,7 @@ function ActivityCard({
  * era un circulo con "2" dentro: decia cuantas jornadas hay y nada mas, asi que para saber cual
  * era o para moverla habia que irse a otra vista. Ahora cada jornada es su propia ficha —con la
  * regional escrita y el estado en el color— y se ARRASTRA de mes, que es la operacion que de
- * verdad ocurre a lo largo del ano.
+ * verdad ocurre a lo largo del año.
  *
  * Mover no es cosmetico: el servidor lo marca REPROGRAMADA, y esa distincion es la que separa
  * "se cumplio en su mes" de "se movio hasta que cupo". Por eso lo ejecutado no se arrastra —ya es
@@ -1927,7 +1928,7 @@ function ProcessTable({ plan }: { plan: PlanDetail }) {
 /**
  * LA TABLA PLANA, que no desaparece: es la vista de buscar, ordenar y exportar.
  *
- * Agrupar por capacitacion contesta "que se dicta este ano"; la tabla contesta "donde esta ESTE
+ * Agrupar por capacitacion contesta "que se dicta este año"; la tabla contesta "donde esta ESTE
  * renglon". Son dos preguntas distintas y por eso conviven en vez de sustituirse.
  */
 function FlatTable({
@@ -1946,6 +1947,7 @@ function FlatTable({
   onAdjust: (item: PlanItemRow) => void;
 }) {
   const sorted = [...items].sort((a, b) => a.plannedMonth - b.plannedMonth);
+  const { visibles: renglonesVisibles, paginador: paginadorRenglones } = usePaginacion(sorted);
 
   if (sorted.length === 0) {
     return (
@@ -1972,7 +1974,7 @@ function FlatTable({
           </Tr>
         </THead>
         <TBody>
-          {sorted.map((item) => (
+          {renglonesVisibles.map((item) => (
             <Tr key={item.id}>
               <Td className="text-ink-700">{monthName(item.plannedMonth)}</Td>
               <Td className="font-medium text-ink-900">{item.offering.activityVersion.activity.name}</Td>
@@ -2006,7 +2008,7 @@ function FlatTable({
                       onClick={() => onRemove(item.id)}
                       disabled={busy}
                       aria-label={`Quitar del plan la convocatoria ${item.offering.code}`}
-                      title="Quitar del plan: saca este renglon del programa del ano. La convocatoria NO se borra ni se cancela, sigue existiendo. Solo mientras el plan es un borrador."
+                      title="Quitar del plan: saca este renglon del programa del año. La convocatoria NO se borra ni se cancela, sigue existiendo. Solo mientras el plan es un borrador."
                     >
                       <Unlink size={15} />
                     </Button>
@@ -2030,6 +2032,7 @@ function FlatTable({
           ))}
         </TBody>
       </Table>
+      {paginadorRenglones}
     </div>
   );
 }

@@ -139,7 +139,7 @@ export interface EnrollmentContent {
   status: ProgressStatus;
   pct: number;
   lastCardIndex: number;
-  /** El tamano de la pieza en la unidad de su tipo. Cada campo es null cuando no aplica. */
+  /** El tamaño de la pieza en la unidad de su tipo. Cada campo es null cuando no aplica. */
   size: { cards: number | null; slides: number | null; minutes: number | null };
   /** El archivo, cuando la pieza ES un archivo (documento, presentacion, video subido). */
   file: { storageKey: string; originalName: string; mimeType: string | null; sizeBytes: number | null } | null;
@@ -313,7 +313,7 @@ export interface AttemptQuestion {
    * ORDER, las DOS COLUMNAS con prefijo L/R en MATCH, y los HUECOS en FILL_BLANK.
    */
   options: Array<{ id: string; text: string }>;
-  /** Solo en NUMERIC: la unidad se ensena junto al campo. El numero correcto no sale del servidor. */
+  /** Solo en NUMERIC: la unidad se enseña junto al campo. El numero correcto no sale del servidor. */
   unit?: string;
   points: number;
   answer: AnswerInput | null;
@@ -371,7 +371,7 @@ export function saveAnswer(attemptId: string, attemptQuestionId: string, answer:
   });
 }
 
-/** Entrega. Puede llevar todas las respuestas de una vez: es el caso del telefono sin senal. */
+/** Entrega. Puede llevar todas las respuestas de una vez: es el caso del telefono sin señal. */
 export function submitAttempt(
   attemptId: string,
   answers: Array<{ attemptQuestionId: string; answer: AnswerInput }>,

@@ -26,6 +26,22 @@ import { StorageService } from './storage.service.js';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
+/** Una evidencia es un PDF o una foto: 25 MB sobran y evitan que alguien suba un video por error. */
+const MAX_EVIDENCIA_BYTES = 25 * 1024 * 1024;
+
+/** Lo unico que es evidencia de una asistencia: el papel, o la foto del papel. */
+const EVIDENCIA_PERMITIDA = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+
+/**
+ * UNA FIRMA CABE EN 300 KB DE SOBRA: es un trazo sobre un lienzo de 600x200. El tope no es tacaneria,
+ * es la defensa que queda cuando la puerta la puede usar CUALQUIER usuario autenticado —`attendance:sign`
+ * lo tiene todo el mundo— y no solo quien toma listas.
+ */
+const MAX_FIRMA_BYTES = 300 * 1024;
+
+/** Y solo PNG: es lo que produce un lienzo del navegador, y no hay razon para aceptar otra cosa. */
+const FIRMA_PERMITIDA = new Set(['image/png']);
+
 @Controller('media')
 export class MediaController {
   constructor(
@@ -75,6 +91,111 @@ export class MediaController {
       select: { id: true, kind: true, storageKey: true, originalName: true, mimeType: true, sizeBytes: true },
     });
     return created;
+  }
+
+  /**
+   * SUBIR UNA EVIDENCIA DE ASISTENCIA: el papel de un tercero o el acta firmada.
+   *
+   * ─── POR QUE NO SIRVE `/media/upload` ───
+   *
+   * Aquel existe para el CONTENIDO que la gente cursa: pide `lessons:manage` y crea un
+   * `ContentPackage`, que es una pieza reutilizable del catalogo. Una evidencia no es ninguna de las
+   * dos cosas:
+   *
+   *   · **El permiso es otro.** Quien toma una lista de asistencia tiene `attendance:take` y no
+   *     tiene por que poder tocar el catalogo de lecciones. Pedirle `lessons:manage` para adjuntar
+   *     el PDF que le acaba de dar la ARL obligaria a darle permisos de autoria — o, lo que pasa de
+   *     verdad, a que no adjunte nada.
+   *   · **No es un paquete de contenido.** Un `ContentPackage` se puede reutilizar en varias
+   *     formaciones; el acta de la jornada del 6 de septiembre pertenece a ESA jornada y a ninguna
+   *     otra. Crear uno seria sembrar el catalogo de piezas que nadie va a volver a usar.
+   *
+   * Asi que esto solo guarda el archivo y devuelve su clave. Quien la recibe la manda dentro de la
+   * lista (`certificate.fileKey`) o de la jornada (`attendanceSheetKey`), y es ahi donde queda
+   * atada a algo.
+   *
+   * ─── QUE SE ACEPTA ───
+   *
+   * PDF e imagenes, y nada mas. Un certificado llega en PDF; un acta firmada llega escaneada o,
+   * mas a menudo de lo que parece, fotografiada con el telefono en el salon. Lo demas —videos,
+   * hojas de calculo, ZIPs— no es evidencia de nada y aceptarlo solo abre la puerta a que el
+   * almacenamiento se llene de cosas que nadie va a abrir.
+   *
+   * El tipo se comprueba por los BYTES (`detectType`) y no por la extension ni por lo que diga el
+   * navegador: renombrar un `.exe` a `.pdf` es el ataque de manual, y aqui sube gente desde el
+   * movil en mitad de una jornada.
+   */
+  @Post('evidencia')
+  @RequirePermissions('attendance:take')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_EVIDENCIA_BYTES } }))
+  async subirEvidencia(@CurrentUser() actor: AuthUser, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file' });
+
+    const detected = detectType(file.buffer);
+    if (!detected || !EVIDENCIA_PERMITIDA.has(detected.mimeType)) {
+      throw new BadRequestException({
+        code: 'UNSUPPORTED_FILE_TYPE',
+        message: 'La evidencia tiene que ser un PDF o una imagen: el certificado o el acta escaneada.',
+        allowed: ['pdf', 'jpeg', 'png', 'webp'],
+      });
+    }
+
+    const tenantId = this.prisma.currentTenantId;
+    const storageKey = this.storage.buildKey(tenantId, 'evidencia', file.originalname);
+    await this.storage.put(storageKey, file.buffer, detected.mimeType);
+
+    /*
+      NO SE GUARDA FILA EN NINGUNA TABLA, y es deliberado. El archivo no significa nada hasta que
+      alguien lo ata a una persona o a una jornada, y eso pasa al guardar la lista. Si el usuario
+      sube el PDF y despues cierra la ventana sin guardar, lo que queda es un archivo huerfano en el
+      disco —barato— y no una fila de evidencia que no evidencia nada, que es lo caro en auditoria.
+    */
+    return {
+      key: storageKey,
+      originalName: file.originalname.slice(0, 200),
+      mimeType: detected.mimeType,
+      sizeBytes: file.size,
+      uploadedBy: actor.id,
+    };
+  }
+
+  /**
+   * SUBIR LA FIRMA DE QUIEN ASISTE (mecanismo 3, `PENDIENTES` 2.4).
+   *
+   * Puerta propia y no la de evidencia, por lo mismo que aquella no es la del contenido: **el
+   * permiso es otro**. Quien firma su asistencia tiene `attendance:sign`, que tiene todo el mundo, y
+   * no puede tener el de tomar la lista de los demas.
+   *
+   * Y por eso es la mas estrecha de las tres: **solo PNG y 300 KB**. Un lienzo de navegador produce
+   * exactamente eso; lo demas —un PDF, una foto de 8 MB, un video— no es una firma, y aqui la puerta
+   * la puede empujar cualquiera con sesion.
+   *
+   * La imagen es un DATO BIOMETRICO (habeas data): se guarda bajo el prefijo del tenant como todo lo
+   * demas, y solo se sirve a quien tenga una firma de acceso valida. No se devuelve en ninguna lista
+   * ni se enseña en pantalla: donde aparece es dentro del acta.
+   */
+  @Post('firma')
+  @RequirePermissions('attendance:sign')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FIRMA_BYTES } }))
+  async subirFirma(@CurrentUser() actor: AuthUser, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file' });
+
+    const detected = detectType(file.buffer);
+    if (!detected || !FIRMA_PERMITIDA.has(detected.mimeType)) {
+      throw new BadRequestException({
+        code: 'UNSUPPORTED_FILE_TYPE',
+        message: 'La firma se manda como PNG: es lo que produce el lienzo de la pantalla.',
+        allowed: ['png'],
+      });
+    }
+
+    const tenantId = this.prisma.currentTenantId;
+    // La clave lleva el id de quien firma: una firma sin dueño no es evidencia de nada, y asi se ve
+    // de quien es sin abrir la imagen.
+    const storageKey = this.storage.buildKey(tenantId, 'firmas', `${actor.id}.png`);
+    await this.storage.put(storageKey, file.buffer, detected.mimeType);
+
+    return { key: storageKey, mimeType: detected.mimeType, sizeBytes: file.size };
   }
 
   /**
@@ -277,6 +398,19 @@ export class MediaController {
     });
     if (own) return own;
 
+    /*
+      LA EVIDENCIA Y LAS ACTAS TAMBIEN SE SIRVEN (2026-09-08).
+
+      Antes solo se servia lo registrado como `ContentPackage`, asi que el certificado escaneado, el
+      acta de la jornada y la firma se subian y **no se podian volver a abrir**: quedaban en el disco
+      y ninguna pantalla podia enseñarlos. Una evidencia que no se puede volver a ver no es evidencia.
+
+      La regla sigue siendo la misma y por eso esto no abre nada: se sirve un archivo si **alguna fila
+      del dominio apunta a el**. Una clave suelta en el disco sigue sin servirse aunque se acierte.
+    */
+    const evidencia = await this.resolveEvidencia(db, storageKey);
+    if (evidencia) return evidencia;
+
     const parentKey = parentPresentationKey(storageKey);
     if (!parentKey) return null;
 
@@ -288,6 +422,36 @@ export class MediaController {
 
     if (!manifestHasSlide(parent.manifest, storageKey)) return null;
     return { mimeType: SLIDE_MIME, originalName: parent.originalName };
+  }
+
+  /**
+   * ¿HAY ALGUNA FILA QUE APUNTE A ESTE ARCHIVO?
+   *
+   * Las seis puertas por las que una evidencia entra al sistema: el acta escaneada de la jornada, el
+   * certificado de un tercero —en la inscripcion y en la obligacion convalidada—, la firma de quien
+   * asistio y el acta que genera el sistema. Si ninguna lo cita, el archivo no se sirve.
+   *
+   * El tipo se deduce de la clave y no se guarda: el acta generada es siempre PDF, las firmas son
+   * siempre PNG, y de lo que sube un usuario ya se comprobo la firma binaria al entrar.
+   */
+  private async resolveEvidencia(
+    db: ReturnType<PrismaService['forTenant']>,
+    storageKey: string,
+  ): Promise<{ mimeType: string; originalName: string } | null> {
+    const [jornada, inscripcion, obligacion, firma, acta] = await Promise.all([
+      db.offering.findFirst({ where: { attendanceSheetKey: storageKey }, select: { code: true } }),
+      db.enrollment.findFirst({ where: { extCertFileKey: storageKey }, select: { id: true } }),
+      db.assignment.findFirst({ where: { extCertFileKey: storageKey }, select: { id: true } }),
+      db.attendanceRecord.findFirst({ where: { signatureKey: storageKey }, select: { userId: true } }),
+      db.sessionAct.findFirst({ where: { pdfStorageKey: storageKey }, select: { id: true } }),
+    ]);
+
+    if (acta) return { mimeType: 'application/pdf', originalName: 'acta-de-sesion.pdf' };
+    if (firma) return { mimeType: 'image/png', originalName: 'firma.png' };
+    if (jornada || inscripcion || obligacion) {
+      return { mimeType: mimeDeLaClave(storageKey), originalName: nombreDeLaClave(storageKey) };
+    }
+    return null;
   }
 
   /**
@@ -313,6 +477,20 @@ export class MediaController {
     const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3100';
     res.setHeader('Content-Security-Policy', `default-src 'none'; frame-ancestors 'self' ${frontend}`);
   }
+}
+
+/** El tipo sale de la extension de la clave, que la construyo el servidor al subirla. */
+function mimeDeLaClave(key: string): string {
+  const ext = key.slice(key.lastIndexOf('.') + 1).toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  return 'image/jpeg';
+}
+
+/** El nombre original va dentro de la clave (`buildKey`): sirve para que la descarga no se llame "file". */
+function nombreDeLaClave(key: string): string {
+  return key.slice(key.lastIndexOf('/') + 1) || 'evidencia';
 }
 
 /**

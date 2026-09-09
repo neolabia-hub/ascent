@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
  * RECORDATORIO DEL CICLO DE DESEMPENO (Decision #134, pendiente cerrado el 2026-09-02).
  *
  * Al abrir un ciclo se avisa a cada evaluador una vez. Entre eso y el cierre no habia nada, y una
- * campana de seis semanas se olvida en la primera: el dia del cierre aparecian cuarenta
+ * campaña de seis semanas se olvida en la primera: el dia del cierre aparecian cuarenta
  * evaluaciones sin responder y ya no habia tiempo. Esto avisa a QUIEN AUN NO HA RESPONDIDO cuando
  * quedan pocos dias.
  *
@@ -64,7 +64,7 @@ export class PerformanceReminderWorker {
   }
 
   private async runTenant(tenantId: string, rawSettings: unknown): Promise<number> {
-    // CUANTOS DIAS ANTES lo decide el tenant, no el codigo: una campana de seis semanas y una de
+    // CUANTOS DIAS ANTES lo decide el tenant, no el codigo: una campaña de seis semanas y una de
     // dos no se recuerdan con el mismo plazo. 0 lo apaga.
     const { performanceReminderDays } = tenantSettingsSchema.parse(rawSettings ?? {});
     if (performanceReminderDays === 0) return 0;

@@ -45,10 +45,21 @@ export function getAnalitica(planId?: string | null): Promise<Analitica> {
   return apiFetch(`/reportes/analitica${planId ? `?plan=${planId}` : ''}`, { method: 'GET' });
 }
 
-export type ClaseVencimiento = 'CERTIFICACION' | 'OBLIGACION';
+/**
+ * QUE HAY QUE HACER CON LA FILA, que es el eje del informe desde el 2026-09-08.
+ *
+ * Antes partia por de donde salia el dato —«Certificacion» / «Obligacion»—, que es una division del
+ * esquema y no del trabajo: a quien esta en su ventana de 60 dias se le contaba en las dos series.
+ * Ahora cada persona y formacion sale UNA vez, del lado que dice que hacer (`expirations.ts`).
+ */
+export type ClaseVencimiento = 'REPROGRAMAR' | 'PERSEGUIR';
+
+/** De donde sale la fecha. No decide nada, pero contesta el "¿segun que?" de quien lo lee. */
+export type FuenteVencimiento = 'PAPEL_DE_TERCERO' | 'CONSTANCIA' | 'OBLIGACION_ABIERTA';
 
 export interface FilaVencimiento {
   clase: ClaseVencimiento;
+  fuente: FuenteVencimiento;
   fecha: string;
   personaId: string;
   personaNombre: string;
@@ -63,8 +74,8 @@ export interface FilaVencimiento {
 export interface MesVencimientos {
   /** 'YYYY-MM'. */
   mes: string;
-  certificaciones: number;
-  obligaciones: number;
+  reprogramar: number;
+  perseguir: number;
   total: number;
 }
 
@@ -81,16 +92,26 @@ export function getVencimientos(meses = 12): Promise<Vencimientos> {
 /**
  * Como se nombra y se pinta cada clase de vencimiento.
  *
- * Son CATEGORIAS, no estados: una certificacion que caduca no es un fallo de nadie —la persona lo
- * hizo bien y el papel tiene fecha— asi que no lleva el color de "atrasado". Los dos tonos estan
+ * Son CATEGORIAS, no estados: a quien se le caduca una acreditacion no ha fallado en nada —lo hizo
+ * bien y el papel tiene fecha— asi que no lleva el color de "atrasado". Los dos tonos estan
  * validados para daltonismo y contraste en los dos temas (ver `globals.css`).
+ *
+ * Los nombres son VERBOS a proposito: el informe existe para decidir que se hace, y "Certificacion"
+ * frente a "Obligacion" obligaba a traducir mentalmente de que tabla salia cada barra.
  */
 export const CLASES: Record<ClaseVencimiento, { label: string; plural: string; color: string }> = {
-  CERTIFICACION: { label: 'Certificacion', plural: 'Certificaciones que caducan', color: 'var(--serie-1)' },
-  OBLIGACION: { label: 'Obligacion', plural: 'Formaciones por hacer', color: 'var(--serie-2)' },
+  REPROGRAMAR: { label: 'Reprogramar', plural: 'Hay que volver a convocarlas', color: 'var(--serie-1)' },
+  PERSEGUIR: { label: 'Perseguir', plural: 'Nunca la han hecho', color: 'var(--serie-2)' },
 };
 
-/** '2026-09' -> 'sep 26'. En un calendario de doce meses el ano importa: hay dos eneros. */
+/** Segun que se dice que vence. Se enseña en la fila: un informe que no lo dice se discute. */
+export const FUENTES: Record<FuenteVencimiento, string> = {
+  PAPEL_DE_TERCERO: 'Papel de un tercero',
+  CONSTANCIA: 'Constancia propia',
+  OBLIGACION_ABIERTA: 'Plazo de la obligación',
+};
+
+/** '2026-09' -> 'sep 26'. En un calendario de doce meses el año importa: hay dos eneros. */
 export function nombreDeMes(clave: string): string {
   const [anio, mes] = clave.split('-').map(Number);
   if (!anio || !mes) return clave;

@@ -235,7 +235,7 @@ export default function ActividadDetallePage() {
   /** Publicar esto la exige sola a toda la empresa: hay que decirlo ANTES. */
   const seExigiraSola =
     activity !== null && quienDecide(readTypeConfig(activity.activityType.config)) === 'TODOS';
-  /** Una induccion de INGRESO no alcanza a quien ya lleva anos: su induccion se hizo al entrar. */
+  /** Una induccion de INGRESO no alcanza a quien ya lleva años: su induccion se hizo al entrar. */
   const esInduccionDeIngreso =
     activity !== null && readTypeConfig(activity.activityType.config).requiresBeforeHire;
 
@@ -860,7 +860,7 @@ export default function ActividadDetallePage() {
               </p>
               <p className="mt-1 text-sm text-ink-700">
                 {esInduccionDeIngreso
-                  ? 'Es una induccion de ingreso: cada persona que entre a partir de hoy la tendra automaticamente, y vencera el dia antes de su fecha de ingreso. A quien ya lleva tiempo en la empresa NO se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada ano es la reinduccion, que es otra formacion.'
+                  ? 'Es una induccion de ingreso: cada persona que entre a partir de hoy la tendra automaticamente, y vencera el dia antes de su fecha de ingreso. A quien ya lleva tiempo en la empresa NO se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada año es la reinduccion, que es otra formacion.'
                   : 'Se le exige a todo el mundo, tambien a quien ya esta, y a quien entre despues. A la plantilla actual se le dan 30 dias de plazo.'}{' '}
                 Se puede ajustar o retirar en Quienes.
               </p>

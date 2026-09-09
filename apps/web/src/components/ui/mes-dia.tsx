@@ -3,24 +3,24 @@
 import { Select } from './select';
 
 /**
- * LA FECHA DE UNA CAMPANA ANUAL: mes y dia, sin ano.
+ * LA FECHA DE UNA CAMPANA ANUAL: mes y dia, sin año.
  *
  * ─── POR QUE NO ES UN CALENDARIO ───
  *
- * Un calendario pide elegir UN dia de UN ano concreto, y esto no es una fecha: es un dia del ano
- * que se repite —"cada ano antes del 31 de marzo"—. Con un calendario habria que elegir 2026 y
- * despues ignorar el ano, que es peor que no tenerlo.
+ * Un calendario pide elegir UN dia de UN año concreto, y esto no es una fecha: es un dia del año
+ * que se repite —"cada año antes del 31 de marzo"—. Con un calendario habria que elegir 2026 y
+ * despues ignorar el año, que es peor que no tenerlo.
  *
  * ─── POR QUE NO ES UN CAMPO DE TEXTO ───
  *
  * Era un campo donde se escribia "03-31" a mano, y el tenant acabo con la reinduccion en `09-31`.
  * Septiembre tiene 30 dias. No fallaba nada —la fecha se desbordaba al mes siguiente en silencio—,
- * asi que la campana vencia el 1 de octubre mientras la pantalla seguia diciendo 09-31.
+ * asi que la campaña vencia el 1 de octubre mientras la pantalla seguia diciendo 09-31.
  *
  * Con dos listas, el 31 de septiembre **no existe para elegir**: los dias salen del mes. Es la
  * diferencia entre rechazar un error y hacerlo imposible.
  *
- * El 29 de febrero SI se puede elegir: es legitimo para una campana, y los anos que no son
+ * El 29 de febrero SI se puede elegir: es legitimo para una campaña, y los años que no son
  * bisiestos cae en el 28 (lo resuelve `nextFixedDate`).
  */
 const MESES = [
@@ -59,7 +59,7 @@ export function MesDia({ value, onChange, idBase, disabled }: MesDiaProps) {
     <div className="flex gap-2">
       <Select
         id={`${idBase}-mes`}
-        aria-label="Mes de la campana"
+        aria-label="Mes de la campaña"
         className="flex-1"
         value={String(mes)}
         disabled={disabled}
@@ -73,7 +73,7 @@ export function MesDia({ value, onChange, idBase, disabled }: MesDiaProps) {
       </Select>
       <Select
         id={`${idBase}-dia`}
-        aria-label="Dia de la campana"
+        aria-label="Dia de la campaña"
         className="w-24"
         value={String(Math.min(dia, maximo))}
         disabled={disabled}

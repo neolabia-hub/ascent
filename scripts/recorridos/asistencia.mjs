@@ -254,7 +254,7 @@ paso(7, 'SE TOMA LA ASISTENCIA: uno vino con su certificado, el otro no vino');
   EL VENCIMIENTO DEL PAPEL, A 30 DIAS, Y NO ES UN CAPRICHO.
 
   Es el mismo truco que usa `reinduccion-ciclos.mjs` con la recurrencia: se comprime lo que se puede
-  comprimir para no esperar un ano. La ventana en que nace la ronda siguiente esta fijada en 60
+  comprimir para no esperar un año. La ventana en que nace la ronda siguiente esta fijada en 60
   dias, asi que un papel que vence dentro de 30 la tiene abierta HOY. Si el papel manda de verdad,
   al empujar el motor tiene que nacer la ronda 2 venciendo el dia que dice el papel — y no dentro de
   doce meses, que es lo que dice la recurrencia del tipo. Es la unica forma de medir "manda el
@@ -378,7 +378,7 @@ comprobar(
 );
 comprobar(
   filaJust?.attendanceMethod === 'INSTRUCTOR',
-  'y COMO se marco: lista del instructor, el primero de los tres metodos que preve el diseno',
+  'y COMO se marco: lista del instructor, el primero de los tres metodos que preve el diseño',
   `metodo=${filaJust?.attendanceMethod}`,
 );
 const trasJustificar = (await suyas(elQueFalta.id)).filter((a) => ['PENDING', 'IN_PROGRESS', 'OVERDUE'].includes(a.status));

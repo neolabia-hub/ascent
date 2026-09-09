@@ -1,7 +1,7 @@
 # Bitacora de sprints — NEO PULSE
 
 Un documento por sprint. Cada uno responde lo mismo, para que cualquiera (incluido el equipo
-dentro de un ano) entienda que hay construido sin leer el codigo:
+dentro de un año) entienda que hay construido sin leer el codigo:
 
 1. **Objetivo y alcance** — que se propuso y que quedo FUERA a proposito.
 2. **Que se construyo** — modulos, endpoints y pantallas reales.
@@ -12,7 +12,7 @@ dentro de un ano) entienda que hay construido sin leer el codigo:
 | Sprint | Tema | Estado |
 |---|---|---|
 | [00](00-fundaciones.md) | Fundaciones: monorepo, datos, aislamiento multi-tenant, autenticacion | Terminado |
-| [01](01-administracion.md) | Administracion del tenant: catalogos, personas, aprobaciones, diseno | Terminado |
+| [01](01-administracion.md) | Administracion del tenant: catalogos, personas, aprobaciones, diseño | Terminado |
 | [02](02-catalogo-formativo.md) | Catalogo formativo: versionado, lecciones, evaluaciones | Terminado |
 | [03](03-convocatorias-asignaciones-plan.md) | Convocatorias, audiencias, asignaciones y plan anual | Terminado |
 | [04](04-experiencia-aprendiz.md) | Experiencia del aprendiz: PWA, reproductor de tarjetas, examenes, repaso y racha | Terminado |

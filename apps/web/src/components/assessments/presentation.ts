@@ -15,7 +15,7 @@
  *
  * Vive en la EVALUACION y no en su version: el color no es evidencia. Retocarlo no cambia que se
  * pregunto ni como se califico, asi que no puede exigir una version nueva ni poner en duda un
- * intento del ano pasado.
+ * intento del año pasado.
  */
 
 export type Accent = 'brand' | 'indigo' | 'teal' | 'violet' | 'amber' | 'rose';

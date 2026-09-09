@@ -176,7 +176,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
  * pantalla se vea distinta —eso seria cosmetica— sino las dos consecuencias que importan:
  *
  *   1. no se pregunta el plazo ni la recurrencia, porque no significan nada aqui: una capacitacion
- *      del plan vence el ultimo dia del mes que diga su renglon, y la del ano que viene es otro
+ *      del plan vence el ultimo dia del mes que diga su renglon, y la del año que viene es otro
  *      plan, no otra ronda de esta;
  *   2. y **no nace ninguna obligacion al guardar**. Antes nacia una por persona, y despues el plan
  *      creaba OTRA al aprobarse: cada quien acababa con dos obligaciones de la misma formacion,

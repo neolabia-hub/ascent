@@ -7,7 +7,7 @@ import { z } from 'zod';
  *
  * ─── COORDENADAS EN PORCENTAJE, NO EN MILIMETROS NI PIXELES ───
  *
- * El arte puede venir a cualquier resolucion: el mismo diseno exportado a 1000 px o a 4000 px es
+ * El arte puede venir a cualquier resolucion: el mismo diseño exportado a 1000 px o a 4000 px es
  * la misma constancia, y en porcentaje la posicion no cambia. Con pixeles habria que reposicionar
  * todo cada vez que alguien reexporta su imagen un poco mas grande.
  *

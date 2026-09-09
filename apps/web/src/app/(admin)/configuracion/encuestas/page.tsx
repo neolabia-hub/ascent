@@ -292,7 +292,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
           <Field
             htmlFor="s-dias"
             label="Se le pide al jefe a los"
-            hint="Antes de un mes nadie ha tenido ocasion de aplicar nada, y por eso 30 es el valor de manual."
+            ayuda="Antes de un mes nadie ha tenido ocasion de aplicar nada, y por eso 30 es el valor de manual."
           >
             <div className="flex items-center gap-2">
               <Input
@@ -312,7 +312,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
 
       {/*
         EL AVISO DE LA VERSION. Cambiar el texto de una pregunta SUBE la version, y lo ya respondido
-        se queda apuntando a la anterior: por eso una respuesta de hace un ano sigue explicandose.
+        se queda apuntando a la anterior: por eso una respuesta de hace un año sigue explicandose.
         Se dice aqui porque es la duda inmediata de quien va a corregir una redaccion.
       */}
       <p className="mt-5 rounded-lg border border-line bg-paper px-3.5 py-3 text-sm leading-relaxed text-ink-700">
@@ -508,7 +508,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: SurveyTemplate; onCerrar: 
             <div className="max-h-[560px] overflow-y-auto p-4">
               {/*
                 EL ENCABEZADO TAMBIEN, no solo las preguntas: es lo primero que se lee y lo que
-                explica por que aparece esto al terminar. Sin el, la vista previa ensenaba una lista
+                explica por que aparece esto al terminar. Sin el, la vista previa enseñaba una lista
                 de preguntas sueltas y no la pantalla de verdad.
               */}
               <div className="mb-4 text-center">

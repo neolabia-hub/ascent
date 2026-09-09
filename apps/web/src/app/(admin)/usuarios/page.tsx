@@ -1,7 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, Copy, Download, KeyRound, Pencil, Plus, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
+import {
+  Award,
+  BadgeCheck,
+  Copy,
+  Download,
+  KeyRound,
+  Pencil,
+  Plus,
+  Search,
+  ShieldCheck,
+  Upload,
+  UserRound,
+} from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createUser,
@@ -22,6 +34,7 @@ import {
 } from '@/lib/admin-api';
 import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
 import { ConstanciasDePersona } from '@/components/modules/admin/constancias-de-persona';
+import { PapelesDePersona } from '@/components/modules/admin/papeles-de-persona';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -103,6 +116,12 @@ export default function UsuariosPage() {
     primer gesto, asi que la descarga tiene que estar donde se acaba de encontrar a Juan.
   */
   const [constanciasDe, setConstanciasDe] = useState<UserRow | null>(null);
+  /*
+    Y LOS PAPELES DE UN TERCERO, en la misma pantalla y por el mismo motivo que las constancias: la
+    peticion llega con un NOMBRE delante —"acaba de llegar el certificado de alturas de Juan"— y
+    nunca con la jornada a la que fue. Ver `PapelesDePersona`.
+  */
+  const [papelesDe, setPapelesDe] = useState<UserRow | null>(null);
   const [editing, setEditing] = useState<UserRow | null>(null);
   /** Persona cuyas excepciones de permiso se estan revisando. */
   const [permissionsFor, setPermissionsFor] = useState<UserRow | null>(null);
@@ -409,7 +428,7 @@ export default function UsuariosPage() {
             <Table>
               <THead>
                 <Tr>
-                  <Th>Persona</Th>
+                  <Th>Nombre</Th>
                   <Th>Documento</Th>
                   <Th>Cargo</Th>
                   <Th>Area</Th>
@@ -446,6 +465,21 @@ export default function UsuariosPage() {
                         >
                           <Award size={14} />
                         </Button>
+                        {/*
+                          DOS PAPELES DISTINTOS, DOS BOTONES. El de al lado son las constancias que
+                          emite la EMPRESA; este, los certificados que emite un TERCERO —la ARL— y
+                          que llegan dias despues de la jornada. Juntarlos en un solo cajon obligaria
+                          a explicar la diferencia dentro; separados, cada icono la dice.
+                        */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPapelesDe(user)}
+                          aria-label={`Papeles de un tercero de ${user.fullName}`}
+                          title="Papel de un tercero: registrar el certificado que llego despues"
+                        >
+                          <BadgeCheck size={14} />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -479,6 +513,15 @@ export default function UsuariosPage() {
           />
         </div>
       )}
+
+      <PapelesDePersona
+        userId={papelesDe?.id ?? null}
+        nombre={papelesDe?.fullName ?? ''}
+        open={papelesDe !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setPapelesDe(null);
+        }}
+      />
 
       <ConstanciasDePersona
         userId={constanciasDe?.id ?? null}
@@ -663,7 +706,7 @@ export default function UsuariosPage() {
                           onChange={setScopeAreaIds}
                         />
                         <p className="mt-1 text-xs text-ink-500">
-                          Incluye los procesos que se creen manana en esas areas.
+                          Incluye los procesos que se creen mañana en esas areas.
                         </p>
                       </div>
 
@@ -755,7 +798,7 @@ export default function UsuariosPage() {
         <div className="space-y-3 text-sm text-ink-700">
           <p>
             <span className="font-medium text-ink-900">La contrasena actual dejara de funcionar</span> y se cerraran
-            todas sus sesiones. La nueva se ensena <span className="font-medium text-ink-900">una sola vez</span>:
+            todas sus sesiones. La nueva se enseña <span className="font-medium text-ink-900">una sola vez</span>:
             copiala antes de cerrar, porque despues no se puede volver a ver.
           </p>
           <p className="rounded-lg bg-paper px-3 py-2 text-ink-500">

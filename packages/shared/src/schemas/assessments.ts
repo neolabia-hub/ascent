@@ -146,7 +146,7 @@ const orderQuestionSchema = z
 /**
  * EMPAREJAR (Decision #86).
  *
- * Senal <-> significado, EPP <-> riesgo, extintor <-> tipo de fuego. Cubre en una pregunta lo que
+ * Señal <-> significado, EPP <-> riesgo, extintor <-> tipo de fuego. Cubre en una pregunta lo que
  * hoy son seis sueltas, y ademas se responde razonando por descarte sobre el conjunto, que es
  * mas parecido a lo que se hace en el puesto.
  */

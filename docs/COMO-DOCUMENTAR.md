@@ -11,7 +11,7 @@ Se evaluaron las dos formas:
 
 | | Por modulo (`docs/modulos/usuarios.md`) | **Por concepto de negocio** (elegida) |
 |---|---|---|
-| Estabilidad | Los modulos se parten, se renombran, se fusionan | Los conceptos duran anos: "asignacion" significara lo mismo en 2030 |
+| Estabilidad | Los modulos se parten, se renombran, se fusionan | Los conceptos duran años: "asignacion" significara lo mismo en 2030 |
 | Duplicacion | Un concepto como "asignacion" toca 4 modulos: se explica 4 veces y se desincroniza | Se explica una vez |
 | Riesgo real | Se convierte en un espejo del codigo, y un espejo desactualizado es peor que nada | Explica el POR QUE, que el codigo no cuenta |
 | Publico | Solo sirve a quien ya programa | Sirve al cliente, al analista funcional y al programador |
@@ -33,8 +33,8 @@ codigo, lo cuenta el codigo (y sus comentarios, que si viven pegados a el).
 | `docs/sprints/NN-*.md` | Que se hizo en un sprint y como se verifico | Historica: envejece |
 
 RUNBOOK y HANDOFF se parecen y no son lo mismo: el RUNBOOK guarda lo que hay que **saber para
-operar** (un comando, una credencial, una trampa que costo una tarde) y sirve dentro de un ano; el
-HANDOFF guarda **en que punto se quedo el trabajo** y sirve, sobre todo, manana. Si dudas: ¿lo
+operar** (un comando, una credencial, una trampa que costo una tarde) y sirve dentro de un año; el
+HANDOFF guarda **en que punto se quedo el trabajo** y sirve, sobre todo, mañana. Si dudas: ¿lo
 volveria a necesitar alguien que no estuvo en esa sesion? RUNBOOK. ¿Solo sirve para retomar el
 hilo? HANDOFF.
 
@@ -60,7 +60,7 @@ cliente, literal), `docs/research/` (las investigaciones con sus fuentes),
 | Cambia **como se opera** (comando, puerto, credencial) | `RUNBOOK.md` |
 | Se **cierra un sprint** | `docs/sprints/NN-*.md` nuevo + estado en `CLAUDE.md` seccion 0 |
 | Se **descubre deuda tecnica** | Tabla de deuda de `arquitectura.md`, con criticidad honesta |
-| Se decide **no hacer algo** | Se escribe igual, con el por que. Lo descartado explica el diseno tanto como lo hecho |
+| Se decide **no hacer algo** | Se escribe igual, con el por que. Lo descartado explica el diseño tanto como lo hecho |
 | **Termina una sesion de trabajo** | Entrada nueva arriba en `HANDOFF.md`: que se hizo, como se verifico (resultados reales) y que queda abierto |
 
 ---

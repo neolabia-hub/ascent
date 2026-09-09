@@ -45,7 +45,7 @@ export interface ModalProps {
  *
  * El cajon derecho es para EDITAR: aparece al lado, deja ver la lista detras y uno guarda y sigue.
  * Eso lo hace bueno para formularios y malo para consultar, porque secuestra la mitad derecha de la
- * pantalla para ensenar dos parrafos.
+ * pantalla para enseñar dos parrafos.
  *
  * Esto es lo contrario: se abre en el centro, se lee y se cierra. Se usa para lo que hace falta una
  * vez al trimestre —el objetivo del plan, su alcance— y que hasta ahora ocupaba sitio fijo en una
@@ -78,7 +78,7 @@ export function Modal({
           del buscador al abrirse, y el mismo recurso que usan las hojas de iOS y de Apple TV.
 
           El velo sigue siendo suave (30%): con el desenfoque no hace falta oscurecer mas, y una
-          pantalla casi negra detras de una ventana pequena se siente pesada.
+          pantalla casi negra detras de una ventana pequeña se siente pesada.
         */}
         <Dialog.Overlay
           className={cn(
@@ -106,7 +106,7 @@ export function Modal({
 
             NO lleva el borde aurora del buscador: ese halo significa una cosa concreta en este
             producto —ahi hay busqueda inteligente— y prestarselo a una ventana de solo lectura lo
-            vaciaria de significado. Un lenguaje visual sirve mientras cada senal signifique una
+            vaciaria de significado. Un lenguaje visual sirve mientras cada señal signifique una
             sola cosa.
           */}
           <div className="flex items-start justify-between gap-4 rounded-t-2xl border-b border-line bg-paper px-6 py-4">

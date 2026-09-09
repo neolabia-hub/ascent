@@ -16,6 +16,19 @@ export const PERMISSIONS = [
   'offerings:manage',
   'offerings:publish',
   'attendance:take',
+  /*
+    FIRMAR LA PROPIA ASISTENCIA (2026-09-08, mecanismos 2 y 3 de la evidencia).
+
+    Es de TODO usuario autenticado y sobre lo SUYO: escanear el QR de la sesion o firmar en su
+    telefono. Va aparte de attendance:take —que es tomar la lista de los demas— porque son dos
+    potestades distintas: quien firma su asistencia no puede marcar la de nadie mas, y quien toma la
+    lista no lo necesita para hacerlo.
+
+    El servidor no se fia solo del permiso: cada operacion escribe sobre la persona de la SESION y
+    nunca sobre la que venga en el cuerpo. Un permiso 'de todos' que ademas dejara elegir a quien
+    marcar seria un permiso de instructor con otro nombre.
+  */
+  'attendance:sign',
   'enrollments:read_all',
   'enrollments:read_scope',
   'enrollments:read_own',
@@ -84,6 +97,7 @@ export const SEED_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]> = 
     'offerings:read',
     'offerings:manage',
     'attendance:take',
+    'attendance:sign',
     'enrollments:read_scope',
     'enrollments:unblock',
     'assignments:manage',
@@ -96,5 +110,5 @@ export const SEED_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]> = 
     'performance:read_own',
   ],
   // Consulta y realiza lo asignado. Lo suyo de desempeno tambien es suyo.
-  USUARIO: ['enrollments:read_own', 'performance:read_own'],
+  USUARIO: ['enrollments:read_own', 'performance:read_own', 'attendance:sign'],
 } as const;

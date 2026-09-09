@@ -774,6 +774,10 @@ model Activity {
   /// asistencia el dia de la jornada.
   tracksExternalCertificate Boolean? @map("tracks_external_certificate")
 
+  /// ¿Se puede dar por cumplida con una certificacion PREVIA de otra empresa? (via C, 2.3).
+  /// `NULL` = lo que diga su tipo, que es el caso normal. Misma cascada que la de arriba.
+  admiteConvalidacion       Boolean? @map("admite_convalidacion")
+
   versions    ActivityVersion[]       @relation("ActivityVersions")
   norms       ActivityNorm[]
   services    ActivityService[]
@@ -1284,6 +1288,28 @@ model Assignment {
   /// lo lee para saber desde cuando contar la ronda siguiente— y la obligacion es la fila que el
   /// auditor ya rastrea. `null` es lo normal: sin papel, manda la recurrencia.
   validUntilOverride DateTime? @map("valid_until_override")
+
+  /// CONVALIDADA: la hizo en otro empleo y aqui se acepto su papel (via C, `PENDIENTES` 2.3).
+  ///
+  /// No hay inscripcion porque no hubo jornada —`enrollments.offering_id` es obligatorio— asi que el
+  /// papel vive AQUI. La obligacion es la unica fila que existe sin jornada, y ademas es la que el
+  /// auditor rastrea y la que el motor lee para saber cuando vuelve a deberse.
+  ///
+  /// CONVALIDAR NO ES EXIMIR. La obligacion queda COMPLETED, porque lo esta: la formacion se hizo,
+  /// en otro sitio. `WAIVED` significa "la dejamos pasar" y es otra cosa — meterlas en la misma
+  /// columna obligaria a leer un texto libre para saber cual de las dos fue, y ningun informe puede.
+  ///
+  /// La vigencia NO se duplica: la sigue llevando `validUntilOverride`, que ya significa "hasta
+  /// cuando vale de verdad cuando lo dice un papel".
+  extCertIssuer      String? @map("ext_cert_issuer")
+  extCertNumber      String? @map("ext_cert_number")
+  extCertFileKey     String? @map("ext_cert_file_key")
+
+  /// Quien acepto el papel ajeno y por que. Aceptarlo es un juicio sobre un documento —¿lo expidio
+  /// un organismo acreditado? ¿sigue vigente? ¿cubre lo mismo?— y esa decision tiene nombre y fecha,
+  /// como todo lo que en este producto sustituye a una evidencia propia.
+  convalidatedBy     String? @map("convalidated_by") @db.Uuid
+  convalidatedReason String? @map("convalidated_reason")
 
   // Enlace asignacion -> ejecucion que la satisfizo (Decision #2: se enlazan, no se fusionan).
   completedEnrollmentId String?   @map("completed_enrollment_id") @db.Uuid

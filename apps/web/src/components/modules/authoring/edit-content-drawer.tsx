@@ -199,7 +199,7 @@ export function EditContentDrawer({
             <Field
               htmlFor="ec-pct"
               label="Minimo visto para darlo por hecho"
-              hint="Se cuentan los segundos distintos reproducidos: adelantar no suma. Con un video de otra plataforma que no se pueda medir, queda como declaracion de la persona."
+              ayuda="Se cuentan los segundos distintos reproducidos: adelantar no suma. Con un video de otra plataforma que no se pueda medir, queda como declaracion de la persona."
             >
               <Input
                 id="ec-pct"

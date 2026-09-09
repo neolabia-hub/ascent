@@ -37,7 +37,7 @@ export default function LearnerActivityPage() {
         if (cancelled) return;
         const encontrada = pendientes.items.find((item) => item.activityId === activityId) ?? null;
 
-        // Si ya esta empezada, no hay nada que ensenar aqui: se entra directamente a ella.
+        // Si ya esta empezada, no hay nada que enseñar aqui: se entra directamente a ella.
         if (encontrada?.enrollmentId) {
           router.replace(`/aprender/${encontrada.enrollmentId}`);
           return;

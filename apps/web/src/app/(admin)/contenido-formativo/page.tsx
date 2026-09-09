@@ -131,7 +131,7 @@ export default function ContenidoFormativoPage() {
     void listCatalog('processes').then((rows) => {
       // SOLO LOS PROCESOS QUE ESTA PERSONA PUEDE USAR.
       //
-      // El desplegable ensenaba los 13 de la empresa a quien solo puede crear en el suyo, y el
+      // El desplegable enseñaba los 13 de la empresa a quien solo puede crear en el suyo, y el
       // servidor rechazaba el guardado con un generico "revisa los campos" que no decia cual.
       // Ofrecer una opcion que va a fallar es peor que no ofrecerla: el error llega tarde, en
       // otro idioma y sin senalar el campo.
@@ -390,7 +390,7 @@ export default function ContenidoFormativoPage() {
           {/*
             EL CODIGO, PLEGADO. Es obligatorio y no se puede cambiar despues, pero ya viene
             propuesto desde el nombre y casi nadie lo toca: tenerlo abierto le cobra a todo el
-            mundo un campo que solo le importa a quien tiene una nomenclatura propia. Se ensena
+            mundo un campo que solo le importa a quien tiene una nomenclatura propia. Se enseña
             siempre cual quedo —plegado no es escondido— y se abre de un clic.
           */}
           {form.codeOpen ? (

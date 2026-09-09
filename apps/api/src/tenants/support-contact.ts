@@ -28,7 +28,7 @@ export interface PlatformSupport {
  * los tres haria que una empresa que solo quiere publicar una extension cayera al respaldo sin
  * enterarse, y veria salir un contacto ajeno en su propia pantalla de ingreso.
  *
- * Devuelve `null` cuando no hay ninguno de los dos: entonces la pantalla no ensena una tarjeta de
+ * Devuelve `null` cuando no hay ninguno de los dos: entonces la pantalla no enseña una tarjeta de
  * contacto vacia, solo el boton de avisar.
  */
 export function resolverContactoDeAyuda(settings: unknown, plataforma: PlatformSupport): SupportContact | null {

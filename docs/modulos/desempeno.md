@@ -90,8 +90,8 @@ performance_forms             La plantilla
 performance_form_items        Que competencias lleva y con que peso
 performance_form_job_titles   A que cargos aplica (vacio = es el general)
   |
-performance_cycles            Desempeno 2026: fechas y reglas de la campana
-performance_cycle_forms       QUE FORMULARIOS lleva la campana, cada uno CONGELADO al abrir
+performance_cycles            Desempeno 2026: fechas y reglas de la campaña
+performance_cycle_forms       QUE FORMULARIOS lleva la campaña, cada uno CONGELADO al abrir
   |
 performance_reviews           UNA evaluacion: ciclo + formulario + persona + evaluador + rol
   |                           (SELF | MANAGER), estado, nota, y la firma (signed_at / signed_ip)

@@ -42,7 +42,7 @@ export function describeDueDate(value: string | null | undefined, now: Date = ne
   const days = Math.round((startOfDay(due) - startOfDay(now)) / (24 * 60 * 60 * 1000));
 
   if (days === 0) return 'Vence hoy';
-  if (days === 1) return 'Vence manana';
+  if (days === 1) return 'Vence mañana';
   if (days > 1) return `Vence en ${days} dias`;
   if (days === -1) return 'Vencio ayer';
   return `Vencio hace ${Math.abs(days)} dias`;

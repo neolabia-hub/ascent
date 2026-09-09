@@ -58,6 +58,8 @@ export interface ActivityDetail extends Omit<ActivityListItem, 'versions'> {
    * cosas: la charla de la ARL que no certifica nada y el curso de alturas que si.
    */
   tracksExternalCertificate: boolean | null;
+  /** Acepta certificacion previa de otra empresa. null = lo que diga su tipo (via C, 2.3). */
+  admiteConvalidacion: boolean | null;
   /** Portada subida. `null` = se pinta la generada, que es un estado normal (Decision #88). */
   coverKey: string | null;
   responsibleUserId: string | null;
@@ -336,7 +338,7 @@ export interface QuestionPayloadClient {
   correctOrder?: string[];
   /** MATCH: las dos columnas, ya emparejadas. Al servir se barajan. */
   pairs?: Array<{ id: string; left: string; right: string }>;
-  /** NUMERIC: el numero, su margen y la unidad que se ensena junto al campo. */
+  /** NUMERIC: el numero, su margen y la unidad que se enseña junto al campo. */
   correctNumber?: number;
   tolerance?: number;
   unit?: string;
@@ -552,7 +554,7 @@ export interface UploadedPresentation extends UploadedPackage {
 
 /**
  * Sube una presentacion. El servidor la CONVIERTE en una imagen por diapositiva antes de
- * responder, asi que esta llamada tarda —de 5 a 30 segundos segun el tamano— y la pantalla tiene
+ * responder, asi que esta llamada tarda —de 5 a 30 segundos segun el tamaño— y la pantalla tiene
  * que decirlo. A cambio, lo que queda se reproduce y se mide como cualquier otra parte.
  */
 export async function uploadPresentation(file: File): Promise<UploadedPresentation> {

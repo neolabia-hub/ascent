@@ -40,7 +40,7 @@ export const ESTADOS_RETIRADOS = ['WITHDRAWN_LEFT_AUDIENCE', 'WITHDRAWN_PLAN_ITE
  *
  * MEDIDO el 2026-09-05 con `asistencia.mjs`: 5 obligaciones, 3 pendientes de verdad, y el informe
  * decia 4 terminadas. En produccion es la reinduccion de 796 personas figurando hecha el 2 de enero
- * de cada ano, y nadie reclama un numero que le favorece.
+ * de cada año, y nadie reclama un numero que le favorece.
  *
  * Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como "sin empezar"— pero
  * al reves: aquel inflaba el incumplimiento y este infla el CUMPLIMIENTO.
@@ -116,7 +116,7 @@ export interface EntradaDeEstado {
    *
    * `EXPIRED_NOT_DONE` y `WAIVED` son estados TERMINALES escritos por el motor y por quien exime, y
    * no dejan ninguna huella en la inscripcion —quien nunca empezo no tiene inscripcion ninguna—.
-   * Sin esto los dos caian en `SIN_EMPEZAR`, que dice justo lo contrario de lo que son: una campana
+   * Sin esto los dos caian en `SIN_EMPEZAR`, que dice justo lo contrario de lo que son: una campaña
    * cerrada sin hacer no es "todavia no la ha empezado", y una eximida no es trabajo pendiente.
    *
    * Opcional para no obligar a tocar a quien solo pregunta por el plazo y la inscripcion.
@@ -203,7 +203,7 @@ export interface ResumenEjecucion {
   /** Eximidas con motivo. Ni cumplimiento ni incumplimiento: fuera del porcentaje. */
   eximidas: number;
   /**
-   * AVANCE = terminadas / (total - eximidas). Es el numero que se ensena arriba.
+   * AVANCE = terminadas / (total - eximidas). Es el numero que se enseña arriba.
    *
    * Las que ESPERAN convocatoria SI cuentan en el denominador, y esa es la decision dificil.
    * Sacarlas daria un porcentaje mas bonito —y falso—: si de cien personas cincuenta no han sido

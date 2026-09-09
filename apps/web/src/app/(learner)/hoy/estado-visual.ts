@@ -24,7 +24,7 @@ export interface EstadoVisual {
  * 2. **En esta pantalla lo atrasado NO es la excepcion, es medio catalogo.** Un color de alarma
  *    que sale en la mitad de las tarjetas deja de alarmar y solo consigue que la pantalla se vea
  *    hostil. Si todo grita, nada avisa.
- * 3. **Le grita a quien menos culpa tiene.** Quien abre esto a las seis de la manana es el que si
+ * 3. **Le grita a quien menos culpa tiene.** Quien abre esto a las seis de la mañana es el que si
  *    entro; los que no entraron no estan mirando.
  *
  * En su lugar, ambar (--warn) y una frase con el numero de dias. Avisa igual y no acusa.

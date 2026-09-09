@@ -38,6 +38,8 @@ export const createActivitySchema = z.object({
    * ARL que no certifica nada y el curso de alturas que si.
    */
   tracksExternalCertificate: z.boolean().nullable().optional(),
+  /** ¿Acepta certificacion previa de otra empresa? Vacio = lo que diga su tipo (via C, 2.3). */
+  admiteConvalidacion: z.boolean().nullable().optional(),
 });
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 

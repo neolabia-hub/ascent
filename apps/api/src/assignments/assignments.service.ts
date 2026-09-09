@@ -83,7 +83,7 @@ export class AssignmentsService {
       if (yaParaTodos && ruleReachesEveryone(this.audiences.parseRule(yaParaTodos.audience.rule))) {
         throw new ConflictException({
           code: 'ALREADY_REQUIRED_FOR_ALL',
-          message: 'Esta formacion ya se le exige a toda la empresa: ajusta el requisito que existe.',
+          message: 'Esta formación ya se le exige a toda la empresa: ajusta el requisito que existe.',
         });
       }
     }
@@ -167,7 +167,7 @@ export class AssignmentsService {
   /**
    * LA MATRIZ DE INDUCCIONES: que formacion de puesto le toca a cada cargo.
    *
-   * Es el documento que la empresa ensena en una auditoria, y por eso la pantalla se parece a el.
+   * Es el documento que la empresa enseña en una auditoria, y por eso la pantalla se parece a el.
    * Cada casilla encendida es, por debajo, una audiencia de ese cargo y un requisito de ingreso.
    *
    * ─── SOLO LAS QUE SE DECIDEN POR CARGO (2026-09-03) ───
@@ -281,7 +281,7 @@ export class AssignmentsService {
    *      formacion es del plan; la matriz mandaba ON_HIRE a pelo. Comprobado contra la base:
    *      marcar una casilla de una capacitacion del plan creaba un requisito que disparaba solo y
    *      **hacia nacer 143 obligaciones de golpe**, que es exactamente lo que esa decision existe
-   *      para impedir. Ahora la matriz solo ensena formaciones por cargo, pero la puerta no puede
+   *      para impedir. Ahora la matriz solo enseña formaciones por cargo, pero la puerta no puede
    *      quedar abierta: una llamada directa a la API no mira lo que la pantalla ofrece.
    *   2. **El plazo.** La ficha manda -1 —D1072 exige que la induccion sea PREVIA al ingreso— y la
    *      pantalla de la matriz mandaba 0. La misma casilla valia una cosa u otra segun por donde
@@ -477,7 +477,7 @@ export class AssignmentsService {
      * evitar.
      *
      * El plazo se fuerza a 0 y la recurrencia a null porque no significan nada en este caso: una
-     * capacitacion del plan vence el ultimo dia del mes que diga su renglon, y la del ano que
+     * capacitacion del plan vence el ultimo dia del mes que diga su renglon, y la del año que
      * viene es otro plan, no otra ronda de esta.
      */
     const config = await this.typeConfigOf(input.activityId);
@@ -492,14 +492,14 @@ export class AssignmentsService {
     });
 
     // Dos formas de repetir, y solo una a la vez: "cada N meses desde que la completo" (rodante)
-    // o "cada ano en esta fecha" (campana anual, que es como las empresas hacen la reinduccion).
+    // o "cada año en esta fecha" (campaña anual, que es como las empresas hacen la reinduccion).
     //
     // `onExpiry` viaja con la recurrencia porque es donde el motor la lee, pero la decide el TIPO:
     // que pasa cuando llega la ronda siguiente y la anterior no se hizo es politica de la empresa.
     const onExpiry = config.defaultOnExpiry ?? 'ESPERA';
     // Igual que `onExpiry`: lo decide el TIPO y viaja con la recurrencia, que es donde el motor lo
     // lee. Quien ingreso hace menos de N meses no entra al ciclo — su induccion es su actualizacion
-    // de ese ano (ver `exemptRecentHiresMonths` en el esquema del tipo).
+    // de ese año (ver `exemptRecentHiresMonths` en el esquema del tipo).
     const exemptRecentHiresMonths = config.exemptRecentHiresMonths ?? 0;
     const recurrence = esDelPlan
       ? null
@@ -548,7 +548,7 @@ export class AssignmentsService {
       */
       /*
         Y SOLO SI ESTA EN VIGOR. Un requisito RETIRADO no se le exige hoy a nadie: la ficha no lo
-        ensena y la matriz lo pinta apagado, asi que volver a encenderlo es declarar, no modificar.
+        enseña y la matriz lo pinta apagado, asi que volver a encenderlo es declarar, no modificar.
         Pedir novedad ahi era pedir explicaciones por cambiar algo que la pantalla dice que no
         existe — lo destapo la comprobacion automatica, que se comio un 400 al marcar tres cargos
         de los que uno se habia retirado en una corrida anterior.
@@ -582,10 +582,10 @@ export class AssignmentsService {
       /*
         EL DISPARADOR no entra en `updateRule` (no se edita desde Asignaciones), pero aqui SI puede
         haber cambiado: pasar de "al ingresar" a "desde ya" es justo lo que hace falta cuando la
-        formacion empieza a exigirse a gente que lleva anos en la empresa.
+        formacion empieza a exigirse a gente que lleva años en la empresa.
 
         Y AL HACERLO SE LEVANTA EL "SOLO A QUIEN ENTRE DESDE AHORA" (2026-09-03). Ese corte se pone
-        solo al publicar una induccion de INGRESO, y significa "a quien lleva siete anos no se le
+        solo al publicar una induccion de INGRESO, y significa "a quien lleva siete años no se le
         pide repetir lo que hizo al entrar". En el momento en que alguien cambia el disparador a
         "al entrar al grupo", esta diciendo lo contrario con todas las letras: que ahora se le exige
         a la gente que ya esta. Dejar el corte puesto convertia ese cambio en un boton que no hacia

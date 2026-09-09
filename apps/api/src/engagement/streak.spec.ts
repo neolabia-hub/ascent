@@ -22,7 +22,7 @@ describe('racha', () => {
     expect(result).toMatchObject({ currentStreak: 3, outcome: 'SAME_DAY' });
   });
 
-  it('completar a las 11 de la noche cuenta como HOY, no como manana', () => {
+  it('completar a las 11 de la noche cuenta como HOY, no como mañana', () => {
     // Sin leer la fecha civil de Colombia, las 23:30 se guardarian como el dia siguiente en UTC
     // y regalarian un dia de racha.
     const result = advanceStreak(base, at('2026-08-27T23:30:00'));

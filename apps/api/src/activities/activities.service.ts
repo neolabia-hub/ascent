@@ -114,7 +114,7 @@ export class ActivitiesService {
 
     // Si no se dice quien responde, responde el del PROCESO. Es un paso menos al crear y ademas
     // la respuesta correcta casi siempre: quien lleva SARLAFT responde por sus capacitaciones.
-    // Se guarda el valor, no la referencia: cambiar el responsable del proceso manana no debe
+    // Se guarda el valor, no la referencia: cambiar el responsable del proceso mañana no debe
     // reescribir en silencio quien respondia por lo que ya existe.
     let responsibleUserId = input.responsibleUserId ?? null;
     if (!responsibleUserId) {
@@ -142,6 +142,7 @@ export class ActivitiesService {
             // es el caso normal. El esquema lo aceptaba y este `data` lo ignoraba en silencio:
             // crear una formacion diciendo que la acredita un tercero no guardaba nada.
             tracksExternalCertificate: input.tracksExternalCertificate,
+            admiteConvalidacion: input.admiteConvalidacion,
             createdBy: actor.id,
             updatedBy: actor.id,
           },
@@ -210,10 +211,11 @@ export class ActivitiesService {
             `nullable` en el zod y no se colapsa a booleano.
 
             NO se congela en la version, al reves que `issuesCertificate`: aquello queda estampado en
-            un papel que hay que poder explicar dentro de dos anos, y esto solo decide que campos
+            un papel que hay que poder explicar dentro de dos años, y esto solo decide que campos
             pide la lista de asistencia el dia de la jornada.
           */
           tracksExternalCertificate: input.tracksExternalCertificate,
+          admiteConvalidacion: input.admiteConvalidacion,
           // La PORTADA no se congela con la version (Decision #88): una foto no es evidencia, asi
           // que cambiarla no puede costar publicar la formacion de nuevo.
           coverKey: input.coverKey,
@@ -235,7 +237,7 @@ export class ActivitiesService {
     return this.getById(actor, id);
   }
 
-  /** Baja logica: el historico formativo debe sobrevivir (retencion 20 anos, Decision #16). */
+  /** Baja logica: el historico formativo debe sobrevivir (retencion 20 años, Decision #16). */
   async softDelete(actor: AuthUser, id: string) {
     const activity = await this.prisma.scoped.activity.findFirst({ where: { id, deletedAt: null } });
     if (!activity || !scopeAllows(actor.scopeProcessIds, activity.processId)) {
@@ -399,7 +401,7 @@ export class ActivitiesService {
     if (!sameSize || !allBelong) {
       throw new ConflictException({
         code: 'REORDER_MISMATCH',
-        message: 'La lista debe contener exactamente los contenidos de esta version.',
+        message: 'La lista debe contener exactamente los contenidos de esta versión.',
       });
     }
 

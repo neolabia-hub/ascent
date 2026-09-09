@@ -3,6 +3,8 @@ import { AuditService } from '../common/audit.service.js';
 import { AssignmentsController } from './assignments.controller.js';
 import { AssignmentsService } from './assignments.service.js';
 import { AudiencesService } from './audiences.service.js';
+import { ConvalidacionController } from './convalidacion.controller.js';
+import { ConvalidacionService } from './convalidacion.service.js';
 import { RequirementEngineService } from './requirement-engine.service.js';
 
 /**
@@ -11,8 +13,8 @@ import { RequirementEngineService } from './requirement-engine.service.js';
  */
 @Global()
 @Module({
-  controllers: [AssignmentsController],
-  providers: [AssignmentsService, AudiencesService, RequirementEngineService, AuditService],
+  controllers: [AssignmentsController, ConvalidacionController],
+  providers: [AssignmentsService, AudiencesService, ConvalidacionService, RequirementEngineService, AuditService],
   exports: [AssignmentsService, AudiencesService, RequirementEngineService],
 })
 export class AssignmentsModule {}

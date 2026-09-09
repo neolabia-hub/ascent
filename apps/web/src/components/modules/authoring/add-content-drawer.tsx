@@ -467,7 +467,7 @@ export function AddContentDrawer({
               htmlFor="c-file"
               label="Archivo"
               required
-              hint="Manual, politica o instructivo. Si lo que quieres es que lo CURSEN, usa Presentacion o Leccion: de un documento solo se registra que la persona confirmo haberlo leido."
+              ayuda="Manual, politica o instructivo. Si lo que quieres es que lo CURSEN, usa Presentacion o Leccion: de un documento solo se registra que la persona confirmo haberlo leido."
             >
               <label
                 htmlFor="c-file"
@@ -495,7 +495,7 @@ export function AddContentDrawer({
               <Field
                 htmlFor="c-url"
                 label="O enlace de YouTube o Vimeo"
-                hint="De YouTube se mide lo reproducido, igual que de un archivo propio. De Vimeo y del resto no: quedan como declaracion de la persona."
+                ayuda="De YouTube se mide lo reproducido, igual que de un archivo propio. De Vimeo y del resto no: quedan como declaracion de la persona."
               >
                 <Input
                   id="c-url"

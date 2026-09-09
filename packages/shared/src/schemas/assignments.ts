@@ -60,7 +60,7 @@ export const ruleTriggerSchema = z.enum(['ON_JOIN', 'ON_HIRE', 'SCHEDULED', 'PLA
 /**
  * Recurrencia del requisito (Decision #12). Dos anclajes, ambos reales en la operacion:
  *   everyMonths -> "cada 12 meses desde que la persona la completo" (reinduccion, carne BPM).
- *   fixedDate   -> "todos los anos antes del 31 de enero" (capacitacion anual SARLAFT).
+ *   fixedDate   -> "todos los años antes del 31 de enero" (capacitacion anual SARLAFT).
  * `windowDays` es con cuanta antelacion nace la ronda siguiente, para que aparezca en los
  * pendientes con tiempo y no el mismo dia del vencimiento.
  */
@@ -71,13 +71,13 @@ export const ruleTriggerSchema = z.enum(['ON_JOIN', 'ON_HIRE', 'SCHEDULED', 'PLA
  *
  *   CIERRA     la anterior se cierra como NO REALIZADA —queda en el historial como incumplimiento
  *              de ese periodo— y la nueva nace para todos. Una sola obligacion viva a la vez. Es
- *              como funciona el cumplimiento por CALENDARIO: cada campana es su periodo, y el
- *              periodo cierra. Es lo que pregunta el auditor, ano por ano.
+ *              como funciona el cumplimiento por CALENDARIO: cada campaña es su periodo, y el
+ *              periodo cierra. Es lo que pregunta el auditor, año por año.
  *   ACUMULA    la anterior sigue pendiente Y nace la nueva: la persona debe las dos. Para quien
- *              exige ponerse al dia antes de seguir. A los tres anos debe tres.
+ *              exige ponerse al dia antes de seguir. A los tres años debe tres.
  *   ESPERA     no nace la siguiente hasta que haga la anterior. Era lo unico que habia, y tiene un
  *              efecto que casi nadie quiere: quien nunca la hace desaparece del denominador de los
- *              anos siguientes, asi que el peor incumplidor sale de la cuenta y la cobertura se ve
+ *              años siguientes, asi que el peor incumplidor sale de la cuenta y la cobertura se ve
  *              mejor de lo que es.
  */
 export const onExpirySchema = z.enum(['CIERRA', 'ACUMULA', 'ESPERA']);
@@ -90,7 +90,7 @@ export const recurrenceSchema = z
     windowDays: z.number().int().min(0).max(365).default(60),
     /**
      * Por defecto ESPERA para no cambiarle el comportamiento a lo que ya existe. Los tipos que son
-     * campana anual lo traen puesto en `defaultOnExpiry` y llega aqui al crear el requisito.
+     * campaña anual lo traen puesto en `defaultOnExpiry` y llega aqui al crear el requisito.
      */
     onExpiry: onExpirySchema.default('ESPERA'),
     /**
@@ -181,7 +181,7 @@ export const setActivityRequirementSchema = z
     /** "Se repite cada N meses" (reinduccion). Null = una sola vez. */
     everyMonths: z.number().int().min(1).max(120).nullable().default(null),
     /**
-     * "Cada ano antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`, y la forma en que las
+     * "Cada año antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`, y la forma en que las
      * empresas hacen de verdad la reinduccion: una CAMPANA anual, no un aniversario por persona.
      *
      * La diferencia importa al arrancar el sistema: con "cada 12 meses" la fecha de todos queda
@@ -248,7 +248,7 @@ export const assignmentStatusSchema = z.enum([
   'WAIVED',
   /**
    * Cerro el periodo y no la hizo. A diferencia de RETIRADA y EXIMIDA, esta **SI cuenta como
-   * incumplimiento** de ese periodo: es lo que permite que una campana anual pase de ano sin
+   * incumplimiento** de ese periodo: es lo que permite que una campaña anual pase de año sin
    * perder de vista a quien no la hizo. Ver `onExpirySchema`.
    */
   'EXPIRED_NOT_DONE',

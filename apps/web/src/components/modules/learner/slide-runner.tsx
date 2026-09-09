@@ -196,7 +196,7 @@ export function SlideRunner({
               /*
                 La previsualizacion se ACOTA a los bordes de la pista. Centrada a secas, en la
                 primera y en la ultima la mitad se salia y la lamina se veia estrecha y recortada:
-                lo que fallaba no era el tamano, era que no cabia.
+                lo que fallaba no era el tamaño, era que no cabia.
               */
               <span
                 className="pointer-events-none absolute bottom-[46px] z-30 flex -translate-x-1/2 flex-col items-center gap-1"

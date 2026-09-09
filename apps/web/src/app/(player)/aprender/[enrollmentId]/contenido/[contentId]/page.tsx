@@ -172,12 +172,12 @@ export default function ContentPlayerPage() {
       ? detail.package.manifest.slides
       : null;
 
-  /** La misma pieza, vista desde el indice: trae la descripcion y el tamano que el detalle no da. */
+  /** La misma pieza, vista desde el indice: trae la descripcion y el tamaño que el detalle no da. */
   const listed = course?.contents.find((content) => content.id === params.contentId) ?? null;
 
   async function leave() {
     // Al salir se guarda lo avanzado: volver mas tarde tiene que retomar donde se dejo. Tambien
-    // en una presentacion: quien vio ocho de once diapositivas y se quedo sin senal no puede
+    // en una presentacion: quien vio ocho de once diapositivas y se quedo sin señal no puede
     // volver a cero. El servidor se queda con el mayor porcentaje, asi que reenviar nunca resta.
     if (isLesson) {
       await push(Math.round(((index + 1) / cards.length) * 100), index);
@@ -251,7 +251,7 @@ export default function ContentPlayerPage() {
           {/*
             LA LAMINA SE QUEDA CON LA PANTALLA. El bloque ocupa el alto de la ventana menos la
             barra, y dentro reparte: titulo arriba, lamina en lo que quede, controles abajo. Asi la
-            diapositiva sale tan grande como el monitor permita —una presentacion se diseno para
+            diapositiva sale tan grande como el monitor permita —una presentacion se diseño para
             verse en grande— y las pestanas quedan a un scroll, que es donde tienen que estar.
           */}
           <div
@@ -277,7 +277,7 @@ export default function ContentPlayerPage() {
                 const result = await push(watchedSlides, undefined, 'MEASURED');
                 setSaving(false);
                 if (result === null) {
-                  showToast({ kind: 'warning', title: 'Guardaremos tu avance al recuperar senal' });
+                  showToast({ kind: 'warning', title: 'Guardaremos tu avance al recuperar señal' });
                 }
                 goAfterFinishing();
               }}
@@ -364,7 +364,7 @@ export default function ContentPlayerPage() {
             if (result === null) {
               showToast({
                 kind: 'warning',
-                title: 'Guardaremos tu avance al recuperar senal',
+                title: 'Guardaremos tu avance al recuperar señal',
                 description: 'Puedes seguir; no perdiste nada.',
               });
             }
@@ -384,7 +384,7 @@ export default function ContentPlayerPage() {
             const result = await push(pct, undefined, evidence);
             setSaving(false);
             if (result === null) {
-              showToast({ kind: 'warning', title: 'Guardaremos tu avance al recuperar senal' });
+              showToast({ kind: 'warning', title: 'Guardaremos tu avance al recuperar señal' });
             }
             goAfterFinishing();
           }}

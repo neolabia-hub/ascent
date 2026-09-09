@@ -65,7 +65,7 @@ export class UsersController {
   @Header('Content-Disposition', 'attachment; filename="plantilla-usuarios.xlsx"')
   async importTemplate(): Promise<StreamableFile> {
     // StreamableFile y no el Buffer pelado: devolver un Buffer hace que Nest lo serialice como
-    // JSON ({"type":"Buffer","data":[...]}) y el .xlsx llega corrupto, con el tamano correcto
+    // JSON ({"type":"Buffer","data":[...]}) y el .xlsx llega corrupto, con el tamaño correcto
     // y sin poder abrirse. Se ve solo al intentar abrirlo.
     return new StreamableFile(await this.importer.buildTemplateXlsx());
   }

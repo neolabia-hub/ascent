@@ -292,13 +292,12 @@ dos plazos por defecto para la misma casilla, y las obligaciones que nacían ven
 
 1. **La primera ronda de una campaña no cae en la fecha de la campaña** (ver `03-reinduccion.md`).
    Decisión del cliente.
-2. **La campaña alcanza a quien acaba de ingresar** y aún no terminó su inducción
-   (`03-reinduccion.md`).
-3. **Una formación exigida por DOS reglas vivas a la vez le nace dos veces a la misma persona.**
-   Solo puede pasar en los tipos de alcance `MANUAL`, donde una formación se puede exigir a un
-   cargo *y* a un área que se solapan; con `BY_JOB_TITLE` es imposible, porque una persona tiene un
-   cargo. Lo CUMPLIDO ya no se repite (punto 4 de abajo), pero dos obligaciones **vivas** siguen
-   naciendo. No se ha visto en la práctica.
+2. ~~La campaña alcanza a quien acaba de ingresar~~ — **cerrado el 2026-09-04** y este documento
+   se quedó atrás: la gracia por ingreso reciente existe (`exemptRecentHiresMonths`), la aplica el
+   motor sobre la PRIMERA ronda de cada quien y se configura en Tipos de formación. Ver
+   `03-reinduccion.md` §9.2.
+3. ~~Una formación exigida por DOS reglas vivas le nace dos veces a la misma persona~~ —
+   **cerrado el 2026-09-08.** Ver abajo, punto 7.
 
 ### Y lo que se cerró (2026-09-05)
 
@@ -308,3 +307,23 @@ dos plazos por defecto para la misma casilla, y las obligaciones que nacían ven
    2026-09-04 por la noche**: está en Configuración → Tipos de formación → Configurar, junto a
    `defaultOnExpiry` y a la gracia por ingreso reciente. Este documento se quedó atrás un día.
 6. ~~`defaultOnExpiry` tampoco tiene pantalla~~ — **la misma**: se cambia desde ahí.
+
+### Y lo que se cerró (2026-09-08)
+
+7. **Una formación exigida por dos reglas vivas ya no nace dos veces.** Antes de abrirle la ronda 1 a
+   quien no tiene historia con esta regla, el motor mira si **ya debe esa misma formación** por otra
+   parte —otra regla, o una asignación a mano, que tiene `rule_id` nulo— y no la crea. Es lo que la
+   asignación manual hacía desde siempre (*«no pisa lo que ya está vivo»*); el motor era la mitad que
+   faltaba.
+
+   **Y no era raro, en contra de lo que decía esta lista.** Se creía que solo podía pasar en alcance
+   `MANUAL`; en realidad **publicar una inducción crea sola su regla de «toda la empresa»**, así que
+   cualquier inducción publicada y además exigida a un cargo ya tenía dos reglas vivas sobre la misma
+   formación. Lo que se veía no era un error visible sino un denominador inflado: la misma persona
+   contada dos veces por la misma formación, y el cumplimiento bajando sin que nadie dejara de hacer
+   nada.
+
+   **No se toca la que ya existe** —es la más antigua, puede tener una inscripción colgando, y elegir
+   cuál sobrevive por la fecha de la regla sería arbitrario—. Y si esa se retira, la siguiente pasada
+   la vuelve a crear por la otra regla: la obligación sigue viva porque sigue habiendo quien la exija.
+   Recorrido: `dos-reglas-una-obligacion.mjs`.

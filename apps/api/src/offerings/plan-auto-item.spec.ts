@@ -11,14 +11,14 @@ describe('renglonAutomatico', () => {
   });
 
   /** El caso que reporto el cliente: programar desde la ficha dejaba la jornada fuera del plan. */
-  it('la capacitacion del plan entra al plan de su ano, en el mes de su fecha', () => {
+  it('la capacitacion del plan entra al plan de su año, en el mes de su fecha', () => {
     expect(renglonAutomatico(true, '2026-03-10', [BORRADOR_2026], HOY)).toEqual({
       planId: 'p-2026',
       plannedMonth: 3,
     });
   });
 
-  it('el ano lo manda la FECHA, no el dia de hoy', () => {
+  it('el año lo manda la FECHA, no el dia de hoy', () => {
     expect(renglonAutomatico(true, '2027-05-04', [BORRADOR_2026, BORRADOR_2027], HOY)).toEqual({
       planId: 'p-2027',
       plannedMonth: 5,
@@ -33,7 +33,7 @@ describe('renglonAutomatico', () => {
     expect(renglonAutomatico(true, '2026-03-10', [APROBADO_2026], HOY)).toBeNull();
   });
 
-  it('sin plan de ese ano no entra a ninguna parte', () => {
+  it('sin plan de ese año no entra a ninguna parte', () => {
     expect(renglonAutomatico(true, '2029-03-10', [BORRADOR_2026], HOY)).toBeNull();
     expect(renglonAutomatico(true, '2026-03-10', [], HOY)).toBeNull();
   });
@@ -59,13 +59,13 @@ describe('renglonAutomatico', () => {
   });
 
   it('una fecha con forma rara cae al mes en curso en vez de inventarse un mes', () => {
-    expect(renglonAutomatico(true, 'manana', [BORRADOR_2026], HOY)).toEqual({
+    expect(renglonAutomatico(true, 'mañana', [BORRADOR_2026], HOY)).toEqual({
       planId: 'p-2026',
       plannedMonth: 8,
     });
   });
 
-  it('el ultimo mes del ano tambien vale', () => {
+  it('el ultimo mes del año tambien vale', () => {
     expect(renglonAutomatico(true, '2026-12-31', [BORRADOR_2026], HOY)?.plannedMonth).toBe(12);
   });
 });

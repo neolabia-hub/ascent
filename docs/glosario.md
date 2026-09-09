@@ -9,7 +9,7 @@ pantalla y en la base de datos, y un **ejemplo real de Transprensa**.
 
 > Convencion general (Decision #26 y #31): la base de datos y el codigo usan el vocabulario
 > estandar de la industria en ingles (`activities`, `offerings`, `enrollments`); la interfaz esta
-> 100% en espanol. Nunca aparece "course" en pantalla.
+> 100% en español. Nunca aparece "course" en pantalla.
 
 ---
 
@@ -25,7 +25,7 @@ arruina las plataformas de formacion:
 | **Quien tiene la obligacion de hacerlo?** | Asignacion | "Todos los conductores" |
 | **Que hizo realmente cada persona?** | Ejecucion (inscripcion) | "Maria asistio, saco 95, aprobo" |
 
-Si estas cuatro fueran una sola cosa, repetir la misma capacitacion el ano siguiente obligaria a
+Si estas cuatro fueran una sola cosa, repetir la misma capacitacion el año siguiente obligaria a
 duplicarla, y no se podria responder "quien estaba obligado pero no lo hizo".
 
 ### El recorrido completo, de punta a punta
@@ -45,7 +45,7 @@ las formaciones.
         |          (para cambiar algo se crea la v2; NO para agregar jornadas)
         v
   4. QUIENES       A quien se le exige -> nacen las OBLIGACIONES
-        |          y quien entre manana y cumpla la regla, la tendra solo
+        |          y quien entre mañana y cumpla la regla, la tendra solo
         v
   5. PROGRAMAR     La JORNADA: cuando, donde, quien dicta, a quienes atiende
         |          Al publicarla se congelan sus PROYECTADOS
@@ -76,7 +76,7 @@ entra sola desde sus pendientes y empieza. No hay a quien convocar ni lista que 
 
 ### Actividad formativa
 **Que es:** el producto formativo en si, independiente de cuando se dicte. Es lo que vive en el
-catalogo y se reutiliza durante anos. Contiene el contenido, la evaluacion y las reglas.
+catalogo y se reutiliza durante años. Contiene el contenido, la evaluacion y las reglas.
 
 **Que NO es:** no es una sesion ni un evento. No tiene fecha, ni asistentes, ni instructor: eso
 pertenece a la convocatoria.
@@ -93,7 +93,7 @@ en 2028, aunque se haya dictado 40 veces.
 
 ### Tipo de actividad
 **Que es:** la clasificacion que decide **como se comporta** una actividad: si es obligatoria al
-ingresar, si se repite cada ano, si emite certificado, si cuenta para el plan anual.
+ingresar, si se repite cada año, si emite certificado, si cuenta para el plan anual.
 
 **Que NO es:** no es una etiqueta decorativa. Cada tipo cambia reglas reales.
 
@@ -107,8 +107,8 @@ Los seis tipos de Transprensa:
 | **Induccion general** | Lo que TODO el que ingresa debe hacer, sin importar el cargo | Automatica al ingresar, y **antes** de iniciar labores | No |
 | **Induccion especifica** | Lo que se debe hacer segun el cargo | Automatica por cargo | No |
 | **Reinduccion** | Repaso periodico de lo anterior | Automatica cada N meses (Transprensa: 12) | No |
-| **Capacitacion del plan** | Lo que se planeo para el ano | Desde el plan anual | **Si** |
-| **Capacitacion extraordinaria** | Lo que surge durante el ano y no estaba planeado | Manual: a una persona, cargo, area o regional | **No** |
+| **Capacitacion del plan** | Lo que se planeo para el año | Desde el plan anual | **Si** |
+| **Capacitacion extraordinaria** | Lo que surge durante el año y no estaba planeado | Manual: a una persona, cargo, area o regional | **No** |
 | **Pildora** (microlearning) | Pieza corta de 3 a 7 minutos para reforzar | Manual o por regla; alimenta el repaso espaciado | No |
 
 **Ejemplo de por que importa la ultima columna:** si en agosto se detecta un problema y se dicta
@@ -119,7 +119,7 @@ cumplimiento del Plan 2026. Son mediciones separadas.
 formacion de tipo "Capacitacion del plan" no la mete en ningun plan — el plan referencia
 convocatorias, no se apropia de actividades (regla de oro 3), y sus indicadores solo miran
 obligaciones nacidas de un renglon suyo (regla de oro 2). Mientras nadie le programe una jornada
-en el plan del ano, esa capacitacion no cuenta ni para el cumplimiento ni para la cobertura. La
+en el plan del año, esa capacitacion no cuenta ni para el cumplimiento ni para la cobertura. La
 ficha de la formacion lo dice y ofrece programarla ahi mismo; el mes lo decide el analista, que es
 la unica parte que el sistema no puede adivinar.
 
@@ -228,7 +228,7 @@ tres semanas despues, no.
 **Que es:** una pila de 5 a 15 **tarjetas** que se pasan como historias de Instagram. Es la unidad
 de contenido del producto y dura menos de 5 minutos.
 
-**Que NO es:** no es un PDF ni un video largo subido. Por diseno, el sistema no permite publicar
+**Que NO es:** no es un PDF ni un video largo subido. Por diseño, el sistema no permite publicar
 un PDF como leccion: el PDF se adjunta como material de consulta o sirve de fuente para generar
 tarjetas.
 
@@ -473,12 +473,12 @@ Sugerencia visible, no decision por detras.
 
 #### Intensidad horaria
 Horas **teoricas** y **practicas**, siempre separadas (lo exige el PESV en su Paso 10) y sumando
-para las 10 h/ano de BPM. Hoy se guarda y se muestra; el indicador anual de horas por persona
+para las 10 h/año de BPM. Hoy se guarda y se muestra; el indicador anual de horas por persona
 todavia no existe (`norms.annual_hours_required` sigue sin leerse).
 
 #### Ejecutada por, y "¿cual?"
 Quien la dicta: la empresa con personal propio, la ARL, la EPS, la temporal u otro tercero. **Si es
-externa se pregunta CUAL**, porque "la ARL Sura dicto 14 jornadas este ano" es una metrica y "un
+externa se pregunta CUAL**, porque "la ARL Sura dicto 14 jornadas este año" es una metrica y "un
 tercero" no lo es. Cuando la dicta la empresa, se elige el **instructor** de entre su gente, con el
 mismo selector que el responsable del proceso.
 
@@ -546,7 +546,7 @@ Es **desde cuando se cuenta el plazo**, y cambia por completo a quien afecta:
 obligacion nace —quien entro en 2019 y hoy se estrena el requisito— se sustituye por **"desde hoy,
 30 dias"** (`DIAS_DE_GRACIA`). Sin eso, estrenar una induccion anclada al ingreso produciria 116
 vencidas el primer dia, y seria falso: la empresa no estaba incumpliendo, es que el sistema no
-existia. A quien entra manana no le afecta.
+existia. A quien entra mañana no le afecta.
 
 **"Se repite cada N meses"** es la reinduccion: al cumplirla, la ronda siguiente se abre contando
 **desde que la completo** (no desde que vencia) y aparece en sus pendientes 60 dias antes de
@@ -598,7 +598,7 @@ progreso, presento el examen, aprobo o reprobo, con su nota.
 **Como se llama:** en pantalla "Mi formacion" / "Participantes"; en la base `enrollments`.
 
 **Guarda una foto del momento:** el titulo, la version, la nota minima exigida y **el cargo y
-area que la persona tenia ese dia**. Si manana la ascienden, el registro historico no cambia:
+area que la persona tenia ese dia**. Si mañana la ascienden, el registro historico no cambia:
 aprobo siendo auxiliar de bodega, y asi debe constar.
 
 ---
@@ -606,11 +606,11 @@ aprobo siendo auxiliar de bodega, y asi debe constar.
 ## 4. El plan de capacitacion
 
 ### Plan de capacitacion
-**Que es:** el documento empresarial donde se planea la formacion de un ano: objetivo, META,
+**Que es:** el documento empresarial donde se planea la formacion de un año: objetivo, META,
 alcance y el calendario de lo que se va a dictar. Tiene su propio ciclo de aprobacion.
 
 **La META es un PORCENTAJE**, no un parrafo: cuanto del programa se compromete la empresa a
-ejecutar ese ano (lo habitual, 90%). Sin ella el plan ensena "62% de cumplimiento" y nadie sabe si
+ejecutar ese año (lo habitual, 90%). Sin ella el plan enseña "62% de cumplimiento" y nadie sabe si
 eso esta bien; con ella la pantalla puede decir "faltan 28 puntos" o "meta cumplida". Se mide
 contra el CUMPLIMIENTO (ejecutadas / programadas), no contra la cobertura.
 
@@ -618,7 +618,7 @@ contra el CUMPLIMIENTO (ejecutadas / programadas), no contra la cobertura.
 
 **Como se llama:** "Plan de capacitacion"; en la base `training_plans`.
 
-**HAY UNO POR ANO, y solo uno.** Lo identifica el **ano**; el nombre es un rotulo y se puede
+**HAY UNO POR ANO, y solo uno.** Lo identifica el **año**; el nombre es un rotulo y se puede
 corregir. Antes la clave incluia el nombre, asi que "Plan 2026", "Plan anual 2026" y "Plan SST
 2026" podian convivir con tres cumplimientos distintos, y a la pregunta del auditor —"enseneme el
 plan de 2026"— habia tres respuestas sin forma de saber cual valia.
@@ -655,7 +655,7 @@ son**: unos son de la FORMACION, otros de cada JORNADA, otro de la PERSONA.
 en Cundinamarca.**
 
 1. En **Quienes** se marcan los dos cargos → nacen **40 obligados**. Cada uno con su vencimiento.
-   Quien entre manana con uno de esos cargos entra solo en la lista.
+   Quien entre mañana con uno de esos cargos entra solo en la lista.
 2. Se programan **dos jornadas**: 12 de marzo en Antioquia, 19 de marzo en Cundinamarca. Cada una
    **declara la tajada que atiende** (ver *Tajada de la jornada*), asi que al publicarlas se
    congelan **20 y 20 proyectados**, no 40 y 40.
@@ -741,7 +741,7 @@ persona tenia esto asignado en junio".
 
 ### Requisito recurrente
 **Que es:** una obligacion que se repite en el tiempo. "Reinduccion cada 12 meses", "todo ingreso
-hace la induccion general", "el carne de manipulacion de alimentos vence al ano".
+hace la induccion general", "el carne de manipulacion de alimentos vence al año".
 
 **Como se llama:** "Requisito" o "Regla de asignacion"; en la base `assignment_rules`.
 
@@ -754,19 +754,19 @@ depende de que alguien se acuerde.
 Es el punto donde mas facil es equivocarse, y se equivoco una vez en este proyecto (2026-08-31).
 
 **Que NO es:** no es "la induccion otra vez, 12 meses despues de que cada quien la hizo". Con ese
-modelo, alguien que lleva anos en la empresa y nunca hizo una induccion **no tendria de donde
+modelo, alguien que lleva años en la empresa y nunca hizo una induccion **no tendria de donde
 contar** sus 12 meses, y se quedaria sin reinduccion para siempre. Absurdo, porque la reinduccion
 es justamente lo que cubre a esa persona.
 
 **Que es:** una obligacion **anual de toda la empresa**, que cae por calendario. "La reinduccion de
 2026 se hace antes del 31 de marzo". No se ancla a nada de cada persona: el 31 de marzo llega igual
-para el que entro ayer y para el que lleva quince anos. Es tambien como lo pregunta el auditor:
+para el que entro ayer y para el que lleva quince años. Es tambien como lo pregunta el auditor:
 *"¿hicieron la reinduccion de 2026?"*, no *"¿cuando la hizo cada uno?"*.
 
 Por eso el tipo Reinduccion se siembra con `defaultAnnualDate` (Transprensa: `03-31`) y no con
 `defaultRecurrenceMonths`.
 
-**Y su contenido es propio.** La norma pide que cubra los CAMBIOS del ano: novedades, incidentes,
+**Y su contenido es propio.** La norma pide que cubra los CAMBIOS del año: novedades, incidentes,
 politicas nuevas. Se crea, se le pone contenido y se publica como cualquier otra formacion.
 
 #### Entonces, ¿para que sirve "se repite"?
@@ -776,7 +776,7 @@ otro eje distinto —eso lo llevan las versiones—, y por eso no se contradicen
 
 | | Se repite | Contenido |
 |---|---|---|
-| **Reinduccion** | cada ano, fecha fija | cada ano se publica una version NUEVA con los cambios del ano |
+| **Reinduccion** | cada año, fecha fija | cada año se publica una version NUEVA con los cambios del año |
 | **Carne de manipulacion** | cada 12 meses desde que lo saco | el mismo, hasta que cambie la norma |
 | **Induccion general** | no se repite | se versiona cuando cambia algo |
 
@@ -792,11 +792,11 @@ valores:
 | | Que hace | Cuando se usa |
 |---|---|---|
 | **Espera** | No nace la siguiente hasta que haga la anterior | Era lo unico que habia. Casi nadie lo quiere: ver abajo |
-| **Acumula** | Nace la siguiente y la anterior sigue pendiente: debe las dos | Empresas que exigen ponerse al dia antes de seguir. A los tres anos debe tres |
-| **Cierra** | La anterior se cierra como **NO REALIZADA** y la siguiente nace para todos | Cumplimiento por CALENDARIO: cada campana es su periodo, y el periodo cierra. Transprensa la usa en la reinduccion |
+| **Acumula** | Nace la siguiente y la anterior sigue pendiente: debe las dos | Empresas que exigen ponerse al dia antes de seguir. A los tres años debe tres |
+| **Cierra** | La anterior se cierra como **NO REALIZADA** y la siguiente nace para todos | Cumplimiento por CALENDARIO: cada campaña es su periodo, y el periodo cierra. Transprensa la usa en la reinduccion |
 
 **Por que "espera" estaba mal como unica opcion:** quien nunca la hace **desaparece del denominador**
-de todos los anos siguientes. El peor incumplidor sale de la cuenta y la cobertura del ano que viene
+de todos los años siguientes. El peor incumplidor sale de la cuenta y la cobertura del año que viene
 se ve mejor de lo que es. Un indicador que mejora cuando alguien incumple esta roto.
 
 ### No realizada
@@ -807,7 +807,7 @@ reinduccion de 2026 de quien no la hizo antes del 31 de marzo.
 
 **Que NO es:** no es "retirada" (cambio de cargo y dejo de aplicarle) ni "eximida" (alguien la
 excuso con motivo). Esas dos **no cuentan** como incumplimiento; esta **si**. Es toda la diferencia:
-sin un estado propio, cerrar una campana obligaba a elegir entre mentir —marcarla retirada— o
+sin un estado propio, cerrar una campaña obligaba a elegir entre mentir —marcarla retirada— o
 dejarla pendiente para siempre.
 
 **Quien la pone:** el motor, y solo cuando la politica del tipo es "cierra". Nunca sobre algo
@@ -860,7 +860,7 @@ ejecucion**, y si hay examen hay que aprobarlo.
 | **Historial de formacion** | Todo lo que una persona ha hecho, con sus fechas y notas | Auditoria, y la propia persona |
 
 El certificado **es un registro, no un archivo**: el PDF se genera una vez y queda congelado. Si
-manana se cambia la plantilla o el nombre del firmante, los documentos ya entregados no cambian.
+mañana se cambia la plantilla o el nombre del firmante, los documentos ya entregados no cambian.
 Se puede **revocar** (emitido por error, fraude), y la pagina publica de verificacion refleja el
 estado actual aunque el PDF siga circulando.
 
@@ -952,7 +952,7 @@ pocas preguntas. Es un **tipo de actividad formativa**, no una entidad aparte: p
 motor de obligacion, ejecucion y evidencia que una induccion.
 
 **Para que sirve:** sostener en el tiempo lo que ya se enseno. Una induccion se hace una vez al
-ano; una pildora de "revisa que la carga este centrada" se puede repetir en marzo y en agosto sin
+año; una pildora de "revisa que la carga este centrada" se puede repetir en marzo y en agosto sin
 sacar a nadie de su turno.
 
 **Que NO es:** un curso recortado. Una pildora se disena corta; no es lo que sobra de otra cosa.
@@ -985,7 +985,7 @@ ninguna pantalla donde una persona vea la racha de otra, ni ranking, ni tabla de
 comparacion publica expulsa a los de abajo, que en una empresa son justo quienes mas necesitan
 formarse.
 
-**Por que hay protectores:** un conductor en carretera puede pasar un dia sin senal. Perder
+**Por que hay protectores:** un conductor en carretera puede pasar un dia sin señal. Perder
 sesenta dias de racha por eso hace que no vuelva.
 
 ### Puntos
@@ -1016,7 +1016,7 @@ se abre o se silencia.
 | "Curso" | Sugiere que la pildora de 4 minutos es otra cosa | Actividad formativa |
 | "Alumno" / "Estudiante" | Es una empresa, no un colegio | Colaborador, participante |
 | "Matricula" | Suena academico | Asignacion (obligacion) o inscripcion (participacion) |
-| "Course", "enrollment", "dashboard" en pantalla | La interfaz es 100% espanol | Actividad, inscripcion, panel |
+| "Course", "enrollment", "dashboard" en pantalla | La interfaz es 100% español | Actividad, inscripcion, panel |
 
 ---
 

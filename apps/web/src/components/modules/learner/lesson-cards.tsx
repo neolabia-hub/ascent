@@ -58,7 +58,7 @@ function CardTitle({ children }: { children: string }) {
   );
 }
 
-/** Rotulo pequeno que dice de que tipo es la tarjeta, en voz baja. */
+/** Rotulo pequeño que dice de que tipo es la tarjeta, en voz baja. */
 function CardKicker({ children }: { children: string }) {
   return (
     <p

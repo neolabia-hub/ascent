@@ -76,7 +76,7 @@ export interface EvaluacionAGenerar {
 // ─────────────────────────  EL REPARTO DE FORMULARIOS  ─────────────────────────
 
 export interface FormularioDelCiclo {
-  /** La fila de `performance_cycle_forms`: el formulario DENTRO de esta campana. */
+  /** La fila de `performance_cycle_forms`: el formulario DENTRO de esta campaña. */
   cycleFormId: string;
   /** Los cargos que declara. Vacio = es el general del ciclo. */
   jobTitleIds: string[];
@@ -99,7 +99,7 @@ export interface ProblemaDeReparto {
  *
  * Dos formularios del mismo ciclo que reclaman el mismo cargo, o dos generales, dejan el reparto a
  * merced del orden de la consulta: el conductor respondera uno u otro segun quien se guardo
- * primero. Eso no es un detalle que se resuelve eligiendo — es una campana que no se puede abrir, y
+ * primero. Eso no es un detalle que se resuelve eligiendo — es una campaña que no se puede abrir, y
  * se dice antes de generar seiscientas evaluaciones.
  */
 export function problemasDeReparto(formularios: FormularioDelCiclo[]): ProblemaDeReparto {
@@ -121,9 +121,9 @@ export function problemasDeReparto(formularios: FormularioDelCiclo[]): ProblemaD
  * ─── EL CARGO MANDA, Y EL GENERAL RECOGE ───
  *
  * El formulario que declara cargos se lleva a las personas de esos cargos; el que no declara
- * ninguno es el general de la campana y recoge a quien no encaje en otro. Es exactamente lo que ya
+ * ninguno es el general de la campaña y recoge a quien no encaje en otro. Es exactamente lo que ya
  * significaba «sin cargos = a toda la empresa» cuando el ciclo llevaba un solo formulario, asi que
- * una campana de un formulario se comporta igual que antes.
+ * una campaña de un formulario se comporta igual que antes.
  *
  * ─── QUIEN NO ENCAJA SE REPORTA, NO SE COLOCA EN CUALQUIERA ───
  *

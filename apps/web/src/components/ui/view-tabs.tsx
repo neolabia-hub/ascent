@@ -19,7 +19,7 @@ export interface ViewTab<T extends string> {
  * Habia dos formas de decir lo mismo. El plan y Seguimiento usaban una pastilla rellena con el
  * color de la empresa; Asignaciones, un subrayado gris tinta. La misma pregunta —"¿en cual de las
  * cuatro estoy?"— se contestaba distinta segun la pantalla, y la de Asignaciones ademas no usaba
- * la marca: en una empresa con acento verde, la senal de "estas aqui" salia gris.
+ * la marca: en una empresa con acento verde, la señal de "estas aqui" salia gris.
  *
  * ─── POR QUE LA PASTILLA Y NO EL SUBRAYADO ───
  *

@@ -152,7 +152,7 @@ describe('tipos de la Decision #86', () => {
       qtype: 'FILL_BLANK',
       stem: 'El arnes se inspecciona cada {{1}} y lo revisa el {{2}}.',
       blanks: [
-        { id: '1', accept: ['seis meses', 'medio ano'] },
+        { id: '1', accept: ['seis meses', 'medio año'] },
         { id: '2', accept: ['supervisor'] },
       ],
       partialCredit: true,
@@ -211,10 +211,10 @@ describe('tipos de la Decision #86', () => {
   it('emparejar conserva las parejas al ir y volver', () => {
     const payload: QuestionPayload = {
       qtype: 'MATCH',
-      stem: 'Une cada senal con su significado',
+      stem: 'Une cada señal con su significado',
       pairs: [
-        { id: '1', left: 'Senal de alto', right: 'Detenerse por completo' },
-        { id: '2', left: 'Senal de ceda', right: 'Dar prioridad' },
+        { id: '1', left: 'Señal de alto', right: 'Detenerse por completo' },
+        { id: '2', left: 'Señal de ceda', right: 'Dar prioridad' },
       ],
       partialCredit: true,
       points: 2,
@@ -225,10 +225,10 @@ describe('tipos de la Decision #86', () => {
   it('emparejar no delata la pareja: el emparejamiento vive solo en `correct`', () => {
     const columns = payloadToColumns({
       qtype: 'MATCH',
-      stem: 'Une cada senal con su significado',
+      stem: 'Une cada señal con su significado',
       pairs: [
-        { id: '1', left: 'Senal de alto', right: 'Detenerse por completo' },
-        { id: '2', left: 'Senal de ceda', right: 'Dar prioridad' },
+        { id: '1', left: 'Señal de alto', right: 'Detenerse por completo' },
+        { id: '2', left: 'Señal de ceda', right: 'Dar prioridad' },
       ],
       partialCredit: true,
       points: 2,

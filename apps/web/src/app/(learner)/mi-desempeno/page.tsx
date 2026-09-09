@@ -13,7 +13,7 @@ import { MiDesempeno } from '@/components/modules/desempeno/mi-desempeno';
  * suyo escondido en el Perfil, entre las constancias. Nadie busca su evaluacion de desempeno en el
  * perfil. Y quien hacia las dos cosas tenia que aprender dos rutas para un solo tema.
  *
- * Ahora es UNA pantalla, "Desempeno", que ensena lo que a cada quien le toca:
+ * Ahora es UNA pantalla, "Desempeno", que enseña lo que a cada quien le toca:
  *
  *   - Si te evaluaron, LO TUYO arriba: la de tu jefe y la propia, para leer y firmar.
  *   - Si calificas a alguien, tu lista de pendientes debajo, con cuanto llevas.
@@ -22,9 +22,9 @@ import { MiDesempeno } from '@/components/modules/desempeno/mi-desempeno';
  *
  * ─── Y SIGUE SIN SER UN ITEM PERMANENTE VACIO ───
  *
- * El menu lo ensena cuando hay ALGO —algo que responder o algo tuyo que leer— y lo esconde cuando
- * no hay nada (ver `learner-shell`). Un item fijo que casi todo el ano no lleva a ninguna parte
- * ensena a la gente a no pulsarlo, y el dia que si tiene algo tampoco lo pulsan.
+ * El menu lo enseña cuando hay ALGO —algo que responder o algo tuyo que leer— y lo esconde cuando
+ * no hay nada (ver `learner-shell`). Un item fijo que casi todo el año no lleva a ninguna parte
+ * enseña a la gente a no pulsarlo, y el dia que si tiene algo tampoco lo pulsan.
  */
 export default function DesempenoPage() {
   return (

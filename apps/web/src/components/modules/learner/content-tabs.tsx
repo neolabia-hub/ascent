@@ -46,7 +46,7 @@ export function ContentTabs({
    * LA PESTANA ES FIJA, y su contenido tambien: el material de apoyo es de la FORMACION, no de la
    * pieza. Es la respuesta a "¿por que en el video sale vacia y en la presentacion no?" — porque
    * antes se colaba ahi el archivo original de la pieza actual, y eso hacia que la misma pestana
-   * ensenara cosas distintas segun donde estuvieras. Ahora ensena siempre lo mismo, este donde
+   * ensenara cosas distintas segun donde estuvieras. Ahora enseña siempre lo mismo, este donde
    * este: los documentos de apoyo de la formacion.
    *
    * El original de la pieza actual se suma solo si el administrador ABRIO la descarga

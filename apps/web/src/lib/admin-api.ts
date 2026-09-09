@@ -337,6 +337,8 @@ export interface TenantSettings {
   efficacyDaysDefault: number;
   /** Dias antes del cierre en que se recuerda el ciclo de desempeno. 0 = sin recordatorio. */
   performanceReminderDays: number;
+  /** Dias hacia adelante que mira el aviso semanal de vencimientos. 0 = sin aviso. */
+  expirationDigestDays: number;
   labels: Record<string, string>;
   features: Record<string, boolean>;
   /** A quien acude quien no puede entrar. Se publica SIN sesion (Decision #97). */

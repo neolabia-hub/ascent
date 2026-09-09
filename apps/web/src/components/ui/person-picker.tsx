@@ -99,7 +99,7 @@ export function PersonPicker({
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => setOpen((current) => !current)}
-        className="focus-ring flex min-h-10 w-full items-center gap-2 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        className="focus-ring flex min-h-10 w-full items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">
           {selected ? (

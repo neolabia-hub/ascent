@@ -13,7 +13,7 @@ import { ESTADO_LABEL, type EstadoEjecucion, type ResumenEjecucion } from './exe
  *
  * ─── XLSX Y NO CSV ───
  *
- * El mismo motivo que la plantilla de personas: un CSV abierto en un Excel en espanol parte por
+ * El mismo motivo que la plantilla de personas: un CSV abierto en un Excel en español parte por
  * comas lo que deberia partir por punto y coma, convierte "0987" en 987 y "12-03" en una fecha. El
  * archivo llega a manos que no van a depurarlo.
  *

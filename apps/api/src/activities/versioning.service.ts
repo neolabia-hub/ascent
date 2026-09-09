@@ -208,7 +208,7 @@ export class VersioningService {
       orderBy: { displayOrder: 'asc' },
     });
     if (contents.length === 0) {
-      throw new BadRequestException({ code: 'VERSION_EMPTY', message: 'La version necesita al menos un contenido.' });
+      throw new BadRequestException({ code: 'VERSION_EMPTY', message: 'La versión necesita al menos un contenido.' });
     }
     const incomplete = contents.filter((c) => !this.isContentComplete(c));
     if (incomplete.length > 0) {
@@ -370,7 +370,7 @@ export class VersioningService {
       // 4. QUIEN RESPONDE, congelado igual que el temario (Decision #64). La actividad sigue
       //    teniendo su responsable vigente —es a quien hay que avisar hoy—, pero la version
       //    publicada guarda el de ESTE momento: la constancia y el auditor preguntan por el de
-      //    entonces, y cambiar el responsable manana no puede reescribir lo que ya se dicto.
+      //    entonces, y cambiar el responsable mañana no puede reescribir lo que ya se dicto.
       const owner = await tx.activity.findUnique({
         where: { id: draft.activityId },
         select: {
@@ -449,7 +449,7 @@ export class VersioningService {
     await this.aplicarExigenciaAutomatica(actor, draft.activityId);
 
     // Y las convocatorias PERMANENTES pasan a esta version: no hay nadie citado a quien mover
-    // por sorpresa, y dejarlas ancladas hace que quien entre manana curse lo viejo. Las de FECHA
+    // por sorpresa, y dejarlas ancladas hace que quien entre mañana curse lo viejo. Las de FECHA
     // no se tocan: ahi si hay gente citada y actualizarlas es un acto aparte.
     await this.offerings.ponerAlDiaLasPermanentes(actor, draft.activityId, versionId);
 
@@ -490,7 +490,7 @@ export class VersioningService {
    * propio tipo: si exige estar hecha antes de empezar a trabajar, ancla en el ingreso; si no,
    * cuenta desde ahora.
    *
-   * Es seguro por la GRACIA de `due-date.ts` (Decision #70): a quien lleva anos en la empresa la
+   * Es seguro por la GRACIA de `due-date.ts` (Decision #70): a quien lleva años en la empresa la
    * obligacion no le nace vencida, le nace con 30 dias. Sin eso, esto habria estrenado cada
    * induccion con la plantilla entera en rojo.
    *
@@ -515,7 +515,7 @@ export class VersioningService {
 
       // A QUIEN ALCANZA, y por que NO se pregunta.
       //
-      // Una INDUCCION es parte del ingreso: quien lleva siete anos en la empresa no esta
+      // Una INDUCCION es parte del ingreso: quien lleva siete años en la empresa no esta
       // ingresando, asi que no se le exige —y si se le exigiera, se le pediria repetir algo que
       // ya hizo el dia que entro—. Una REINDUCCION es al reves: es la obligacion anual de todos,
       // y dejar fuera a la plantilla actual la vaciaria de sentido.
@@ -532,7 +532,7 @@ export class VersioningService {
         // -1 y no 0: D1072 art. 2.2.4.6.11 exige que la induccion sea PREVIA al inicio de
         // labores. "El mismo dia" no es previa.
         dueDaysAfterTrigger: esInduccionDeIngreso ? -1 : 30,
-        // La campana anual manda: es una obligacion de calendario, no un aniversario por persona.
+        // La campaña anual manda: es una obligacion de calendario, no un aniversario por persona.
         everyMonths: config.data.defaultAnnualDate ? null : (config.data.defaultRecurrenceMonths ?? null),
         fixedDate: config.data.defaultAnnualDate ?? null,
         soloNuevos: esInduccionDeIngreso,
@@ -566,7 +566,7 @@ export class VersioningService {
     if (existingDraft) {
       throw new ConflictException({
         code: 'DRAFT_ALREADY_EXISTS',
-        message: 'Ya hay una version en borrador. Editala o descartala antes de crear otra.',
+        message: 'Ya hay una versión en borrador. Edítala o descártala antes de crear otra.',
         versionId: existingDraft.id,
         versionNumber: existingDraft.versionNumber,
       });
@@ -653,7 +653,7 @@ export class VersioningService {
     if (count === 1) {
       throw new ConflictException({
         code: 'LAST_VERSION',
-        message: 'No se puede descartar la unica version. Elimina o desactiva la actividad.',
+        message: 'No se puede descartar la única versión. Elimina o desactiva la actividad.',
       });
     }
     await this.prisma.tx(async (tx) => {
@@ -678,7 +678,7 @@ export class VersioningService {
     if (version.status !== 'DRAFT') {
       throw new ConflictException({
         code: 'VERSION_NOT_EDITABLE',
-        message: 'Esta version esta publicada y no se puede modificar. Crea una version nueva.',
+        message: 'Esta versión esta publicada y no se puede modificar. Crea una versión nueva.',
         status: version.status,
       });
     }

@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
  *
  * Corre CADA HORA y no una vez al dia porque el envio va en la hora en la que cada persona suele
  * estudiar: un conductor que aprende a las 7 de la noche y un auxiliar que aprende a las 6 de la
- * manana no caben en el mismo disparo.
+ * mañana no caben en el mismo disparo.
  *
  * La regla de a quien y cuando le toca vive en `engagement/nudge.ts`, probada aparte. Aqui solo
  * se reunen los datos y se envia: asi la decision de "recordar o hostigar" se puede revisar sin

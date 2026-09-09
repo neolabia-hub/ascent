@@ -93,7 +93,7 @@ const SECTIONS: Section[] = [
     singular: 'norma',
     feminine: true,
     description: 'Normas a las que tributa la formacion (BASC, BPM, PESV, ISO...).',
-    extraFields: [{ key: 'annualHoursRequired', label: 'Horas/ano exigidas', kind: 'number', hint: 'Ej.: BPM exige 10 horas anuales por manipulador. Vacio si no aplica.' }],
+    extraFields: [{ key: 'annualHoursRequired', label: 'Horas/año exigidas', kind: 'number', hint: 'Ej.: BPM exige 10 horas anuales por manipulador. Vacio si no aplica.' }],
   },
   /*
     "TIPOS DE ACTIVIDAD" SALIO DE AQUI (Decision #116).

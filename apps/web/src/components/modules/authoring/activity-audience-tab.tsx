@@ -34,12 +34,13 @@ import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { motivoDelError } from '@/lib/api';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /**
  * QUIENES — a quien se le exige esta formacion, decidido AQUI y no en otra pantalla.
  *
  * Antes esto solo sabia crear obligaciones sueltas (una fila por persona, origen MANUAL). Para
- * lo que de verdad hace falta —"esto lo hacen los conductores, y quien entre de conductor manana
+ * lo que de verdad hace falta —"esto lo hacen los conductores, y quien entre de conductor mañana
  * tambien"— habia que salir al modulo de Asignaciones, crear una AUDIENCIA con nombre, volver y
  * crear un REQUISITO eligiendola de una lista: dos palabras que no son del negocio y tres
  * pantallas para decir una sola cosa.
@@ -59,7 +60,7 @@ import { motivoDelError } from '@/lib/api';
  * QUE CLASE DE OBLIGACION CREA CADA FORMA DE REPETIR.
  *
  * Una palabra, no una explicacion: la diferencia entre las dos que repiten no esta en el texto de
- * la opcion —"cada ano" y "cada N meses" se leen igual de bien— sino en si todos vencen el mismo
+ * la opcion —"cada año" y "cada N meses" se leen igual de bien— sino en si todos vencen el mismo
  * dia o cada quien tiene el suyo. Eso es lo que hay que poder ver de un vistazo.
  */
 const COMO_SE_REPITE: Record<'NO' | 'MESES' | 'ANUAL', string> = {
@@ -85,12 +86,12 @@ export function ActivityAudienceTab({
   /**
    * UNA CAPACITACION DEL PLAN NO PREGUNTA CUANDO VENCE NI SI SE REPITE (Decision #76).
    *
-   * Los tres campos del plazo no significan nada aqui, y uno de ellos hacia dano:
+   * Los tres campos del plazo no significan nada aqui, y uno de ellos hacia daño:
    *   - "se le exige desde ahora / al ingresar": no cuelga del ingreso ni de entrar a un grupo,
    *     pasa el mes que diga el plan;
    *   - "vence a los N dias": inventaba un vencimiento que COMPETIA con el mes del plan, y de
    *     ahi salia que cada persona acabara con dos obligaciones de la misma formacion;
-   *   - "se repite": la del ano que viene es otro plan, no otra ronda de esta.
+   *   - "se repite": la del año que viene es otro plan, no otra ronda de esta.
    *
    * Asi que aqui solo se pregunta A QUIENES, que es la unica decision real. El servidor fuerza
    * el disparador PLAN aunque el formulario mandara otra cosa: no es una preferencia de la
@@ -99,6 +100,9 @@ export function ActivityAudienceTab({
   const esDelPlan = typeConfig.participatesInPlan;
 
   const [rows, setRows] = useState<AssignmentRow[] | null>(null);
+  // `?? []` porque el hook va SIEMPRE, tambien mientras carga: un hook detras de un return
+  // condicional se salta en el primer render y React lo castiga con "rendered fewer hooks".
+  const { visibles: obligadosVisibles, paginador: paginadorObligados } = usePaginacion(rows ?? []);
   const [total, setTotal] = useState(0);
   const [requirements, setRequirements] = useState<ActivityRequirement[] | null>(null);
   /** Cuantas obligaciones se pusieron A MANO, sin regla detras. Ver `load`. */
@@ -124,7 +128,7 @@ export function ActivityAudienceTab({
     trigger: typeConfig.requiresBeforeHire ? ('ON_HIRE' as const) : ('ON_JOIN' as const),
     dias: typeConfig.requiresBeforeHire ? '0' : '30',
     everyMonths: typeConfig.defaultRecurrenceMonths ? String(typeConfig.defaultRecurrenceMonths) : '',
-    /** Como se repite: no, cada N meses, o cada ano en una fecha fija (campana anual). */
+    /** Como se repite: no, cada N meses, o cada año en una fecha fija (campaña anual). */
     modoRepite: (typeConfig.defaultAnnualDate ? 'ANUAL' : typeConfig.defaultRecurrenceMonths ? 'MESES' : 'NO') as
       | 'NO'
       | 'MESES'
@@ -215,7 +219,7 @@ export function ActivityAudienceTab({
 
   /**
    * A cuanta gente alcanza el alcance que se esta armando, ANTES de guardarlo. Sin esta cifra,
-   * crear un requisito es firmar a ciegas: la primera senal de que alcanzaba a 116 personas
+   * crear un requisito es firmar a ciegas: la primera señal de que alcanzaba a 116 personas
    * llegaria cuando ya les hubiera llegado el aviso a las 116.
    */
   useEffect(() => {
@@ -316,7 +320,7 @@ export function ActivityAudienceTab({
     se esta leyendo "Quienes la tienen que hacer" y se ve el nombre de quien no puede hacerla.
 
     Es la misma ventana y el mismo endpoint que Asignaciones. La obligacion no se borra: queda
-    eximida con motivo, que es lo que se ensena en una auditoria.
+    eximida con motivo, que es lo que se enseña en una auditoria.
   */
   const [eximiendo, setEximiendo] = useState<AssignmentRow | null>(null);
   const eximir = async (motivo: string) => {
@@ -417,23 +421,23 @@ export function ActivityAudienceTab({
                         {yaEsDeTodos
                           ? 'Se aplico sola al publicar: en este tipo de formacion no hay nada que decidir.'
                           : typeConfig.requiresBeforeHire
-                            ? 'Es una induccion de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada ano es la reinduccion, que es otra formacion.'
+                            ? 'Es una induccion de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su induccion se hizo cuando entro. Lo que le toca cada año es la reinduccion, que es otra formacion.'
                             : `Al publicar quedara exigida a ${reach ?? '...'} personas, y a quien entre despues. No hay que marcar a nadie.`}
                       </p>
                       {/*
                         LO QUE VA A PASAR AL PUBLICAR, DICHO ANTES (2026-09-03).
 
-                        Los campos de plazo y recurrencia no se ensenan aqui a proposito —no hay
+                        Los campos de plazo y recurrencia no se enseñan aqui a proposito —no hay
                         nada que decidir: lo pone el tipo— pero de ahi se paso a no decir NADA, y
                         una reinduccion publicada obliga a la empresa entera con un vencimiento y
-                        una campana anual que el usuario no vio en ninguna parte. No tener que
+                        una campaña anual que el usuario no vio en ninguna parte. No tener que
                         rellenar un campo no es lo mismo que no tener derecho a saberlo.
                       */}
                       {!yaEsDeTodos && !typeConfig.requiresBeforeHire ? (
                         <p className="mt-1 text-sm text-ink-500">
                           Vencera <strong className="font-medium text-ink-700">al mes</strong> de publicarla
                           {typeConfig.defaultAnnualDate
-                            ? `, y se repetira cada ano antes del ${diaYMes(typeConfig.defaultAnnualDate)}.`
+                            ? `, y se repetira cada año antes del ${diaYMes(typeConfig.defaultAnnualDate)}.`
                             : typeConfig.defaultRecurrenceMonths
                               ? `, y se repetira cada ${typeConfig.defaultRecurrenceMonths} meses.`
                               : ', y no se repite.'}
@@ -445,7 +449,7 @@ export function ActivityAudienceTab({
                         que va a obligar a la empresa entera.
 
                         NO SE ENSENA EN UNA INDUCCION DE INGRESO (2026-09-03). Ahi ese numero es el
-                        tamano de la audiencia, no a cuanta gente va a obligar — que hoy es CERO,
+                        tamaño de la audiencia, no a cuanta gente va a obligar — que hoy es CERO,
                         porque solo alcanza a quien entre a partir de ahora. Ensenar "768" al lado
                         de "se exigira a quien entre desde ahora" son dos frases que se contradicen,
                         y la salvaguarda de "mira dos veces antes de obligar a la empresa entera"
@@ -483,7 +487,7 @@ export function ActivityAudienceTab({
                 <Field
                   htmlFor="q-jobs"
                   label="Cargos que la deben hacer"
-                  hint="Es la matriz de competencia: quien entre con uno de estos cargos la tendra sin que nadie la asigne."
+                  ayuda="Es la matriz de competencia: quien entre con uno de estos cargos la tendra sin que nadie la asigne."
                 >
                   <MultiSelect
                     id="q-jobs"
@@ -586,9 +590,9 @@ export function ActivityAudienceTab({
 
               {/*
                 LA TRAMPA DEL ANCLAJE, dicha antes de caer en ella. "Al ingresar" cuenta desde la
-                fecha de ingreso de cada persona: para quien lleva cuatro anos en la empresa esa
+                fecha de ingreso de cada persona: para quien lleva cuatro años en la empresa esa
                 fecha ya paso, y la obligacion nace VENCIDA. Es lo correcto para la induccion de
-                quien entra manana y un desastre para estrenar un requisito con la plantilla
+                quien entra mañana y un desastre para estrenar un requisito con la plantilla
                 actual; en pantalla las dos opciones se parecen demasiado como para no avisar.
               */}
               {plazo.trigger === 'ON_HIRE' ? (
@@ -606,13 +610,13 @@ export function ActivityAudienceTab({
                 acaba donde caiga. Si se estrena subiendo 116 usuarios el mismo dia, los 116
                 vencen el mismo dia, que no se parece a como funciona una empresa.
 
-                "Cada ano en una fecha" es la CAMPANA anual, que es como se hace de verdad la
+                "Cada año en una fecha" es la CAMPANA anual, que es como se hace de verdad la
                 reinduccion y como la pregunta el auditor: "¿hicieron la reinduccion de 2026?".
               */}
               {/*
                 LA PALABRA QUE NOMBRA LO ELEGIDO, debajo (2026-09-05).
 
-                Las tres opciones se leen parecido —"cada ano en una fecha fija" y "cada N meses"—
+                Las tres opciones se leen parecido —"cada año en una fecha fija" y "cada N meses"—
                 y la diferencia entre ellas no esta en las palabras sino en QUE clase de obligacion
                 crean: una hace que todos venzan el mismo dia y la otra le da a cada quien su propio
                 aniversario. Lo pidio el cliente: una linea corta que lo nombre.
@@ -631,7 +635,7 @@ export function ActivityAudienceTab({
                   }
                 >
                   <option value="NO">No se repite</option>
-                  <option value="ANUAL">Cada ano, en una fecha fija</option>
+                  <option value="ANUAL">Cada año, en una fecha fija</option>
                   <option value="MESES">Cada N meses desde que la hizo</option>
                 </Select>
               </Field>
@@ -643,7 +647,7 @@ export function ActivityAudienceTab({
                 No se quita la opcion, y es deliberado. El motor lee la recurrencia del REQUISITO,
                 no del tipo, asi que hacerla repetir funciona entero —rondas, ventana, vigencia de
                 la constancia— y hay casos legitimos: una induccion especifica de un puesto que la
-                empresa decide refrescar cada dos anos.
+                empresa decide refrescar cada dos años.
 
                 Lo que si cambia es COMO SE LEE. El tipo es la palabra que usa el auditor: una
                 induccion contesta "¿se la hicieron cuando llego?" y una recertificacion "¿esta
@@ -684,8 +688,8 @@ export function ActivityAudienceTab({
               {plazo.modoRepite === 'ANUAL' ? (
                 <Field
                   htmlFor="q-repite-fecha-mes"
-                  label="Antes de que fecha, cada ano"
-                  hint="Todos vencen el mismo dia, que es como se hace una campana anual."
+                  label="Antes de que fecha, cada año"
+                  hint="Todos vencen el mismo dia, que es como se hace una campaña anual."
                 >
                   <MesDia
                     idBase="q-repite-fecha"
@@ -862,7 +866,7 @@ export function ActivityAudienceTab({
                       {/*
                         LA CIFRA, dicha segun a quien obliga de VERDAD. Un requisito de "solo a
                         quien entre desde ahora" alcanza a 471 personas en la audiencia y obliga a
-                        CERO hoy: ensenar el 471 a secas hace pensar que el sistema esta roto
+                        CERO hoy: enseñar el 471 a secas hace pensar que el sistema esta roto
                         cuando esta haciendo justo lo que se le pidio.
                       */}
                       {requirement.soloNuevos
@@ -959,7 +963,7 @@ export function ActivityAudienceTab({
               <Table>
                 <THead>
                   <Tr>
-                    <Th>Persona</Th>
+                    <Th>Nombre</Th>
                     <Th>Cargo</Th>
                     {/*
                       AREA EN LUGAR DE ORIGEN (2026-09-03).
@@ -981,7 +985,7 @@ export function ActivityAudienceTab({
                   </Tr>
                 </THead>
                 <TBody>
-                  {rows.map((row) => (
+                  {obligadosVisibles.map((row) => (
                     <Tr key={row.id}>
                       <Td className="font-medium text-ink-900">
                         <span className="flex items-center gap-2">
@@ -1020,6 +1024,7 @@ export function ActivityAudienceTab({
                   ))}
                 </TBody>
               </Table>
+              {paginadorObligados}
             </div>
           )}
         </section>
@@ -1073,10 +1078,10 @@ function describirRequisito(requirement: ActivityRequirement): string {
         ? 'vence el mismo dia'
         : `vence a los ${dias} dias`;
   const repite = requirement.fixedDate
-    ? ` · cada ano antes del ${requirement.fixedDate.replace("-", "/")}`
+    ? ` · cada año antes del ${requirement.fixedDate.replace("-", "/")}`
     : requirement.everyMonths
       ? requirement.everyMonths === 12
-        ? " · se repite cada ano desde que la hizo"
+        ? " · se repite cada año desde que la hizo"
         : ` · se repite cada ${requirement.everyMonths} meses desde que la hizo`
       : "";
   return `${cuando}${repite}`;
@@ -1113,7 +1118,7 @@ function sourceLabel(source: string): string {
   return map[source] ?? source;
 }
 
-/** "03-31" -> "31 de marzo". La fecha de la campana se lee, no se descifra. */
+/** "03-31" -> "31 de marzo". La fecha de la campaña se lee, no se descifra. */
 function diaYMes(fixedDate: string): string {
   const MESES = [
     'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',

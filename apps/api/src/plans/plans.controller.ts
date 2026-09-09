@@ -86,7 +86,7 @@ export class PlansController {
   }
 
   // REABRIR: la salida para un plan cerrado por error, que desde la Decision #71 se queda con el
-  // ano entero y no deja planear. Va con `plans:approve`, igual que cerrarlo, y exige motivo.
+  // año entero y no deja planear. Va con `plans:approve`, igual que cerrarlo, y exige motivo.
   @Post(':id/reopen')
   @RequirePermissions('plans:approve')
   reopen(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {

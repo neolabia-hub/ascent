@@ -84,7 +84,7 @@ export default function ProfilePage() {
             icon={Shield}
             label="Protectores"
             value={`${progress.freezesAvailable}`}
-            hint="cubren un dia sin senal"
+            hint="cubren un dia sin señal"
           />
         </section>
       )}
@@ -95,7 +95,7 @@ export default function ProfilePage() {
         Es el expediente formativo de la persona y lo consulta ella misma, casi siempre porque se
         la esta pidiendo alguien: el cliente al que va a entrar, una empresa a la que se postula.
         Una pantalla propia para una lista que casi siempre tiene tres filas seria una entrada mas
-        en la navegacion para algo que se mira dos veces al ano.
+        en la navegacion para algo que se mira dos veces al año.
       */}
       <MisConstancias />
 

@@ -63,7 +63,7 @@ export function TenantMark({ collapsed = false }: { collapsed?: boolean }) {
         <div className="min-w-0">
           <p className="truncate font-display text-sm font-semibold leading-tight text-ink-900">{name}</p>
           {/*
-            EL NOMBRE DEL PRODUCTO, pequeno y debajo del de la empresa. Ese es el orden correcto
+            EL NOMBRE DEL PRODUCTO, pequeño y debajo del de la empresa. Ese es el orden correcto
             dentro de la aplicacion: la persona que entra trabaja en su empresa, no en NEO PULSE.
             Pero tiene que estar, porque si no, nadie sabe como se llama la herramienta que usa
             todos los dias —y es lo que escribe en el asunto cuando pide ayuda—.

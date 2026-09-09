@@ -235,15 +235,44 @@ siguiente: hoy esa lista se arma a mano en una hoja de cálculo y por eso siempr
 recuerda en octubre que en marzo caducan cuarenta certificados de alturas—. Es además la segunda
 pregunta del auditor: la primera es «¿quién lo hizo?» y la segunda «¿sigue vigente?».
 
-**Dos cosas distintas vencen, y no se suman:**
+**Dos trabajos distintos, y no se suman** (eje corregido el 2026-09-08, Decisión #162):
 
 | | Qué es | Qué se hace |
 |---|---|---|
-| **Certificación** | El papel caduca en una fecha (`certification_grants.valid_until`) | **Reprogramar.** La persona lo hizo bien y aun así deja de estar acreditada |
-| **Obligación** | Una formación que se debe y no se ha hecho, con su fecha límite | **Perseguir.** Hay a quién llamar |
+| **Reprogramar** | Ya la tuvo y deja de estar acreditado | **Volver a convocarla.** No hay a quién regañar: ocupa un salón, un instructor y un día del año que viene |
+| **Perseguir** | Nunca la ha cumplido y tiene una obligación abierta con fecha límite | **Llamar.** Hay a quién |
 
 Sumarlas daría una cifra grande y sin significado, y las dos acciones son opuestas. Por eso son dos
 series de la misma barra y nunca un solo número.
+
+**El eje partía antes por DE DÓNDE SALÍA EL DATO** —«Certificación» leía `certification_grants`,
+«Obligación» leía `assignments`— y eso es una división del esquema, no del trabajo. Costaba dos
+cosas, y las dos se veían en la pantalla:
+
+1. `certification_grants` **no la escribe nadie**, así que su serie salía siempre en cero mientras
+   las fechas de caducidad existían de verdad en otras dos columnas.
+2. Y a quien está en su ventana de 60 días —el papel le caduca en marzo y la ronda siguiente ya le
+   nació— se le contaba en las **dos** series: el mismo trabajo, dos veces.
+
+**De dónde salen hoy las fechas:**
+
+| Fuente | Qué es | Clase |
+|---|---|---|
+| `assignments.valid_until_override` | lo que dice el papel de un tercero (#157); manda sobre la recurrencia | Reprogramar |
+| `certificates.valid_until` | la constancia propia, escrita en cada emisión (#111) | Reprogramar |
+| `assignments.due_at` de una abierta | la ronda que ya nació y todavía se debe | según su historia |
+
+**Una fila por persona y formación.** Cuando coinciden varias manda la **obligación abierta** —es la
+que tiene plazo de verdad y la que se cierra al tomar la lista— y, si no la hay, la caducidad más
+próxima. Cada fila dice además **según qué** vence: quien lee «vence en marzo» pregunta siempre
+«¿según qué?», y la respuesta cambia lo que hace.
+
+**Y al medirlo apareció un fallo debajo** (2026-09-08): la constancia propia se emitía **sin fecha de
+vencimiento** cuando la formación tenía más de una regla viva. La vigencia salía de `findFirst` sobre
+las reglas, así que dependía del orden de las filas; si tocaba la regla sin recurrencia —la de «toda
+la empresa», que se crea sola al publicar una inducción— el papel nacía sin caducidad y la persona
+desaparecía de este informe. Ahora se miran todas y manda **la vigencia más corta**: la obligación
+más exigente es la que decide, y equivocarse hacia avisar antes se corrige mirando.
 
 **Detalles que son decisiones:**
 
@@ -256,22 +285,30 @@ series de la misma barra y nunca un solo número.
   que se amontona en el mes de al lado.
 - **Cada mes filtra la lista de abajo**, porque la pregunta siguiente a «en marzo hay cuarenta» es
   siempre «¿quiénes?».
-- **Solo las obligaciones abiertas.** Una ya cumplida no vence: se volverá a exigir cuando toque la
-  ronda siguiente, y esa obligación todavía no existe. Incluir las cerradas llenaría el calendario
-  de trabajo ya hecho, que es la forma más rápida de que nadie vuelva a mirarlo.
+- **Solo las obligaciones abiertas.** Una ya cumplida no vence: lo que vence es su papel, y de eso se
+  encargan las otras dos fuentes.
 
-**La serie de «Certificación» sale hoy en CERO, y no porque no haya datos** (2026-09-05). Lee
-`certification_grants`, una tabla que se consulta en tres sitios y que **no escribe nadie**: no hay
-módulo `certifications` en la API ni nada en la semilla. Mientras tanto la fecha de caducidad de
-cada persona sí existe en otras dos columnas —`certificates.valid_until`, escrita en cada constancia
-desde la Decisión #111, y `assignments.valid_until_override`, con lo que dice el papel de un tercero
-(#157)—. La serie no está vacía por falta de dato: está leyendo la tabla equivocada.
+### Y ahora alguien se entera: el aviso de los lunes
 
-Y eso importa más de lo que parece, porque **la serie de Obligación solo ve lo que ya existe**: la
-ronda siguiente de algo que se repite nace 60 días antes de vencer, no antes. Con el horizonte por
-defecto en 12 meses, los meses 3 al 12 del calendario salen estructuralmente vacíos para todo lo
-recurrente — que es justo lo contrario de «nadie recuerda en octubre que en marzo caducan cuarenta
-certificados».
+El informe existía y **había que acordarse de entrar a mirarlo**, que es el problema que venía a
+resolver. Desde el 2026-09-08 sale un aviso semanal —los lunes— **a la bandeja de la plataforma, no
+por correo** (decisión del cliente), a quien tiene `reports:read_scope`: los mismos que pueden abrir
+la pantalla, dicho por permiso y nunca por nombre de rol.
+
+Tres decisiones dentro del aviso, todas sobre lo mismo —que se lea—:
+
+- **Uno, no cuarenta.** Un resumen por persona, no una notificación por vencimiento. Cuarenta avisos
+  el mismo lunes enseñan a archivarlos sin leerlos, y con ellos se archiva el que sí importaba.
+- **Las dos cifras por separado, nunca la suma.** Un número único obliga a entrar para saber de qué
+  trabajo se trata, que es justo lo que no se hace.
+- **Si no hay nada, no se manda.** Un aviso semanal que llega igual cuando no vence nada es ruido de
+  fondo en tres semanas.
+
+Cuántos días mira hacia adelante lo decide el tenant (`expirationDigestDays`, 45 por defecto, 0 lo
+apaga) en Configuración → Preferencias: conseguir un cupo de alturas con la ARL no se tarda lo que se
+tarda en programar una charla propia. Y se puede disparar a mano —`POST /reportes/vencimientos/avisar`,
+bajo `config:manage_tenant`— porque probar un aviso semanal esperando al lunes es como no poder
+probarlo.
 
 **El color de las dos series no es decorativo.** Son categorías, no estados, así que no reutilizan
 el ámbar de «atrasado» ni el rojo de «reprobado» —prestarlos los vaciaría de significado—. Los dos

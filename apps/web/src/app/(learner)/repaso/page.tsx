@@ -22,7 +22,7 @@ import { motivoDelError } from '@/lib/api';
  * 2-7-14-30, y no dura mas de tres minutos: el backend acota la cola a proposito.
  *
  * Se responde TODA la sesion y se entrega de una vez. Entregar pregunta por pregunta obligaria a
- * tener senal en cada toque, y esta pantalla existe justo para quien no la tiene.
+ * tener señal en cada toque, y esta pantalla existe justo para quien no la tiene.
  */
 export default function ReviewPage() {
   const { showToast } = useToast();

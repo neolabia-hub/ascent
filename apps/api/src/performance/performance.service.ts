@@ -23,7 +23,7 @@ import {
  *   1. No toca `enrollments`, `assignments` ni `certification_grants`. El cliente pidio que el
  *      desempeno no se mezcle con la capacitacion, y la forma de garantizarlo no es tener cuidado:
  *      es que este archivo no conozca esas tablas.
- *   2. No decide a quien se forma el ano que viene. Una competencia puede APUNTAR a la formacion
+ *   2. No decide a quien se forma el año que viene. Una competencia puede APUNTAR a la formacion
  *      que la fortalece, y ahi se queda: convertir una nota baja en una obligacion automatica seria
  *      que el sistema decida algo que decide una persona.
  *   3. No deja leer una evaluacion a quien no le toca. La autorizacion es por IDENTIDAD —el
@@ -131,7 +131,7 @@ export class PerformanceService {
       include: {
         items: { include: { competency: true }, orderBy: { displayOrder: 'asc' } },
         jobTitles: { include: { jobTitle: { select: { id: true, name: true } } } },
-        // La base con SUS competencias: la pantalla tiene que poder ensenar las heredadas sin
+        // La base con SUS competencias: la pantalla tiene que poder enseñar las heredadas sin
         // pedirlas aparte, y la vista previa las pinta junto a las propias.
         base: {
           select: {
@@ -181,7 +181,7 @@ export class PerformanceService {
       Tres cosas que no pueden pasar y que aqui se cortan:
 
       - Heredar de si mismo, o de un formulario que a su vez hereda. Una cadena de plantillas es
-        imposible de leer en pantalla y de explicar a quien la configura una vez al ano.
+        imposible de leer en pantalla y de explicar a quien la configura una vez al año.
       - Ser base Y heredar a la vez: si de este formulario ya cuelgan otros, no puede colgar el.
       - Repetir en el cargo una competencia que ya viene de la base. Se preguntaria dos veces la
         misma cosa en la misma evaluacion, y ademas contaria doble en la nota.
@@ -283,7 +283,7 @@ export class PerformanceService {
    *
    * El reparto se comprueba AQUI y no solo al abrir: dos formularios que se pelean el mismo cargo
    * es un error de configuracion, y descubrirlo al pulsar «Abrir» es descubrirlo con prisa y con la
-   * campana ya anunciada.
+   * campaña ya anunciada.
    */
   async createCycle(body: unknown, user: AuthUser) {
     const data = cycleSchema.parse(body);
@@ -422,7 +422,7 @@ export class PerformanceService {
       Filtrar de entrada por los cargos declarados seria mas corto y dejaria fuera EN SILENCIO a
       quien no encaje — que es exactamente como se descubre en diciembre que a los conductores nadie
       los evaluo porque nadie hizo su formulario. Se reparte sobre toda la plantilla y lo que queda
-      fuera se cuenta. Si la campana era a proposito solo para unos cargos, el aviso sobra y no
+      fuera se cuenta. Si la campaña era a proposito solo para unos cargos, el aviso sobra y no
       estorba; si fue un olvido, es la unica ocasion de verlo.
     */
     const personas = await this.prisma.scoped.user.findMany({
@@ -462,7 +462,7 @@ export class PerformanceService {
 
       Pasa cuando ningun cargo de la empresa encaja con los formularios elegidos, o cuando nadie
       tiene responsable de area y el ciclo no lleva autoevaluacion. Abrir es irreversible: dejarlo
-      pasar convierte un error de configuracion en una campana vacia que ya no se puede corregir.
+      pasar convierte un error de configuracion en una campaña vacia que ya no se puede corregir.
     */
     if (evaluaciones.length === 0) {
       throw new BadRequestException({
@@ -473,7 +473,7 @@ export class PerformanceService {
     }
 
     // La copia congelada de CADA formulario: lo que se pregunto en este ciclo, con sus escalas y
-    // sus pesos. Una por formulario, porque en la misma campana conviven varios.
+    // sus pesos. Una por formulario, porque en la misma campaña conviven varios.
     const congelados = cycle.forms.map((cycleForm) => ({
       cycleFormId: cycleForm.id,
       formSnapshot: {
@@ -560,7 +560,7 @@ export class PerformanceService {
     if (cycle.status !== 'OPEN') throw new ConflictException({ code: 'CYCLE_NOT_OPEN' });
 
     // Cerrar NO borra lo que quedo sin responder: queda como estaba, y el consolidado lo dice. Un
-    // ciclo con quince evaluaciones sin entregar es informacion sobre como fue la campana.
+    // ciclo con quince evaluaciones sin entregar es informacion sobre como fue la campaña.
     const updated = await this.prisma.scoped.performanceCycle.update({
       where: { id },
       data: { status: 'CLOSED', closedAt: new Date() },
@@ -585,7 +585,7 @@ export class PerformanceService {
       orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
       include: {
         cycle: { select: { id: true, name: true, endsAt: true } },
-        // El nombre del formulario, que con varios en la misma campana es lo que distingue una
+        // El nombre del formulario, que con varios en la misma campaña es lo que distingue una
         // evaluacion de otra en la lista de un jefe con gente de dos cargos.
         cycleForm: { select: { id: true, form: { select: { name: true } } } },
       },
@@ -666,7 +666,7 @@ export class PerformanceService {
     if (review.status === 'SUBMITTED') throw new ConflictException({ code: 'ALREADY_SUBMITTED' });
 
     // La copia congelada sale del formulario QUE LE TOCO A ESTA PERSONA, no del ciclo: en la misma
-    // campana el conductor y el analista responden formularios distintos.
+    // campaña el conductor y el analista responden formularios distintos.
     const snapshot = review.cycleForm.formSnapshot as unknown as {
       items: { competencyId: string; name: string; scale: EscalaCompetencia; weight: number }[];
     } | null;
@@ -696,7 +696,7 @@ export class PerformanceService {
           reviewId: id,
           competencyId: respuesta.competencyId,
           // El nombre se guarda con la respuesta: la competencia puede renombrarse, y lo que se
-          // respondio tiene que poder leerse dentro de cinco anos tal como se pregunto.
+          // respondio tiene que poder leerse dentro de cinco años tal como se pregunto.
           competencyName: porCompetencia.get(respuesta.competencyId)?.name ?? 'Competencia',
           value: respuesta.value,
           comment: respuesta.comment ?? null,
@@ -781,7 +781,7 @@ export class PerformanceService {
    * El consolidado de un ciclo, para quien lo gestiona.
    *
    * Va ENTERO y POR FORMULARIO (Decision #139). Tener el de conductores y el de analistas en la
-   * misma campana existe justamente para poder mirar las dos cosas: la campana completa, y cada
+   * misma campaña existe justamente para poder mirar las dos cosas: la campaña completa, y cada
    * grupo por separado sin sumar a mano. La nota se puede promediar entre formularios distintos
    * porque esta normalizada a 100 — un 4 sobre 5 y un "cumple" valen 80 y 100 en las dos.
    */
@@ -815,10 +815,10 @@ export class PerformanceService {
   }
 
   /**
-   * EL CONSOLIDADO EN EXCEL: lo mismo que ensena la pantalla, entero.
+   * EL CONSOLIDADO EN EXCEL: lo mismo que enseña la pantalla, entero.
    *
    * La pantalla se queda en 100 filas porque nadie lee 900 en una ventana; el archivo va completo,
-   * que es lo que se guarda como evidencia del ano. Las filas salen del MISMO metodo que pinta la
+   * que es lo que se guarda como evidencia del año. Las filas salen del MISMO metodo que pinta la
    * pantalla —no de una consulta paralela—: un informe que no cuadra con lo que se acaba de mirar
    * destruye la confianza en los dos a la vez.
    */
@@ -891,7 +891,7 @@ export class PerformanceService {
 /**
  * LAS CUATRO CIFRAS de un monton de evaluaciones.
  *
- * Fuera de la clase porque no consulta nada, y en un solo sitio porque se usa para la campana
+ * Fuera de la clase porque no consulta nada, y en un solo sitio porque se usa para la campaña
  * entera y para cada formulario: contarlas dos veces con dos codigos es como acaban sin cuadrar.
  */
 /** Como se dice cada estado de ciclo en un archivo que lee alguien de fuera. */

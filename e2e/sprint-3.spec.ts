@@ -165,7 +165,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     /*
       HAY QUE PEDIR "TODOS" PARA VERLO (2026-09-03).
 
-      La lista de Requisitos ensena por defecto **solo lo VIGENTE**: un requisito retirado no obliga
+      La lista de Requisitos enseña por defecto **solo lo VIGENTE**: un requisito retirado no obliga
       a nadie y verlo mezclado con los vivos hace contar mal de un vistazo. Asi que al retirarlo la
       fila desaparece, y esta comprobacion —que no se BORRA, que queda RETIRADO— hay que hacerla
       cambiando el filtro. Es la propia pantalla la que lo sugiere cuando una busqueda no encuentra
@@ -201,11 +201,11 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     /*
       SI HAY UN PLAN APROBADO VIVO, ESTE FORMULARIO PIDE MOTIVO (2026-09-03).
 
-      Desde que programar una jornada de una capacitacion del plan la mete en el plan del ano
+      Desde que programar una jornada de una capacitacion del plan la mete en el plan del año
       (Decision #75), el cajon pide el "por que" cuando el plan destino ya esta aprobado — agregar
       un renglon crea obligaciones reales y el auditor va a preguntar de donde salio.
 
-      Que aparezca o no depende de si existe un plan aprobado del ano en curso o posterior, es
+      Que aparezca o no depende de si existe un plan aprobado del año en curso o posterior, es
       decir, del ESTADO de la base, no de esta prueba. Antes fallaba en cuanto otra corrida dejaba
       uno: el boton salia apagado y el error era un timeout, que no se parece a la causa. Se rellena
       si lo pide y se sigue. Que el motivo sea OBLIGATORIO lo comprueba la prueba del plan, mas
@@ -213,7 +213,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     */
     const motivo = page.locator('#o-justification');
     if (await motivo.isVisible()) {
-      await motivo.fill('Jornada de la prueba de punta a punta: se programa dentro del ano en curso.');
+      await motivo.fill('Jornada de la prueba de punta a punta: se programa dentro del año en curso.');
     }
 
     await page.getByRole('button', { name: /^Crear (convocatoria|y agregar al plan)$/ }).click();
@@ -232,8 +232,8 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     //    El plan se crea DESPUES de la convocatoria a proposito: si existiera antes, la
     //    convocatoria entraria sola (Decision #75) y este paso no probaria el camino de
     //    enganchar una que YA existe, que es la unica via cuando el plan ya esta aprobado.
-    // Cada prueba trabaja en SU ano: desde la Decision #71 hay UN plan por ano, asi que dos
-    // pruebas sobre el mismo ano se pisarian entre si y con el plan real de la empresa.
+    // Cada prueba trabaja en SU año: desde la Decision #71 hay UN plan por año, asi que dos
+    // pruebas sobre el mismo año se pisarian entre si y con el plan real de la empresa.
     await crearPlanDelAno(page, ANO_PLAN_DOD, `Plan S3 ${suffix}`);
 
     // El plan ofrece DOS caminos: crear la jornada ahi mismo, o enganchar una que ya existe.
@@ -262,7 +262,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
 
     // ...pero AGREGAR ya no (Decision #55). Si en agosto abren una regional, esa jornada tiene
-    // que entrar en el plan del ano; prohibirlo no evitaba el cambio, lo sacaba del sistema.
+    // que entrar en el plan del año; prohibirlo no evitaba el cambio, lo sacaba del sistema.
     await page.getByRole('button', { name: 'Agregar otra convocatoria' }).click();
     await page.locator('#o-month').selectOption('9');
     // El formulario nace con lo que propone el TIPO —una induccion queda disponible, no se cita a
@@ -304,8 +304,8 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(marzo.locator('a')).toHaveCount(0);
 
     // 8. Y se retira al terminar. Un plan aprobado que sobrevive a la prueba es lo que llenaba la
-    //    base de planes fantasma —168 de 2026 llego a haber—, y desde que hay uno por ano ademas
-    //    le quita el ano al de al lado. Borrarlo comprueba de paso la otra mitad de la Decision
+    //    base de planes fantasma —168 de 2026 llego a haber—, y desde que hay uno por año ademas
+    //    le quita el año al de al lado. Borrarlo comprueba de paso la otra mitad de la Decision
     //    #62: aprobado pero sin que nadie empezara, se borra revocando sus obligaciones.
     await limpiarPlanDelAno(page, ANO_PLAN_DOD);
   });
@@ -317,7 +317,7 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
  * El plan no puede resolverlo en un cajon: una capacitacion nueva hay que armarla y publicarla
  * antes de poder convocarla. Lo que si tiene que cumplir es no perder a quien la empieza — el
  * fallo que se reporto era exactamente ese: se salia a "Formaciones" y ya no habia camino de
- * vuelta al plan, asi que planear el ano eran cuatro pantallas por renglon.
+ * vuelta al plan, asi que planear el año eran cuatro pantallas por renglon.
  */
 test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan', async ({ page }) => {
   await loginAsAdmin(page);
@@ -342,9 +342,9 @@ test('desde el plan se crea una capacitacion nueva y la ficha devuelve al plan',
   // "capacitacion del plan" no la mete en ningun plan, su tipo promete en pantalla que cuenta
   // para los indicadores del plan anual, y no cuenta para nada. Ninguna pantalla lo decia.
   //
-  // El ANO no se fija: la tarjeta elige el plan del ano en curso y solo cae al siguiente si el
+  // El ANO no se fija: la tarjeta elige el plan del año en curso y solo cae al siguiente si el
   // de este no existe o esta cerrado. Cual sea depende de lo que haya en la base —si alguien
-  // creo el plan de este ano mientras corre la suite, y esta bien que la ficha apunte a ese—.
+  // creo el plan de este año mientras corre la suite, y esta bien que la ficha apunte a ese—.
   // Clavarlo hacia fallar la prueba por un comportamiento correcto.
   await expect(page.getByText(/^Esta capacitacion no esta en el plan de \d{4}\.$/)).toBeVisible();
   // Sin contenido publicado no se ofrece programarla: solo se convoca lo publicado.
@@ -376,7 +376,7 @@ test('un plan en borrador se corrige y se elimina desde el listado', async ({ pa
 
   await crearPlanDelAno(page, ANO_PLAN_DESECHABLE, nombre);
 
-  // 1. Corregir la cabecera. En borrador se puede cambiar hasta el ano, y sin pedir motivo.
+  // 1. Corregir la cabecera. En borrador se puede cambiar hasta el año, y sin pedir motivo.
   await page.getByRole('button', { name: 'Editar' }).click();
   await page.locator('#e-name').fill(corregido);
   await page.locator('#e-objective').fill('Objetivo escrito despues de crear el plan.');

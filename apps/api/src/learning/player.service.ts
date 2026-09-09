@@ -14,7 +14,7 @@ import { meetsCompletion, mergeProgressData, readLastCard, resolveMinWatchPct } 
  *  1. **Todo lo mio es solo mio.** Cada operacion comprueba que la ejecucion pertenece a quien
  *     la pide. El aislamiento por empresa (RLS) no basta: dentro de la misma empresa, el
  *     progreso de otra persona tampoco se toca.
- *  2. **El avance no retrocede.** El telefono puede reenviar progreso viejo al recuperar senal;
+ *  2. **El avance no retrocede.** El telefono puede reenviar progreso viejo al recuperar señal;
  *     el servidor se queda con el mayor porcentaje y acumula el tiempo. Repetir un envio nunca
  *     puede empeorar el estado de alguien.
  */
@@ -45,7 +45,7 @@ export class PlayerService {
           lessonId: true,
           assessmentId: true,
           surveyTemplateId: true,
-          // Lo justo para que el indice diga de que tamano es cada parte ANTES de abrirla:
+          // Lo justo para que el indice diga de que tamaño es cada parte ANTES de abrirla:
           // "8 tarjetas", "11 diapositivas". Un indice que solo lista titulos obliga a entrar
           // para saber en que se esta metiendo uno.
           lesson: { select: { estimatedMinutes: true, _count: { select: { cards: true } } } },
@@ -204,7 +204,7 @@ export class PlayerService {
 
   /**
    * Guarda el avance de una pieza. Acumulativo e idempotente: es el endpoint que mas veces va a
-   * recibir envios repetidos desde un telefono que recupera senal.
+   * recibir envios repetidos desde un telefono que recupera señal.
    */
   async saveProgress(actor: AuthUser, contentId: string, input: ProgressInput) {
     const tenantId = this.prisma.currentTenantId;

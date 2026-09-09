@@ -12,16 +12,16 @@
  *   - BORRADOR              → se borra. Nunca obligo a nadie; no hay nada que reescribir.
  *   - CERRADO SIN NINGUNA OBLIGACION
  *                           → se borra. Un plan que se cerro sin haber obligado a nadie no es
- *                             evidencia de nada: es un ensayo. Desde que hay UN plan por ano
- *                             (Decision #71) dejarlo puesto bloquea el ano entero.
+ *                             evidencia de nada: es un ensayo. Desde que hay UN plan por año
+ *                             (Decision #71) dejarlo puesto bloquea el año entero.
  *   - APROBADO / EN EJECUCION sin que nadie haya empezado
  *                           → se borra, REVOCANDO sus obligaciones y diciendo cuantas. Un plan
  *                             aprobado por error el viernes y detectado el lunes es un error, no
- *                             historia, y obligar a arrastrarlo todo el ano ensucia el indicador
+ *                             historia, y obligar a arrastrarlo todo el año ensucia el indicador
  *                             de cumplimiento de la empresa entera.
  *   - Con alguien que YA EMPEZO → NO. Ese avance es de una persona, no del plan, y borrarlo seria
  *                             borrarle a alguien lo que hizo. Se cancelan los renglones o se
- *                             cierra el ano, que es lo que el auditor espera encontrar.
+ *                             cierra el año, que es lo que el auditor espera encontrar.
  *   - CERRADO CON OBLIGACIONES → NO. Cerrar es lo que lo convierte en evidencia. Pero ya no es un
  *                             callejon sin salida: se REABRE con motivo auditado, que deja rastro
  *                             donde borrar no lo dejaria.
@@ -50,9 +50,9 @@ export function decidePlanDeletion(facts: PlanDeletionFacts): PlanDeletionVerdic
      * UN PLAN CERRADO QUE NUNCA OBLIGO A NADIE NO ES EVIDENCIA DE NADA.
      *
      * La regla anterior —"cerrado no se borra ni se reabre"— protegia lo correcto y lo aplicaba a
-     * todo, y desde que hay UN plan por ano (Decision #71) eso dejo de ser una molestia y paso a
+     * todo, y desde que hay UN plan por año (Decision #71) eso dejo de ser una molestia y paso a
      * ser una TRAMPA: un plan de ensayo que alguien cerro por probar el boton ocupa 2026 para
-     * siempre, y ya no se puede planear el ano ni programar nada en el. Sin salida en la interfaz,
+     * siempre, y ya no se puede planear el año ni programar nada en el. Sin salida en la interfaz,
      * la unica salida real era entrar a la base de datos.
      *
      * Lo que hay que proteger sigue siendo lo mismo que en el resto de esta funcion: el registro
@@ -68,7 +68,7 @@ export function decidePlanDeletion(facts: PlanDeletionFacts): PlanDeletionVerdic
       allowed: false,
       code: 'PLAN_CLOSED_IS_EVIDENCE',
       message:
-        'El plan cerrado ya obligo a gente: es la evidencia del ano y no se borra. Si hay que corregirlo, reabrelo.',
+        'El plan cerrado ya obligo a gente: es la evidencia del año y no se borra. Si hay que corregirlo, reabrelo.',
     };
   }
 

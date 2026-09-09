@@ -14,7 +14,7 @@ import { columnsToPayload } from './question-payload.js';
  *
  * Antes tenia su propia escalera de versiones, que era una SEGUNDA solucion al mismo problema que
  * la version de la formacion ya resolvia. Las dos escaleras no estaban sincronizadas, y de ahi
- * salian cuatro danos —el peor: publicar la v2 retiraba la v1 mientras el contenido de la
+ * salian cuatro daños —el peor: publicar la v2 retiraba la v1 mientras el contenido de la
  * formacion seguia apuntando a ella, y el examen dejaba de poder abrirse—.
  *
  * DOS CLASES DE FILA, y la diferencia es `sourceId`:
@@ -333,7 +333,7 @@ export class AssessmentsService {
     if (assessment.sourceId) {
       throw new ConflictException({
         code: 'ASSESSMENT_IS_COPY',
-        message: 'Esta es la copia congelada dentro de una formacion. Se quita desde la formacion.',
+        message: 'Esta es la copia congelada dentro de una formación. Se quita desde la formación.',
       });
     }
 
@@ -384,7 +384,7 @@ export class AssessmentsService {
     if (assessment.sourceId) {
       throw new ConflictException({
         code: 'ASSESSMENT_NOT_EDITABLE',
-        message: 'Esta es la copia congelada dentro de una formacion y no se modifica.',
+        message: 'Esta es la copia congelada dentro de una formación y no se modifica.',
       });
     }
     return assessment;

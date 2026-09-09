@@ -16,7 +16,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 /**
  * MI FORMACION: la hoja de vida formativa de la persona, como catalogo.
  *
- * El historial importa mas de lo que parece. Es lo que alguien ensena cuando le preguntan si hizo
+ * El historial importa mas de lo que parece. Es lo que alguien enseña cuando le preguntan si hizo
  * la induccion, y lo que consulta antes de pedir un certificado. Por eso se ve igual de cuidado
  * que lo pendiente y no como una tabla de registros.
  */

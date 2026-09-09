@@ -264,7 +264,7 @@ export class UsersService {
       throw new ConflictException({
         code: 'CANNOT_RESET_OWN_PASSWORD',
         message:
-          'No puedes restablecer tu propia contrasena aqui: te dejaria fuera con una generada al azar. Usa "Cambiar contrasena" desde tu perfil.',
+          'No puedes restablecer tu propia contraseña aquí: te dejaría fuera con una generada al azar. Usa "Cambiar contraseña" desde tu perfil.',
       });
     }
 

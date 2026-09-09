@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 function apiErrorText(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -25,6 +26,9 @@ export default function LeccionesPage() {
   const { showToast } = useToast();
 
   const [lessons, setLessons] = useState<LessonListItem[] | null>(null);
+  // `?? []` porque el hook va SIEMPRE, tambien mientras carga: un hook detras de un return
+  // condicional se salta en el primer render y React lo castiga con "rendered fewer hooks".
+  const { visibles: leccionesVisibles, paginador } = usePaginacion(lessons ?? []);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -126,7 +130,7 @@ export default function LeccionesPage() {
                 </Tr>
               </THead>
               <TBody>
-                {lessons.map((lesson) => (
+                {leccionesVisibles.map((lesson) => (
                   <Tr key={lesson.id}>
                     <Td className="font-medium text-ink-900">{lesson.title}</Td>
                     <Td className="text-ink-700">{lesson._count.cards}</Td>
@@ -165,6 +169,7 @@ export default function LeccionesPage() {
               </TBody>
             </Table>
           </div>
+          {paginador}
         </div>
       )}
 

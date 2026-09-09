@@ -7,7 +7,7 @@
  * El problema que resuelve. Una capacitacion del plan obliga a marcar Quienes, y el plan deriva a
  * quien obligar **de los ya obligados** (`projected.resolve`). Asi que el plan se encontraba
  * siempre con gente que YA tenia esa obligacion, y creaba una segunda. No era un caso raro: era
- * el 100% de los casos, y de ahi salian tres danos —la formacion duplicada en los pendientes,
+ * el 100% de los casos, y de ahi salian tres daños —la formacion duplicada en los pendientes,
  * terminarla cerraba solo una y la otra vencia, y la cobertura del plan podia marcar 0% con todo
  * el mundo capacitado, porque la inscripcion se ataba a la otra—.
  *

@@ -59,7 +59,7 @@ describe('rondas siguientes', () => {
     expect(civil(dueAt)).toBe('2027-03-15');
   });
 
-  it('la fecha fija anual salta al ano siguiente, nunca al mismo dia', () => {
+  it('la fecha fija anual salta al año siguiente, nunca al mismo dia', () => {
     const dueAt = computeNextCycleDueAt(enFecha, new Date('2026-01-31T10:00:00-05:00'));
     expect(civil(dueAt)).toBe('2027-01-31');
   });
@@ -76,7 +76,7 @@ describe('rondas siguientes', () => {
     expect(opensAt.getTime()).toBeLessThan(dueAt.getTime());
   });
 
-  it('la proxima fecha fija respeta el ano en curso si aun no ha pasado', () => {
+  it('la proxima fecha fija respeta el año en curso si aun no ha pasado', () => {
     expect(nextFixedDate('01-31', { year: 2026, month: 1, day: 5 })).toEqual({ year: 2026, month: 1, day: 31 });
     expect(nextFixedDate('01-31', { year: 2026, month: 2, day: 5 })).toEqual({ year: 2027, month: 1, day: 31 });
   });
@@ -85,7 +85,7 @@ describe('rondas siguientes', () => {
 /**
  * UNA CAMPANA SE SATISFACE POR PERIODO, UN ANIVERSARIO POR FECHA DE CUMPLIMIENTO.
  *
- * El ancla era `completedAt` para las dos. Quien hacia la campana ANTES de su fecha —o sea,
+ * El ancla era `completedAt` para las dos. Quien hacia la campaña ANTES de su fecha —o sea,
  * cualquiera que cumpliera— recibia al dia siguiente la ronda 2 con el mismo vencimiento que
  * acababa de satisfacer, y diez meses despues esa ronda se cerraba como NO REALIZADA. El
  * indicador acusaba de incumplir exactamente a quien habia cumplido.
@@ -93,7 +93,7 @@ describe('rondas siguientes', () => {
 describe('el ancla de la ronda siguiente', () => {
   const campana = recurrenceSchema.parse({ fixedDate: '03-31', windowDays: 60 });
 
-  it('en una campana ancla en el VENCIMIENTO, aunque la haya hecho once dias antes', () => {
+  it('en una campaña ancla en el VENCIMIENTO, aunque la haya hecho once dias antes', () => {
     const ronda = {
       completedAt: new Date('2026-03-20T10:00:00-05:00'),
       dueAt: new Date('2026-03-31T23:59:59-05:00'),
@@ -104,7 +104,7 @@ describe('el ancla de la ronda siguiente', () => {
     expect(civil(computeNextCycleDueAt(campana, ancla))).toBe('2027-03-31');
   });
 
-  it('adelantarse a la campana no la adelanta: el periodo es el que es', () => {
+  it('adelantarse a la campaña no la adelanta: el periodo es el que es', () => {
     const enero = {
       completedAt: new Date('2026-01-15T10:00:00-05:00'),
       dueAt: new Date('2026-03-31T23:59:59-05:00'),
@@ -112,7 +112,7 @@ describe('el ancla de la ronda siguiente', () => {
     expect(civil(computeNextCycleDueAt(campana, cycleAnchor(campana, enero, new Date())))).toBe('2027-03-31');
   });
 
-  it('hacerla TARDE tampoco corre la campana: sigue siendo la del ano siguiente', () => {
+  it('hacerla TARDE tampoco corre la campaña: sigue siendo la del año siguiente', () => {
     const tarde = {
       completedAt: new Date('2026-05-10T10:00:00-05:00'),
       dueAt: new Date('2026-03-31T23:59:59-05:00'),
@@ -151,7 +151,7 @@ describe('la gracia de quien ya estaba', () => {
     expect(dueAt.getTime()).toBeGreaterThan(entraHoy.getTime());
   });
 
-  it('a quien entra manana NO le afecta: su fecha de D1072 se respeta intacta', () => {
+  it('a quien entra mañana NO le afecta: su fecha de D1072 se respeta intacta', () => {
     // El alta se registra el 20 de agosto y la persona ingresa el 1 de diciembre: la fecha
     // calculada (30 de noviembre) es POSTERIOR a su entrada a la audiencia, asi que manda ella.
     const ingreso1Dic = new Date('2026-12-01T00:00:00.000Z');
@@ -251,7 +251,7 @@ describe('nextFixedDate: el dia se acota al mes', () => {
     expect(nextFixedDate('12-31', hoy)).toEqual({ year: 2026, month: 12, day: 31 });
   });
 
-  it('y si ya paso, se acota tambien en el ano siguiente', () => {
+  it('y si ya paso, se acota tambien en el año siguiente', () => {
     expect(nextFixedDate('09-31', { year: 2026, month: 11, day: 1 })).toEqual({ year: 2027, month: 9, day: 30 });
   });
 });

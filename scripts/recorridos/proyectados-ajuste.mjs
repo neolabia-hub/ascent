@@ -69,7 +69,7 @@ const pub = await admin.post(`/activities/versions/${creado.versionId}/publish`,
 comprobar(pub.ok, `publicada (${pub.estado})`, `publicar: ${pub.estado} ${JSON.stringify(pub.cuerpo).slice(0, 250)}`);
 
 /*
-  El alcance se acota a un CARGO dentro del area para que el grupo sea pequeno: este recorrido crea
+  El alcance se acota a un CARGO dentro del area para que el grupo sea pequeño: este recorrido crea
   personas de verdad para mover el numero, y hacerlo sobre un area de 200 seria caro y ruidoso.
 */
 const requisito = await admin.post(`/activities/${creado.activityId}/requirements`, {
@@ -142,7 +142,7 @@ comprobar(
 */
 comprobar(
   trasEntrar?.projectedCount === congelado,
-  'y el CONGELADO no se movio solo: el denominador del ano no cambia por detras',
+  'y el CONGELADO no se movio solo: el denominador del año no cambia por detras',
   `el congelado paso de ${congelado} a ${trasEntrar?.projectedCount} sin que nadie lo ajustara`,
 );
 

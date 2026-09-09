@@ -416,7 +416,7 @@ function FraseQueSeEscribe() {
  *
  * La URL llega YA FIRMADA del endpoint publico (Decision #96): esta pantalla no tiene sesion, asi
  * que no puede pedir la firma como hace el resto del producto. Sin eso, la unica pantalla donde la
- * marca de verdad importa seria la unica que no la puede ensenar.
+ * marca de verdad importa seria la unica que no la puede enseñar.
  *
  * Mientras no haya archivo se pinta la inicial sobre vidrio: un hueco donde deberia ir el logo se
  * lee como que la pagina esta rota.
@@ -463,7 +463,7 @@ function LogoEmpresa({ logoUrl, nombre }: { logoUrl: string | null; nombre: stri
  *
  * DOS COSAS Y NADA MAS: el contacto de esa empresa y un boton que deja constancia. Son para dos
  * personas distintas —la que tiene al jefe de SST a diez metros y solo necesitaba su extension, y
- * la que entra a las cinco de la manana desde una bodega y no va a llamar a nadie— y por eso estan
+ * la que entra a las cinco de la mañana desde una bodega y no va a llamar a nadie— y por eso estan
  * las dos. El boton no manda ninguna contrasena: pone un aviso en la bandeja de quien SI puede
  * restablecerla.
  *

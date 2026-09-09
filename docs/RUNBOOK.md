@@ -17,6 +17,40 @@ El diario de sesiones (que se hizo cada dia, que quedo abierto) vive en `docs/HA
 - node_modules instalado por Linux NO sirve para Windows (binarios de plataforma): si se cambia
   de runtime, `pnpm install --force`.
 
+## Agregar un permiso nuevo (2026-09-08)
+
+Los guards evaluan CODIGOS de `packages/shared/src/constants/permissions.ts`, pero la concesion vive
+en la base: un permiso nuevo en la constante **no lo tiene nadie** hasta que existe su fila y se le
+concede a los roles.
+
+```
+pnpm --filter @neo-pulse/api dev:sincronizar-permisos          # dice que falta
+pnpm --filter @neo-pulse/api dev:sincronizar-permisos -- --si  # lo aplica
+```
+
+**Por que NO se corre `db:seed` para esto.** El seed **reemplaza el juego completo de permisos de
+cada rol** con el de la semilla, y ademas repasa catalogos y tipos de formacion — que es como ya se
+borro una vez la parametrizacion del cliente. Este script **solo añade**: crea los permisos que
+falten y concede lo que le toca a cada rol semilla, sin quitar nada, asi que lo que el administrador
+dio a mano sobrevive.
+
+Corre como DUEÑO de la base (`DIRECT_DATABASE_URL`), como la semilla y los dos scripts de limpieza:
+`roles` y `role_permissions` estan bajo RLS y con el rol de la aplicacion veria cero filas — y diria,
+tan tranquilo, que todos tienen lo que les toca.
+
+## Una trampa que costo un fallo silencioso: `findFirst` sobre las reglas (2026-09-08)
+
+La vigencia de una constancia sale de la recurrencia del requisito, y se leia con
+`assignmentRule.findFirst(...)`. **Puede haber varias reglas vivas sobre la misma formacion** —al
+publicar una induccion se crea sola la de "toda la empresa", ademas de la que se exija a un cargo—
+asi que la vigencia dependia del ORDEN DE LAS FILAS: si tocaba la regla sin recurrencia, la
+constancia se emitia **sin fecha de vencimiento** y la persona desaparecia del informe de
+Vencimientos.
+
+La forma del fallo importa mas que el caso: **`findFirst` sobre algo que puede tener varios es una
+decision tomada por la base de datos**. Si hay que elegir, se eligen todas y se decide en el codigo
+—aqui, la vigencia mas corta— o se ordena explicitamente.
+
 ## Comandos canonicos (desde la raiz del repo, PowerShell)
 
 ```
@@ -135,7 +169,7 @@ node scripts/generate-icons.mjs
 ```
 El script dibuja el pulso de la marca y codifica el PNG con `zlib` (sin dependencias). Cambiar el
 icono es cambiar la constante `PULSE` o los colores del script: asi la revision es un diff legible
-y se puede sacar cualquier tamano nuevo que pida una plataforma.
+y se puede sacar cualquier tamaño nuevo que pida una plataforma.
 
 ### 2026-08-27 — El service worker se queda pegado entre despliegues
 `public/sw.js` usa `VERSION = 'v1'` en el nombre de los caches. **Al cambiar lo que se cachea hay
@@ -496,7 +530,7 @@ sesiones se abren en `C:\Users\Prueba` y desde ahi se entra al proyecto con `cd`
 Por que importa: el contexto del proyecto se carga desde el directorio de trabajo **hacia arriba**,
 nunca hacia abajo. Lanzando desde `C:\Users\Prueba` **no se cargan solos**:
 - `CLAUDE.md` del proyecto (80 KB: el modelo completo y las decisiones irreversibles),
-- las skills de `.claude/skills/` (`pulse-ui`, el contrato de diseno),
+- las skills de `.claude/skills/` (`pulse-ui`, el contrato de diseño),
 - los permisos y ajustes de `.claude/settings.json` del repo — de ahi que pregunte permiso por todo.
 
 Es la razon de que cada sesion haya que empezar diciendo "lee el RUNBOOK, el CLAUDE.md y el
@@ -589,7 +623,7 @@ suyos. Y si se levantaron a mano, bajarlos antes de construir.
 
 ```bash
 for port in 3100 3002; do
-  pid=$(netstat -ano | grep ":$port " | grep LISTENING | awk '{print $5}' | head -1)
+  pid=$(netstat -año | grep ":$port " | grep LISTENING | awk '{print $5}' | head -1)
   [ -n "$pid" ] && taskkill //PID $pid //F
 done
 pnpm build && pnpm exec playwright test
@@ -773,7 +807,7 @@ corrupta. El motivo, en los primeros bytes del archivo:
 ```
 
 Nest serializa lo que devuelve el handler, y un `Buffer` se convierte en ese JSON. El fichero llega
-"bien" —codigo correcto, tamano plausible— y solo falla al abrirlo, que es donde peor se descubre.
+"bien" —codigo correcto, tamaño plausible— y solo falla al abrirlo, que es donde peor se descubre.
 
 **Regla:** cualquier binario (xlsx, pdf, zip) se devuelve envuelto en `StreamableFile`:
 
@@ -794,7 +828,7 @@ Se pedia dos veces lo mismo: al configurar el proceso y otra vez en cada formaci
 crear una formacion no se dice quien responde, **se copia el del proceso**
 (`activities.service.ts`, `create`).
 
-Se copia el VALOR, no se referencia: cambiar manana el responsable del proceso no debe reescribir
+Se copia el VALOR, no se referencia: cambiar mañana el responsable del proceso no debe reescribir
 en silencio quien respondia por lo que ya existe. Quien quiera cambiarlo en una formacion concreta
 lo hace en su ficha, y ahi el desplegable ofrece **solo la gente del area de ese proceso** (si el
 proceso todavia no cuelga de un area, ofrece a todos: una lista larga se maneja, una vacia parece
@@ -1036,7 +1070,7 @@ nombre antes de elegir.
 Aviso para leer bien las corridas: la base de desarrollo acumula datos de decenas de e2e (253
 convocatorias, 43 borradores). Un fallo que aparece "de repente" sin que nadie tocara esa pantalla
 suele ser un tope alcanzado, no una regresion — y con un cliente real llega igual, solo que en dos
-anos en vez de en dos semanas.
+años en vez de en dos semanas.
 
 ### 2026-08-30 — La respuesta lenta que pisa a la rapida
 
@@ -1060,7 +1094,7 @@ const load = useCallback(async () => {
 }, [filtros]);
 ```
 
-Las tres pantallas que ya lo necesitaban por tamano de datos: Obligaciones (arreglada), y a
+Las tres pantallas que ya lo necesitaban por tamaño de datos: Obligaciones (arreglada), y a
 revisar cuando toque, el listado de convocatorias y el de personas.
 
 ### 2026-08-31 — Crear un requisito "para toda la empresa" tarda, y se nota
@@ -1175,7 +1209,7 @@ sentencias y fallo a la mitad sin transaccion, hay que mirar el estado real ante
 revertida cuando SI aplico la mitad deja el esquema y el historial diciendo cosas distintas.
 
 Y de ahi la regla que ya estaba escrita en la propia migracion: **una migracion no deduplica
-datos**. Borrar el plan del ano de alguien no puede pasar dentro de un despliegue; que falle y
+datos**. Borrar el plan del año de alguien no puede pasar dentro de un despliegue; que falle y
 obligue a decidir a mano es el comportamiento correcto.
 
 ### 2026-08-31 — Los comentarios `/** */` NO son validos en `schema.prisma`
@@ -1358,7 +1392,7 @@ contra todas las reglas ya existentes — y aun asi son los 180 ms medidos. Al r
 funciona: publicar una regla despues genera las obligaciones de quien corresponda en su propio
 recorrido.
 
-**Lo que queda abierto y ya NO es urgente:** el alta individual es lenta y **empeora con el tamano
+**Lo que queda abierto y ya NO es urgente:** el alta individual es lenta y **empeora con el tamaño
 del tenant** (6,2 s -> 9,0 s solo por anadir 125 personas). No bloquea el piloto, pero Gestion
 Humana va a esperar ~9 s cada vez que cree a alguien nuevo en el dia a dia. Ahora hay numeros para
 decidir si se optimiza `syncPerson` (acotar el recorrido de audiencias a las que puedan aplicar a
@@ -1542,7 +1576,7 @@ Sintoma: la API no levanta en desarrollo y muere en el arranque:
 
 Causa: al cablear R2 se anadio la regla "o estan las cuatro variables o ninguna". Sonaba prudente y
 no lo era: `apps/api/.env` llevaba meses con `R2_BUCKET_NAME=neo-pulse-files` heredado de la
-plantilla, sin credenciales al lado. La comprobacion estaba mirando la senal equivocada.
+plantilla, sin credenciales al lado. La comprobacion estaba mirando la señal equivocada.
 
 Arreglo: quien decide si se quiere R2 son las **credenciales**, no el nombre del bucket. Con alguna
 credencial presente se exigen las cuatro y se dice cual falta —con tres de cuatro el fallo llegaria
@@ -1642,7 +1676,7 @@ cumplimiento se equivoca callado. `PATCH /users/:id` con un `jobTitleId` distint
    (`where: { ruleId, userId }`), no por formacion, asi que tener una de la otra regla no la frena.
 3. `withdrawLeavers` retira lo PENDIENTE de la regla que ya no le aplica:
    `WITHDRAWN_LEFT_AUDIENCE`, **no se borra** —el auditor pregunta por que dejo de deberla— y de
-   paso marca leidos sus avisos, para que la campana no siga reclamando algo que ya no debe.
+   paso marca leidos sus avisos, para que la campaña no siga reclamando algo que ya no debe.
 
 Resultado observado: la persona pasa de `PENDING` a `PENDING + WITHDRAWN_LEFT_AUDIENCE`, dos filas
 para la misma formacion y **una sola viva**. En `/me/pending` la ve UNA vez.
@@ -1684,7 +1718,7 @@ Arreglado en tres partes, todas apoyadas en el servicio que ya existia:
    cortar por uno que da cero, y eso solo se descubria despues de publicar. Las facetas salen de
    los obligados de verdad y **no de los requisitos**: una persona puede estarlo por una asignacion
    suelta hecha en "Quienes", y filtrar por reglas la habria borrado de la lista. Si todavia no hay
-   obligados, se ensena el catalogo entero — acotar antes es legitimo y una lista vacia seria un
+   obligados, se enseña el catalogo entero — acotar antes es legitimo y una lista vacia seria un
    callejon sin salida.
 
 Comprobado contra la base: la misma formacion que decia 777 (la empresa) dice ahora **3 de 3**, y
@@ -1800,7 +1834,7 @@ otras formaciones que usan esa misma audiencia. El sitio de partirlo es ARRIBA, 
 de cargos**, reparte: un requisito de un cargo por cada cargo marcado. Para quien lo hace sigue
 siendo un gesto —marca los tres, pulsa una vez—; lo que cambia es que cada casilla queda
 independiente y se enciende y apaga desde cualquiera de las dos puertas. La contrapartida, a la
-vista: "Lo que se exige hoy" ensena tres renglones en vez de uno, que es la verdad.
+vista: "Lo que se exige hoy" enseña tres renglones en vez de uno, que es la verdad.
 
 "Conductores de Antioquia" NO se reparte: es un grupo de verdad, no tres casillas.
 
@@ -1811,7 +1845,7 @@ vista: "Lo que se exige hoy" ensena tres renglones en vez de uno, que es la verd
    por los tres que nadie toco — y el usuario acabaria escribiendo "sin cambios" para poder pasar,
    que es como se vacia de sentido un registro de auditoria. Ahora, si nada difiere (disparador,
    plazo, recurrencia), no se toca nada y no se pide nada.
-2. **Un requisito RETIRADO no pide novedad para volver a encenderse.** La ficha no lo ensena
+2. **Un requisito RETIRADO no pide novedad para volver a encenderse.** La ficha no lo enseña
    —`activityRequirements` filtra por `active: true`— y la matriz lo pinta apagado, asi que
    reencenderlo es DECLARAR, no modificar. Pedir novedad ahi era pedir explicaciones por cambiar
    algo que la pantalla dice que no existe. Lo destapo la comprobacion automatica, que se comio un
@@ -1880,7 +1914,7 @@ incumplimiento que nunca ocurrio.
 
 **El arreglo.** La obligacion no puede vencer antes de que existiera la regla que la crea:
 `computeFirstDueAt` recibe ahora `ruleCreatedAt` y ancla en **el maximo de los dos** —la creacion de
-la regla, o la entrada a la audiencia si es posterior—. A quien entra manana no le cambia nada: su
+la regla, o la entrada a la audiencia si es posterior—. A quien entra mañana no le cambia nada: su
 entrada es posterior a la regla y manda ella. Cuatro pruebas unitarias lo fijan, incluida la de
 "sin `ruleCreatedAt` se comporta como antes", que es el camino de las obligaciones sueltas.
 
@@ -1897,7 +1931,7 @@ Comprobado de punta a punta: la misma reinduccion pasa de vencer el 2026-09-29 a
 | Publicar obliga a **TODA la plantilla** | 791 de 791, **sin** el corte de "solo los nuevos". Es lo contrario que la induccion general, y es lo que hace que la reinduccion anual no dependa de que alguien se acuerde |
 | Y tarda **~2 s** | medido sobre 791 personas. No hace falta hacer nada antes del piloto |
 | Todas vencen **el mismo dia** | es una CAMPANA, no un aniversario por persona: una sola fecha para las 791 |
-| Pero la PRIMERA no cae el 31 de marzo | `computeFirstDueAt` solo usa la fecha fija con disparador `SCHEDULED`, y el automatismo pone `ON_JOIN`: la primera vence a los 30 dias de publicarla y **la campana rige desde la 2a ronda**. Es defendible —estrenar el 15 de marzo con vencimiento el 31 daria dos semanas para 800 personas— pero la pantalla dice "cada ano el 31 de marzo" y la primera no vence ese dia |
+| Pero la PRIMERA no cae el 31 de marzo | `computeFirstDueAt` solo usa la fecha fija con disparador `SCHEDULED`, y el automatismo pone `ON_JOIN`: la primera vence a los 30 dias de publicarla y **la campaña rige desde la 2a ronda**. Es defendible —estrenar el 15 de marzo con vencimiento el 31 daria dos semanas para 800 personas— pero la pantalla dice "cada año el 31 de marzo" y la primera no vence ese dia |
 | La ronda siguiente **no se abre al terminar** | solo cuando se entra en la ventana de la proxima (60 dias antes). Si naciera al completarla, quien la hace en abril tendria encima la de 2027 desde abril |
 | Emite constancia y trae encuesta | 3 piezas: leccion, examen y encuesta al final |
 
@@ -1948,7 +1982,7 @@ regla que existia **solo en la pantalla**.
 La lista de "agregar convocatoria existente" filtraba por `participatesInPlan`... en el navegador.
 Por la API entraba cualquier cosa. El recorrido metio una induccion general en un plan de prueba y
 **los proyectados del plan pasaron de 22 a 819**, porque la induccion alcanza a la empresa entera:
-el cumplimiento del ano se calculaba contra un denominador que no era del plan.
+el cumplimiento del año se calculaba contra un denominador que no era del plan.
 
 Arreglado en `plans.addItem`: **409 `ACTIVITY_NOT_PLANNABLE`** si el tipo no dice
 `participatesInPlan: true`. Un filtro que solo vive en la pantalla no es un filtro: es una
@@ -1986,12 +2020,12 @@ Arreglado: `status: { in: ['PLANNED', 'RESCHEDULED'] }`. Lo EJECUTADO no se toca
 - **El vencimiento se lee en hora de Colombia.** Es el FINAL del ultimo dia del mes: 31 de mayo a
   las 23:59 de Bogota es **1 de junio en UTC**. Comparar el ISO en crudo hace fallar una fecha que
   esta bien. Misma trampa que `hired_at` (2026-08-27).
-- **Un recorrido que aprueba un plan tiene que usar un ANO LIBRE por corrida.** Hay un plan por ano
+- **Un recorrido que aprueba un plan tiene que usar un ANO LIBRE por corrida.** Hay un plan por año
   (Decision #71) y aprobarlo es irreversible en la practica: la segunda corrida se quedaba sin plan
-  en borrador y fallaba entera. Busca el primer ano libre desde 2030.
+  en borrador y fallaba entera. Busca el primer año libre desde 2030.
 
 **La cuenta del requisito sigue en cero, y es correcto:** las obligaciones del plan cuelgan del
-RENGLON (`plan_item_id`), no de la regla, asi que "Lo que se exige hoy" ensena 0 obligadas mientras
+RENGLON (`plan_item_id`), no de la regla, asi que "Lo que se exige hoy" enseña 0 obligadas mientras
 hay 11 personas obligadas de verdad.
 
 ### 2026-09-04 — El plan proyectaba a la misma gente DOS VECES (bug medido, arreglado)
@@ -2005,7 +2039,7 @@ lo que el plan decia proyectar:                26
 ```
 
 Dos jornadas de la misma capacitacion, sin tajada, y el plan **sumaba a la misma gente dos veces**.
-La cobertura del ano no podia pasar del 50% aunque se capacitara a todo el mundo. Es el dano que
+La cobertura del año no podia pasar del 50% aunque se capacitara a todo el mundo. Es el daño que
 describe la Decision #68 —"40 obligados repartidos en dos jornadas salian como 80 proyectados"—
 pero un piso mas arriba: no en la convocatoria, en el PLAN.
 
@@ -2037,15 +2071,15 @@ mismo recorrido.
 
 Faltaba, y tenia dos consecuencias que el cliente noto:
 
-1. **La reinduccion decia "cada ano antes del 31 de marzo" y esa fecha no se podia cambiar desde
+1. **La reinduccion decia "cada año antes del 31 de marzo" y esa fecha no se podia cambiar desde
    ninguna parte.** Vivia en `activity_types.config.defaultAnnualDate`, sembrada.
-2. **Un cliente que NO trabaje por campana no tenia como decirlo.** Los hay: "cada 12 meses desde
+2. **Un cliente que NO trabaje por campaña no tenia como decirlo.** Los hay: "cada 12 meses desde
    que cada quien la hizo" es igual de legitimo, y el modelo ya lo soportaba
    (`defaultRecurrenceMonths`) — lo que no habia era donde decirlo.
 
 Ahora esta en **Configuracion -> Tipos de formacion**, debajo de las reglas del tipo:
 
-- **Como se repite**: no / cada ano en fecha fija / cada N meses. Una sola pregunta con tres
+- **Como se repite**: no / cada año en fecha fija / cada N meses. Una sola pregunta con tres
   respuestas, porque por debajo son dos claves EXCLUYENTES y con las dos puestas manda la fecha:
   ofrecerlas sueltas dejaria configurar un tipo que dice dos cosas y solo una es verdad. Al elegir
   una se limpia la otra.
@@ -2055,7 +2089,7 @@ Ahora esta en **Configuracion -> Tipos de formacion**, debajo de las reglas del 
 
 **Por que en el TIPO y no en "Reglas academicas" de Preferencias.** Se planteo y se descarto:
 Reglas academicas son valores por defecto **transversales** —nota minima, % de video, intentos— que
-cualquier actividad puede ajustar. La fecha de la campana no es transversal: solo significa algo
+cualquier actividad puede ajustar. La fecha de la campaña no es transversal: solo significa algo
 para un tipo que se repite. Ponerla ahi seria clavar un tipo concreto en una pantalla general, y un
 cliente con DOS tipos recurrentes —reinduccion y recertificacion anual— no podria expresarlo. Ademas
 el motor la lee del tipo: tenerla en otro sitio seria una segunda fuente de verdad.
@@ -2076,7 +2110,7 @@ OFFERING_NOT_OPEN` —el error confuso que ya avisaba este RUNBOOK—. **El prob
 PUBLICADAS**: la misma persona se inscribia en las dos y quedaba con **dos inscripciones distintas
 de la misma formacion**. Comprobado, con sus dos ids.
 
-Y el dano no es cosmetico:
+Y el daño no es cosmetico:
 
 - la **obligacion es UNA**, asi que al terminar una se cierra la obligacion y **la otra inscripcion
   se queda viva para siempre**, sin nada que la cierre;
@@ -2085,7 +2119,7 @@ Y el dano no es cosmetico:
 
 **La causa**: `learner.enroll` deduplicaba por `offeringId`. **El arreglo**: una inscripcion VIVA
 por FORMACION. Si ya tiene una abierta en otra convocatoria de la misma actividad, se le devuelve
-esa en vez de crear otra. Se mira lo vivo y no el historial a proposito: la reinduccion del ano que
+esa en vez de crear otra. Se mira lo vivo y no el historial a proposito: la reinduccion del año que
 viene necesita inscripcion nueva, y la anterior ya esta terminada.
 
 #### Lo demas que comprobo el recorrido, y que estaba bien
@@ -2141,7 +2175,7 @@ pedir el motivo. Cuatro caminos para lo mismo, y el usuario adivinando cual.
 
 - **La pestana de la ficha** pide la novedad y mete el renglon cuando el plan esta vivo.
 - **El modulo de Convocatorias** hace lo mismo: `NewOfferingDrawer` gana `autoPlan`, busca el plan
-  aprobado del ano y, si la formacion elegida es del plan, pide el motivo y mete el renglon.
+  aprobado del año y, si la formacion elegida es del plan, pide el motivo y mete el renglon.
 - **El boton de la tarjeta del plan se quito.** Era la unica razon de su existencia.
 
 Con el plan en BORRADOR nada de esto hace falta: el renglon entra solo (Decision #75).
@@ -2161,7 +2195,7 @@ dice solo *"El cupo es de 30 personas."* y ahi se acaba. Falta lo accionable: **
 obligados**, cuantas sillas faltan, y que la salida es partir en dos jornadas con su tajada, que es
 justamente para lo que existe la tajada.
 
-En el recorrido solo se esquivo: el cupo se saca ahora del tamano del cargo (`elegido.n + 50`) para
+En el recorrido solo se esquivo: el cupo se saca ahora del tamaño del cargo (`elegido.n + 50`) para
 que no se rompa solo cuando la base de pruebas crece. **El producto sigue igual.**
 
 ### 2026-09-04 — Recorrido de PILDORA: el tipo que se define por lo que NO hace
@@ -2189,13 +2223,13 @@ Queda un solo tipo sin recorrido: **extraordinaria**.
 ### 2026-09-04 — El informe de cumplimiento contaba 96.000 obligaciones que ya no se le piden a nadie
 
 **El fallo mas caro de los encontrados hasta hoy**, medido en la unica unidad que importa aqui: el
-numero que el cliente le ensena a un auditor.
+numero que el cliente le enseña a un auditor.
 
 **Como se encontro.** No buscandolo. `reinduccion-ciclos.mjs` es el primer recorrido que, tras ver
-que el motor cierra una ronda como NO REALIZADA, se acordo de preguntar **que ensena el informe de
+que el motor cierra una ronda como NO REALIZADA, se acordo de preguntar **que enseña el informe de
 esa ronda**. Dos respuestas, las dos malas:
 
-| Lo que el motor escribia | Lo que el Seguimiento ensenaba |
+| Lo que el motor escribia | Lo que el Seguimiento enseñaba |
 |---|---|
 | Ronda cerrada `EXPIRED_NOT_DONE` | **"Sin empezar"** — lo contrario de lo que es |
 | **96.246** obligaciones `WITHDRAWN_*` | **"Sin empezar"**, y sumando al denominador |
@@ -2238,10 +2272,10 @@ un caso, conviene preguntarse en voz alta a que otros casos se aplica el mismo a
 Y la de proceso: **un estado nuevo no esta terminado cuando el motor lo escribe, sino cuando alguien
 lo lee**. Vale la pena recorrer los sitios donde se lee antes de dar por cerrada la decision.
 
-### 2026-09-04 — Como probar "el ano que viene" sin esperar un ano ni tocar la base
+### 2026-09-04 — Como probar "el año que viene" sin esperar un año ni tocar la base
 
 `03-reinduccion.md` decia que "cierra y abre" solo se podia probar con unitarias porque **haria
-falta esperar un ano o manipular fechas en la base**. Ninguna de las dos.
+falta esperar un año o manipular fechas en la base**. Ninguna de las dos.
 
 La ventana en la que nace la ronda siguiente esta fijada en **60 dias** antes del vencimiento
 (`assignments.service.ts`, `windowDays: 60`). Con una recurrencia ANUAL hay que esperar al 30 de
@@ -2250,7 +2284,7 @@ ronda 1 —60 dias de ventana sobre un periodo de 30—, y el motor abre la sigu
 siguiente.
 
 **Es el mismo codigo que correra en 2027**: `generateForRule` no sabe si la recurrencia es de un mes
-o de un ano, solo compara `now` con `cycleOpensAt`. Se comprime la RECURRENCIA, no el reloj: no hay
+o de un año, solo compara `now` con `cycleOpensAt`. Se comprime la RECURRENCIA, no el reloj: no hay
 fechas falsas en la base ni mocks de tiempo, que es lo que hace que estas pruebas envejezcan mal.
 
 Y para dar la segunda pasada del motor sin esperar al cron de cada hora: `PATCH /users/:id` con el
@@ -2314,7 +2348,7 @@ Las dos formas que usa el producto, y conviene saber cual es cual:
 
 | | |
 |---|---|
-| `ACTIVITY_NOT_PLANNABLE` | la excepcion **lleva** `message` → llega en `title`, listo para ensenar |
+| `ACTIVITY_NOT_PLANNABLE` | la excepcion **lleva** `message` → llega en `title`, listo para enseñar |
 | `CATALOG_IN_USE` | **no lleva** `message` → `title` acaba siendo "Conflict Exception", y la frase la arma la pantalla con `references`/`usedBy`, que viajan aparte |
 
 ### 2026-09-04 (tarde) — Dos jornadas de la misma formacion proyectaban CADA UNA a todos
@@ -2355,7 +2389,7 @@ ANTES**, que es justo cuando se programan las jornadas y se decide como partirla
 plan probaba la tajada despues de aprobar (14 -> 1, en verde) y por eso pasaba.
 
 **Lo que costaba.** Publicar CONGELA los proyectados. Dos jornadas de 405 congeladas para 405
-personas dan un denominador de 810: la cobertura del ano no podia pasar del 50% aunque se capacitara
+personas dan un denominador de 810: la cobertura del año no podia pasar del 50% aunque se capacitara
 a todo el mundo. Es literalmente el fallo que la cabecera de `projected-audience.service.ts` dice que
 la tajada existe para impedir — descrito arriba y reintroducido una rama mas abajo.
 
@@ -2386,7 +2420,7 @@ fallo mas caro de la semana. Ahora los ocho llaman a `comprobarSeguimiento` (`se
 antes de limpiar, que cruza la BASE contra el INFORME:
 
 - lo retirado no entra en el informe;
-- el resumen cuenta exactamente las filas que ensena;
+- el resumen cuenta exactamente las filas que enseña;
 - `EXPIRED_NOT_DONE` se lee "No realizada" y `WAIVED` se lee "Eximida", nunca "sin empezar";
 - el avance cuadra con `terminadas / (total - eximidas)`;
 - los estados suman el total: nadie se queda sin clasificar.
@@ -2501,17 +2535,17 @@ coherente:
 |---|---|
 | Publicar | congela **exactamente** lo derivado (97), con sello y **sin** motivo de ajuste |
 | Entran 2 personas mas | hoy se derivarian 99, y **el congelado sigue en 97** |
-| Por que no se mueve solo | si se recalculara, el denominador del ano cambiaria por detras cada vez que entra alguien (regla de oro 2) |
+| Por que no se mueve solo | si se recalculara, el denominador del año cambiaria por detras cada vez que entra alguien (regla de oro 2) |
 | Ajustar sin motivo | 422. Con "ok" de motivo, 422. Con -1 proyectados, 422 |
 | Ajustar con motivo | 99, el motivo guardado tal cual, y **sigue congelado**: ajustar no descongela |
 
-### 2026-09-04 (noche) — Una fecha de campana que no existe, y nadie se entera
+### 2026-09-04 (noche) — Una fecha de campaña que no existe, y nadie se entera
 
 Leyendo la configuracion REAL del tenant para escribir la guia de usuario aparecio esto: la
-reinduccion tenia la campana puesta en **`09-31`**. Septiembre tiene 30 dias.
+reinduccion tenia la campaña puesta en **`09-31`**. Septiembre tiene 30 dias.
 
 No falla nada. `Date.UTC(2026, 8, 31)` no lanza: se lleva la fecha al mes siguiente en silencio. Asi
-que la campana vencia **el 1 de octubre** mientras la pantalla seguia diciendo 09-31, y el auditor
+que la campaña vencia **el 1 de octubre** mientras la pantalla seguia diciendo 09-31, y el auditor
 leeria una fecha distinta de la que el sistema usa.
 
 **Medido**, con las tres que el patron dejaba pasar:
@@ -2529,8 +2563,8 @@ Un patron copiado en tres sitios es un patron que se corrige en dos.
 **El arreglo**, en dos capas porque hacen falta las dos:
 
 1. `packages/shared/src/schemas/fixed-date.ts` — un solo `fixedDateSchema` que ademas comprueba que
-   el dia EXISTE en ese mes, y los tres sitios lo usan. Se valida contra un ano bisiesto a
-   proposito: `02-29` es legitimo para una campana y rechazarlo obligaria a explicar por que.
+   el dia EXISTE en ese mes, y los tres sitios lo usan. Se valida contra un año bisiesto a
+   proposito: `02-29` es legitimo para una campaña y rechazarlo obligaria a explicar por que.
 2. `nextFixedDate` **acota** el dia al ultimo del mes en vez de desbordarlo, igual que ya hacia
    `addMonths` para el caso hermano. Es la red de abajo: la base ya tiene fechas escritas con el
    patron viejo, y no se arreglan solas.
@@ -2601,15 +2635,15 @@ escape por formacion volveria a dejar la regla en una sugerencia, que es de dond
 
 **Lo que costo, y estaba previsto:** tres de las pruebas de punta a punta publicaban tipos que piden
 evaluacion sin anadirla. Eso era, palabra por palabra, la segunda razon de la #74 para no bloquear
-—"ni una sola de las 19 pruebas anade evaluacion... es la senal de que la regla no esta acordada"—.
+—"ni una sola de las 19 pruebas anade evaluacion... es la señal de que la regla no esta acordada"—.
 Ahora esta acordada, y las pruebas se pusieron al dia con un helper compartido (`agregarEvaluacion`).
 
 ### 2026-09-04 (noche) — Reinduccion: la primera ronda, y quien acaba de entrar
 
 Dos cosas que llevaban semanas anotadas como "decision del cliente" y se cerraron.
 
-**1. La primera ronda ya cae en la fecha de la campana** — si da tiempo. Antes vencia siempre a los
-30 dias de publicarla, asi que la pantalla decia "cada ano antes del 31 de marzo" y la primera no
+**1. La primera ronda ya cae en la fecha de la campaña** — si da tiempo. Antes vencia siempre a los
+30 dias de publicarla, asi que la pantalla decia "cada año antes del 31 de marzo" y la primera no
 vencia ese dia. La razon para dejarlo asi era buena: estrenarla el 15 de marzo con vencimiento el 31
 da dos semanas para 1.060 personas.
 
@@ -2617,7 +2651,7 @@ No habia que elegir una de las dos, sino mirar **cuanto falta**:
 
 | Falta | Vence |
 |---|---|
-| mas que la ventana (60 dias) | en la fecha de la campana |
+| mas que la ventana (60 dias) | en la fecha de la campaña |
 | menos | a los 30 dias de gracia |
 
 Se usa la VENTANA de la propia recurrencia como umbral y no un numero suelto: es la misma antelacion
@@ -2625,13 +2659,13 @@ con la que el motor abre las rondas siguientes, asi que la primera se comporta c
 
 **Medido:** publicada el 2026-09-04, la primera ronda vence el **31 de marzo de 2027**.
 
-**2. Quien ingreso hace menos de N meses no entra a la campana** (`exemptRecentHiresMonths`, 6 para
-TRANSPRENSA). Su induccion ES su actualizacion de ese ano, y encimarle la reinduccion sobre una
+**2. Quien ingreso hace menos de N meses no entra a la campaña** (`exemptRecentHiresMonths`, 6 para
+TRANSPRENSA). Su induccion ES su actualizacion de ese año, y encimarle la reinduccion sobre una
 induccion a medio hacer es pedirle dos veces lo mismo. Antes habia que eximir a mano a cada ingreso
-reciente —unos cincuenta al ano— escribiendo cincuenta veces el mismo motivo.
+reciente —unos cincuenta al año— escribiendo cincuenta veces el mismo motivo.
 
 **Medido:** de 1.071 personas, obliga a **747**; 324 quedan fuera por ingreso reciente. Solo afecta a
-la PRIMERA ronda de cada quien: a quien ya tiene historia con la regla la campana anterior si le
+la PRIMERA ronda de cada quien: a quien ya tiene historia con la regla la campaña anterior si le
 toco, y sigue su ciclo.
 
 ### 2026-09-04 (noche) — Convocar a todos ya no falla entero si no caben
@@ -2646,7 +2680,7 @@ tiene obligacion viva va al final.
 
 Y la respuesta trae `sinCupo`, que es lo unico que le sirve a quien esta programando: la pantalla
 dice *"30 inscritas de 47 obligadas · faltan 17 por cupo: programa otra jornada"*. Los que quedan
-fuera siguen obligados y sin inscribir, que es justo lo que la cobertura tiene que ensenar.
+fuera siguen obligados y sin inscribir, que es justo lo que la cobertura tiene que enseñar.
 
 ### 2026-09-04 (noche) — Una opcion que existe y no se puede tocar es una opcion que no existe
 
@@ -2654,7 +2688,7 @@ El cliente pregunto: *"¿desde donde se configuran esos 6 meses?"*. La respuesta
 ningun sitio**: `exemptRecentHiresMonths` se anadio al esquema, al motor y a la semilla, pero no a la
 pantalla de Tipos de formacion. Funcionaba, y solo se podia cambiar resembrando.
 
-Ya esta en *Configuracion → Tipos de formacion → Configurar*, junto a la fecha de la campana y a
+Ya esta en *Configuracion → Tipos de formacion → Configurar*, junto a la fecha de la campaña y a
 "si llega la siguiente y no hizo la anterior". Solo sale si la formacion VUELVE: sin ciclo no hay
 "dentro del ciclo".
 
@@ -2709,7 +2743,7 @@ pasa siempre no es una asercion: es un comentario con sintaxis de codigo.
 
 **Tres valores de su config son obligatorios, no gustos** —y los tres se equivocarian en silencio:
 
-- **Aniversario y no fecha fija.** Un certificado vence el dia de cada persona. Con campana, quien
+- **Aniversario y no fecha fija.** Un certificado vence el dia de cada persona. Con campaña, quien
   se certifico en agosto figura al dia hasta marzo con la habilitacion caducada desde agosto.
 - **`participatesInPlan: false`.** El servidor fuerza recurrencia NULA a lo que participa del plan.
   Un `true` aqui mata el aniversario sin dar error y el tipo deja de servir.
@@ -2750,15 +2784,15 @@ Medido en el paso 14 del recorrido de la especifica: antes del cambio **1 CUMPLI
 **Lo que NO cubre, dicho:** una formacion exigida por dos reglas VIVAS a la vez —cargo y area, solo
 posible en tipos de alcance `MANUAL`— sigue naciendo dos veces. Aqui solo se mira lo cumplido.
 
-### 2026-09-05 — La campana acusaba de incumplir exactamente a quien cumplia
+### 2026-09-05 — La campaña acusaba de incumplir exactamente a quien cumplia
 
 Salio buscando otra cosa: al escribir la unitaria de la carga de vigencia con una recurrencia de
 fecha fija, la asercion daba lo contrario de lo esperado. **El ancla de la ronda siguiente era
-`completedAt` para las dos formas de repetir**, y en una campana eso es falso.
+`completedAt` para las dos formas de repetir**, y en una campaña eso es falso.
 
 Quien hace la reinduccion el 20 de marzo la hace **para el periodo que vence el 31**, no para el dia
 20. Con el ancla en el dia 20, `nextFixedDate` devuelve la ocurrencia siguiente a ese dia —el **31
-de marzo del mismo ano**, once dias despues—, la ventana de 60 dias ya esta abierta, y al dia
+de marzo del mismo año**, once dias despues—, la ventana de 60 dias ya esta abierta, y al dia
 siguiente de cumplir le nace la **ronda 2 con el mismo vencimiento que acaba de satisfacer**.
 
 MEDIDO, reproduciendo lo que hace el motor: completada el 20/03/2026 -> ronda 2 abierta venciendo el
@@ -2768,7 +2802,7 @@ despues.
 | Quien | Que le pasaba |
 |---|---|
 | La hizo **antes** del 31 de marzo (o sea, cumplio) | ronda 2 el 31, vencida el 1 de abril, NO REALIZADA en enero |
-| La hizo tarde, o no la hizo | su ancla caia despues del 31 y su siguiente era la del ano que viene: **correcto** |
+| La hizo tarde, o no la hizo | su ancla caia despues del 31 y su siguiente era la del año que viene: **correcto** |
 
 Un indicador que solo castiga a quien cumple esta al reves, y de la forma mas dificil de ver: el
 informe acusa a la gente que si se formo.
@@ -2776,18 +2810,18 @@ informe acusa a la gente que si se formo.
 **El arreglo** es `cycleAnchor` (`due-date.ts`): la fecha fija ancla en el **VENCIMIENTO** de la
 ronda —lo que se satisface es el PERIODO— y "cada N meses" sigue anclando en `completedAt`, que es
 el sentido entero del aniversario. Cinco unitarias sobre las funciones reales de fecha, incluidas
-las dos esquinas: adelantarse no adelanta la campana, y hacerla tarde tampoco la corre.
+las dos esquinas: adelantarse no adelanta la campaña, y hacerla tarde tampoco la corre.
 
 **Por que no lo vio ningun recorrido, y por que sigue sin verlo.** `reinduccion-ciclos.mjs` comprime
-la recurrencia a **un mes** para no esperar un ano — el truco que este proyecto usa siempre— y prueba
+la recurrencia a **un mes** para no esperar un año — el truco que este proyecto usa siempre— y prueba
 el camino de la que NO se hizo. El caso solo aparece con `fixedDate` **completando dentro de la
-ventana**, y para eso hacen falta 60 dias entre crear la regla y la fecha de campana. Una campana no
-se puede comprimir: su periodo es el ano, no un numero que se pueda bajar. Asi que aqui la unitaria
+ventana**, y para eso hacen falta 60 dias entre crear la regla y la fecha de campaña. Una campaña no
+se puede comprimir: su periodo es el año, no un numero que se pueda bajar. Asi que aqui la unitaria
 sobre las funciones de fecha reales **es** la prueba, y conviene que quede dicho en vez de fingir
 una cobertura de punta a punta que no hay.
 
 **La leccion, que ya tiene tres marcas:** el truco de comprimir la recurrencia solo prueba lo que
-puede comprimirse. Todo lo que dependa de una FECHA DEL CALENDARIO —campana anual, ultimo dia del
+puede comprimirse. Todo lo que dependa de una FECHA DEL CALENDARIO —campaña anual, ultimo dia del
 mes del plan— se queda fuera y hay que probarlo en la logica pura.
 
 ### 2026-09-05 — No habia forma de registrar una formacion presencial, y nadie lo habia notado
@@ -2843,15 +2877,15 @@ certifica nada deja a la persona sin nada mas.
 Lo decidio el cliente: *"el papel siempre debe mandar, en caso de externas"*. Contradice a proposito
 la Decision #111 —*"la vigencia sale de la recurrencia y pedirla aparte seria pedir el mismo dato dos
 veces"*— y con razon: **la fecha del certificado de un tercero no la pone la empresa**. Si la ARL
-certifica por tres anos y el tipo dice doce meses, reclamarla al ano es inventar un incumplimiento
+certifica por tres años y el tipo dice doce meses, reclamarla al año es inventar un incumplimiento
 sobre alguien con su habilitacion vigente y el papel para probarlo.
 
-`proximoVencimiento` (`due-date.ts`) resuelve las tres en orden: **papel → campana → aniversario**.
+`proximoVencimiento` (`due-date.ts`) resuelve las tres en orden: **papel → campaña → aniversario**.
 La fecha se copia a `assignments.valid_until_override` y no se queda solo en la inscripcion, porque
 es el MOTOR quien la lee y la obligacion es la fila que el auditor rastrea.
 
 **Ojo a la forma:** `validUntilOverride` **no es un ancla** a la que sumarle meses — es el
-vencimiento mismo. Tratarlo como ancla daria "tres anos despues de que caduque".
+vencimiento mismo. Tratarlo como ancla daria "tres años despues de que caduque".
 
 **Y como se prueba de punta a punta sin manipular fechas:** un certificado que vence dentro de **30
 dias** sobre una formacion con recurrencia de **12 meses**. Es el mismo truco de comprimir que usa
@@ -2892,12 +2926,12 @@ input value for enum AttendanceStatus: PRESENTE"*, y despues `generate` con *"th
 AttendanceStatus cannot be defined because a enum with that name already exists"*. El error decia
 exactamente lo que pasaba y aun asi hubo que pararse a leerlo dos veces.
 
-**Se corrigio el mismo dia, con la tabla todavia vacia**, y no cuando hubiera un ano de asistencias
+**Se corrigio el mismo dia, con la tabla todavia vacia**, y no cuando hubiera un año de asistencias
 repartidas entre dos sitios. Es el mismo problema que este proyecto ya conoce por el otro lado: el
 informe de Vencimientos leyendo `certification_grants`, que tampoco escribe nadie — solo que aquel
 lleva meses asi y este se cazo en horas.
 
-**La leccion, que vale mas que el caso:** este esquema se diseno ENTERO al principio y lleva partes
+**La leccion, que vale mas que el caso:** este esquema se diseño ENTERO al principio y lleva partes
 esperando. Antes de anadir una columna, mirar si el modelo ya la tiene. Buscar `model X` en
 `schema.prisma` cuesta diez segundos; una migracion de vuelta cuesta el dia que alguien descubre que
 hay dos sitios donde mirar.
@@ -2926,7 +2960,7 @@ la RONDA mas reciente, no todas. Y como `resolverEstadoEjecucion` pregunta prime
 salia con la ronda 2 tambien como TERMINADA**.
 
 MEDIDO: el mismo escenario pasaba de **80% de avance a 40%**, que es el real. En produccion es la
-reinduccion de 796 personas figurando hecha el 2 de enero de cada ano.
+reinduccion de 796 personas figurando hecha el 2 de enero de cada año.
 
 Es el hermano del fallo del 2026-09-04 —el informe contando lo retirado como "sin empezar"— pero al
 reves, y por eso es peor: **aquel inflaba el incumplimiento y este infla el cumplimiento**. Nadie
@@ -2973,6 +3007,43 @@ Lo que si hacia falta era cubrir las combinaciones dentro de UN recorrido, y es 
 dos reglas sobre la misma persona, dos jornadas, las tres formas de marcar, el acotamiento y el
 Seguimiento cruzado al final.
 
+### 2026-09-06 (tarde) — Tres trampas de interfaz que costaron media sesion cada una
+
+**1. Un panel absoluto dentro de una celda de tabla SE RECORTA.**
+
+Las tablas viven en un `div` con `overflow-x-auto` —hace falta para que una tabla ancha ruede en vez
+de romperse— y ese contenedor recorta a cualquier hijo posicionado. Un menu, un globo de ayuda o un
+panel abierto desde una celda sale cortado por el borde de la tabla, o peor: a medias y con barra de
+desplazamiento propia.
+
+**La salida es un portal.** `components/ui/popover.tsx` pinta el panel en `document.body` con
+`position: fixed` y calcula el sitio desde el rectangulo del boton. Cualquier panel nuevo que salga
+de una tabla tiene que usarlo; no hay que volver a escribir la mecanica.
+
+**2. Un `<button>` dentro de un `<label>` activa tambien el campo rotulado.**
+
+Mordio dos veces el mismo dia: el icono de ayuda al lado del rotulo de un campo, y el mismo icono al
+lado del interruptor de un tipo de formacion. Pulsar el icono abria la explicacion **y** de paso
+abria el calendario / encendia el interruptor. El usuario pide una cosa y ve dos.
+
+El icono va en una fila al lado del `<label>`, nunca dentro.
+
+**3. Poner el ancho a un control compuesto se lo pone solo a una de sus dos capas.**
+
+Es lo que estuvo detras de la "columna de mas" que el cliente veia en la lista de asistencia. `Select`
+es un `div.relative` con un `<select>` dentro y la flecha en `absolute right-3` **contra el div**.
+Pasarle `className="w-44"` estrechaba el `<select>` y dejaba el div con el ancho de la celda: la
+flecha se quedaba a doscientos pixeles de su desplegable.
+
+La regla, y vale para cualquier componente con envoltura: **el ancho define la huella del control, y
+la huella es la envoltura.** Si un componente tiene una capa que posiciona algo, `className` tiene
+que llegarle a esa capa.
+
+Sintoma para reconocerlo: la persona describe "una columna de mas sin nombre", "un icono suelto",
+"algo flotando", y contar cabeceras contra celdas en el fuente CUADRA. Si cuadra en el fuente, no es
+la tabla — es un hijo posicionado de una celda.
+
+
 ### 2026-09-06 — Cuatro cosas que cazo el cliente mirando la pantalla
 
 Todas ciertas, y tres son fallos de la version de ayer.
@@ -2998,7 +3069,7 @@ Se bajo a la formacion con la MISMA cascada que ya gobiernan la constancia y la 
 tipo". `decidirCertificadoExterno` vive junto a sus dos hermanas en `certificate-policy.ts` por lo
 mismo de siempre: tres archivos con la misma logica y distinto nombre se separan el dia que alguien
 corrige uno. **No se congela en la version**, al reves que `issuesCertificate`: aquello queda
-estampado en un papel que hay que poder explicar dentro de dos anos, y esto solo decide que campos
+estampado en un papel que hay que poder explicar dentro de dos años, y esto solo decide que campos
 pide la lista el dia de la jornada.
 
 **4. La guia decia "la siguiente ronda se cuenta desde esta fecha"** sin dejar claro que **no todas
@@ -3160,7 +3231,7 @@ inventadas.
 
 **Y la leccion de metodo, que vale mas que el caso:** cuando una regla derivada se rompe dos veces
 seguidas, el problema no es la regla — es que se esta deduciendo algo que hay que preguntar. La
-senal es tener que justificarla con un caso inventado: la version 1 se defendio con "el webinar en
+señal es tener que justificarla con un caso inventado: la version 1 se defendio con "el webinar en
 vivo", que este cliente no tiene, y ese mismo caso inventado acabo siendo el que rompio la
 version 2.
 
@@ -3245,7 +3316,7 @@ Cinco cosas, todas de forma y todas ciertas:
   falta justificada: una columna de guiones hace que nadie lea la unica que si dice algo.
 - **"Se dicto el" y "vence" se confundian.** Son cosas distintas y ahora lo dicen: el primero es el
   dia de la sesion y queda como fecha de cumplimiento; el segundo es lo que dice el papel del
-  tercero y puede ser dentro de anos.
+  tercero y puede ser dentro de años.
 
 ### 2026-09-06 (noche, 2) — Quien dicto la anterior, heredado
 
@@ -3297,3 +3368,100 @@ plan tiene que ocupar el ancho completo, y los datos van siempre arriba de "Falt
 tipo"* confunde. Se puede simplificar SIN perder la herencia: enseñar Si/No con el valor resuelto
 del tipo y **no mandar el campo mientras nadie lo toque** (queda `null` = hereda). El dia que
 alguien lo cambia, se guarda explicito.
+
+### 2026-09-08 — Los recorridos heredan la basura de los anteriores: acota SIEMPRE por sufijo
+
+**El sintoma es de los que engañan.** `convalidar-papel-ajeno.mjs` fallaba en dos aserciones de forma
+consistente, y **pasaba al añadir una linea de depuracion**. Parecia una carrera entre la escritura y
+la lectura. No lo era.
+
+**La causa.** Las reglas de las formaciones de prueba siguen ACTIVAS hasta que se limpian, asi que a
+cada persona nueva del mismo cargo le nacen tambien las obligaciones de todo lo que dejaron las
+corridas anteriores. Una persona recien creada aparecia con noventa obligaciones, de las cuales
+ochenta y nueve eran de otras corridas.
+
+El recorrido buscaba su formacion con `includes('Trabajo en alturas')` y cazaba la de OTRA corrida:
+**se convalidaba una obligacion y se leia otra**. La funcionalidad iba bien y la asercion decia que
+no.
+
+**La regla:** en un recorrido, toda busqueda por nombre va acotada al sufijo de su corrida —
+`` includes(`Trabajo en alturas ${SUFIJO}`) ``, nunca el nombre a secas. Vale para `find`, `filter` y
+cualquier `some`.
+
+**Y la otra mitad: los recorridos no limpian solos.** El teardown que borra los datos de prueba
+cuelga de la suite e2e (`e2e/global-teardown.ts`), asi que un recorrido lanzado a mano deja todo lo suyo
+en pie —reglas incluidas— y engorda el problema de arriba para el siguiente. Despues de una tanda de
+recorridos:
+
+```powershell
+pnpm --filter @neo-pulse/api dev:limpiar-pruebas
+```
+
+Con la acotacion por sufijo el recorrido pasa igual sin limpiar; sin limpiar, lo que crece es el
+tiempo de cada corrida y el ruido de las pantallas de desarrollo.
+
+**Y como reconocerlo la proxima vez:** si una asercion falla pero al mirar el dato a mano todo esta
+bien, comprueba que el id que se esta leyendo sea el que se escribio. Imprimir el listado completo
+—con el id y el nombre de cada fila— lo resuelve en un minuto; sin eso se pierde media hora buscando
+una carrera que no existe.
+
+### 2026-09-08 — La configuracion de un TIPO es estado del tenant: si un recorrido la toca, la devuelve
+
+`convalidar-papel-ajeno.mjs` enciende `admiteConvalidacion` en el tipo Recertificacion para poder
+probarlo, y **la apaga al terminar**. No es cosmetica: la configuracion del tipo cambia el
+comportamiento de TODAS sus formaciones para todo el mundo, y el siguiente que abra la pantalla no
+tendria forma de saber por que.
+
+Si un recorrido tiene que tocar configuracion del tenant: guardar el valor original al empezar y
+restaurarlo al final, pase lo que pase.
+
+**El caso que lo puso de manifiesto** no fue un recorrido, sino esto: el tipo `INDUCCION_ESPECIFICA`
+tiene hoy `tracksExternalCertificate: true`, y por eso una induccion —que dicta la propia empresa—
+aparece ofreciendo registrar "papel de un tercero". La logica es correcta: enseña lo que el tipo
+declara. Lo que falta es que la pantalla diga POR QUE lo ofrece. Anotado en `PENDIENTES` 2.5.
+
+### 2026-09-08 — Prisma no regenera con el servidor levantado
+
+`prisma generate` falla con `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`
+si el API esta corriendo: el proceso tiene el motor abierto. Hay que parar lo que escucha en 3012
+(y 3200) antes de regenerar, y volver a levantar despues con `mirar.ps1`.
+
+El mensaje no menciona al servidor por ningun lado, asi que se parece a un problema de permisos del
+disco.
+
+
+### 2026-09-08 — Dos condiciones que se leen como una, y por que hay que mirarlas por separado
+
+**`registraCertificadoExterno` y `admiteAsistencia` son INDEPENDIENTES.** Suenan a lo mismo —las dos
+hablan de como se acredita una formacion— y no lo son:
+
+| | De donde sale | Que decide |
+|---|---|---|
+| `registraCertificadoExterno` | de la FORMACION (tipo + ficha) | si hay un papel de un tercero que registrar |
+| `admiteAsistencia` | de la JORNADA (`cierre-de-la-jornada.ts`) | si se cierra con lista o al completar el contenido |
+
+Las cuatro combinaciones existen, y **una de ellas no tiene pantalla**: papel de tercero + cierre por
+contenido. Ahi no aparece la lista de asistencia, que es el unico sitio donde hoy se escribe el
+numero del certificado. Lo destapo el cliente el 2026-09-08 preguntando por ese cruce exacto.
+
+**La leccion para la proxima:** cuando dos banderas se resuelven en sitios distintos y la pantalla
+usa una para hablar de la otra, hay que escribir las cuatro casillas antes de redactar el texto. La
+tarjeta decia *"la lista pedira su numero"* SIEMPRE que hubiera papel, y en una de las cuatro no hay
+lista. Un texto que promete algo que no ocurre es peor que uno que calla: quien lo lee cierra la
+jornada esperando que le pregunten.
+
+**Sintoma para reconocerlo en otras pantallas:** una frase que empieza "la lista...", "el formulario
+pedira...", "despues podras..." y cuya condicion NO es la misma que la que enciende esa frase.
+
+### 2026-09-08 — Prettier reformatea el repositorio entero si se le deja
+
+`pnpm exec prettier --write <archivo>` sobre un archivo suelto lo reescribio de arriba abajo: 319
+lineas cambiadas para un reordenamiento de campos. **No hay `.prettierrc` en el proyecto**, asi que
+prettier usa su defecto —80 columnas— y el codigo esta escrito a ~120. El archivo quedaba con un
+estilo que no comparte con ningun otro y el diff se volvia ilegible.
+
+Se comprobo con `prettier --check` sobre archivos que nadie habia tocado: fallan los tres. **El
+repositorio NO esta formateado con prettier**, aunque `package.json` tenga el script `format`.
+
+Si hace falta formatear algo puntual: `--print-width 120 --single-quote`, que es lo que se parece al
+codigo de al lado. Y mejor a mano si son pocas lineas.

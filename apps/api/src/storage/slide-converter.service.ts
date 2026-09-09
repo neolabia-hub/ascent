@@ -37,7 +37,7 @@ const run = promisify(execFile);
  * Formato de las diapositivas. PNG parece la opcion obvia y es la equivocada: una diapositiva
  * lleva fotos y degradados, y en PNG pesaba 1,4 MB cada una —doce megas por una presentacion de
  * once—. Eso en un telefono en carretera no se abre. WebP con calidad 82 da la misma lectura por
- * una fraccion del peso, y lo entiende cualquier navegador desde hace anos.
+ * una fraccion del peso, y lo entiende cualquier navegador desde hace años.
  */
 const SLIDE_FORMAT = 'webp' as const;
 const SLIDE_QUALITY = 82;

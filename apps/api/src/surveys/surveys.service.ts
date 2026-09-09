@@ -169,7 +169,7 @@ export class SurveysService {
   /**
    * GUARDA UNA RESPUESTA.
    *
-   * Congela `templateVersion` para que lo contestado siga explicandose aunque manana se reescriba
+   * Congela `templateVersion` para que lo contestado siga explicandose aunque mañana se reescriba
    * una pregunta, y califica en el momento: el veredicto es lo que alimenta el indicador y, en
    * eficacia, lo que dispara un refuerzo.
    */
@@ -197,7 +197,7 @@ export class SurveysService {
       .forTenant(tenantId)
       .surveyResponse.findFirst({ where: { enrollmentId, surveyTemplateId: templateId, respondentUserId: userId } });
     // Idempotente: reenviar el mismo formulario —el boton pulsado dos veces, un reintento sin
-    // senal— no crea una segunda respuesta ni cuenta doble en el indicador.
+    // señal— no crea una segunda respuesta ni cuenta doble en el indicador.
     if (existente) return { ok: true as const, result: existente.result };
 
     const result = calificarEncuesta(preguntas, input.answers);
@@ -221,7 +221,7 @@ export class SurveysService {
    * `scheduledDaysAfter` solo tiene sentido en EFICACIA.
    *
    * En satisfaccion se fuerza a `null` en vez de rechazarlo con un error: un valor ahi no rompe
-   * nada, no significa nada, y devolver un error por un campo que la pantalla ni siquiera ensena
+   * nada, no significa nada, y devolver un error por un campo que la pantalla ni siquiera enseña
    * seria un muro sin motivo. Se limpia y ya.
    */
   private diasDe(kind: 'SATISFACTION' | 'EFFICACY', dias: number | null): number | null {

@@ -192,7 +192,7 @@ async function probarReparto({ activityId, versionId }, faceta, etiquetaTipo) {
   await admin.pedir(`/activities/${activityId}/requirements/${ruleId}`, { method: 'DELETE' });
 }
 
-paso(2, 'EL PLAN, por TODAS las facetas: es donde el reparto decide la cobertura del ano');
+paso(2, 'EL PLAN, por TODAS las facetas: es donde el reparto decide la cobertura del año');
 const tipoPlan = tipos.find((t) => t.code === 'PLAN');
 const delPlan = tipoPlan ? await montarFormacion(tipoPlan, 'PLAN') : null;
 if (delPlan) {

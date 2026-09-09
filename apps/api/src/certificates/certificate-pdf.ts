@@ -17,12 +17,12 @@ import type { CertificateSnapshot } from './certificate-snapshot.js';
  * ─── TODO SALE DEL SNAPSHOT ───
  *
  * Ni una consulta a la base de datos mientras se dibuja. Una constancia es un documento con fecha:
- * si se armara leyendo las tablas de hoy, reimprimirla dentro de dos anos daria un papel distinto
+ * si se armara leyendo las tablas de hoy, reimprimirla dentro de dos años daria un papel distinto
  * —la persona cambio de cargo, la formacion se renombro, quien respondia se jubilo— y eso invalida
  * la evidencia. Ver `certificate-snapshot.ts`.
  */
 
-/** A4 en puntos PDF (72 por pulgada). El tamano de hoja que usa todo el mundo aqui. */
+/** A4 en puntos PDF (72 por pulgada). El tamaño de hoja que usa todo el mundo aqui. */
 const A4_LARGO = 841.89;
 const A4_CORTO = 595.28;
 
@@ -61,7 +61,7 @@ export async function dibujarConstancia(datos: DatosParaDibujar): Promise<Uint8A
     EL FONDO A SANGRE, deformando si hace falta.
 
     Se valoro respetar la proporcion del arte y centrarlo, y es peor: dejaria franjas blancas
-    arriba y abajo en una constancia que el cliente diseno para ocupar la hoja entera, y esas
+    arriba y abajo en una constancia que el cliente diseño para ocupar la hoja entera, y esas
     franjas se ven como un error de impresion. Si el arte viene con otra proporcion, lo que hay que
     arreglar es el arte —y se ve al momento en la vista previa—, no repartir el problema.
   */
@@ -160,7 +160,7 @@ function escribir(
     conversion en el unico sitio que dibuja es lo que permite que el resto del sistema —la pantalla
     de colocacion, la vista previa, el JSON guardado— hable un solo idioma.
 
-    Se resta el tamano de la letra porque la Y del campo es donde empieza el texto por ARRIBA, que
+    Se resta el tamaño de la letra porque la Y del campo es donde empieza el texto por ARRIBA, que
     es lo que se ve al colocarlo; pdf-lib dibuja desde la linea base.
   */
   const y = ctx.alto - (campo.y / 100) * ctx.alto - tamano;

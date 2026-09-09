@@ -40,6 +40,7 @@ import { StatusPill, type StatusPillKind } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/components/ui/cn';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 type Tab = 'requisitos' | 'matriz' | 'audiencias' | 'obligaciones';
 
@@ -69,7 +70,7 @@ const ASSIGNMENT_STATUS: Record<AssignmentStatus, { kind: StatusPillKind; label:
   WITHDRAWN_PLAN_ITEM_CANCELLED: { kind: 'neutral', label: 'RENGLON CANCELADO' },
   WAIVED: { kind: 'neutral', label: 'EXIMIDA' },
   // En rojo y no en gris: retirada y eximida NO cuentan como incumplimiento, y esta SI. Pintarlas
-  // igual haria que la campana de un ano cerrado se leyera como si no hubiera pasado nada.
+  // igual haria que la campaña de un año cerrado se leyera como si no hubiera pasado nada.
   EXPIRED_NOT_DONE: { kind: 'danger', label: 'NO REALIZADA' },
 };
 
@@ -97,7 +98,7 @@ export default function AsignacionesPage() {
     completas: pedirle al servidor un filtro que se resuelve aqui anadiria latencia a cada tecla sin
     ganar nada. Obligaciones NO: esa se pagina en el servidor y su buscador ya viaja en la consulta.
 
-    Por defecto se ensena SOLO LO VIGENTE. Un requisito retirado no obliga a nadie, y verlo mezclado
+    Por defecto se enseña SOLO LO VIGENTE. Un requisito retirado no obliga a nadie, y verlo mezclado
     con los vivos hace contar mal de un vistazo, que es justo lo que se viene a hacer aqui.
   */
   const [rulesQuery, setRulesQuery] = useState({ q: '', soloVigentes: true });
@@ -129,7 +130,7 @@ export default function AsignacionesPage() {
   /**
    * SOLO SE PINTA LA ULTIMA RESPUESTA.
    *
-   * Sin este guardia hay una carrera que empeora con el tamano de la base: al entrar a
+   * Sin este guardia hay una carrera que empeora con el tamaño de la base: al entrar a
    * Obligaciones sale una peticion SIN filtro que, con miles de filas, tarda; se escribe en el
    * buscador y sale otra, filtrada, que vuelve enseguida; y despues aterriza la primera y
    * **pisa** el resultado. La pantalla acaba mostrando filas que no corresponden a lo que se
@@ -316,12 +317,15 @@ export default function AsignacionesPage() {
         (rule.targetName ?? '').toLowerCase().includes(buscaReglas) ||
         rule.audience.name.toLowerCase().includes(buscaReglas)),
   );
+  const { visibles: reglasEnPagina, paginador: paginadorReglas } = usePaginacion(reglasVisibles);
   const buscaAudiencias = audienceQuery.q.trim().toLowerCase();
   const audienciasVisibles = (audiences ?? []).filter(
     (audience) =>
       (!audienceQuery.soloActivas || audience.active) &&
       (buscaAudiencias === '' || audience.name.toLowerCase().includes(buscaAudiencias)),
   );
+  const { visibles: audienciasEnPagina, paginador: paginadorAudiencias } = usePaginacion(audienciasVisibles);
+  const { visibles: obligacionesEnPagina, paginador: paginadorObligaciones } = usePaginacion(assignments ?? []);
 
   return (
     <div>
@@ -417,7 +421,7 @@ export default function AsignacionesPage() {
                   </Tr>
                 </THead>
                 <TBody>
-                  {reglasVisibles.map((rule) => (
+                  {reglasEnPagina.map((rule) => (
                     <Tr key={rule.id}>
                       <Td className="font-medium text-ink-900">{rule.targetName ?? 'Actividad'}</Td>
                       <Td className="text-ink-700">{rule.audience.name}</Td>
@@ -427,7 +431,7 @@ export default function AsignacionesPage() {
                         {rule.recurrence?.everyMonths
                           ? `Cada ${rule.recurrence.everyMonths} meses`
                           : rule.recurrence?.fixedDate
-                            ? `Cada ano el ${rule.recurrence.fixedDate}`
+                            ? `Cada año el ${rule.recurrence.fixedDate}`
                             : 'Una vez'}
                       </Td>
                       <Td className="text-right tabular-nums text-ink-700">{rule.assignmentCount}</Td>
@@ -446,6 +450,7 @@ export default function AsignacionesPage() {
                   ))}
                 </TBody>
               </Table>
+                  {paginadorReglas}
             </div>
             {/* Filtrar hasta dejarlo vacio no es un error, pero hay que decirlo. */}
             {reglasVisibles.length === 0 ? (
@@ -516,7 +521,7 @@ export default function AsignacionesPage() {
                   </Tr>
                 </THead>
                 <TBody>
-                  {audienciasVisibles.map((audience) => (
+                  {audienciasEnPagina.map((audience) => (
                     <Tr key={audience.id}>
                       <Td className="font-medium text-ink-900">{audience.name}</Td>
                       <Td className="text-right tabular-nums text-ink-700">{audience.memberCount}</Td>
@@ -529,6 +534,7 @@ export default function AsignacionesPage() {
                   ))}
                 </TBody>
               </Table>
+                  {paginadorAudiencias}
             </div>
             {audienciasVisibles.length === 0 ? (
               <p className="px-5 py-6 text-center text-sm text-ink-500">
@@ -610,7 +616,7 @@ export default function AsignacionesPage() {
                 <Table>
                   <THead>
                     <Tr>
-                      <Th>Persona</Th>
+                      <Th>Nombre</Th>
                       <Th>Formacion</Th>
                       <Th>Origen</Th>
                       <Th>Ronda</Th>
@@ -620,7 +626,7 @@ export default function AsignacionesPage() {
                     </Tr>
                   </THead>
                   <TBody>
-                    {assignments.map((assignment) => (
+                    {obligacionesEnPagina.map((assignment) => (
                       <Tr key={assignment.id}>
                         <Td>
                           <div className="font-medium text-ink-900">{assignment.user.fullName}</div>
@@ -656,6 +662,7 @@ export default function AsignacionesPage() {
                     ))}
                   </TBody>
                 </Table>
+                    {paginadorObligaciones}
               </div>
             </div>
           )}

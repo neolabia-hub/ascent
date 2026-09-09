@@ -30,7 +30,7 @@ import { motivoDelError } from '@/lib/api';
  *   - sin el no existe el BLOQUE AL AZAR, que es lo que evita que 116 personas se pasen la hoja
  *     de respuestas el primer dia;
  *   - guarda el VERSIONADO (Decision #6): corregir un enunciado hoy no reescribe lo que alguien
- *     respondio el ano pasado.
+ *     respondio el año pasado.
  *
  * Los dos siguen enteros. Lo que se retira es el DESTINO: nadie entra a este modulo queriendo
  * "administrar un banco", entra queriendo armar un examen. Tenerlo como pestana de primer nivel

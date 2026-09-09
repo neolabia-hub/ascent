@@ -35,7 +35,7 @@ import { ADMIN_HOME, LEARNER_HOME } from '@/lib/landing';
  * y salio un control de dos rotulos para una accion sola: mas ancho, mas ruido y dos sitios donde
  * mirar. Asi que ahora es un CONMUTADOR de verdad (Decision #106), como el de claro/oscuro:
  *
- *   PLEGADO     el icono de DONDE ESTAS. Ocupa lo que una campana.
+ *   PLEGADO     el icono de DONDE ESTAS. Ocupa lo que una campaña.
  *   DESPLEGADO  al pasar o al enfocarlo se abre a lo ancho y lo dice con todas las letras.
  *   AL PULSAR   cambia al otro espacio.
  *
@@ -45,7 +45,7 @@ import { ADMIN_HOME, LEARNER_HOME } from '@/lib/landing';
  *
  * EL CONTADOR ES DE PENDIENTES, NO DE AVISOS, y esa diferencia es el motivo de que exista. Un
  * aviso se apaga al leerlo; una formacion pendiente sigue ahi aunque leas el correo diez veces. Si
- * el numero contara avisos, bajaria a cero sin que nadie se hubiera capacitado. La campana ya
+ * el numero contara avisos, bajaria a cero sin que nadie se hubiera capacitado. La campaña ya
  * cuenta lo leido; esto cuenta lo que falta por HACER, y se pone rojo cuando algo esta vencido.
  */
 export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
@@ -107,12 +107,12 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
       para que nadie tuviera que deducir nada, y salio un control de dos celdas y dos rotulos para
       una accion sola — mas ancho, mas ruido y dos sitios donde mirar.
 
-      Ahora es un CONMUTADOR de verdad, como el de claro/oscuro: ensena el estado en el que esta y
+      Ahora es un CONMUTADOR de verdad, como el de claro/oscuro: enseña el estado en el que esta y
       al pulsarlo pasa al otro. Plegado es un icono, y al pasar por encima o al enfocarlo con el
       teclado se abre a lo ancho para decir donde estas con todas las letras.
 
       EL NOMBRE ACCESIBLE DICE LA ACCION, no el estado: quien navega escuchando oye "ir a mi
-      formacion" —que es lo que pasa al pulsar— mientras la pantalla ensena "Administracion", que
+      formacion" —que es lo que pasa al pulsar— mientras la pantalla enseña "Administracion", que
       es donde esta. Un solo rotulo visible no puede decir las dos cosas, asi que la que se ve es
       la que orienta y la que se oye es la que actua. El tooltip las junta para quien use raton.
 
@@ -125,7 +125,7 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
       aria-label={accesible}
       title={descripcion}
       className="group/sw focus-ring flex h-10 items-center rounded-full border border-line p-1 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:shadow-card-hover focus-visible:-translate-y-px"
-      // Mismo tono de reposo que la campana y la cuenta: los tres son una familia (Decision #108).
+      // Mismo tono de reposo que la campaña y la cuenta: los tres son una familia (Decision #108).
       style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
     >
       {/*

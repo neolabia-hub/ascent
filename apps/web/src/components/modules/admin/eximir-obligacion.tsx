@@ -89,7 +89,7 @@ export function EximirObligacion({
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-ink-500">
           La obligacion deja de contar para el cumplimiento y desaparece de sus pendientes. No se borra: queda con el
-          motivo, la fecha y quien la eximio, y es lo que se ensena si alguien pregunta por que esta persona no la hizo.
+          motivo, la fecha y quien la eximio, y es lo que se enseña si alguien pregunta por que esta persona no la hizo.
         </p>
         <Field
           htmlFor="eximir-motivo"

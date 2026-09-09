@@ -1,5 +1,7 @@
-import { Controller, Get, Header, Param, Query, StreamableFile } from '@nestjs/common';
-import { RequirePermissions } from '../common/decorators.js';
+import { Controller, Get, Header, Param, Post, Query, StreamableFile } from '@nestjs/common';
+import { CurrentUser, RequirePermissions } from '../common/decorators.js';
+import type { AuthUser } from '../common/types.js';
+import { ExpirationDigestService } from './expiration-digest.service.js';
 import { ESTADOS_EJECUCION, type EstadoEjecucion } from './execution-state.js';
 import { ReportsService } from './reports.service.js';
 
@@ -25,9 +27,32 @@ function leerEstado(valor?: string): EstadoEjecucion | null {
  */
 @Controller('reportes')
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly digest: ExpirationDigestService,
+  ) {}
 
-  /** Como va TODO. Es la primera pantalla que se abre cada manana. */
+  /**
+   * MANDAR EL AVISO DE VENCIMIENTOS AHORA (`PENDIENTES` 3.3).
+   *
+   * El aviso sale solo los lunes. Esto existe para dos cosas que el cron no cubre: comprobar que
+   * funciona sin esperar una semana —cambiar el plazo en Preferencias y ver el efecto— y mandarlo a
+   * mano el dia que el servidor estuvo caido justo el lunes.
+   *
+   * Va bajo `config:manage_tenant` y no bajo el permiso de LEER informes: esto no consulta nada,
+   * escribe en la bandeja de todo el que pueda ver reportes. Quien mira indicadores no tiene por
+   * que poder mandarle un aviso a los demas.
+   *
+   * Salta la comprobacion de "ya se aviso esta semana", que existe para que un reinicio del
+   * servidor un lunes no mande el aviso dos veces: al pedirlo a mano se quiere justamente verlo.
+   */
+  @Post('vencimientos/avisar')
+  @RequirePermissions('config:manage_tenant')
+  avisarVencimientos(@CurrentUser() actor: AuthUser) {
+    return this.digest.enviar(actor.tenantId, { forzar: true });
+  }
+
+  /** Como va TODO. Es la primera pantalla que se abre cada mañana. */
   @Get('ejecucion')
   @RequirePermissions('reports:read_scope')
   ejecucionGeneral() {
@@ -61,7 +86,7 @@ export class ReportsController {
   /**
    * LO QUE SE VENCE, mirando hacia adelante (Decision #126).
    *
-   * Es de donde sale el plan del ano siguiente, y la segunda pregunta del auditor: la primera es
+   * Es de donde sale el plan del año siguiente, y la segunda pregunta del auditor: la primera es
    * "¿quien lo hizo?" y la segunda "¿sigue vigente?".
    */
   @Get('vencimientos')
@@ -69,7 +94,7 @@ export class ReportsController {
   vencimientos(@Query('meses') meses?: string) {
     /*
       El horizonte se acota entre 1 y 24 meses. Menos de un mes no es un horizonte, y mas de dos
-      anos no se planea: seria traer miles de filas que nadie va a mirar para que la pantalla tarde.
+      años no se planea: seria traer miles de filas que nadie va a mirar para que la pantalla tarde.
     */
     const pedidos = Number(meses);
     const horizonte = Number.isFinite(pedidos) ? Math.min(24, Math.max(1, Math.trunc(pedidos))) : 12;

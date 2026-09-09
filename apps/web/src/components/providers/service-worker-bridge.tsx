@@ -10,7 +10,7 @@ import { getAccessToken } from '@/lib/api';
  *  1. REGISTRA el worker (sin el no hay nada offline).
  *  2. Le pasa el access token vigente. El worker reintenta envios encolados horas despues, y el
  *     token dura 15 minutos: sin esto, el avance de alguien se perderia por una cabecera vencida.
- *  3. Le avisa al recuperar senal para que vacie la cola sin esperar a Background Sync (que solo
+ *  3. Le avisa al recuperar señal para que vacie la cola sin esperar a Background Sync (que solo
  *     existe en Chromium).
  *
  * Ademas avisa EN PANTALLA cuando no hay conexion. Un aviso honesto evita el peor escenario:
@@ -24,10 +24,10 @@ export function ServiceWorkerBridge() {
 
     // En DESARROLLO no se registra, y si quedo uno registrado se da de baja.
     //
-    // El worker cachea el armazon para que la aplicacion abra sin senal, que es justo lo que
+    // El worker cachea el armazon para que la aplicacion abra sin señal, que es justo lo que
     // arruina el trabajo del dia: cambias una pantalla, recargas, y el navegador te sigue
     // sirviendo la anterior desde el cache. Depurar eso cuesta horas y parece un fallo del
-    // codigo. Sin senal solo hay que funcionar en produccion.
+    // codigo. Sin señal solo hay que funcionar en produccion.
     if (process.env.NODE_ENV !== 'production') {
       void navigator.serviceWorker
         .getRegistrations()
@@ -75,7 +75,7 @@ export function ServiceWorkerBridge() {
       role="status"
       className="fixed inset-x-0 top-0 z-50 bg-warn px-4 py-2 text-center text-sm font-medium text-white"
     >
-      Sin conexion. Puedes seguir: tu avance se guarda y se envia al volver la senal.
+      Sin conexion. Puedes seguir: tu avance se guarda y se envia al volver la señal.
     </div>
   );
 }

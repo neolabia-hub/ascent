@@ -203,7 +203,7 @@ export function Combo({
         onClick={() => setAbierto((valor) => !valor)}
         onKeyDown={navegar}
         className={cn(
-          'focus-ring flex h-10 w-full items-center gap-2 rounded-md border bg-surface px-3 text-left text-sm shadow-btn-flat transition-all duration-150',
+          'focus-ring flex h-10 w-full items-center gap-2 rounded-lg border bg-surface px-3 text-left text-sm shadow-btn-flat transition-all duration-150',
           'hover:border-line-strong hover:shadow-btn disabled:cursor-not-allowed disabled:border-line disabled:bg-paper disabled:text-ink-300 disabled:shadow-none',
           abierto ? 'border-primary' : 'border-line-strong',
         )}

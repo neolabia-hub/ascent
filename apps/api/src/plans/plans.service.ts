@@ -50,8 +50,8 @@ export class PlansService {
    * El listado trae los INDICADORES de cada plan, no solo su nombre.
    *
    * Antes devolvia cuatro escalares y la pantalla los pintaba en una tabla, asi que para saber
-   * como va el ano habia que entrar. Con un plan por ano (Decision #71) la lista es corta —una
-   * fila por ano— y calcular sus numeros cuesta una consulta mas: la pregunta que trae a alguien
+   * como va el año habia que entrar. Con un plan por año (Decision #71) la lista es corta —una
+   * fila por año— y calcular sus numeros cuesta una consulta mas: la pregunta que trae a alguien
    * a esta pantalla es "¿como vamos?", y ahora se contesta sin abrir nada.
    *
    * Se respeta el ALCANCE del analista igual que en la ficha: quien gestiona SST ve el
@@ -74,7 +74,7 @@ export class PlansService {
       },
     });
 
-    // Una sola pasada por TODOS los renglones visibles y despues se reparten: con un plan por ano
+    // Una sola pasada por TODOS los renglones visibles y despues se reparten: con un plan por año
     // son pocas filas, pero una consulta por plan volveria a ser el N+1 de siempre.
     const facts = await this.factsFor(plans.flatMap((plan) => plan.items));
     const factsById = new Map(facts.map((fact) => [fact.itemId, fact]));
@@ -219,8 +219,8 @@ export class PlansService {
    *
    * Antes cualquier cambio quedaba congelado al aprobar, y eso protegia de mas: nombre, objetivo,
    * metas y alcance son texto descriptivo —lo que obliga a la gente son los renglones—, asi que
-   * bloquearlos no defendia ninguna obligacion; solo dejaba puesto todo el ano un nombre mal
-   * escrito. Lo que si sigue cerrado es el plan CERRADO, que ya es la evidencia del ano.
+   * bloquearlos no defendia ninguna obligacion; solo dejaba puesto todo el año un nombre mal
+   * escrito. Lo que si sigue cerrado es el plan CERRADO, que ya es la evidencia del año.
    *
    * El ANO es otra cosa: identifica al plan junto al nombre y ancla el vencimiento de cada
    * renglon al ultimo dia de su mes. Cambiarlo despues de aprobar moveria la fecha limite de
@@ -231,7 +231,7 @@ export class PlansService {
     if (plan.status === 'CLOSED') {
       throw new ConflictException({
         code: 'PLAN_CLOSED',
-        message: 'El plan cerrado es la evidencia del ano: ya no se edita.',
+        message: 'El plan cerrado es la evidencia del año: ya no se edita.',
       });
     }
     if (plan.status !== 'DRAFT') {
@@ -244,7 +244,7 @@ export class PlansService {
       if (input.year !== undefined && input.year !== plan.year) {
         throw new ConflictException({
           code: 'PLAN_YEAR_LOCKED',
-          message: 'El ano de un plan aprobado no se cambia: moveria el vencimiento de obligaciones ya vigentes.',
+          message: 'El año de un plan aprobado no se cambia: moveria el vencimiento de obligaciones ya vigentes.',
         });
       }
     }
@@ -289,7 +289,7 @@ export class PlansService {
    * al renglon por clave foranea— y tampoco vivas: una obligacion sin plan que la explique es
    * justo lo que el plan existe para evitar.
    *
-   * Va con `plans:approve` y no con `plans:manage`: borrar el plan del ano es al menos tan grave
+   * Va con `plans:approve` y no con `plans:manage`: borrar el plan del año es al menos tan grave
    * como aprobarlo.
    */
   async remove(actor: AuthUser, id: string, input: DeletePlanInput) {
@@ -369,7 +369,7 @@ export class PlansService {
    *
    * Se puede agregar con el plan YA APROBADO, con justificacion (Decision #55). La regla anterior
    * —"el plan aprobado no se edita"— era correcta en su intencion y demasiado apretada en la
-   * practica: si en agosto abren una regional, esa jornada tiene que entrar en el plan del ano.
+   * practica: si en agosto abren una regional, esa jornada tiene que entrar en el plan del año.
    * Prohibirlo no evita el cambio, lo saca del sistema, que es justo lo que el plan existe para
    * impedir. AGREGAR no reescribe el pasado; BORRAR si, y eso sigue prohibido.
    */
@@ -379,7 +379,7 @@ export class PlansService {
     if (plan.status === 'CLOSED') {
       throw new ConflictException({
         code: 'PLAN_CLOSED',
-        message: 'El plan del ano esta cerrado: ya es historia y no admite renglones nuevos.',
+        message: 'El plan del año esta cerrado: ya es historia y no admite renglones nuevos.',
       });
     }
     const live = plan.status !== 'DRAFT';
@@ -421,7 +421,7 @@ export class PlansService {
       matiz teorico: el recorrido de punta a punta metio una induccion general en un plan de prueba
       y los proyectados del plan pasaron de **22 a 819**, porque la induccion alcanza a la empresa
       entera. Eso es mover el cumplimiento del plan con algo que por la regla de oro 2 no debe
-      tocarlo, y deja la cobertura del ano en un numero que no significa nada.
+      tocarlo, y deja la cobertura del año en un numero que no significa nada.
 
       Un filtro que solo vive en la pantalla no es un filtro: es una sugerencia.
     */
@@ -429,7 +429,7 @@ export class PlansService {
     if (configDelTipo.participatesInPlan !== true) {
       throw new ConflictException({
         code: 'ACTIVITY_NOT_PLANNABLE',
-        message: `"${offering.activityVersion.activity.activityType.name}" no es una formacion del plan: engancharla moveria el cumplimiento del ano con algo que no le corresponde.`,
+        message: `"${offering.activityVersion.activity.activityType.name}" no es una formacion del plan: engancharla moveria el cumplimiento del año con algo que no le corresponde.`,
       });
     }
 
@@ -437,7 +437,7 @@ export class PlansService {
     /**
      * SI YA ESTA, NO ES UN ERROR: es que entro sola (Decision #75).
      *
-     * Desde que programar una jornada de una capacitacion del plan la mete en el plan del ano
+     * Desde que programar una jornada de una capacitacion del plan la mete en el plan del año
      * cuando esta en borrador, quien la crea DESDE el plan se encuentra el renglon ya hecho. Antes
      * eso era un 409 "esa convocatoria ya esta en el plan", que es cierto y es inutil: lo que la
      * persona quiso hacer ya esta hecho.
@@ -516,7 +516,7 @@ export class PlansService {
     if (item.status === 'EXECUTED') {
       throw new ConflictException({
         code: 'PLAN_ITEM_EXECUTED',
-        message: 'Un renglon ya ejecutado no se reprograma: quedo como historia.',
+        message: 'Un renglón ya ejecutado no se reprograma: quedó como historia.',
       });
     }
 
@@ -584,7 +584,7 @@ export class PlansService {
     if (withAssignments > 0) {
       throw new ConflictException({
         code: 'PLAN_ITEM_IN_USE',
-        message: 'El renglon ya genero obligaciones: cancelalo en vez de borrarlo.',
+        message: 'El renglón ya generó obligaciones: cancélalo en vez de borrarlo.',
       });
     }
 
@@ -654,7 +654,7 @@ export class PlansService {
     return { plan: approved, assignments: createdAssignments };
   }
 
-  /** APPROVED -> ACTIVE (en ejecucion) -> CLOSED (cerrado el ano). */
+  /** APPROVED -> ACTIVE (en ejecucion) -> CLOSED (cerrado el año). */
   async changeStatus(actor: AuthUser, id: string, next: 'ACTIVE' | 'CLOSED') {
     const plan = await this.requirePlan(id);
     const allowed = next === 'ACTIVE' ? plan.status === 'APPROVED' : plan.status === 'ACTIVE' || plan.status === 'APPROVED';
@@ -677,19 +677,19 @@ export class PlansService {
   }
 
   /**
-   * REABRIR el plan del ano, con motivo.
+   * REABRIR el plan del año, con motivo.
    *
-   * Cerrar es lo que convierte al plan en la evidencia del ano, y por eso la regla era que no se
-   * reabria. Con un plan por ano (Decision #71) esa regla dejo de ser estricta y paso a ser una
-   * TRAMPA: un plan cerrado —de ensayo o por error— se queda con el ano y ya no hay forma de
-   * planear 2026 ni de programar nada en el, porque el unico plan posible de ese ano esta cerrado.
+   * Cerrar es lo que convierte al plan en la evidencia del año, y por eso la regla era que no se
+   * reabria. Con un plan por año (Decision #71) esa regla dejo de ser estricta y paso a ser una
+   * TRAMPA: un plan cerrado —de ensayo o por error— se queda con el año y ya no hay forma de
+   * planear 2026 ni de programar nada en el, porque el unico plan posible de ese año esta cerrado.
    *
    * La salida no es dar un permiso de "control total" que se salte las reglas: es que la operacion
    * EXISTA y deje rastro. Reabrir queda en la auditoria con quien, cuando y por que; borrar no
    * dejaria nada, y por eso borrar sigue reservado al plan que nunca obligo a nadie.
    *
    * Vuelve a EN EJECUCION y no a BORRADOR: sus renglones ya materializaron obligaciones reales, y
-   * mandarlo a borrador diria que el ano esta sin aprobar cuando hay gente con la formacion encima.
+   * mandarlo a borrador diria que el año esta sin aprobar cuando hay gente con la formacion encima.
    */
   async reopen(actor: AuthUser, id: string, input: ReopenPlanInput) {
     const plan = await this.requirePlan(id);
@@ -838,7 +838,7 @@ export class PlansService {
    * Antes creaba siempre la suya, y el solape no era un caso raro sino el CAMINO NORMAL: una
    * capacitacion del plan obliga a marcar Quienes, y `projected.resolve` deriva a quien obliga el
    * plan precisamente DE LOS YA OBLIGADOS. Es decir, el 100% de las veces. Cada persona acababa
-   * con dos obligaciones de la misma formacion, y de ahi salian tres danos:
+   * con dos obligaciones de la misma formacion, y de ahi salian tres daños:
    *
    *   - la formacion aparecia dos veces en sus pendientes, con dos vencimientos distintos;
    *   - terminarla cerraba UNA (`closeAssignment` cierra la de vencimiento mas cercano) y la otra
@@ -939,7 +939,7 @@ export class PlansService {
     await this.congelarProyectados(item.id);
     // Solo se AVISA a quien recibe una obligacion NUEVA. A quien ya la tenia no se le manda nada:
     // "se te asigno X" seria falso —ya estaba asignada— y ademas un aviso repetido por algo que no
-    // cambio para esa persona es como se ensena a ignorar la campana.
+    // cambio para esa persona es como se enseña a ignorar la campaña.
     return recipients.length + adoptadas;
   }
 
@@ -951,8 +951,8 @@ export class PlansService {
    * decia proyectar a trece y obligaba a cero.
    *
    * MEDIDO: dos jornadas de la misma capacitacion sin acotar, 13 obligados reales, y el plan
-   * proyectando **26**. La cobertura del ano no podia pasar del 50% aunque se capacitara a todo el
-   * mundo — que es exactamente el dano que describe la Decision #68, pero en el plan y no en la
+   * proyectando **26**. La cobertura del año no podia pasar del 50% aunque se capacitara a todo el
+   * mundo — que es exactamente el daño que describe la Decision #68, pero en el plan y no en la
    * convocatoria.
    *
    * Ahora el denominador sale del MISMO sitio que el numerador: las obligaciones que este renglon
@@ -982,7 +982,7 @@ export class PlansService {
     });
     return new ConflictException({
       code: 'PLAN_YEAR_TAKEN',
-      message: `Ya existe el plan de ${year}. Hay uno por ano: abrelo y agregale renglones.`,
+      message: `Ya existe el plan de ${year}. Hay uno por año: abrelo y agregale renglones.`,
       year,
       planId: existing?.id ?? null,
       planName: existing?.name ?? null,

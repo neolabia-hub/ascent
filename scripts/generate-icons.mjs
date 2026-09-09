@@ -2,7 +2,7 @@
  * Genera los iconos de la PWA (apps/web/public/icons).
  *
  * Se dibujan por codigo y no se guardan como binarios opacos en el repo por dos razones: se
- * pueden regenerar en cualquier tamano que pida una plataforma nueva, y la revision de un cambio
+ * pueden regenerar en cualquier tamaño que pida una plataforma nueva, y la revision de un cambio
  * de icono es un diff legible en vez de "cambio un PNG".
  *
  * El icono es de la PLATAFORMA (NEO PULSE), no del tenant: es lo que queda en la pantalla de

@@ -184,7 +184,7 @@ export function ConstanciasDePersona({
           <Field
             htmlFor="motivo-revocacion"
             label="Motivo"
-            hint="Minimo 10 caracteres. Queda guardado: sin el, la revocacion es indefendible dentro de seis meses."
+            ayuda="Minimo 10 caracteres. Queda guardado: sin el, la revocacion es indefendible dentro de seis meses."
           >
             <Input
               id="motivo-revocacion"

@@ -65,7 +65,7 @@ export function addMonths(date: CalendarDate, months: number): CalendarDate {
  *
  * ─── EL DIA SE ACOTA AL MES, NO SE DESBORDA (2026-09-04) ───
  *
- * La campana se guarda como texto "MM-DD" y el patron que la valida acepta `3[01]` en CUALQUIER
+ * La campaña se guarda como texto "MM-DD" y el patron que la valida acepta `3[01]` en CUALQUIER
  * mes: `09-31`, `04-31`, `02-30` pasan el filtro. Con el dia desbordado, `Date.UTC` no falla — se
  * lo lleva al mes siguiente en silencio—, asi que una reinduccion configurada "cada 30 de
  * septiembre" mal escrita como `09-31` vencia **el 1 de octubre**, y nadie tenia forma de notarlo:
@@ -77,7 +77,7 @@ export function addMonths(date: CalendarDate, months: number): CalendarDate {
  * Se ACOTA al ultimo dia del mes, que es lo mismo que ya hacia `addMonths` para el caso hermano
  * ("si el mes destino es mas corto, cae en su ultimo dia"): dos funciones de fecha en el mismo
  * archivo no pueden resolver distinto el mismo problema. Febrero 29 sigue valiendo y cae en 28 los
- * anos que no son bisiestos, que es lo que espera cualquiera que escriba esa fecha.
+ * años que no son bisiestos, que es lo que espera cualquiera que escriba esa fecha.
  *
  * El patron tambien se apreto (`fixedDateSchema`), para que no se pueda GUARDAR una fecha que no
  * existe. Esto de aqui es la red de abajo: la base ya tiene fechas escritas con el patron viejo.
@@ -134,8 +134,8 @@ export const DIAS_DE_GRACIA = 30;
  *             desde la entrada a la audiencia.
  *
  * LA GRACIA. Si la fecha calculada cae ANTES del momento en que la obligacion nace —el caso de
- * quien lleva anos en la empresa cuando se estrena el requisito—, se sustituye por "desde hoy,
- * con `DIAS_DE_GRACIA` de plazo". A quien entra manana no le afecta: su ancla de ingreso es
+ * quien lleva años en la empresa cuando se estrena el requisito—, se sustituye por "desde hoy,
+ * con `DIAS_DE_GRACIA` de plazo". A quien entra mañana no le afecta: su ancla de ingreso es
  * posterior a su entrada a la audiencia, asi que la fecha de D1072 se respeta intacta.
  *
  * ─── CUANDO NACE LA OBLIGACION NO ES CUANDO ENTRO A LA AUDIENCIA (2026-09-03) ───
@@ -169,14 +169,14 @@ export function computeFirstDueAt(trigger: Trigger, dueDays: number, ctx: FirstD
 
     Antes no. La fecha fija solo la usaba `SCHEDULED`, y el automatismo que exige una reinduccion al
     publicarla pone `ON_JOIN`: la primera ronda vencia a los 30 dias de publicarla y la campana solo
-    regia desde la segunda. La pantalla decia "cada ano antes del 31 de marzo" y la primera no vencia
-    ese dia — lo que el auditor lee y lo que el sistema hace no coincidian el primer ano.
+    regia desde la segunda. La pantalla decia "cada año antes del 31 de marzo" y la primera no vencia
+    ese dia — lo que el auditor lee y lo que el sistema hace no coincidian el primer año.
 
     Y la razon por la que se dejo asi era buena: estrenar la reinduccion el 15 de marzo con
     vencimiento el 31 da dos semanas para que 1.060 personas la hagan. Asi que no se trata de
     escoger una de las dos, sino de mirar CUANTO FALTA:
 
-      falta mas que la ventana (60 dias)  -> vence en la fecha de la campana. Es lo que dice la
+      falta mas que la ventana (60 dias)  -> vence en la fecha de la campaña. Es lo que dice la
                                              pantalla, y hay tiempo de sobra.
       falta menos                          -> los dias de gracia. Estrenarla encima de la fecha no
                                              puede obligar a una empresa entera en dos semanas.
@@ -207,7 +207,7 @@ export function computeFirstDueAt(trigger: Trigger, dueDays: number, ctx: FirstD
  * El ancla era `completedAt` para las dos, y en una CAMPANA eso es falso: quien hace la
  * reinduccion el 20 de marzo la hace **para el periodo que vence el 31 de marzo**, no para el dia
  * 20. Con el ancla en la fecha de completado, `nextFixedDate` devolvia la ocurrencia siguiente al
- * dia 20 —que es el 31 de marzo **del mismo ano**, once dias despues—, la ventana de 60 dias ya
+ * dia 20 —que es el 31 de marzo **del mismo año**, once dias despues—, la ventana de 60 dias ya
  * estaba abierta, y al dia siguiente de cumplir le nacia la ronda 2 con el mismo vencimiento que
  * acababa de satisfacer.
  *
@@ -216,7 +216,7 @@ export function computeFirstDueAt(trigger: Trigger, dueDays: number, ctx: FirstD
  * acusa de incumplir justo a quien cumplio**, y solo a quien cumplio: al que la hace tarde o no la
  * hace no le pasa. Un indicador que castiga cumplir esta al reves.
  *
- * Solo pica cuando se completa DENTRO de la ventana de la campana —que es cuando la hace todo el
+ * Solo pica cuando se completa DENTRO de la ventana de la campaña —que es cuando la hace todo el
  * mundo—, y por eso no lo vieron los recorridos: `reinduccion-ciclos.mjs` comprime la recurrencia
  * a un mes (`everyMonths`) y prueba el camino de la que NO se hizo.
  *
@@ -236,7 +236,7 @@ export function cycleAnchor(
 
 /**
  * Vencimiento de la ronda SIGUIENTE (Decision #12: la obligacion es viva en el tiempo).
- * El ancla la elige `cycleAnchor`: no es la misma para una campana que para un aniversario.
+ * El ancla la elige `cycleAnchor`: no es la misma para una campaña que para un aniversario.
  */
 export function computeNextCycleDueAt(recurrence: Recurrence, anchorInstant: Date): Date {
   const anchor = toBogotaDate(anchorInstant);
@@ -263,12 +263,12 @@ export interface RondaCumplida {
  * dos veces y garantizar que algun dia no coincidan.
  *
  * La excepcion es el certificado de un TERCERO, y no es una preferencia: **la fecha no la pone la
- * empresa**. Si la ARL certifica en alturas por tres anos y el tipo dice doce meses, reclamarla al
- * ano es inventar un incumplimiento sobre alguien que tiene su habilitacion vigente y el papel
+ * empresa**. Si la ARL certifica en alturas por tres años y el tipo dice doce meses, reclamarla al
+ * año es inventar un incumplimiento sobre alguien que tiene su habilitacion vigente y el papel
  * para probarlo. En las externas manda el papel.
  *
  * Ojo a la forma: `validUntilOverride` **no es un ancla** a la que sumarle meses — es el
- * vencimiento mismo. Tratarlo como ancla daria "tres anos despues de que caduque", que es justo
+ * vencimiento mismo. Tratarlo como ancla daria "tres años despues de que caduque", que es justo
  * al reves de lo que dice el documento.
  */
 export function proximoVencimiento(recurrence: Recurrence, ronda: RondaCumplida, fallback: Date): Date {

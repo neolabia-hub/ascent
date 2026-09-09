@@ -17,10 +17,10 @@ export interface CompletionOutcome {
  *   la persona termina la EJECUCION -> se cumple su OBLIGACION -> el PLAN sube su cobertura
  *
  * Hasta el Sprint 3 la obligacion se creaba pero nada la cerraba: la cobertura del plan se
- * quedaba en cero por diseno, y era la deuda declarada de ese sprint. Aqui se paga.
+ * quedaba en cero por diseño, y era la deuda declarada de ese sprint. Aqui se paga.
  *
  * Cerrar la obligacion tambien habilita la RONDA SIGUIENTE del requisito recurrente (la
- * reinduccion del ano que viene se cuenta desde que esta se completo, no desde su vencimiento).
+ * reinduccion del año que viene se cuenta desde que esta se completo, no desde su vencimiento).
  */
 @Injectable()
 export class CompletionService {
@@ -37,7 +37,7 @@ export class CompletionService {
    *
    * Criterio: TODOS los contenidos requeridos completados; y si hay evaluacion requerida, haberla
    * aprobado. Se recalcula desde los hechos guardados en vez de confiar en un contador, para que
-   * un progreso perdido por falta de senal no deje a alguien aprobado sin haber visto nada.
+   * un progreso perdido por falta de señal no deje a alguien aprobado sin haber visto nada.
    */
   async evaluate(enrollmentId: string): Promise<CompletionOutcome> {
     const tenantId = this.prisma.currentTenantId;
@@ -228,6 +228,37 @@ export class CompletionService {
       ? false
       : await this.closeAssignment(db, enrollment, input.attendedAt, cert?.validUntil ?? null);
 
+    /*
+      EL PAPEL QUE LLEGA TARDE TAMBIEN TIENE QUE MOVER LA OBLIGACION (2026-09-06).
+
+      ─── EL FALLO, QUE ERA DE LOS QUE NO SE VEN ───
+
+      Cerrar y corregir compartian camino, y el de corregir no tenia salida: `closeAssignment` solo
+      se llama cuando se cierra algo nuevo, y ademas corta en seco si la obligacion ya esta
+      COMPLETED. Asi que cuando el certificado llegaba DESPUES —el caso normal, el papel de la ARL
+      tarda quince dias— se guardaba en la inscripcion y su vencimiento **no llegaba nunca a la
+      obligacion**.
+
+      Lo que veia el usuario: registraba el papel, lo veia guardado en la lista, y no pasaba nada.
+      Ni el motor programaba la ronda siguiente en la fecha correcta, ni el informe de Vencimientos
+      se enteraba: la obligacion se quedaba con la fecha que calcula la recurrencia, que es justo la
+      que el papel viene a corregir (Decision #157, EL PAPEL MANDA).
+
+      Lo encontro `scripts/recorridos/asistencia-correcciones.mjs`, paso 5, escrito el mismo dia en
+      que la pantalla empezo a ofrecer esta correccion.
+
+      ─── POR QUE UNA FUNCION APARTE Y NO UN PARAMETRO MAS ───
+
+      Porque son dos operaciones distintas, y mezclarlas fue el error de origen. Cerrar cambia el
+      estado, pone la fecha de cumplimiento, apaga avisos y crea el evento de aprendizaje. Corregir
+      la vigencia no hace nada de eso: solo escribe la fecha que dice el papel. Un parametro del
+      tipo "y ademas no cierres" dentro de `closeAssignment` dejaria la misma trampa montada para el
+      siguiente que pase por aqui.
+    */
+    if (yaCerrada && cert) {
+      await this.actualizarVigenciaPorPapel(db, enrollment, cert.validUntil ?? null);
+    }
+
     if (!yaCerrada) {
       await db.learningEvent.create({
         data: {
@@ -311,7 +342,7 @@ export class CompletionService {
     });
 
     // EL AVISO QUE YA NO PIDE NADA SE APAGA. "Tienes esta formacion asignada" deja de tener
-    // sentido en cuanto la formacion esta hecha, y dejarlo sin leer hace que la campana reclame
+    // sentido en cuanto la formacion esta hecha, y dejarlo sin leer hace que la campaña reclame
     // atencion por algo que la persona acaba de terminar.
     //
     // Se marca LEIDO, no se borra: sigue estando en "ver leidas", que es donde se comprueba que a
@@ -329,6 +360,51 @@ export class CompletionService {
     });
 
     return true;
+  }
+
+  /**
+   * LA VIGENCIA QUE DICE EL PAPEL, sobre una obligacion YA CERRADA.
+   *
+   * Es la mitad que faltaba de la Decision #157: el papel de un tercero puede llegar dias despues
+   * de la jornada, y cuando llega tiene que mover la fecha en la que la formacion vuelve a deberse.
+   * Ver la nota larga en `cerrarPorAsistencia`.
+   *
+   * NO toca el estado ni la fecha de cumplimiento: eso ya paso y no se repite. Solo escribe lo que
+   * dice el papel, y lo escribe tambien cuando llega vacio —si alguien borra una fecha que habia
+   * tecleado mal, la obligacion tiene que dejar de creersela y volver a lo que calcule la
+   * recurrencia—. `validUntilOverride` significa "lo que dice el papel", y sin papel no dice nada.
+   *
+   * Se busca por `completedEnrollmentId` primero porque es el vinculo exacto —esta inscripcion
+   * cerro esa obligacion— y no una coincidencia por persona y formacion, que con varias rondas
+   * podria dar con la ronda equivocada.
+   */
+  /**
+   * LA MISMA VIGENCIA, DESDE FUERA DE LA LISTA DE ASISTENCIA (2026-09-08).
+   *
+   * Publica para la SEGUNDA PUERTA: registrar el papel desde la ficha de la persona
+   * (). Es exactamente la misma operacion, y por eso se comparte en
+   * vez de copiarse: la primera version de esto se olvido de propagar la vigencia y el papel se
+   * guardaba sin mover nada. Escrito dos veces, la segunda repite el olvido.
+   */
+  async registrarVigenciaDePapel(
+    db: TenantPrisma,
+    enrollment: { id: string; userId: string; assignmentId: string | null; activityVersion: { activityId: string } },
+    validUntil: Date | null,
+  ): Promise<void> {
+    await this.actualizarVigenciaPorPapel(db, enrollment, validUntil);
+  }
+
+  private async actualizarVigenciaPorPapel(
+    db: TenantPrisma,
+    enrollment: { id: string; userId: string; assignmentId: string | null; activityVersion: { activityId: string } },
+    validUntil: Date | null,
+  ): Promise<void> {
+    const assignment =
+      (await db.assignment.findFirst({ where: { completedEnrollmentId: enrollment.id } })) ??
+      (enrollment.assignmentId ? await db.assignment.findUnique({ where: { id: enrollment.assignmentId } }) : null);
+    if (!assignment) return;
+    if (assignment.validUntilOverride?.getTime() === validUntil?.getTime()) return;
+    await db.assignment.update({ where: { id: assignment.id }, data: { validUntilOverride: validUntil } });
   }
 
   private async markStatus(db: TenantPrisma, enrollmentId: string, status: 'IN_PROGRESS' | 'FAILED'): Promise<void> {

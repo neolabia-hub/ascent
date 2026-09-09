@@ -4,7 +4,7 @@ Ideas que **no** estan comprometidas. Cada una con lo mismo: que problema resuel
 ya la soporta, cuanto cuesta de verdad y una recomendacion honesta —incluido "no lo haria".
 
 No es una lista de deseos: si una idea no se va a hacer, se dice por que. Lo descartado explica
-el diseno tanto como lo hecho.
+el diseño tanto como lo hecho.
 
 Lo que **si** esta comprometido vive en `docs/sprints/README.md` (sprints 5 y 6) y la deuda real
 en `docs/arquitectura.md` seccion 10.
@@ -132,7 +132,7 @@ Lo unico pendiente es lo de la idea 4: que el repaso sepa de que tema viene cada
 **La idea.** Que cada persona pueda escribir notas sobre la parte que esta cursando y recuperarlas
 despues, como en Coursera o Udemy. Salio al disenar las pestanas del reproductor.
 
-**Lo que cuesta.** Tabla nueva (`content_notes`), endpoints, y —lo caro— cola de reenvio sin senal:
+**Lo que cuesta.** Tabla nueva (`content_notes`), endpoints, y —lo caro— cola de reenvio sin señal:
 una nota escrita en carretera que se pierde al recuperar cobertura es peor que no tener notas.
 
 **Recomendacion: NO por ahora, y no por esfuerzo sino por encaje.** Las notas rinden en cursos
@@ -164,7 +164,7 @@ gratuito"). Tres razones, en orden de peso:
    registro que se presenta ante un auditor de SST, PESV o BASC. Una estetica de landing de startup
    le resta exactamente lo que necesita: que parezca un registro serio.
 2. **Envejece a la vista.** La aurora de 2026 es el degradado morado de 2021. Un tenant que firma a
-   tres anos lo va a mirar viejo antes de que termine el contrato.
+   tres años lo va a mirar viejo antes de que termine el contrato.
 3. **El publico y el aparato.** Conductores y auxiliares de bodega, en telefonos de gama media y
    con datos contados. Un fondo animado a pantalla completa se paga en bateria y en scroll con
    tirones justo donde no sobra ninguno.

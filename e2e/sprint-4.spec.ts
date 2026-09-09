@@ -4,7 +4,7 @@ import { elegirEnCombo, loginAsAdmin, unique } from './helpers';
 /**
  * E2E del Sprint 4 (Definition of Done de la experiencia del aprendiz):
  *
- *   "un auxiliar de bodega completa una pildora desde el celular sin senal estable;
+ *   "un auxiliar de bodega completa una pildora desde el celular sin señal estable;
  *    sus preguntas falladas reaparecen a los 2 dias; su racha avanza."
  *
  * Este archivo cubre la primera y la tercera parte de punta a punta: se arma una pildora real

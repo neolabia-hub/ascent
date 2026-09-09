@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Contratos del LADO DEL APRENDIZ (CLAUDE.md 1, "usuario final"; 3.4-3.6).
  *
- * Todo lo que entra por aqui lo envia un telefono, muchas veces con senal intermitente y a veces
+ * Todo lo que entra por aqui lo envia un telefono, muchas veces con señal intermitente y a veces
  * repetido al reconectar. Por eso los contratos son ACUMULATIVOS y tolerantes a repeticion:
  * mandar dos veces el mismo progreso no puede dar un resultado distinto que mandarlo una vez.
  */
@@ -60,7 +60,7 @@ export type SaveAnswerInput = z.infer<typeof saveAnswerSchema>;
 
 /**
  * Entrega del examen. Puede traer todas las respuestas de una vez: es el caso del telefono que
- * estuvo sin senal y sincroniza al final.
+ * estuvo sin señal y sincroniza al final.
  */
 export const submitAttemptSchema = z.object({
   answers: z.array(saveAnswerSchema).max(200).default([]),

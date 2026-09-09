@@ -50,7 +50,7 @@ import { WorkersModule } from './workers/workers.module.js';
       TODA LA EMPRESA SALE POR UNA SOLA IP. En TRANSPRENSA, seiscientas personas comparten la
       salida a internet de la oficina, asi que "por IP" no significa "por persona": significa "por
       toda la empresa a la vez". Un limite bajo no para a un atacante —que viene de fuera y solo,
-      con su propia IP— pero SI deja fuera a un turno entero entrando a las 6 de la manana.
+      con su propia IP— pero SI deja fuera a un turno entero entrando a las 6 de la mañana.
       
       Se probo con 30/minuto y rompio el uso normal: cargar una pantalla del aprendiz dispara
       cinco peticiones, asi que seis pantallas agotaban el cupo de la empresa entera.

@@ -28,7 +28,7 @@ export interface ActivityTypeConfig {
   defaultAssignmentMode: AssignmentMode;
   defaultOfferingKind: OfferingKind;
   defaultRecurrenceMonths: number | null;
-  /** "Cada ano antes del 31 de marzo" (MM-DD): la campana anual. Manda sobre los meses. */
+  /** "Cada año antes del 31 de marzo" (MM-DD): la campaña anual. Manda sobre los meses. */
   defaultAnnualDate: string | null;
   participatesInPlan: boolean;
   isMicro: boolean;
@@ -105,8 +105,8 @@ export function esJornada(config: ActivityTypeConfig): boolean {
 /**
  * Lo que le pasa a una formacion de este tipo, en frases cortas, para ensenarlo al ELEGIR el tipo.
  *
- * Se ensena antes de crear nada porque el tipo cambia el resto del formulario: si no se dice, la
- * primera senal de que "induccion general" obliga a toda la empresa llega cuando ya obligo a toda
+ * Se enseña antes de crear nada porque el tipo cambia el resto del formulario: si no se dice, la
+ * primera señal de que "induccion general" obliga a toda la empresa llega cuando ya obligo a toda
  * la empresa.
  */
 export function consecuenciasDelTipo(config: ActivityTypeConfig): string[] {
@@ -120,7 +120,7 @@ export function consecuenciasDelTipo(config: ActivityTypeConfig): string[] {
   if (config.defaultRecurrenceMonths) {
     frases.push(
       config.defaultRecurrenceMonths === 12
-        ? 'Se repite cada ano.'
+        ? 'Se repite cada año.'
         : `Se repite cada ${config.defaultRecurrenceMonths} meses.`,
     );
   }

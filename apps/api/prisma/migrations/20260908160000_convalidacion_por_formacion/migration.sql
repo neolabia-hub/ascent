@@ -1,0 +1,19 @@
+-- ACEPTAR CERTIFICACION PREVIA SE DECIDE POR FORMACION, NO SOLO POR TIPO.
+--
+-- Lo pregunto el cliente el mismo dia que se creo la bandera: "¿no es mejor que este en cada
+-- formacion?". Si, y la prueba es que a `tracks_external_certificate` le paso exactamente esto dos
+-- dias antes (migracion 20260906090000): nacio por tipo, el cliente vio el caso que no encajaba y
+-- hubo que anadir la cascada.
+--
+-- El caso que no encaja aqui es el mismo de siempre: dentro de la MISMA clase conviven las dos
+-- cosas. Una recertificacion de alturas es transferible porque la norma lo dice; una recertificacion
+-- interna sobre el procedimiento de un equipo propio no lo es, y las dos son "Recertificacion".
+--
+-- Misma cascada que ya gobiernan la constancia, la eficacia y el papel de un tercero (#111, #118,
+-- #157):
+--
+--     TIPO (punto de partida)  ->  FORMACION (puede desviarse; NULL = hereda)
+--
+-- `NULL` es lo normal y significa "lo que diga mi tipo". Y el defecto del tipo sigue siendo `false`:
+-- lo raro es que un papel ajeno valga, no al reves.
+ALTER TABLE "activities" ADD COLUMN IF NOT EXISTS "admite_convalidacion" BOOLEAN;

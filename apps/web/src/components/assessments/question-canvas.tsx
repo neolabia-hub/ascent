@@ -19,7 +19,7 @@ import { huecosDelEnunciado, OPTION_IDS } from './question-model';
  *     formulario y se publicaban sin haber visto ninguna.
  *
  * Ahora la pregunta se edita EXACTAMENTE con la pinta que tendra: el enunciado en el mismo
- * cuerpo y tamano que leera el empleado, y las opciones como las mismas tarjetas de 60 px. Se
+ * cuerpo y tamaño que leera el empleado, y las opciones como las mismas tarjetas de 60 px. Se
  * escribe encima del resultado.
  *
  * LA UNICA DIFERENCIA con la vista del aprendiz es deliberada: aqui SE VE cual es la correcta, y
@@ -154,7 +154,7 @@ export function QuestionCanvas({
                   >
                     {/*
                       LA MARCA ES EL OBJETIVO, y ocupa 40 px. Antes era un radio de 13 px al lado
-                      del campo: el objetivo mas pequeno de la pantalla, justo donde se decide lo
+                      del campo: el objetivo mas pequeño de la pantalla, justo donde se decide lo
                       mas importante de la pregunta.
                     */}
                     <button
@@ -486,7 +486,7 @@ function EditorOrden({ payload, set, disabled }: { payload: QuestionPayloadClien
 /**
  * EMPAREJAR (Decision #86).
  *
- * Se escriben las parejas YA UNIDAS, en una fila cada una: es como se piensan ("la senal de alto
+ * Se escriben las parejas YA UNIDAS, en una fila cada una: es como se piensan ("la señal de alto
  * significa detenerse por completo"). El barajado de la columna derecha lo hace el servidor al
  * servir el intento, no esta pantalla.
  */
@@ -511,7 +511,7 @@ function EditorParejas({ payload, set, disabled }: { payload: QuestionPayloadCli
                 value={pair.left}
                 disabled={disabled}
                 maxLength={300}
-                placeholder="Senal de alto"
+                placeholder="Señal de alto"
                 aria-label={`Lado izquierdo de la pareja ${posicion + 1}`}
                 onChange={(event) => cambiar(pair.id, 'left', event.target.value)}
                 className="focus-ring min-h-[56px] rounded-xl border-2 border-line-strong bg-surface px-3.5 text-base text-ink-900 placeholder:text-ink-300"
@@ -564,7 +564,7 @@ function EditorParejas({ payload, set, disabled }: { payload: QuestionPayloadCli
 /**
  * RESPUESTA NUMERICA (Decision #86).
  *
- * La TOLERANCIA se ensena resuelta —"se acepta de 1,4 a 1,6"— y no como un numero suelto: quien
+ * La TOLERANCIA se enseña resuelta —"se acepta de 1,4 a 1,6"— y no como un numero suelto: quien
  * la escribe esta pensando en el margen que quiere dar, no en hacer dos restas.
  */
 function EditorNumerica({ payload, set, disabled }: { payload: QuestionPayloadClient; set: Set; disabled: boolean }) {

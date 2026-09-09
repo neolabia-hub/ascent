@@ -76,7 +76,7 @@ if (creado.lessonId) {
   const tarjetas = await admin.pedir(`/lessons/${creado.lessonId}/cards`, { method: 'PUT', body: JSON.stringify({
     cards: [
       { payload: { cardType: 'TEXT_IMAGE', title: 'Lo que no cambia', body: 'La politica de seguridad y el reglamento siguen vigentes.' } },
-      { payload: { cardType: 'TEXT_IMAGE', title: 'Lo que cambio este ano', body: 'Novedades del sistema de gestion.' } },
+      { payload: { cardType: 'TEXT_IMAGE', title: 'Lo que cambio este año', body: 'Novedades del sistema de gestion.' } },
     ],
   }) });
   comprobar(tarjetas.ok, '2 tarjetas guardadas', `tarjetas: ${tarjetas.estado}`);
@@ -93,7 +93,7 @@ const pregunta = await admin.post('/questions', {
     stem: 'La politica de seguridad de la empresa...',
     options: [
       { id: 'a', text: 'Sigue vigente y aplica a todos' },
-      { id: 'b', text: 'Se derogo este ano' },
+      { id: 'b', text: 'Se derogo este año' },
     ],
     correctOptionId: 'a',
     points: 1,
@@ -135,7 +135,7 @@ if (req) {
     Antes esta comprobacion exigia `assignmentCount === plantilla`. Desde que el tipo puede decir
     "no se le exige a quien ingreso hace menos de N meses" (`exemptRecentHiresMonths`, 6 en
     TRANSPRENSA), a quien entro dentro del ciclo no se le encima la campana sobre una induccion a
-    medio hacer: **su induccion ES su actualizacion de ese ano**.
+    medio hacer: **su induccion ES su actualizacion de ese año**.
 
     Lo que se comprueba es lo que importa y no envejece: que obliga a MUCHOS —no es un requisito
     dormido— y que a los excluidos los explica el corte, no un fallo.
@@ -152,8 +152,8 @@ if (req) {
     'y si el tipo no excluye a nadie, no se queda nadie fuera',
     `el tipo no excluye por ingreso reciente y aun asi quedaron ${excluidos} fuera`,
   );
-  comprobar(req.fixedDate === tipo.config?.defaultAnnualDate, `se repite cada ano el ${tipo.config?.defaultAnnualDate}`, `fecha fija: ${req.fixedDate}`);
-  comprobar(req.everyMonths === null, 'y NO cada N meses: campana, no aniversario', `everyMonths: ${req.everyMonths}`);
+  comprobar(req.fixedDate === tipo.config?.defaultAnnualDate, `se repite cada año el ${tipo.config?.defaultAnnualDate}`, `fecha fija: ${req.fixedDate}`);
+  comprobar(req.everyMonths === null, 'y NO cada N meses: campaña, no aniversario', `everyMonths: ${req.everyMonths}`);
 }
 
 paso(6, 'LA CONVOCATORIA: la abre el tipo');
@@ -169,8 +169,8 @@ const fechas = new Set((obligaciones?.items ?? []).map((a) => (a.dueAt ?? '').sl
 console.log(`   ... ${obligaciones?.total} obligaciones · ${fechas.size} fecha(s) de vencimiento distintas: ${[...fechas].slice(0, 4).join(', ')}`);
 comprobar(
   fechas.size === 1,
-  'todas vencen el MISMO dia: es una campana, no un aniversario por persona',
-  `hay ${fechas.size} fechas distintas, y una campana anual deberia tener una sola`,
+  'todas vencen el MISMO dia: es una campaña, no un aniversario por persona',
+  `hay ${fechas.size} fechas distintas, y una campaña anual deberia tener una sola`,
 );
 const laFecha = [...fechas][0] ?? '';
 /*
@@ -182,7 +182,7 @@ const laFecha = [...fechas][0] ?? '';
 
   Es defendible: estrenar el sistema el 15 de marzo con vencimiento el 31 daria dos semanas para
   que 780 personas hagan la reinduccion. Pero conviene tenerlo escrito, porque la pantalla dice
-  "cada ano el 31 de marzo" y la primera no vence ese dia.
+  "cada año el 31 de marzo" y la primera no vence ese dia.
 */
 const [mes, dia] = (tipo.config?.defaultAnnualDate ?? '--').split('-');
 const caeEnLaCampana = laFecha.slice(5) === `${mes}-${dia}`;
@@ -289,7 +289,7 @@ paso(11, 'LA RONDA SIGUIENTE no se abre todavia');
 const trasCompletar = (await admin.get(`/assignments?targetId=${creado.activityId}&userId=${creado.userId}`)).cuerpo;
 const suyas = trasCompletar?.items ?? [];
 console.log(`   ... la persona tiene ${suyas.length} ronda(s): ${suyas.map((a) => `#${a.cycleNumber} ${a.status}`).join(', ')}`);
-comprobar(suyas.length === 1, 'sigue con UNA sola ronda: la del ano que viene se abre cuando toque', `tiene ${suyas.length} rondas`);
+comprobar(suyas.length === 1, 'sigue con UNA sola ronda: la del año que viene se abre cuando toque', `tiene ${suyas.length} rondas`);
 
 await comprobarSeguimiento(admin, creado.activityId, { numeroDePaso: 12, usuarioId: creado.userId, estadoEsperado: 'TERMINADA' });
 

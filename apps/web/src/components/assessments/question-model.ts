@@ -26,7 +26,7 @@ export const QTYPE_LABEL: Record<QuestionType, string> = {
  * Los cuatro ultimos son de la Decision #86, y no se anadieron por variedad: con solo opcion
  * multiple, media formacion de SST se pregunta mal. Un LOTO es una secuencia y las cuatro
  * opciones llevan la respuesta escrita; una distancia de seguridad se acierta por descarte; una
- * senal se reconoce, no se elige de una lista.
+ * señal se reconoce, no se elige de una lista.
  */
 export const QTYPE_HINT: Record<QuestionType, string> = {
   SINGLE: 'Una sola respuesta es correcta. Es la que mejor se corrige sola.',
@@ -34,7 +34,7 @@ export const QTYPE_HINT: Record<QuestionType, string> = {
   TRUE_FALSE: 'Para afirmaciones tajantes. Ojo: se acierta la mitad de las veces al azar.',
   FILL_BLANK: 'Escribe la palabra que falta. No hay opciones a la vista de donde copiar.',
   ORDER: 'Pone los pasos en su orden. Para procedimientos: un bloqueo, una emergencia.',
-  MATCH: 'Une dos columnas: senal con significado, EPP con riesgo. Cubre mucho en una pregunta.',
+  MATCH: 'Une dos columnas: señal con significado, EPP con riesgo. Cubre mucho en una pregunta.',
   NUMERIC: 'Un numero con su unidad y su margen. Evita acertar la distancia por descarte.',
   ESSAY: 'Responde con sus palabras. No se corrige sola: alguien tiene que calificarla.',
 };

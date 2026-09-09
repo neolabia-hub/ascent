@@ -82,7 +82,7 @@ export function nextState(current: ReviewState, correct: boolean, now: Date): Re
 }
 
 /**
- * Tamano de la sesion de repaso del dia. Se acota a proposito: el compromiso con el colaborador
+ * Tamaño de la sesion de repaso del dia. Se acota a proposito: el compromiso con el colaborador
  * es "3 a 5 minutos", y una cola de 40 preguntas rompe ese compromiso y vacia la funcion.
  */
 export const REVIEW_SESSION_SIZE = 5;

@@ -13,7 +13,7 @@ import { motivoDelError } from '@/lib/api';
  *
  * ─── ESTABA EN EL PERFIL Y ERA EL SITIO EQUIVOCADO ───
  *
- * El razonamiento original era bueno y el resultado no: como se mira una o dos veces al ano, se
+ * El razonamiento original era bueno y el resultado no: como se mira una o dos veces al año, se
  * puso en el perfil junto a las constancias para no gastar una entrada permanente del menu. Pero
  * nadie busca su evaluacion de desempeno en el perfil, y ademas partia el mismo asunto en dos
  * puertas distintas segun si calificas a alguien o no. Ahora las dos cosas viven en "Desempeno", y

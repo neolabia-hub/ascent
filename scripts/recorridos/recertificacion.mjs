@@ -4,15 +4,15 @@
 //
 // Las dos cuelgan del CARGO y usan el mismo motor, asi que tecnicamente bastaba con poner "cada N
 // meses" en una especifica. Pero el TIPO es lo que lee el auditor, y "Induccion especifica:
-// Montacargas" que vence cada ano no es una induccion. Son dos preguntas distintas:
+// Montacargas" que vence cada año no es una induccion. Son dos preguntas distintas:
 //
 //   Induccion especifica  ->  "¿le hicieron la induccion del puesto cuando llego?" Hecho pasado.
 //   Recertificacion       ->  "¿esta VIGENTE hoy su habilitacion?" Estado de HOY, que vence.
 //
 // ─── LO QUE ESTE RECORRIDO COMPRUEBA, Y QUE NINGUN OTRO MIRA ───
 //
-//   1. Cuelga del CARGO: quien entre manana con ese cargo la debe sin que nadie se acuerde.
-//   2. Vence por ANIVERSARIO de cada persona, no por campana: dos personas certificadas en meses
+//   1. Cuelga del CARGO: quien entre mañana con ese cargo la debe sin que nadie se acuerde.
+//   2. Vence por ANIVERSARIO de cada persona, no por campaña: dos personas certificadas en meses
 //      distintos NO pueden vencer el mismo dia. Es lo unico que hace util al tipo, y lo que se
 //      perderia si alguien lo metiera al plan (el servidor fuerza recurrencia nula ahi).
 //   3. Emite CONSTANCIA: en una recertificacion la constancia no es un extra, ES el certificado.
@@ -43,11 +43,11 @@ comprobar(c.defaultAssignmentMode === 'BY_JOB_TITLE', 'cuelga del CARGO, como la
 comprobar(
   Number(c.defaultRecurrenceMonths) > 0 && !c.defaultAnnualDate,
   `vuelve cada ${c.defaultRecurrenceMonths} meses (ANIVERSARIO), no en fecha fija`,
-  'esta configurada como campana anual, y un certificado vence el dia de cada persona',
+  'esta configurada como campaña anual, y un certificado vence el dia de cada persona',
 );
 /*
   ESTA ES LA COMPROBACION QUE PROTEGE AL TIPO ENTERO. El servidor fuerza recurrencia NULA a todo lo
-  que participa del plan —la del ano que viene es otro plan, no otra ronda—, asi que poner
+  que participa del plan —la del año que viene es otro plan, no otra ronda—, asi que poner
   `participatesInPlan: true` aqui mataria el aniversario en silencio y el tipo dejaria de servir.
 */
 comprobar(
@@ -123,13 +123,13 @@ const req = ((await admin.get(`/activities/${creado.activityId}/requirements`)).
 console.log(`   ... alcance=${req?.reach} obligadas=${req?.assignmentCount} cadaNMeses=${req?.everyMonths} fechaFija=${req?.fixedDate}`);
 comprobar(
   req?.everyMonths === Number(tipo.config?.defaultRecurrenceMonths ?? 12) && !req?.fixedDate,
-  `la regla guarda el aniversario de ${req?.everyMonths} meses, y NO una fecha de campana`,
+  `la regla guarda el aniversario de ${req?.everyMonths} meses, y NO una fecha de campaña`,
   `everyMonths=${req?.everyMonths} fixedDate=${req?.fixedDate}`,
 );
 
 paso(5, 'DOS PERSONAS QUE ENTRAN EN MOMENTOS DISTINTOS');
 /*
-  Es LA comprobacion del tipo. Con una campana, las dos venceran el mismo dia. Con aniversario, cada
+  Es LA comprobacion del tipo. Con una campaña, las dos venceran el mismo dia. Con aniversario, cada
   una vence contando desde SU momento — y por eso el certificado de quien se habilito en agosto no
   puede figurar vigente hasta marzo.
 */
@@ -239,7 +239,7 @@ const trasCumplir = await suyas(p1.id);
 console.log(`   ... tiene ${trasCumplir.length} obligacion(es): ${trasCumplir.map((a) => `#${a.cycleNumber} ${a.status}`).join(' · ')}`);
 comprobar(
   trasCumplir.length === 1,
-  'sigue con UNA sola: la del ano que viene se abre 60 dias antes de su vencimiento, no al terminar',
+  'sigue con UNA sola: la del año que viene se abre 60 dias antes de su vencimiento, no al terminar',
   `tiene ${trasCumplir.length} obligaciones`,
 );
 

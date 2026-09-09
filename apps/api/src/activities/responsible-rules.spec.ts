@@ -36,7 +36,7 @@ describe('responsibleChangeAllowed', () => {
     } catch (error) {
       const body = (error as { response?: { code?: string; message?: string } }).response;
       expect(body?.code).toBe('RESPONSIBLE_LOCKED');
-      expect(body?.message).toContain('version nueva');
+      expect(body?.message).toContain('versión nueva');
     }
   });
 });

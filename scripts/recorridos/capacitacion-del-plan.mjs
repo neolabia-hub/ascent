@@ -7,7 +7,7 @@
 //      persona) y NO crea ningun requisito automatico.
 //   2. El requisito que se cree en "Quienes" queda con disparador PLAN y NO GENERA NADA: guarda a
 //      quienes, y las obligaciones nacen al APROBAR el renglon (Decision #76).
-//   3. Programar la jornada ES ponerla en el plan: el renglon se crea solo si el plan del ano de
+//   3. Programar la jornada ES ponerla en el plan: el renglon se crea solo si el plan del año de
 //      la fecha esta en BORRADOR (Decision #75).
 //   4. Aprobar el plan CONGELA los proyectados y materializa las obligaciones, con el ultimo dia
 //      del mes del renglon como vencimiento.
@@ -66,7 +66,7 @@ creado.versionId = ((await admin.get(`/activities/${creado.activityId}`)).cuerpo
 const leccion = await admin.post('/lessons', { title: `Material ${SUFIJO}`, estimatedMinutes: 5 });
 creado.lessonId = leccion.cuerpo?.id;
 await admin.pedir(`/lessons/${creado.lessonId}/cards`, { method: 'PUT', body: JSON.stringify({
-  cards: [{ payload: { cardType: 'TEXT_IMAGE', title: 'El tema del ano', body: 'Contenido de la capacitacion programada.' } }],
+  cards: [{ payload: { cardType: 'TEXT_IMAGE', title: 'El tema del año', body: 'Contenido de la capacitacion programada.' } }],
 }) });
 const contLeccion = await admin.post(`/activities/versions/${creado.versionId}/contents`, {
   type: 'LESSON', title: 'Material', isRequired: true, config: { minSeconds: 1 }, lessonId: creado.lessonId,
@@ -118,7 +118,7 @@ const req = ((await admin.get(`/activities/${creado.activityId}/requirements`)).
 console.log(`   ... disparador=${req?.trigger} vence=${req?.dueDaysAfterTrigger}d repite=${req?.everyMonths ?? 'no'} obligadas=${req?.assignmentCount} alcanza=${req?.reach}`);
 comprobar(req?.trigger === 'PLAN', 'el disparador queda en PLAN aunque se pidiera ON_HIRE: lo fuerza el servidor', `quedo en ${req?.trigger}`);
 comprobar(req?.dueDaysAfterTrigger === 0, 'el plazo se anula: la fecha la pone el mes del plan', `quedo en ${req?.dueDaysAfterTrigger}`);
-comprobar(req?.everyMonths === null, 'y la recurrencia tambien: la del ano que viene es OTRO plan', `quedo en ${req?.everyMonths}`);
+comprobar(req?.everyMonths === null, 'y la recurrencia tambien: la del año que viene es OTRO plan', `quedo en ${req?.everyMonths}`);
 comprobar(
   req?.assignmentCount === 0,
   `NO nacio ninguna obligacion, aunque alcance a ${req?.reach} personas: nacen al aprobar el plan`,
@@ -167,7 +167,7 @@ paso(5, 'EL PLAN DEL ANO, en borrador');
   UN ANO LIBRE POR CORRIDA, y no siempre el mismo.
 
   Hay UN plan por ano (Decision #71) y este recorrido lo APRUEBA, asi que reutilizar el del ano
-  anterior deja la segunda corrida sin plan en borrador y falla entera. Se busca el primer ano
+  anterior deja la segunda corrida sin plan en borrador y falla entera. Se busca el primer año
   libre a partir de 2030 — los de verdad viven en 2026 y alrededores, asi que no se pisan.
 */
 const planes = (await admin.get('/plans')).cuerpo;
@@ -175,7 +175,7 @@ const anosOcupados = new Set((planes?.items ?? planes ?? []).map((p) => p.year))
 let ano = 2030;
 while (anosOcupados.has(ano)) ano += 1;
 const plan = await admin.post('/plans', {
-  year: ano,
+  year: año,
   name: `Plan de capacitacion ${ano} ${SUFIJO}`,
   objective: 'Recorrido automatico de punta a punta.',
   goalPct: 80,
@@ -195,7 +195,7 @@ const convocatoria = await admin.post('/offerings', {
   endTime: '12:00',
   location: 'Sala de capacitacion, sede principal',
   executedBy: 'PROPIOS',
-  // El cupo se saca del tamano del cargo, no de un numero fijo: convocar a todos falla ENTERO si
+  // El cupo se saca del tamaño del cargo, no de un numero fijo: convocar a todos falla ENTERO si
   // se pasa del cupo (409 OFFERING_CAPACITY_EXCEEDED, no convoca a los que caben), y con un 30
   // clavado el recorrido se rompia solo en cuanto el cargo de pruebas crecia.
   capacity: elegido.n + 50,
@@ -416,7 +416,7 @@ if (suConvocatoria) {
   comprobar(
     colar.estado === 409 && colar.cuerpo?.code === 'ACTIVITY_NOT_PLANNABLE',
     `una induccion general no entra al plan (${colar.estado} ${colar.cuerpo?.code ?? ''})`,
-    `dejo meter una induccion general en el plan (${colar.estado}), y eso mueve el cumplimiento del ano con algo que no le toca`,
+    `dejo meter una induccion general en el plan (${colar.estado}), y eso mueve el cumplimiento del año con algo que no le toca`,
   );
 } else {
   console.log('   ... no hay ninguna induccion de recorrido con convocatoria; se salta');

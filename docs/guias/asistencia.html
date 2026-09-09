@@ -179,6 +179,8 @@
     <tbody>
       <tr><td><strong>En la plataforma</strong></td><td>La persona entra, ve el contenido y aprueba el examen</td><td>Su progreso, su nota y la constancia</td></tr>
       <tr><td><strong>Lista de asistencia</strong></td><td>Jornada con fecha: presencial o virtual en vivo</td><td>Quién asistió, quién no, y quién lo marcó</td></tr>
+      <tr><td><strong>QR de la sesión</strong></td><td>La misma jornada, pero cada quien se marca solo desde su teléfono</td><td>Lo mismo, y además <em>la hora exacta de cada persona</em></td></tr>
+      <tr><td><strong>Firma en pantalla</strong></td><td>Cuando además hace falta la firma: el acta que pide un auditor</td><td>El trazo de cada quien, dentro del acta en PDF</td></tr>
       <tr><td><strong>Certificado de un tercero</strong></td><td>El papel lo emite la ARL o un centro acreditado</td><td>Entidad, número y fecha de vencimiento</td></tr>
     </tbody>
   </table></div>
@@ -237,6 +239,68 @@
       en la permanente, <strong>su inscripción se mueve a la jornada</strong>: no acaba con dos.</p>
   </div>
 
+  <h3>Pasar lista desde la sala: el QR y la firma</h3>
+  <p>La lista de arriba la marca el instructor, uno por uno. En una jornada de cuarenta eso son diez
+    minutos del tiempo de todos, y lo que queda es una marca puesta después, de memoria. La otra vía
+    es al revés: <strong>se proyecta un código y cada quien se marca desde su teléfono</strong>.</p>
+  <ol class="pasos">
+    <li>En la jornada, arriba de la lista, está <b>Pasar lista desde la sala</b>. Pulsa
+      <b>Proyectar el código</b>.</li>
+    <li>La pantalla se llena con el <b>QR</b> y el <b>código en grande</b>. Es lo que se proyecta.
+      Para volver a la lista, <b>Escape</b> — salir no apaga el código.</li>
+    <li>Cada persona escanea con la cámara de su teléfono, entra a la plataforma y pulsa
+      <b>Estoy aquí</b>. Su formación queda cumplida en ese momento.</li>
+    <li>Si además hace falta la firma, pulsa <b>Firmar</b> y firma con el dedo.</li>
+    <li>Al terminar: <b>Generar acta</b>. Y si quieres cortar antes, <b>Cerrar sesión</b>.</li>
+  </ol>
+
+  <div class="aviso">
+    <span class="etiqueta">El código cambia cada minuto y medio</span>
+    <p>Y no es un capricho: un código fijo se fotografía y se manda al grupo de WhatsApp, y entonces
+      quien está en su casa marca asistencia a una jornada a la que no fue. Rotando, la foto sirve
+      minuto y medio. En la pantalla se ve la <b>cuenta atrás</b> y se renueva solo — no hay que
+      pulsar nada.</p>
+    <p>Quien llegue tarde al escaneo verá <em>«Ese codigo ya caduco. El de la pantalla cambia cada
+      minuto y medio: mira el nuevo»</em>. No hay que hacer nada: mirar el nuevo.</p>
+  </div>
+
+  <div class="aviso bien">
+    <span class="etiqueta">Siempre hay alguien que no puede escanear</span>
+    <p>Cámara rota, sin datos, una funda que no deja enfocar. Por eso el código <strong>se puede
+      dictar en voz alta</strong>: son seis caracteres y no lleva ninguno de los que se confunden
+      —ni 0 ni O, ni 1 ni I ni L—. Se teclea y sirve igual.</p>
+  </div>
+
+  <div class="aviso">
+    <span class="etiqueta">Solo entra quien está convocado</span>
+    <p>Quien no esté en la lista de esa jornada verá <em>«No estas en la lista de esta jornada.
+      Pideselo a quien la esta dictando»</em>. Es a propósito: inscribir a alguien es un acto del
+      instructor. Si bastara con el código, cualquiera con la foto entraría a una jornada a la que no
+      fue citado.</p>
+  </div>
+
+  <h3>El acta de la sesión</h3>
+  <p><b>Generar acta</b> produce el PDF que se le entrega a un auditor: la formación, la jornada, el
+    lugar, quién la dictó, la intensidad, y la lista con el estado de cada quien, cómo se marcó, a qué
+    hora y su firma. Se descarga desde la misma tarjeta.</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Detalle</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td>Se genera <strong>cuando tú lo pides</strong>, no sola al cerrar la jornada</td><td>La lista se corrige —alguien llegó tarde, alguien se apuntó mal—. Un acta que se genera sola diría una cosa mientras la lista dice otra</td></tr>
+      <tr><td>Volver a generarla <strong>no borra la anterior</strong></td><td>Un acta es un documento con fecha: la que entregaste en marzo tiene que seguir existiendo</td></tr>
+      <tr><td>Cada acta lleva su <strong>huella</strong></td><td>Es lo que permite decir «este papel es el que generó el sistema». Dos copias del mismo contenido tienen la misma huella</td></tr>
+      <tr><td>Sin nadie marcado, no se genera</td><td>Dice <em>«Todavia no hay ninguna asistencia marcada: un acta vacia no documenta nada»</em></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="aviso">
+    <span class="etiqueta">La firma es un dato personal, y se trata como tal</span>
+    <p>Se guarda como imagen, atada a esa persona y esa jornada. <strong>No se enseña en ninguna
+      pantalla ni en ninguna lista</strong>: donde aparece es dentro del acta. Y solo se acepta el
+      trazo hecho en la pantalla —si intentas subir otra cosa dice <em>«La firma se manda como PNG:
+      es lo que produce el lienzo de la pantalla»</em>—.</p>
+  </div>
+
   <h3>Los tres estados, y lo que hace cada uno</h3>
   <div class="tabla-envuelve"><table>
     <thead><tr><th>Marcas</th><th>Qué pasa con su formación</th></tr></thead>
@@ -287,8 +351,21 @@
 
   <div class="aviso">
     <span class="etiqueta">Si el papel todavía no ha llegado</span>
-    <p>Es lo normal: la ARL suele mandarlos días después. Marca la asistencia hoy —la formación queda cumplida igual— y vuelve a la jornada a añadir el certificado cuando llegue. El campo es opcional.</p>
-    <p>Lo que no puedes es poner el número sin la entidad, ni al revés: un número suelto no se puede rastrear y una entidad sola no identifica nada.</p>
+    <p>Es lo normal: la ARL suele mandarlos días después. Marca la asistencia hoy —la formación queda
+      cumplida igual— y añade el certificado cuando llegue. El campo es opcional.</p>
+    <p>Y no hace falta volver a buscar la jornada. El certificado llega con un nombre delante
+      —«acaba de llegar el de Juan»— así que se registra desde <b>Usuarios</b>, en el botón
+      <b>Papeles de un tercero</b> de su fila. Sale ahí toda formación suya que ya esté cumplida y
+      lleve papel, con el número, el vencimiento y el escaneo.</p>
+    <p>Cada fila dice además <strong>por qué aparece</strong> —«Lo pide su tipo» o «Lo pide su
+      ficha»— y deja abrir la formación y la convocatoria, por si algo no cuadra.</p>
+  </div>
+
+  <div class="aviso">
+    <span class="etiqueta">Y si la jornada la dictó la empresa</span>
+    <p>Esa fila no pide el número: lo dice y ofrece <b>Registrarlo de todos modos</b>. Es un defecto
+      de pantalla, no una prohibición — hay empresas que son centros de entrenamiento acreditados y
+      para ellas «propios» y «certificado oficial» conviven.</p>
   </div>
 
   <div class="aviso bien">
@@ -319,7 +396,13 @@
   </div>
   <div class="aviso">
     <span class="etiqueta">Quién puede tomarla</span>
-    <p>Quien tenga el permiso <em>Tomar asistencia</em>. Está pensado para que el <strong>instructor</strong> pueda hacerlo sin poder además programar, publicar ni cancelar convocatorias. Administrador y Analista lo tienen de fábrica.</p>
+    <p>Quien tenga el permiso <em>Tomar asistencia</em>: marcar la lista, abrir la sesión del QR y
+      generar el acta. Está pensado para que el <strong>instructor</strong> pueda hacerlo sin poder
+      además programar, publicar ni cancelar convocatorias. Administrador y Analista lo tienen de
+      fábrica.</p>
+    <p>Marcarse uno mismo con el QR y firmar es otro permiso —<em>Registrar la propia
+      asistencia</em>— y lo tiene <strong>todo el mundo</strong>, porque es sobre lo suyo. Quien firma
+      su asistencia no puede marcar la de nadie más.</p>
   </div>
 </section>
 <footer>

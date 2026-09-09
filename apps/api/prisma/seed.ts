@@ -49,7 +49,7 @@ function fallbackPermissionDescription(code: string): string {
   return `Permite ${action.replace(/_/g, ' ')} en el modulo ${category}`;
 }
 
-// Descripciones curadas en espanol para el catalogo de permisos (mejor calidad que un
+// Descripciones curadas en español para el catalogo de permisos (mejor calidad que un
 // texto generado). Si en el futuro se agrega un permiso nuevo a PERMISSIONS sin entrada
 // aqui, se usa fallbackPermissionDescription para no romper el seed.
 const PERMISSION_DESCRIPTIONS: Partial<Record<PermissionCode, string>> = {
@@ -90,6 +90,7 @@ const PERMISSION_DESCRIPTIONS: Partial<Record<PermissionCode, string>> = {
   'users:import': 'Importar usuarios de forma masiva',
   'roles:manage': 'Crear y editar roles y sus permisos',
   'users:manage_permissions': 'Asignar o revocar permisos individuales a usuarios',
+  'attendance:sign': 'Registrar la propia asistencia: escanear el QR de la sesion y firmar en pantalla',
   'config:manage_catalogs': 'Administrar catalogos del tenant (areas, cargos, regionales, normas...)',
   'config:manage_tenant': 'Administrar la configuracion general del tenant',
   'approvals:decide': 'Aprobar o rechazar solicitudes de aprobacion',
@@ -485,8 +486,8 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
           Es la clase de formacion donde el papel lo emite un TERCERO acreditado —la ARL, un centro
           de entrenamiento— y la empresa es receptora: lo que necesita saber es cuando vence. Con
           esto encendido, la lista de asistencia de la jornada pide entidad, numero y vencimiento, y
-          esa fecha MANDA sobre la que calcularia la recurrencia: si la ARL certifica por tres anos
-          y aqui dice doce meses, reclamarla al ano seria inventar un incumplimiento.
+          esa fecha MANDA sobre la que calcularia la recurrencia: si la ARL certifica por tres años
+          y aqui dice doce meses, reclamarla al año seria inventar un incumplimiento.
 
           Los otros seis nacen apagados y cada empresa lo enciende donde le aplique.
         */
@@ -500,15 +501,15 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
       config: {
         requiresAssessment: true,
         issuesCertificate: true,
-        // Se le exige a TODA la empresa, como la general, y ademas vuelve cada ano. Estaba sin
+        // Se le exige a TODA la empresa, como la general, y ademas vuelve cada año. Estaba sin
         // modo de asignacion, asi que caia en MANUAL: la reinduccion anual de 116 personas
         // quedaba dependiendo de que alguien se acordara de marcarla.
         defaultAssignmentMode: 'ON_HIRE',
         defaultOfferingKind: 'PERMANENT',
-        // QUE PASA SI NO LA HIZO Y LLEGA LA DEL ANO SIGUIENTE: la de este ano se cierra como NO
+        // QUE PASA SI NO LA HIZO Y LLEGA LA DEL ANO SIGUIENTE: la de este año se cierra como NO
         // REALIZADA —que cuenta como incumplimiento de ese periodo— y la nueva nace para todos. Es
-        // como funciona una campana de calendario, y evita que quien nunca la hace desaparezca del
-        // denominador de los anos siguientes.
+        // como funciona una campaña de calendario, y evita que quien nunca la hace desaparezca del
+        // denominador de los años siguientes.
         defaultOnExpiry: 'CIERRA',
         // CAMPANA ANUAL, no aniversario por persona: la reinduccion es una obligacion de
         // calendario que cae sobre todos el mismo dia. Anclarla a "12 meses desde que cada quien
@@ -516,9 +517,9 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
         // auditor: pregunta si se hizo LA REINDUCCION DE 2026.
         defaultAnnualDate: '03-31',
         // QUIEN ENTRO HACE MENOS DE SEIS MESES NO ENTRA A LA CAMPANA: su induccion ES su
-        // actualizacion de ese ano, y encimarle la reinduccion sobre una induccion a medio hacer es
+        // actualizacion de ese año, y encimarle la reinduccion sobre una induccion a medio hacer es
         // pedirle dos veces lo mismo. Sin esto habia que eximir a mano a cada ingreso reciente
-        // —unos cincuenta al ano— escribiendo cincuenta veces el mismo motivo.
+        // —unos cincuenta al año— escribiendo cincuenta veces el mismo motivo.
         exemptRecentHiresMonths: 6,
         participatesInPlan: false,
         isMicro: false,

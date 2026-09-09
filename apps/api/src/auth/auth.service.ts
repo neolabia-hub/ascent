@@ -202,7 +202,7 @@ export class AuthService {
     if (await argon2.verify(user.passwordHash, newPassword).catch(() => false)) {
       throw new BadRequestException({
         code: 'SAME_PASSWORD',
-        message: 'La contrasena nueva no puede ser la misma que la actual.',
+        message: 'La contraseña nueva no puede ser la misma que la actual.',
       });
     }
 
@@ -420,7 +420,7 @@ export class AuthService {
    *
    * Es la mitad activa de la pantalla de olvido. La otra mitad —el telefono y el correo de quien
    * administra— sirve para la persona que tiene a mano a esa persona; esta sirve para la que no:
-   * el conductor a las cinco de la manana, que no va a llamar a nadie y lo unico que quiere es
+   * el conductor a las cinco de la mañana, que no va a llamar a nadie y lo unico que quiere es
    * dejar constancia de que necesita una contrasena nueva.
    *
    * NO ES una recuperacion automatica y no manda ninguna contrasena. Deja una notificacion en la
@@ -472,7 +472,7 @@ export class AuthService {
       channels: ['IN_APP'],
       subject: 'Alguien no puede entrar',
       // Dice QUIEN y DESDE DONDE, porque es lo que permite reconocer un aviso raro: una solicitud
-      // a nombre de alguien del turno de la manana llegando de madrugada desde otra IP.
+      // a nombre de alguien del turno de la mañana llegando de madrugada desde otra IP.
       body: `${quien} (${user.documentNumber}) pidio ayuda para entrar. Si lo reconoces, restablece su contrasena desde Usuarios. Origen: ${ctx.ipAddress ?? 'IP desconocida'}.`,
       referenceType: 'user',
       referenceId: user.id,

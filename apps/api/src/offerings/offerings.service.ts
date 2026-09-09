@@ -22,7 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ruleReachesEveryone } from '../assignments/audience-rule.js';
 import { AudiencesService } from '../assignments/audiences.service.js';
-import { decidirCertificadoExterno } from '../certificates/certificate-policy.js';
+import { decidirCertificadoExterno, laDictaUnTercero } from '../certificates/certificate-policy.js';
 import { cierraPorLista } from './cierre-de-la-jornada.js';
 import { CompletionService } from '../learning/completion.service.js';
 import { ProjectedAudienceService } from './projected-audience.service.js';
@@ -143,7 +143,7 @@ export class OfferingsService {
       throw new ConflictException({
         code: 'OFFERING_NOT_ATTENDABLE',
         message:
-          'Esta jornada no se cierra con lista: se acredita con lo que cada persona complete en la plataforma. Si hubo una sesion con lista —una videollamada en vivo, por ejemplo— marcalo en la convocatoria.',
+          'Esta jornada no se cierra con lista: se acredita con lo que cada persona complete en la plataforma. Si hubo una sesión con lista —una videollamada en vivo, por ejemplo— márcalo en la convocatoria.',
       });
     }
     if (offering.status === 'DRAFT' || offering.status === 'CANCELLED') {
@@ -173,7 +173,7 @@ export class OfferingsService {
       throw new ConflictException({
         code: 'TYPE_DOES_NOT_TRACK_EXTERNAL_CERT',
         message:
-          'Esta formacion no lleva certificado de un tercero. Se cambia en su ficha, o en Configuracion → Tipos de formacion para toda su clase.',
+          'Esta formación no lleva certificado de un tercero. Se cambia en su ficha, o en Configuración → Tipos de formación para toda su clase.',
       });
     }
 
@@ -192,6 +192,35 @@ export class OfferingsService {
     );
 
     const heldOn = input.heldOn ? new Date(`${input.heldOn}T12:00:00-05:00`) : new Date();
+
+    /*
+      UN CERTIFICADO NO PUEDE VENCER ANTES DE LA JORNADA QUE LO ORIGINA (2026-09-06).
+
+      Lo destapo `scripts/recorridos/asistencia-correcciones.mjs`, paso 9: el servidor aceptaba un
+      papel con vencimiento de ayer y cerraba la formacion tan tranquilo. Lo que entra a la base es
+      una habilitacion CADUCADA el mismo dia en que se registra — y como el papel MANDA sobre la
+      recurrencia (Decision #157), esa fecha se copia a la obligacion y el informe de Vencimientos
+      la saca en rojo sin que nadie sepa de donde salio.
+
+      Casi siempre es el mismo error de captura: equivocarse de año al teclear. La pantalla ya pone
+      su tope con `min`, pero un control que solo existe en el navegador no es un control — la misma
+      leccion que la compuerta del tipo, veinte lineas mas arriba.
+
+      Se comprueba TODO el lote antes de escribir nada: rechazar a mitad de camino dejaria media
+      lista marcada y media no, y quien la tomo no tendria como saber por donde se quedo.
+    */
+    const conFechaImposible = input.items.filter((fila) => {
+      const vence = fila.certificate?.validUntil;
+      return vence ? new Date(`${String(vence).slice(0, 10)}T23:59:59-05:00`) < heldOn : false;
+    });
+    if (conFechaImposible.length > 0) {
+      throw new ConflictException({
+        code: 'CERT_EXPIRES_BEFORE_SESSION',
+        message:
+          'Hay un certificado que vence antes del día de la jornada. Revisa el año: un papel que ya caducó no acredita nada.',
+      });
+    }
+
     let cerradas = 0;
     let ausentes = 0;
     let justificados = 0;
@@ -296,7 +325,9 @@ export class OfferingsService {
       },
     });
 
-    return { revisadas: input.items.length, cerradas, ausentes, justificados, ignoradas };
+    // `acta` viaja en la respuesta y no solo en la auditoria: quien acaba de guardar tiene que
+    // poder confirmar que el escaneo quedo, sin ir a mirar la jornada.
+    return { revisadas: input.items.length, cerradas, ausentes, justificados, ignoradas, acta: Boolean(input.attendanceSheetKey) };
   }
 
   /**
@@ -357,32 +388,19 @@ export class OfferingsService {
     /*
       SI LA DICTA LA EMPRESA, NO HAY TERCERO QUE CERTIFIQUE (2026-09-06).
 
-      Lo cazo el cliente mirando un ejemplo: *"esto ejecuta propios y TRANSPRENSA no da
-      certificaciones oficiales"*. Y es mas fuerte que una preferencia suya: un certificado
-      **externo** es por definicion el de alguien de fuera. Con `executedBy: PROPIOS` no hay fuera,
-      asi que pedir su numero es pedir un dato que no existe — y un campo que no se puede llenar se
-      aprende a saltar.
+      El criterio y su porque entero viven ahora en `certificate-policy.ts`. Estaban escritos aqui
+      dentro, y la consecuencia fue la que se paga siempre por copiar una regla en vez de importarla:
+      la segunda puerta —*Papeles de un tercero*, en la ficha de la persona— no se entero, y enseñaba
+      filas que se contradecian a si mismas (`PENDIENTES` 2.5).
 
-      Se decide por JORNADA y no por formacion porque es la jornada la que sabe quien la dicto: una
-      habilitacion la puede dar la ARL en marzo y un instructor propio en septiembre; la primera trae
-      papel y la segunda no, y la formacion es la misma.
-
-      ─── PERO NO ES UNA COMPUERTA, Y LA DIFERENCIA IMPORTA ───
-
-      Esto decide QUE CAMPOS PIDE la pantalla, no que se pueda guardar. La compuerta sigue siendo la
-      de la formacion (409 `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`), porque es ahi donde la empresa dice
-      si esta clase de formacion se acredita con papel de fuera. Un tenant que sea un centro de
-      entrenamiento acreditado, o cualquier caso que no se nos ocurra hoy, puede seguir registrando
-      el papel por la API sin que este defecto se lo impida. Poner aqui un rechazo seria convertir
-      una suposicion nuestra sobre como trabajan las empresas en una regla del producto.
-
-      Lo que la empresa emite por su cuenta es su CONSTANCIA, que es otra cosa y la decide
-      `issuesCertificate` (Decision #111).
+      Lo que NO es, y conviene no olvidarlo al leerlo aqui: decide QUE CAMPOS PIDE la pantalla, no que
+      se pueda guardar. La compuerta sigue siendo la de la formacion (409
+      `TYPE_DOES_NOT_TRACK_EXTERNAL_CERT`).
     */
-    const laDictaUnTercero = (fila?.executedBy ?? 'PROPIOS') !== 'PROPIOS';
+    const deUnTercero = laDictaUnTercero(fila?.executedBy);
     return {
       registraCertificado:
-        actividad && laDictaUnTercero
+        actividad && deUnTercero
           ? decidirCertificadoExterno(tipo, { tracksExternalCertificate: actividad.tracksExternalCertificate })
           : false,
       quienLaDicto: (fila?.executedByOther ?? '').trim() || (fila?.executedBy ?? 'PROPIOS'),
@@ -543,7 +561,7 @@ export class OfferingsService {
      * SE PUEDE PROGRAMAR CON EL CONTENIDO EN BORRADOR (Decision #77).
      *
      * Aqui se rechazaba si la version no estaba publicada, y eso obligaba a un orden que no hace
-     * falta: para planear el ano en enero —"Manejo defensivo, marzo, Cali"— el contenido todavia
+     * falta: para planear el año en enero —"Manejo defensivo, marzo, Cali"— el contenido todavia
      * no existe, asi que o se publicaba una capacitacion vacia o no se podia planear. Lo dijo el
      * cliente: *"esto hace mas lento el proceso"*.
      *
@@ -555,12 +573,12 @@ export class OfferingsService {
      * que todavia puede cambiar**. Una convocatoria en borrador no cita a nadie, no congela
      * proyectados, no abre el candado y no deja aprobar el plan (`PLAN_OFFERINGS_NOT_PUBLISHED`).
      * Lo unico que hace es reservar el sitio en el calendario, que es exactamente lo que se hace
-     * al planear un ano.
+     * al planear un año.
      */
     if (version.status === 'RETIRED') {
       throw new ConflictException({
         code: 'VERSION_RETIRED',
-        message: 'Esa version quedo atras: programa sobre la version vigente.',
+        message: 'Esa versión quedó atrás: programa sobre la versión vigente.',
       });
     }
 
@@ -649,7 +667,7 @@ export class OfferingsService {
         planId: destino.planId,
         offering: offeringCode,
         plannedMonth: destino.plannedMonth,
-        automatico: 'La formacion es del plan y el plan del ano estaba en borrador (Decision #75).',
+        automatico: 'La formacion es del plan y el plan del año estaba en borrador (Decision #75).',
       },
     });
   }
@@ -731,7 +749,7 @@ export class OfferingsService {
     });
     /**
      * LA COMPUERTA DE VERDAD (Decision #77). Programar con el contenido en borrador se permite —es
-     * como se planea un ano— pero PUBLICAR la convocatoria es lo que cita a la gente y congela los
+     * como se planea un año— pero PUBLICAR la convocatoria es lo que cita a la gente y congela los
      * proyectados, y eso no puede pasar sobre contenido que todavia puede cambiar.
      *
      * El mensaje dice QUE hacer, no solo que no se puede: quien llega aqui casi siempre no sabe
@@ -741,7 +759,7 @@ export class OfferingsService {
       throw new ConflictException({
         code: 'VERSION_NOT_PUBLISHED',
         message:
-          'Publica primero el contenido de la formacion. Hasta entonces esta convocatoria puede quedar programada, pero no se puede abrir a la gente.',
+          'Publica primero el contenido de la formación. Hasta entonces esta convocatoria puede quedar programada, pero no se puede abrir a la gente.',
       });
     }
 
@@ -822,7 +840,7 @@ export class OfferingsService {
     if (offering.status === 'DRAFT') {
       throw new ConflictException({
         code: 'OFFERING_NOT_PUBLISHED',
-        message: 'Sin publicar no hay proyectados congelados: el numero se ajusta al publicar.',
+        message: 'Sin publicar no hay proyectados congelados: el número se ajusta al publicar.',
       });
     }
     if (offering.status === 'CANCELLED') {
@@ -906,7 +924,7 @@ export class OfferingsService {
         alguien le habia cambiado el mes —queda en `RESCHEDULED`, que es lo correcto al moverlo— se
         quedaba diciendo que estaba reprogramado despues de cancelar la jornada. Y es falso: no se
         reprogramo a ninguna parte, se cancelo. El plan lo seguia contando como programado, asi que
-        el cumplimiento del ano se calculaba contra una jornada que nadie iba a dictar. Lo encontro
+        el cumplimiento del año se calculaba contra una jornada que nadie iba a dictar. Lo encontro
         el recorrido de punta a punta al reprogramar y cancelar en la misma corrida.
 
         Se excluyen los terminales: lo ya EJECUTADO no se cancela hacia atras.
@@ -1104,7 +1122,7 @@ export class OfferingsService {
     if (target.activity.currentVersionId !== target.id) {
       throw new ConflictException({
         code: 'VERSION_SUPERSEDED',
-        message: 'Se publico otra version mientras decidias. Vuelve a revisar antes de mover a la gente.',
+        message: 'Se publicó otra versión mientras decidías. Vuelve a revisar antes de mover a la gente.',
       });
     }
 
@@ -1241,7 +1259,7 @@ export class OfferingsService {
    *
    * Pero en una convocatoria PERMANENTE no hay nadie citado: es una puerta abierta por la que la
    * gente entra cuando puede. Dejarla anclada a la version vieja significa que quien ingrese
-   * manana hace la induccion desantiguada mientras la nueva espera a que alguien se acuerde de
+   * mañana hace la induccion desantiguada mientras la nueva espera a que alguien se acuerde de
    * pulsar "actualizar". Es el mismo fallo silencioso de siempre: el sistema sabe lo que hay que
    * hacer y espera a que alguien lo adivine.
    *
@@ -1396,6 +1414,13 @@ export class OfferingsService {
         extCertNumber: true,
         extCertIssuedAt: true,
         extCertValidUntil: true,
+        /*
+          EL ESCANEO TAMBIEN VUELVE (2026-09-08). Se guardaba y no se devolvia, asi que al reabrir la
+          lista el archivo adjunto no aparecia y parecia que no se habia subido — el mismo fallo que
+          los estados de asistencia cuando no se sembraban. Es la clave, no el archivo: para verlo se
+          pide firmada a .
+        */
+        extCertFileKey: true,
         user: {
           select: {
             id: true,
@@ -1444,7 +1469,7 @@ export class OfferingsService {
   /**
    * Inscribir = crear la EJECUCION. La inscripcion nace ENLAZADA a la obligacion que va a
    * satisfacer (Decision #2) y con el cargo, area y vinculacion de la persona congelados
-   * (Decision #33): dentro de dos anos el certificado debe decir el cargo que tenia ese dia.
+   * (Decision #33): dentro de dos años el certificado debe decir el cargo que tenia ese dia.
    */
   async enroll(actor: AuthUser, id: string, input: EnrollOfferingInput) {
     const tenantId = this.prisma.currentTenantId;
@@ -1581,7 +1606,7 @@ export class OfferingsService {
         **primero quien esta mas cerca de incumplir**, es decir, quien vence antes.
 
       No es arbitrario y se explica en una frase. Quien se queda fuera no pierde nada —sigue
-      obligado y sin inscribir, que es justo lo que la cobertura tiene que ensenar— y la respuesta
+      obligado y sin inscribir, que es justo lo que la cobertura tiene que enseñar— y la respuesta
       dice cuantos faltan, para que se programe la otra jornada.
     */
     const sillasLibres = offering.capacity === null ? candidatos.length : offering.capacity - enrolledAlready.size;

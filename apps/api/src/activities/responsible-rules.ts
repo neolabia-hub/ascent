@@ -35,7 +35,7 @@ export function assertResponsibleChangeAllowed(facts: ResponsibleChangeFacts): v
   throw new ConflictException({
     code: 'RESPONSIBLE_LOCKED',
     message:
-      'El responsable quedo congelado en la version publicada. Para cambiarlo, crea una version nueva: ' +
-      'la que ya se dicto tiene que seguir diciendo quien respondia por ella.',
+      'El responsable quedó congelado en la versión publicada. Para cambiarlo, crea una versión nueva: ' +
+      'la que ya se dictó tiene que seguir diciendo quién respondía por ella.',
   });
 }

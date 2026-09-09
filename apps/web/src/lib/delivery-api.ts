@@ -4,7 +4,7 @@
  *
  * Nombres tecnicos solo aqui: en pantalla se dice Convocatoria, Requisito, Obligacion y Plan.
  */
-import { apiFetch } from './api';
+import { apiFetch, getAccessToken } from './api';
 import type { Modality } from './catalog-api';
 
 // ─────────────────────────── Convocatorias ───────────────────────────
@@ -257,6 +257,8 @@ export interface RosterRow {
   extCertNumber: string | null;
   extCertIssuedAt: string | null;
   extCertValidUntil: string | null;
+  /** La clave del escaneo, si lo hay. Para verlo hay que pedirlo firmado a `/media/sign`. */
+  extCertFileKey: string | null;
   user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string }; area: { name: string } };
 }
 
@@ -271,6 +273,8 @@ export interface CertificadoExterno {
   issuedAt?: string;
   /** Lo que dice el papel. MANDA sobre la vigencia que calcularia la recurrencia. */
   validUntil?: string;
+  /** El escaneo, ya subido con `subirEvidencia`. Viaja la CLAVE, nunca el archivo. */
+  fileKey?: string;
 }
 
 /**
@@ -291,8 +295,14 @@ export function marcarAsistencia(
       motivo?: string;
       certificate?: CertificadoExterno;
     }[];
+    /**
+     * EL ACTA FIRMADA DE LA JORNADA. Una por jornada y no por persona: lo que se escanea es la hoja
+     * entera con las cuarenta firmas, y trocearla por persona seria inventar un documento que no
+     * existe. El papel de un tercero, en cambio, SI es de cada quien y va en su `certificate`.
+     */
+    attendanceSheetKey?: string;
   },
-): Promise<{ revisadas: number; cerradas: number; ausentes: number; justificados: number; ignoradas: string[] }> {
+): Promise<{ revisadas: number; cerradas: number; ausentes: number; justificados: number; ignoradas: string[]; acta: boolean }> {
   return apiFetch(`/offerings/${id}/attendance`, { method: 'POST', body });
 }
 
@@ -569,7 +579,7 @@ export interface PlanRow {
   itemCount: number;
   updatedAt: string;
   /**
-   * Los indicadores del ano, ya calculados. Vienen en el LISTADO a proposito: la pregunta que
+   * Los indicadores del año, ya calculados. Vienen en el LISTADO a proposito: la pregunta que
    * trae a alguien a esa pantalla es "¿como vamos?", y antes habia que entrar a cada plan.
    */
   metrics: PlanMetrics;
@@ -633,7 +643,7 @@ export interface PlanDetail {
   year: number;
   name: string;
   objective: string | null;
-  /** La META en porcentaje: cuanto del programa se compromete la empresa a ejecutar este ano. */
+  /** La META en porcentaje: cuanto del programa se compromete la empresa a ejecutar este año. */
   goalPct: number | null;
   scope: string | null;
   status: PlanStatus;
@@ -656,7 +666,7 @@ export function getPlan(id: string): Promise<PlanDetail> {
 }
 
 /**
- * Se pide LO MISMO que al editar. El alta preguntaba solo ano, nombre y objetivo, asi que la meta
+ * Se pide LO MISMO que al editar. El alta preguntaba solo año, nombre y objetivo, asi que la meta
  * y el alcance —que son parte del documento que revisa el auditor— habia que acordarse de
  * anadirlos despues, entrando al plan y abriendo "Editar". Un campo que solo existe en una de las
  * dos pantallas es un campo que se queda vacio.
@@ -735,9 +745,9 @@ export function closePlan(id: string): Promise<PlanRow> {
 /**
  * REABRIR un plan cerrado, con motivo obligatorio.
  *
- * Cerrar es lo que convierte al plan en la evidencia del ano, y por eso durante meses no se
- * reabria. Con un plan por ano (Decision #71) esa regla paso a ser una trampa: un plan cerrado se
- * queda con el ano y ya no hay forma de planear. Reabrir deja rastro en la auditoria; borrar no,
+ * Cerrar es lo que convierte al plan en la evidencia del año, y por eso durante meses no se
+ * reabria. Con un plan por año (Decision #71) esa regla paso a ser una trampa: un plan cerrado se
+ * queda con el año y ya no hay forma de planear. Reabrir deja rastro en la auditoria; borrar no,
  * y por eso borrar sigue reservado al plan que nunca obligo a nadie.
  */
 export function reopenPlan(id: string, justification: string): Promise<PlanRow> {
@@ -759,7 +769,7 @@ export interface ActivityRequirement {
   trigger: RuleTrigger;
   dueDaysAfterTrigger: number;
   everyMonths: number | null;
-  /** "Cada ano antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`. */
+  /** "Cada año antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`. */
   fixedDate: string | null;
   assignmentCount: number;
   /** Si solo obliga a quien entre desde que se creo. Cambia como se lee `reach`. */
@@ -813,4 +823,240 @@ export interface PendingInvites {
 
 export function getPendingInvites(offeringId: string): Promise<PendingInvites> {
   return apiFetch(`/offerings/${offeringId}/pendientes-por-convocar`, { method: 'GET' });
+}
+
+/** Una evidencia ya subida: el papel de un tercero, o el acta firmada de la jornada. */
+export interface EvidenciaSubida {
+  key: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+/**
+ * SUBIR UNA EVIDENCIA DE ASISTENCIA.
+ *
+ * Va aparte de `uploadMedia` —el de contenido— por lo mismo que su endpoint: aquel pide
+ * `lessons:manage` y crea un paquete reutilizable del catalogo, y esto pide `attendance:take` y
+ * solo deja un archivo con su clave. Ver la nota larga en `media.controller.ts`.
+ *
+ * Devuelve la CLAVE y nada mas. El archivo no significa nada hasta que se manda dentro de la lista
+ * (`certificate.fileKey`) o de la jornada (`attendanceSheetKey`): si quien lo sube cierra la ventana
+ * sin guardar, queda un archivo huerfano —barato— y no una evidencia que no evidencia nada.
+ */
+export async function subirEvidencia(file: File): Promise<EvidenciaSubida> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+  const form = new FormData();
+  form.append('file', file);
+  const token = getAccessToken();
+  const response = await fetch(`${apiUrl}/v1/media/evidencia`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  const data: unknown = await response.json();
+  if (!response.ok) {
+    const detalle = (data ?? {}) as { title?: string; code?: string; message?: string };
+    throw new Error(
+      detalle.code === 'UNSUPPORTED_FILE_TYPE'
+        ? (detalle.message ?? 'Tiene que ser un PDF o una imagen.')
+        : (detalle.title ?? 'No se pudo subir el archivo.'),
+    );
+  }
+  return data as EvidenciaSubida;
+}
+
+
+// ─────────────────────── La sala: QR de sesion, firma y acta (2.4) ───────────────────────
+
+/** El codigo que se proyecta, con su QR ya dibujado y los segundos que le quedan. */
+export interface SesionAbierta {
+  codigo: string;
+  expiraEn: string;
+  segundos: number;
+  /** PNG en `data:` — la pantalla no tiene que saber dibujar codigos de barras. */
+  qr: string;
+}
+
+/**
+ * Abrir o ROTAR el codigo de la sesion.
+ *
+ * Si el que hay sigue vigente devuelve el mismo: recargar la pantalla no puede invalidar el codigo
+ * que la gente esta escaneando en ese momento.
+ */
+export function abrirSesion(offeringId: string): Promise<SesionAbierta> {
+  return apiFetch(`/offerings/${offeringId}/sesion`, { method: 'POST' });
+}
+
+/** Cerrarla a mano: el codigo deja de servir aunque no haya caducado. */
+export function cerrarSesion(offeringId: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/offerings/${offeringId}/sesion/cerrar`, { method: 'POST' });
+}
+
+export interface ActaDeSesion {
+  id: string;
+  generadaEl: string;
+  /** SHA-256 de lo que el acta AFIRMA, no de los bytes del PDF. */
+  huella: string;
+  url: string;
+  personas?: number;
+  firmadas?: number;
+}
+
+/** Genera el acta con la lista, las firmas y su huella. Volver a generarla NO pisa la anterior. */
+export function generarActa(offeringId: string): Promise<ActaDeSesion> {
+  return apiFetch(`/offerings/${offeringId}/acta`, { method: 'POST' });
+}
+
+export function actasDe(offeringId: string): Promise<ActaDeSesion[]> {
+  return apiFetch(`/offerings/${offeringId}/actas`, { method: 'GET' });
+}
+
+/** A que jornada corresponde un codigo, para poder decirlo ANTES de marcar nada. */
+export interface JornadaDelCodigo {
+  offeringId: string;
+  code: string;
+  formacion: string;
+  fecha: string | null;
+  lugar: string | null;
+  segundos: number;
+}
+
+export function jornadaDelCodigo(codigo: string): Promise<JornadaDelCodigo> {
+  return apiFetch(`/asistencia/${encodeURIComponent(codigo)}`, { method: 'GET' });
+}
+
+export function loMioEnLaJornada(
+  codigo: string,
+): Promise<{ marcada: boolean; estado: string | null; metodo: string | null; cuando: string | null; firmada: boolean }> {
+  return apiFetch(`/asistencia/${encodeURIComponent(codigo)}/lo-mio`, { method: 'GET' });
+}
+
+/** MECANISMO 2: quedo presente con mi sello de tiempo. */
+export function registrarmeEnLaJornada(
+  codigo: string,
+): Promise<{ ok: boolean; metodo: string; cerrada: boolean; firmada: boolean }> {
+  return apiFetch(`/asistencia/${encodeURIComponent(codigo)}/registrarme`, { method: 'POST' });
+}
+
+/** MECANISMO 3: la firma, que ya esta subida, se ata a mi asistencia de esta jornada. */
+export function firmarAsistencia(
+  codigo: string,
+  firmaKey: string,
+): Promise<{ ok: boolean; metodo: string; cerrada: boolean; firmada: boolean }> {
+  return apiFetch('/asistencia/firmar', { method: 'POST', body: { codigo, firmaKey } });
+}
+
+/**
+ * Sube la firma (PNG del lienzo) y devuelve su clave.
+ *
+ * Puerta propia y no la de evidencia: el permiso es otro —`attendance:sign` lo tiene todo el mundo—
+ * y por eso el servidor solo acepta PNG y 300 KB.
+ */
+export async function subirFirma(png: Blob): Promise<{ key: string }> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+  const form = new FormData();
+  form.append('file', png, 'firma.png');
+  const token = getAccessToken();
+  const response = await fetch(`${apiUrl}/v1/media/firma`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  const data: unknown = await response.json();
+  if (!response.ok) {
+    const detalle = (data ?? {}) as { title?: string; message?: string };
+    throw new Error(detalle.message ?? detalle.title ?? 'No se pudo guardar la firma.');
+  }
+  return data as { key: string };
+}
+
+/** Una formacion cumplida que lleva papel de un tercero, vista desde la ficha de la persona. */
+export interface PapelDeTercero {
+  enrollmentId: string;
+  completedAt: string | null;
+  /** Para poder ABRIR la formacion desde la fila, y comprobar por que pide papel. */
+  actividadId: string;
+  actividad: string;
+  tipo: string | null;
+  convocatoria: { id: string; code: string; scheduledDate: string | null } | null;
+  /** Quien la dicto: el emisor por defecto del certificado. */
+  quienLaDicto: string | null;
+  /**
+   * QUIEN PIDE EL PAPEL: la ficha de esta formacion (`PROPIO`) o su tipo (`HEREDADO`). Es lo que
+   * contesta "¿y esta por que sale aqui?" — y dice donde se cambia.
+   */
+  origen: 'PROPIO' | 'HEREDADO';
+  /**
+   * Si la jornada la dicto alguien de FUERA. Con `PROPIOS` no hay tercero que expida nada, asi que
+   * la pantalla no pide el numero por defecto — pero se puede registrar igual: es un defecto, no una
+   * compuerta (mismo criterio que la lista de asistencia, `certificate-policy.ts`).
+   */
+  laDictaUnTercero: boolean;
+  number: string | null;
+  issuer: string | null;
+  validUntil: string | null;
+  fileKey: string | null;
+}
+
+/**
+ * LA SEGUNDA PUERTA AL PAPEL DE UN TERCERO (`PENDIENTES` 2.2).
+ *
+ * Solo lo CERRADO y solo lo que lleva papel. La cascada tipo -> ficha se resuelve en el servidor
+ * (`papel-de-tercero.service.ts`): una formacion que lo hereda del tipo sin decirlo en su ficha
+ * tambien sale, y son la mayoria.
+ */
+export function papelesDePersona(userId: string): Promise<PapelDeTercero[]> {
+  return apiFetch(`/enrollments/con-papel-de-tercero?userId=${encodeURIComponent(userId)}`, { method: 'GET' });
+}
+
+/**
+ * Registrar o corregir el papel de una inscripcion, sin volver a la convocatoria.
+ *
+ * No toca el estado ni la fecha de cumplimiento: solo el papel — y la vigencia de la obligacion,
+ * que es lo unico que el papel MANDA.
+ */
+export function guardarPapelDeTercero(
+  enrollmentId: string,
+  body: { number: string; issuer?: string; validUntil?: string | null; fileKey?: string | null },
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/enrollments/${enrollmentId}/papel-de-tercero`, { method: 'PATCH', body });
+}
+
+/** Una obligacion abierta que se puede dar por cumplida con un papel de otro empleo (via C). */
+export interface Convalidable {
+  assignmentId: string;
+  /** Para abrir la formacion desde la fila y ver que exige la nuestra. */
+  actividadId: string;
+  actividad: string;
+  tipo: string | null;
+  dueAt: string | null;
+  cycleNumber: number;
+  status: string;
+}
+
+/**
+ * LO QUE SE LE PUEDE CONVALIDAR A ALGUIEN.
+ *
+ * Solo obligaciones ABIERTAS de formaciones cuyo tipo lo ADMITE. La segunda condicion es la que
+ * impide dar por cumplida una induccion con el papel de otra empresa, y vive en el servidor: una
+ * lista que filtra bien no es una compuerta.
+ */
+export function convalidablesDe(userId: string): Promise<Convalidable[]> {
+  return apiFetch(`/assignments/convalidables?userId=${encodeURIComponent(userId)}`, { method: 'GET' });
+}
+
+/**
+ * Aceptar el papel de otro empleo y dar la obligacion por CUMPLIDA (no eximida).
+ *
+ * El motivo es obligatorio y largo a proposito: seis meses despues, cuando un auditor pregunte por
+ * que esta persona no aparece en ninguna lista de asistencia, la respuesta tiene que estar escrita.
+ */
+export function convalidar(
+  assignmentId: string,
+  body: { number: string; issuer: string; validUntil: string; fileKey?: string; reason: string },
+): Promise<{ ok: boolean; validUntil: string }> {
+  return apiFetch(`/assignments/${assignmentId}/convalidar`, { method: 'POST', body });
 }

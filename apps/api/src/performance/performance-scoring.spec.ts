@@ -126,7 +126,7 @@ describe('repartirFormularios', () => {
   };
   const general: FormularioDelCiclo = { cycleFormId: 'cf-general', jobTitleIds: [] };
 
-  it('cada quien responde el formulario de su cargo, en la MISMA campana', () => {
+  it('cada quien responde el formulario de su cargo, en la MISMA campaña', () => {
     // Es la razon de ser de la Decision #139: antes, esto eran dos ciclos y dos consolidados.
     const { asignaciones, sinFormulario } = repartirFormularios(
       [
@@ -201,7 +201,7 @@ describe('problemasDeReparto', () => {
     expect(problemas.generales).toBe(0);
   });
 
-  it('dos generales en la misma campana tambien son ambiguos', () => {
+  it('dos generales en la misma campaña tambien son ambiguos', () => {
     const problemas = problemasDeReparto([
       { cycleFormId: 'cf-1', jobTitleIds: [] },
       { cycleFormId: 'cf-2', jobTitleIds: [] },
@@ -243,9 +243,9 @@ describe('el recordatorio del ciclo', () => {
     expect(diasHastaElCierre(cierre, new Date('2026-12-30T21:00:00Z'))).toBe(1);
   });
 
-  it('manana y hoy no se dicen con un numero', () => {
+  it('mañana y hoy no se dicen con un numero', () => {
     expect(cuandoCierra(0)).toBe('cierra hoy');
-    expect(cuandoCierra(1)).toBe('cierra manana');
+    expect(cuandoCierra(1)).toBe('cierra mañana');
     expect(cuandoCierra(3)).toBe('cierra en 3 dias');
   });
 });

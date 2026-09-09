@@ -98,7 +98,7 @@ describe('dibujarConstancia', () => {
     const horizontal = await dibujarConstancia(datos({ landscape: true }));
     const vertical = await dibujarConstancia(datos({ landscape: false }));
 
-    // Se lee el tamano de la pagina en vez de buscar el numero en los bytes: el PDF va
+    // Se lee el tamaño de la pagina en vez de buscar el numero en los bytes: el PDF va
     // comprimido y el texto crudo no siempre esta ahi. Fallaba por la asercion, no por el dibujo.
     const tam = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).getPage(0).getSize();
 

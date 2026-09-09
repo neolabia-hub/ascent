@@ -59,13 +59,13 @@ export interface Formulario {
    */
   baseFormId: string | null;
   base: { id: string; name: string; items: ItemHeredado[] } | null;
-  /** Usos en campanas, y cuantos formularios cuelgan de este como base. */
+  /** Usos en campañas, y cuantos formularios cuelgan de este como base. */
   _count: { cycleForms: number; derivados: number };
 }
 
 export type EstadoCiclo = 'DRAFT' | 'OPEN' | 'CLOSED';
 
-/** Un formulario DENTRO de una campana. La copia congelada vive aqui, una por formulario. */
+/** Un formulario DENTRO de una campaña. La copia congelada vive aqui, una por formulario. */
 export interface FormularioDelCiclo {
   id: string;
   formId: string;
@@ -85,7 +85,7 @@ export interface Ciclo {
   closedAt: string | null;
   /**
    * LOS FORMULARIOS DE LA CAMPANA (Decision #139). Varios: el de conductores y el de analistas son
-   * la misma campana, y cada persona responde el de su cargo.
+   * la misma campaña, y cada persona responde el de su cargo.
    */
   forms: FormularioDelCiclo[];
   _count: { reviews: number };
@@ -128,10 +128,10 @@ export interface Evaluacion {
   /**
    * EL FORMULARIO QUE LE TOCO A ESTA PERSONA, con su copia congelada (Decision #139).
    *
-   * De aqui salen las preguntas, y no del ciclo: en la misma campana el conductor y el analista
+   * De aqui salen las preguntas, y no del ciclo: en la misma campaña el conductor y el analista
    * responden formularios distintos. Y si alguien renombro o retiro una competencia despues, esta
    * evaluacion sigue preguntando lo que preguntaba — que es lo unico que permite compararla con
-   * las demas del mismo ano.
+   * las demas del mismo año.
    */
   cycleForm?: {
     id: string;
@@ -162,7 +162,7 @@ export const MOTIVOS_SIN_FORMULARIO: Record<AperturaDeCiclo['sinFormulario'][num
   CARGO_SIN_FORMULARIO: 'Ningun formulario del ciclo cubre su cargo',
 };
 
-/** Las cifras de una campana, o de uno de sus formularios. Se cuentan igual. */
+/** Las cifras de una campaña, o de uno de sus formularios. Se cuentan igual. */
 export interface CifrasDeCiclo {
   total: number;
   entregadas: number;
@@ -172,7 +172,7 @@ export interface CifrasDeCiclo {
 
 export interface Consolidado extends CifrasDeCiclo {
   cycle: Ciclo;
-  /** El mismo recuento, formulario a formulario: es para lo que sirve tenerlos en una campana. */
+  /** El mismo recuento, formulario a formulario: es para lo que sirve tenerlos en una campaña. */
   porFormulario: (CifrasDeCiclo & { cycleFormId: string; name: string })[];
   items: Evaluacion[];
 }

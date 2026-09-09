@@ -54,8 +54,8 @@ const NAV_ITEMS: NavItem[] = [
  * entre las constancias, y nadie busca ahi su evaluacion de desempeno.
  *
  * Sigue sin ser fijo. Aparece cuando hay algo —que responder, o algo tuyo que leer— y desaparece
- * cuando no queda nada: un item permanente que casi todo el ano no lleva a ninguna parte ensena a
- * no pulsarlo. En movil la barra inferior pasa de cuatro a cinco items solo durante la campana.
+ * cuando no queda nada: un item permanente que casi todo el año no lleva a ninguna parte enseña a
+ * no pulsarlo. En movil la barra inferior pasa de cuatro a cinco items solo durante la campaña.
  */
 const ITEM_DESEMPENO: NavItem = { href: '/mi-desempeno', label: 'Desempeno', icon: ClipboardCheck };
 
@@ -211,7 +211,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
           y es donde la referencia de plataforma de contenido pone su bloque bajo la navegacion.
 
           Y JUNTOS, no sueltos. La racha era una pastilla en la barra de arriba: un numero con una
-          llama al lado no dice que es una racha ni que se pierde manana. Con los puntos, las
+          llama al lado no dice que es una racha ni que se pierde mañana. Con los puntos, las
           congelaciones y la frase de que se pierde, se entiende sin que nadie lo explique.
 
           SIGUE SIENDO PRIVADA (Decision #23): es la propia, jamas la de otro. No hay tabla de

@@ -129,7 +129,7 @@ export class LessonsService {
     if (used > 0) {
       throw new ConflictException({
         code: 'LESSON_IN_USE',
-        message: 'La leccion esta usada en una actividad. Quitala de la actividad primero.',
+        message: 'La lección esta usada en una actividad. Quítala de la actividad primero.',
       });
     }
     await this.prisma.tx(async (tx) => {
@@ -195,7 +195,7 @@ export class LessonsService {
     if (lesson.status === 'PUBLISHED') {
       throw new ConflictException({
         code: 'LESSON_NOT_EDITABLE',
-        message: 'Esta leccion pertenece a una version publicada y es inmutable. Duplicala para editarla.',
+        message: 'Esta lección pertenece a una versión publicada y es inmutable. Duplícala para editarla.',
       });
     }
     return lesson;

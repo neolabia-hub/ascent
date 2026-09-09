@@ -82,7 +82,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading || locked}
       aria-disabled={locked ? true : undefined}
       className={cn(
-        'focus-ring relative isolate inline-flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md font-medium transition-[transform,box-shadow,filter,background-color,border-color] duration-150 ease-pulse disabled:cursor-not-allowed',
+        'focus-ring relative isolate inline-flex items-center justify-center overflow-hidden whitespace-nowrap rounded-lg font-medium transition-[transform,box-shadow,filter,background-color,border-color] duration-150 ease-pulse disabled:cursor-not-allowed',
         opening && 'animate-unlock',
         variantClasses[variant],
         /*

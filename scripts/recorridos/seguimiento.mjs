@@ -14,7 +14,7 @@
 // ─── QUE COMPRUEBA ───
 //
 // No repite el criterio de estados —eso vive en `execution-state.ts` y tiene sus unitarias—. Cruza
-// lo que hay en la BASE (por `/assignments`) contra lo que ensena el INFORME
+// lo que hay en la BASE (por `/assignments`) contra lo que enseña el INFORME
 // (`/reportes/actividades/:id/ejecucion`), que es justo lo que ninguna de las dos capas puede
 // comprobar sola.
 import { paso, ok, comprobar } from './api.mjs';
@@ -80,8 +80,8 @@ export async function comprobarSeguimiento(admin, activityId, opciones = {}) {
   );
   comprobar(
     filas.length === resumen.total,
-    'el resumen cuenta exactamente las filas que ensena',
-    `ensena ${filas.length} filas y el resumen dice ${resumen.total}`,
+    'el resumen cuenta exactamente las filas que enseña',
+    `enseña ${filas.length} filas y el resumen dice ${resumen.total}`,
   );
 
   /*

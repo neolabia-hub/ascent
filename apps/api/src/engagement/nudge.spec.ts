@@ -1,6 +1,6 @@
 import { DEFAULT_NUDGE_HOUR, decideNudge, preferredHourFrom, startOfWeek, type NudgeInput } from './nudge.js';
 
-/** 8:00 de la manana en Bogota (UTC-5) del dia indicado. */
+/** 8:00 de la mañana en Bogota (UTC-5) del dia indicado. */
 function bogota(year: number, month: number, day: number, hour = 8): Date {
   return new Date(Date.UTC(year, month - 1, day, hour + 5, 0, 0));
 }

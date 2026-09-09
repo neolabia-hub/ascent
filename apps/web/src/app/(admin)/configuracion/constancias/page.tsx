@@ -45,7 +45,7 @@ import { useToast } from '@/components/ui/toast';
  * ─── POR QUE SE ARRASTRA Y NO SE ESCRIBEN COORDENADAS ───
  *
  * Se penso en dos campos numericos por elemento. Nadie sabe que significa "x: 47.5" mirando su
- * propio diseno, y acertar exigiria una decena de vistas previas por campo. Arrastrando, la
+ * propio diseño, y acertar exigiria una decena de vistas previas por campo. Arrastrando, la
  * pregunta "¿donde va el nombre?" se contesta senalando, que es como se contesta de verdad.
  */
 export default function ConstanciasPage() {
@@ -126,7 +126,7 @@ export default function ConstanciasPage() {
         <div>
           <h1 className="font-display text-[28px] font-semibold text-ink-900">Constancias</h1>
           <p className="mt-1 text-sm text-ink-500">
-            El diseno del papel que recibe quien termina una formacion. Sube tu arte y coloca los datos encima.
+            El diseño del papel que recibe quien termina una formacion. Sube tu arte y coloca los datos encima.
           </p>
         </div>
         <Button onClick={() => void crear()} glow>
@@ -221,7 +221,7 @@ const CLAVES: CampoClave[] = [
   'qr',
 ];
 
-/** Como se llama cada campo en la lista. La clave cruda ("qr", "vence") no se ensena. */
+/** Como se llama cada campo en la lista. La clave cruda ("qr", "vence") no se enseña. */
 const NOMBRES: Record<CampoClave, string> = {
   nombre: 'Nombre',
   documento: 'Documento',
@@ -275,7 +275,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
     `size` es un porcentaje del ALTO DE LA HOJA, que es lo que significa en el PDF. Estaba escrito
     como `fontSize: ${size}%` y eso en CSS es otra cosa completamente: un porcentaje del tamano de
     letra HEREDADO, no del alto del contenedor. El resultado era que mover el control no cambiaba
-    casi nada en pantalla y solo se veia el tamano de verdad al generar la vista previa — que es
+    casi nada en pantalla y solo se veia el tamaño de verdad al generar la vista previa — que es
     justo lo que esta pantalla existe para evitar.
 
     Con el alto medido, `(size/100) * alto` da los mismos pixeles que `(size/100) * altoDeHoja` da
@@ -321,7 +321,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
 
   /**
    * ARRASTRAR UN CAMPO. Las coordenadas se calculan contra el LIENZO, no contra la ventana: el
-   * lienzo cambia de tamano con el ancho de la pantalla y lo que se guarda es un porcentaje.
+   * lienzo cambia de tamaño con el ancho de la pantalla y lo que se guarda es un porcentaje.
    *
    * Se acota a 0-100 porque el raton puede salirse del lienzo mientras se arrastra, y un campo
    * colocado en -12% no se dibujaria en el PDF: desapareceria sin explicacion.
@@ -472,7 +472,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
       {/*
         ACTIVAR NO ES UNA CASILLA MAS (Decision #113).
 
-        Era un `<input type="checkbox">` perdido entre los botones de subir el diseno, y es la
+        Era un `<input type="checkbox">` perdido entre los botones de subir el diseño, y es la
         decision mas importante de la pantalla: activar significa "esto es lo que se le entrega a la
         gente a partir de ahora". Una casilla de 16 px no dice eso.
 
@@ -503,10 +503,10 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
           </p>
           <p className="mt-0.5 text-sm leading-relaxed text-ink-500">
             {activa
-              ? 'Quien termine una formacion que acredite recibira este diseno.'
+              ? 'Quien termine una formacion que acredite recibira este diseño.'
               : fondo
                 ? 'Actívala para que sea la que reciba la gente. Solo puede haber una en uso.'
-                : 'Sube el diseno antes de poder usarla.'}
+                : 'Sube el diseño antes de poder usarla.'}
           </p>
         </div>
         <Button variant={activa ? 'outline' : 'primary'} disabled={!fondo && !activa} onClick={() => setActiva((v) => !v)} glow={!activa && !!fondo}>
@@ -530,7 +530,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-paper">
                 <p className="max-w-xs text-center text-sm leading-relaxed text-ink-500">
-                  Sube el diseno de tu constancia. Sin el, la hoja sale en blanco y no se puede activar.
+                  Sube el diseño de tu constancia. Sin el, la hoja sale en blanco y no se puede activar.
                 </p>
               </div>
             )}
@@ -621,7 +621,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => inputFondo.current?.click()}>
               <Upload className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-              {fondo ? 'Cambiar diseno' : 'Subir diseno'}
+              {fondo ? 'Cambiar diseño' : 'Subir diseño'}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setLandscape((v) => !v)}>
               {landscape ? 'Pasar a vertical' : 'Pasar a horizontal'}
@@ -640,7 +640,7 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
                   const subido = await uploadMedia(file, 'certificate');
                   setFondo(subido.storageKey);
                 } catch (error) {
-                  showToast({ kind: 'danger', title: 'No se pudo subir el diseno', description: motivoDelError(error) });
+                  showToast({ kind: 'danger', title: 'No se pudo subir el diseño', description: motivoDelError(error) });
                 }
               }}
             />
@@ -690,9 +690,9 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
                 {seleccion ? NOMBRES[seleccion] : ''}
               </p>
-              <p className="mt-1 text-xs text-ink-500">Arrastralo sobre el diseno para moverlo.</p>
+              <p className="mt-1 text-xs text-ink-500">Arrastralo sobre el diseño para moverlo.</p>
 
-              <Field htmlFor="c-size" label="Tamano" className="mt-3">
+              <Field htmlFor="c-size" label="Tamaño" className="mt-3">
                 <input
                   id="c-size"
                   type="range"
@@ -864,7 +864,7 @@ function redondear(valor: number): number {
  */
 function FirmaEnLienzo({ firma, altoLienzo }: { firma: FirmanteConstancia; altoLienzo: number }) {
   const rubrica = useMediaUrl(firma.imageKey);
-  // Los mismos tamanos que `dibujarFirma` en el servidor: 1.8% del alto para el nombre.
+  // Los mismos tamaños que `dibujarFirma` en el servidor: 1.8% del alto para el nombre.
   const tamano = altoLienzo * 0.018;
 
   return (

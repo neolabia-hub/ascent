@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /** Campo extra propio de un catalogo (ademas de code/name). */
 export interface ExtraField {
@@ -229,6 +230,8 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
     await toggleActive(fila);
   };
 
+  const { visibles: filasVisibles, paginador } = usePaginacion(rows ?? []);
+
   const extraColumn = useMemo(
     () => extraFields.find((f) => f.kind === 'select' || f.kind === 'number' || f.kind === 'user'),
     [extraFields],
@@ -267,7 +270,7 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
             </Tr>
           </THead>
           <TBody>
-            {rows.map((row) => (
+            {filasVisibles.map((row) => (
               <Tr key={row.id}>
                 <Td className="font-mono text-xs text-ink-500">{row.code}</Td>
                 <Td className="font-medium">{row.name}</Td>
@@ -335,6 +338,7 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
             ))}
           </TBody>
         </Table>
+        {paginador}
       </div>
 
       <Drawer

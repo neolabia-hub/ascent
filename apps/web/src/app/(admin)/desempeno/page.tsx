@@ -41,6 +41,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /**
  * DESEMPENO (Decision #134). Ver `docs/modulos/desempeno.md`.
@@ -52,8 +53,8 @@ import { useToast } from '@/components/ui/toast';
  * Tres pestanas, tres publicos:
  *
  *   Evaluar        el jefe que califica, y quien se autoevalua. La abre todo el mundo.
- *   Ciclos         Gestion Humana: abrir la campana y ver como va.
- *   Que se evalua  el catalogo: competencias y formularios. Se toca una vez al ano.
+ *   Ciclos         Gestion Humana: abrir la campaña y ver como va.
+ *   Que se evalua  el catalogo: competencias y formularios. Se toca una vez al año.
  *
  * "Evaluar" va PRIMERA aunque sea la ultima en construirse: es la que abre mas gente y la unica con
  * algo que hacer hoy.
@@ -61,7 +62,7 @@ import { useToast } from '@/components/ui/toast';
 type Pestana = 'ciclos' | 'catalogo';
 
 /**
- * ADMINISTRAR EL DESEMPENO: la campana y lo que se pregunta. CALIFICAR NO ESTA AQUI (Decision #140).
+ * ADMINISTRAR EL DESEMPENO: la campaña y lo que se pregunta. CALIFICAR NO ESTA AQUI (Decision #140).
  *
  * ─── POR QUE SE QUITO LA PESTANA "EVALUAR" ───
  *
@@ -75,7 +76,7 @@ type Pestana = 'ciclos' | 'catalogo';
  * administrar la plataforma, es tu trabajo — lo hace tambien quien no administra nada.
  *
  * Queda una sola: el item "Desempeno" del menu, a un clic con el conmutador de espacio. Aqui
- * quedan las dos cosas que si son de administracion: la campana y el catalogo de lo que se pregunta.
+ * quedan las dos cosas que si son de administracion: la campaña y el catalogo de lo que se pregunta.
  */
 export default function DesempenoPage() {
   const puedeGestionar = useCan()('performance:manage');
@@ -96,7 +97,7 @@ export default function DesempenoPage() {
           className="mt-6"
           icon={ClipboardCheck}
           title="Esto lo configura Gestion Humana"
-          description="Las campanas y las competencias se administran con el permiso de desempeno. Si tienes gente a cargo, tus evaluaciones estan en Desempeno, dentro de tu menu."
+          description="Las campañas y las competencias se administran con el permiso de desempeno. Si tienes personas a cargo, tus evaluaciones estan en Desempeno, dentro de tu menu."
           action={
             <Link href="/mi-desempeno">
               <Button>Ir a mis evaluaciones</Button>
@@ -241,7 +242,7 @@ function Ciclos() {
         <EmptyState
           icon={CalendarRange}
           title="Todavia no hay ciclos"
-          description="Un ciclo es la campana: «Desempeno 2026», con sus fechas. Al abrirlo se generan las evaluaciones."
+          description="Un ciclo es la campaña: «Desempeno 2026», con sus fechas. Al abrirlo se generan las evaluaciones."
         />
       ) : (
         <div className="space-y-2">
@@ -404,7 +405,7 @@ function NuevoCiclo({
     cargosRepetidos.length > 0
       ? `Dos formularios se reparten el mismo cargo: ${[...new Set(cargosRepetidos.map((cargo) => cargo.name))].join(', ')}.`
       : generales.length > 1
-        ? `Hay ${generales.length} formularios sin cargos, y solo puede haber uno general por campana.`
+        ? `Hay ${generales.length} formularios sin cargos, y solo puede haber uno general por campaña.`
         : null;
 
   const guardar = async () => {
@@ -432,7 +433,7 @@ function NuevoCiclo({
       }}
       icon={CalendarRange}
       title="Nuevo ciclo"
-      description="La campana del ano. Queda en borrador hasta que la abras."
+      description="La campaña del año. Queda en borrador hasta que la abras."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onCerrar}>
@@ -461,7 +462,7 @@ function NuevoCiclo({
           VARIOS FORMULARIOS EN LA MISMA CAMPANA (Decision #139).
 
           Casillas y no un desplegable: elegir varios de una lista desplegable obliga a abrirla
-          tantas veces como formularios lleve la campana, y a acordarse de lo que ya se marco.
+          tantas veces como formularios lleve la campaña, y a acordarse de lo que ya se marco.
         */}
         <Field
           // El rotulo del grupo apunta a la primera casilla: es la unica manera de que "Formularios"
@@ -469,7 +470,7 @@ function NuevoCiclo({
           htmlFor={`c-form-${formularios[0]?.id ?? ''}`}
           label="Formularios"
           required
-          hint="Marca todos los que apliquen: cada persona responde el de su cargo, y el que no declara cargos recoge al resto."
+          ayuda="Marca todos los que apliquen: cada persona responde el de su cargo, y el que no declara cargos recoge al resto."
         >
           <div className="space-y-3 rounded-xl border border-line p-3">
             {/* Con cuarenta cargos la lista deja de caber: buscador a partir de ocho, como en todo. */}
@@ -520,8 +521,8 @@ function NuevoCiclo({
           QUE TRAE CADA FORMULARIO ELEGIDO, aqui mismo.
 
           Elegir por el nombre obliga a acordarse de que llevaba dentro, y de eso dependen a quien
-          se evalua y con que peso. Se ensenan enteros: son listas cortas y deciden la campana del
-          ano.
+          se evalua y con que peso. Se enseñan enteros: son listas cortas y deciden la campaña del
+          año.
         */}
         {elegidos.map((formulario) => (
           <div key={formulario.id} className="rounded-xl bg-paper p-4">
@@ -695,7 +696,7 @@ function ResultadoApertura({
             <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             <span>
               <strong>
-                La campana no alcanza a {datos.resultado.sinFormulario.length} personas.
+                La campaña no alcanza a {datos.resultado.sinFormulario.length} personas.
               </strong>{' '}
               Ningun formulario del ciclo cubre su cargo, y no se les puso el primero que habia:
               preguntarle a un conductor por competencias de analista se descubre cuando ya lo
@@ -711,7 +712,7 @@ function ResultadoApertura({
             ))}
           </ul>
           <p className="mt-3 text-xs leading-relaxed text-ink-700">
-            Si la campana era solo para esos cargos, no hay nada que arreglar. Si no, se anade al
+            Si la campaña era solo para esos cargos, no hay nada que arreglar. Si no, se anade al
             ciclo un formulario que cubra ese cargo, o uno sin cargos que recoja al resto.
           </p>
         </div>
@@ -735,6 +736,12 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
     }
   };
 
+  /*
+    CORTABA EN 100 Y NO LO DECIA: `datos.items.slice(0, 100)` dejaba fuera el resto sin ningun
+    aviso, asi que la lista parecia el total. Ahora se paginan las que haya.
+  */
+  const { visibles: evaluacionesVisibles, paginador: paginadorEvaluaciones } = usePaginacion(datos.items);
+
   return (
     <Modal
       open
@@ -748,8 +755,8 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/*
-            EL ARCHIVO ENTERO, al lado de la tabla que solo ensena 100 filas. Es lo que se guarda
-            como evidencia del ano y lo que pide quien audita: con fecha, completo y filtrable.
+            EL ARCHIVO ENTERO, al lado de la tabla que solo enseña 100 filas. Es lo que se guarda
+            como evidencia del año y lo que pide quien audita: con fecha, completo y filtrable.
           */}
           <Button variant="outline" loading={bajando} onClick={() => void bajar()}>
             <Download size={16} />
@@ -770,9 +777,9 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
       {/*
         Y LO MISMO, FORMULARIO A FORMULARIO (Decision #139).
 
-        Es para lo que sirve tener varios en una campana: el promedio de conductores y el de
+        Es para lo que sirve tener varios en una campaña: el promedio de conductores y el de
         analistas separados, sin abrir dos ciclos ni sumar a mano. Con un solo formulario no se
-        ensena: seria repetir las cifras de arriba.
+        enseña: seria repetir las cifras de arriba.
       */}
       {datos.porFormulario.length > 1 ? (
         <div className="mt-3 overflow-hidden rounded-xl bg-paper">
@@ -795,14 +802,14 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
         <Table>
           <THead>
             <Tr>
-              <Th>Persona</Th>
+              <Th>Nombre</Th>
               <Th>Evalua</Th>
               <Th>Estado</Th>
               <Th className="text-right">Nota</Th>
             </Tr>
           </THead>
           <TBody>
-            {datos.items.slice(0, 100).map((fila) => (
+            {evaluacionesVisibles.map((fila) => (
               <Tr key={fila.id}>
                 <Td>
                   <p className="font-medium text-ink-900">{fila.subjectName ?? '—'}</p>
@@ -827,6 +834,7 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
             ))}
           </TBody>
         </Table>
+        {paginadorEvaluaciones}
       </div>
       {datos.items.length > 100 ? (
         <p className="mt-3 text-center text-xs text-ink-500">Se muestran 100 de {datos.items.length}.</p>
@@ -846,7 +854,7 @@ function Cifra({ valor, etiqueta }: { valor: number | string; etiqueta: string }
 
 // ─────────────────────────────  CATALOGO  ─────────────────────────────
 
-/** Competencias y formularios: lo que se toca una vez al ano, antes de abrir el ciclo. */
+/** Competencias y formularios: lo que se toca una vez al año, antes de abrir el ciclo. */
 function Catalogo() {
   const { showToast } = useToast();
   const [competencias, setCompetencias] = useState<Competencia[] | null>(null);
@@ -969,7 +977,7 @@ function Catalogo() {
                     EL BOTON SIGUE AHI AUNQUE NO SE PUEDA EDITAR.
 
                     Antes se deshabilitaba, y eso dejaba sin salida: quien queria cambiar el
-                    formulario del ano pasado veia un boton apagado y ningun camino. La regla —lo que
+                    formulario del año pasado veia un boton apagado y ningun camino. La regla —lo que
                     ya uso un ciclo no se reescribe— es correcta; esconderla no la explica.
 
                     Ahora se pulsa, se dice POR QUE no se puede, y se ofrece lo que si se puede:
@@ -1113,7 +1121,7 @@ function EditarCompetencia({
         <Field
           htmlFor="k-desc"
           label="Que se espera"
-          hint="Lo lee quien califica, en el momento de calificar. Es lo que hace que dos jefes evaluen parecido."
+          ayuda="Lo lee quien califica, en el momento de calificar. Es lo que hace que dos jefes evaluen parecido."
         >
           <Textarea
             id="k-desc"
@@ -1482,7 +1490,7 @@ function ArmarFormulario({
             <p className="text-sm font-medium text-ink-900">A quien se le hace</p>
             <p className="mb-2 text-xs text-ink-500">
               Lo que se le pregunta a un conductor no es lo que se le pregunta a un analista. Dentro
-              de una misma campana, cada persona responde el formulario de su cargo.
+              de una misma campaña, cada persona responde el formulario de su cargo.
             </p>
 
             <div className="inline-flex rounded-full bg-paper p-1">
@@ -1497,7 +1505,7 @@ function ArmarFormulario({
             {alcance === 'EMPRESA' ? (
               <p className="mt-2 text-xs leading-relaxed text-ink-500">
                 Sera el formulario <strong>general</strong> del ciclo: recoge a quien no encaje en
-                ningun otro. Solo puede haber uno general por campana.
+                ningun otro. Solo puede haber uno general por campaña.
               </p>
             ) : (
               <div className="mt-3 space-y-2">

@@ -35,7 +35,7 @@
 // ─── LO QUE ESTA SUITE NO HACE ───
 //
 // No sustituye a los recorridos por tipo: aquellos prueban lo que es PROPIO de cada uno —que el
-// plan crea su renglon al programar, que la reinduccion cierra la ronda del ano, que la especifica
+// plan crea su renglon al programar, que la reinduccion cierra la ronda del año, que la especifica
 // resuelve el cambio de cargo—. Esta prueba lo COMUN, que es lo que se rompe al cambiar el motor.
 //
 //   estandar.mjs   ->  todos los tipos, lo comun, derivado de la configuracion

@@ -35,7 +35,7 @@ export interface StageQuestion {
    * intento y este componente sirvan para los ocho tipos sin un solo caso especial.
    */
   options: Array<{ id: string; text: string }>;
-  /** Solo en NUMERIC: se ensena junto al campo. El numero correcto nunca sale del servidor. */
+  /** Solo en NUMERIC: se enseña junto al campo. El numero correcto nunca sale del servidor. */
   unit?: string;
 }
 
@@ -565,7 +565,7 @@ interface TipoNuevoProps {
 /**
  * COMPLETAR HUECOS.
  *
- * El enunciado NO se ensena como texto con los campos debajo: los huecos se abren DENTRO de la
+ * El enunciado NO se enseña como texto con los campos debajo: los huecos se abren DENTRO de la
  * frase, en su sitio. Es la diferencia entre leer "El arnes se inspecciona cada ___" y leer una
  * frase con un agujero seguida de "Hueco 1: [ ]", que obliga a hacer la correspondencia mental.
  *

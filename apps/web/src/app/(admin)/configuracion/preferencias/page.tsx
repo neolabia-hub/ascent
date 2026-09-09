@@ -166,6 +166,21 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, performanceReminderDays: num(e.target.value, 0, 30, 3) })}
               />
             </Field>
+            <Field
+              htmlFor="pref-vencimientos"
+              label="Avisar de lo que vence (días antes)"
+              hint="Un aviso semanal en la bandeja, los lunes, a quien puede ver Reportes. 0 = sin aviso."
+              ayuda="Lo que se tarda en conseguir un cupo de alturas con la ARL no se parece a lo que se tarda en programar una charla propia: avisar con quince días de algo que necesita dos meses de gestión es avisar tarde. Va a la bandeja de la plataforma, nunca por correo."
+            >
+              <Input
+                id="pref-vencimientos"
+                type="number"
+                min={0}
+                max={180}
+                value={settings.expirationDigestDays}
+                onChange={(e) => setSettings({ ...settings, expirationDigestDays: num(e.target.value, 0, 180, 45) })}
+              />
+            </Field>
             <Field htmlFor="pref-pills" label="Pildoras por semana" hint="Cadencia gobernada por el sistema (2-3 recomendado).">
               <Input
                 id="pref-pills"
@@ -213,7 +228,7 @@ export default function PreferenciasPage() {
         </p>
 
         {/*
-          LA ADVERTENCIA VA ARRIBA, antes de los campos, no debajo en letra pequena: es lo que
+          LA ADVERTENCIA VA ARRIBA, antes de los campos, no debajo en letra pequeña: es lo que
           cambia lo que la persona escribe. La pantalla de ingreso esta abierta a internet —no
           puede pedir sesion a quien todavia no ha entrado—, asi que esto lo lee cualquiera que
           conozca la direccion. Un area y una extension es informacion de la empresa; el movil

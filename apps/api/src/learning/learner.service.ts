@@ -231,7 +231,7 @@ export class LearnerService {
       });
     }
     if (!this.isOpenWindow(offering.windowStart, offering.windowEnd, new Date())) {
-      throw new ConflictException({ code: 'OFFERING_WINDOW_CLOSED', message: 'Esta formacion no esta disponible hoy.' });
+      throw new ConflictException({ code: 'OFFERING_WINDOW_CLOSED', message: 'Esta formación no esta disponible hoy.' });
     }
 
     /*
@@ -242,12 +242,12 @@ export class LearnerService {
       misma persona acababa con DOS inscripciones de la misma formacion. Medido en el recorrido de
       varias convocatorias.
 
-      El dano no es cosmetico: la obligacion es UNA, asi que al terminar una se cierra la obligacion
+      El daño no es cosmetico: la obligacion es UNA, asi que al terminar una se cierra la obligacion
       y **la otra inscripcion se queda viva para siempre**; y los numeros de ejecucion cuentan dos
       inscritos donde hay una persona, lo que infla la asistencia y la cobertura de la jornada.
 
       Se mira lo VIVO y no todo el historial a proposito: una formacion que se repite —la
-      reinduccion del ano que viene— necesita inscripcion nueva, y la anterior ya esta terminada.
+      reinduccion del año que viene— necesita inscripcion nueva, y la anterior ya esta terminada.
     */
     const existing = await this.prisma.scoped.enrollment.findFirst({
       where: {

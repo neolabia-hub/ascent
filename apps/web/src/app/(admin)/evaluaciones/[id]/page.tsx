@@ -330,7 +330,7 @@ export default function EvaluacionEditorPage() {
     try {
       await updateAssessmentPresentation(assessmentId, siguiente);
     } catch (error) {
-      showToast({ kind: 'danger', title: 'No se pudo guardar el diseno', description: motivoDelError(error) });
+      showToast({ kind: 'danger', title: 'No se pudo guardar el diseño', description: motivoDelError(error) });
     }
   };
 
@@ -476,7 +476,7 @@ export default function EvaluacionEditorPage() {
           {/*
             VER COMO EL EMPLEADO no es un extra: es la unica forma de comprobar antes de publicar
             que el examen se entiende. Y usa el MISMO componente que el reproductor real, para que
-            no pueda ensenar algo distinto de lo que va a pasar de verdad.
+            no pueda enseñar algo distinto de lo que va a pasar de verdad.
           */}
           <div className="flex items-center rounded-lg border border-line p-0.5">
             <button
@@ -1322,7 +1322,7 @@ function ComoSeCalifica({
     LOS MISMOS VALORES POR DEFECTO QUE APLICA EL SERVIDOR (`reviewPolicySchema`).
 
     Se repiten aqui porque una evaluacion vieja tiene `{}` guardado, y pintar todas las casillas
-    apagadas diria que no se ensena nada — cuando en realidad si se ensena la nota y la
+    apagadas diria que no se enseña nada — cuando en realidad si se enseña la nota y la
     explicacion. Una pantalla que miente sobre lo que esta pasando es peor que no tenerla.
   */
   const revision = {
@@ -1364,7 +1364,7 @@ function ComoSeCalifica({
         <Field
           htmlFor="cc-attempts"
           label="Intentos maximos"
-          hint="Vacio = los que tenga la formacion. Al agotarlos, la formacion queda bloqueada y se avisa."
+          ayuda="Vacio = los que tenga la formacion. Al agotarlos, la formacion queda bloqueada y se avisa."
         >
           <Input
             id="cc-attempts"
@@ -1433,13 +1433,13 @@ function ComoSeCalifica({
 
           Las dos cosas ya se podian expresar; lo que faltaba eran estas cuatro casillas.
 
-          ES CRITICO CON UN BANCO REUTILIZADO: ensenar las correctas a todo el mundo equivale a
+          ES CRITICO CON UN BANCO REUTILIZADO: enseñar las correctas a todo el mundo equivale a
           publicar el examen. Por eso "mostrar las correctas" nace APAGADA y las otras tres no.
         */}
         <div className="space-y-2 border-t border-line pt-5">
           <p className="text-sm font-medium text-ink-900">Al terminar, la persona ve</p>
           <p className="pb-1 text-xs leading-relaxed text-ink-500">
-            Con un banco de preguntas que se reutiliza, ensenar las correctas a todo el mundo equivale a publicar
+            Con un banco de preguntas que se reutiliza, enseñar las correctas a todo el mundo equivale a publicar
             el examen.
           </p>
           <Casilla
@@ -1461,7 +1461,7 @@ function ComoSeCalifica({
             disabled={disabled}
             onChange={(showExplanations) => onChange({ reviewPolicy: { ...revision, showExplanations } })}
             titulo="La explicacion de cada pregunta"
-            pista="Lo que escribiste como retroalimentacion. Ensena sin regalar cual era la correcta."
+            pista="Lo que escribiste como retroalimentacion. Enseña sin regalar cual era la correcta."
           />
           <Casilla
             checked={revision.showCorrectAnswers}

@@ -27,7 +27,7 @@ import { motivoDelError } from '@/lib/api';
  * ─── PARA QUIEN ES ───
  *
  * Para el jefe que califica a su gente, y para quien se autoevalua. Es la pantalla que mas gente va
- * a abrir del modulo, y casi siempre una vez al ano: tiene que explicarse sola.
+ * a abrir del modulo, y casi siempre una vez al año: tiene que explicarse sola.
  *
  * ─── SE ENTREGA ENTERA, Y UNA SOLA VEZ ───
  *
@@ -197,7 +197,7 @@ function agruparPorFormulario(filas: Evaluacion[]): { nombre: string; filas: Eva
  * CUANTO LLEVAS, en una pieza.
  *
  * El numero grande es lo HECHO y no lo que falta: es lo que da ganas de seguir. Debajo, una barra
- * de segmentos —uno por evaluacion— para que doscientas dejen de ser una palabra y sean un tamano.
+ * de segmentos —uno por evaluacion— para que doscientas dejen de ser una palabra y sean un tamaño.
  * Es el mismo recurso de la tarjeta de repaso, que dibuja las preguntas en vez de contarlas.
  */
 function Medidor({
@@ -228,7 +228,7 @@ function Medidor({
           El rotulo dice "lo que TE toca calificar" y no el nombre del ciclo, porque puesto arriba y
           en mayusculas ese nombre se leia como una cabecera de reporte — y esto no es un indicador
           de administracion: son las evaluaciones que tienes tu, con tu plazo. Quien no califica a
-          nadie no ve esta pieza. El nombre de la campana baja a la linea de apoyo, que es donde
+          nadie no ve esta pieza. El nombre de la campaña baja a la linea de apoyo, que es donde
           sirve: para saber de cual se trata cuando hay dos abiertas.
         */}
         <div className="min-w-0">
@@ -379,7 +379,7 @@ function Formulario({
   /*
     LAS COMPETENCIAS SALEN DE LA COPIA CONGELADA DEL CICLO, no del catalogo de hoy. Si alguien
     renombro o retiro una competencia despues de abrir el ciclo, esta evaluacion sigue preguntando
-    lo que preguntaba — que es lo unico que permite compararla con las demas del mismo ano.
+    lo que preguntaba — que es lo unico que permite compararla con las demas del mismo año.
 
     Ya entregada, se leen las RESPUESTAS: llevan el nombre con el que se pregunto.
   */
@@ -477,7 +477,7 @@ function Formulario({
               : (evaluacion.subjectName ?? undefined)
             : soloLectura
               ? 'Ya entregada. Se muestra tal como quedo.'
-              : // Con varios formularios en la misma campana, cual se esta respondiendo deja de ser
+              : // Con varios formularios en la misma campaña, cual se esta respondiendo deja de ser
                 // obvio: un jefe con conductores y analistas abre dos formularios distintos.
                 [evaluacion.subjectJobTitle, evaluacion.subjectArea, evaluacion.cycleForm?.form.name]
                   .filter(Boolean)
@@ -658,7 +658,7 @@ function Formulario({
  *
  * CON NUMEROS Y NO CON CARAS, y esa es la unica diferencia deliberada. Las caras son perfectas para
  * medir satisfaccion; para calificar el desempeno de una persona convierten un juicio profesional
- * en un emoticono, y quien lo lea dentro de un ano merece "3 de 5" y no una carita.
+ * en un emoticono, y quien lo lea dentro de un año merece "3 de 5" y no una carita.
  */
 function Escala({
   escala,

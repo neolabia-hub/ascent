@@ -19,7 +19,7 @@ interface ListQuestionsParams {
  *
  * Editar una pregunta NO la modifica: crea la version N+1 y mueve el puntero `currentVersionId`.
  * Los intentos historicos siguen apuntando a la version que realmente se sirvio, asi que una
- * correccion de hoy jamas reescribe lo que alguien respondio el ano pasado (y por eso, a
+ * correccion de hoy jamas reescribe lo que alguien respondio el año pasado (y por eso, a
  * diferencia de Moodle, aqui nunca hay que "borrar los intentos" para poder corregir un enunciado).
  */
 @Injectable()

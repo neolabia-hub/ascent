@@ -9,7 +9,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        'focus-ring w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-300',
+        'focus-ring w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink-900 placeholder:text-ink-300 transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink-300',
         className,
       )}
       {...props}

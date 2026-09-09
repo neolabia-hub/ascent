@@ -77,7 +77,7 @@ export type PlatformSettingsInput = z.infer<typeof platformSettingsSchema>;
 
 /**
  * La foto de perfil (Decision #105). Llega la CLAVE de un fichero ya subido por `/media/upload`,
- * que es donde se valida el tipo real y el tamano; aqui solo se dice a quien pertenece.
+ * que es donde se valida el tipo real y el tamaño; aqui solo se dice a quien pertenece.
  *
  * `null` es un valor legitimo: quitar la foto y volver a las iniciales.
  */

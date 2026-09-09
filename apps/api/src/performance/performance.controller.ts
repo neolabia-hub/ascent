@@ -99,7 +99,7 @@ export class PerformanceController {
   }
 
   /**
-   * EL MISMO CONSOLIDADO, EN EXCEL. La pantalla ensena 100 filas; esto va entero.
+   * EL MISMO CONSOLIDADO, EN EXCEL. La pantalla enseña 100 filas; esto va entero.
    *
    * `StreamableFile` y no el Buffer pelado: devolver un Buffer hace que Nest lo serialice como JSON
    * y el archivo llega corrupto. El nombre del fichero lo pone el servicio —lleva ciclo y fecha—
