@@ -28,11 +28,21 @@
 -- Un area sin responsable no rompe nada: simplemente esa gente no recibe encuesta de eficacia, y
 -- se ve en la pantalla de areas. Es mejor que inventar un evaluador —el coordinador de SST, por
 -- ejemplo— que acabaria evaluando a seiscientas personas que no ha visto trabajar.
-ALTER TABLE "areas" ADD COLUMN "responsible_user_id" UUID;
+-- IDEMPOTENTE DESDE EL 2026-09-09. La migracion `20260902010000_area_un_solo_responsable` corre
+-- ANTES que esta —01:00 frente a 12:00— y necesita la columna, asi que la crea ella si falta. Aqui
+-- se acepta encontrarla hecha en vez de reventar: el resultado es el mismo por los dos caminos, y
+-- asi ninguna base —la de desarrollo, la del piloto o la del proximo cliente— depende de en que
+-- orden le tocaron las cosas.
+ALTER TABLE "areas" ADD COLUMN IF NOT EXISTS "responsible_user_id" UUID;
 
-ALTER TABLE "areas"
-  ADD CONSTRAINT "areas_responsible_user_id_fkey"
-  FOREIGN KEY ("responsible_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- Postgres no tiene `ADD CONSTRAINT IF NOT EXISTS`, de ahi el bloque.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'areas_responsible_user_id_fkey') THEN
+    ALTER TABLE "areas"
+      ADD CONSTRAINT "areas_responsible_user_id_fkey"
+      FOREIGN KEY ("responsible_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
 
--- Se busca "las areas que dirige esta persona" al dar de baja a alguien y al listar evaluadores.
-CREATE INDEX "areas_responsible_user_id_idx" ON "areas"("responsible_user_id");
+CREATE INDEX IF NOT EXISTS "areas_responsible_user_id_idx" ON "areas"("responsible_user_id");
