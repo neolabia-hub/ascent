@@ -889,6 +889,11 @@ export function abrirSesion(offeringId: string): Promise<SesionAbierta> {
   return apiFetch(`/offerings/${offeringId}/sesion`, { method: 'POST' });
 }
 
+/** Cuantos se han marcado ya, para la cuenta en vivo mientras se proyecta. */
+export function marcadosDeSesion(offeringId: string): Promise<{ inscritos: number; presentes: number }> {
+  return apiFetch(`/offerings/${offeringId}/sesion/marcados`, { method: 'GET' });
+}
+
 /** Cerrarla a mano: el codigo deja de servir aunque no haya caducado. */
 export function cerrarSesion(offeringId: string): Promise<{ ok: boolean }> {
   return apiFetch(`/offerings/${offeringId}/sesion/cerrar`, { method: 'POST' });

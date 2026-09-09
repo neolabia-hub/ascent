@@ -77,22 +77,27 @@ export default function PreferenciasPage() {
     <div className="max-w-3xl">
       <Link href="/configuracion" className="focus-ring mb-4 inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-700">
         <ArrowLeft size={14} />
-        Configuracion
+        Configuración
       </Link>
       <h1 className="font-display text-[28px] font-semibold text-ink-900">Preferencias y marca</h1>
       <p className="mt-1 text-sm text-ink-500">Reglas del negocio y identidad visual de la empresa en la plataforma.</p>
 
       <section className="card mt-6 p-6">
-        <h2 className="font-display text-lg font-semibold">Reglas academicas</h2>
+        <h2 className="font-display text-lg font-semibold">Reglas académicas</h2>
         <p className="mb-4 mt-1 text-sm text-ink-500">
-          Valores por defecto para actividades nuevas. Cada actividad puede ajustarlos, y la version publicada congela
-          su copia: cambiar esto no reinterpreta evaluaciones ya presentadas.
+          Valores por defecto para las formaciones nuevas. Cada formación puede ajustarlos, y la versión publicada
+          congela su copia: <strong className="font-medium text-ink-700">cambiar esto no reinterpreta lo ya presentado</strong>.
         </p>
         {!settings ? (
           <Skeleton className="h-40 w-full" />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field htmlFor="pref-score" label="Nota minima de aprobacion (%)" hint="Transprensa exige 90.">
+            <Field
+              htmlFor="pref-score"
+              label="Nota mínima de aprobación (%)"
+              hint="Transprensa exige 90."
+              ayuda="Por debajo de esta nota la evaluación queda REPROBADA: la formación no se da por cumplida y no se emite constancia. Solo rige para las formaciones que se publiquen a partir de ahora — las publicadas llevan dentro la nota que tenían el día que se publicaron, para que un examen presentado el año pasado no cambie de resultado hoy."
+            >
               <Input
                 id="pref-score"
                 type="number"
@@ -110,8 +115,9 @@ export default function PreferenciasPage() {
             */}
             <Field
               htmlFor="pref-watch"
-              label="Minimo de video visto (%)"
+              label="Mínimo de video visto (%)"
               hint="Se cuentan los segundos distintos reproducidos: adelantar no suma."
+              ayuda="Es lo que hay que ver de un video para darlo por visto. Al 100% se exige el video entero, créditos incluidos; al 80% se acepta que los últimos segundos no aporten. Si no se llega, la pieza queda sin completar y la formación no cierra."
             >
               <Input
                 id="pref-watch"
@@ -122,7 +128,12 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, minWatchPctDefault: num(e.target.value, 50, 100, 90) })}
               />
             </Field>
-            <Field htmlFor="pref-attempts" label="Intentos maximos de evaluacion">
+            <Field
+              htmlFor="pref-attempts"
+              label="Intentos máximos de evaluación"
+              hint="Al agotarlos hace falta desbloquear a mano."
+              ayuda="Cuántas veces puede presentar cada persona la misma evaluación. Al agotarlos queda BLOQUEADA: no puede volver a intentarlo hasta que alguien con permiso la desbloquee, y eso queda registrado. Ponerlo en 1 significa que un error de conexión a mitad del examen deja a esa persona esperando a que la desbloqueen."
+            >
               <Input
                 id="pref-attempts"
                 type="number"
@@ -132,7 +143,12 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, maxAttemptsDefault: num(e.target.value, 1, 10, 3) })}
               />
             </Field>
-            <Field htmlFor="pref-wait" label="Espera entre intentos (horas)" hint="0 = sin espera.">
+            <Field
+              htmlFor="pref-wait"
+              label="Espera entre intentos (horas)"
+              hint="0 = sin espera."
+              ayuda="Cuánto tiene que pasar antes de poder repetir la evaluación. Existe para que el segundo intento no sea el mismo examen contestado a ojo dos minutos después; con 24 horas, entre uno y otro cabe volver a estudiar."
+            >
               <Input
                 id="pref-wait"
                 type="number"
@@ -142,7 +158,12 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, retryWaitHours: num(e.target.value, 0, 720, 0) })}
               />
             </Field>
-            <Field htmlFor="pref-efficacy" label="Evaluacion de eficacia a los (dias)" hint="El jefe la responde pasado este plazo.">
+            <Field
+              htmlFor="pref-efficacy"
+              label="Evaluación de eficacia a los (días)"
+              hint="El jefe la responde pasado este plazo."
+              ayuda="La eficacia mide si la formación cambió algo en el puesto, y por eso no se pregunta el mismo día: se le pide al jefe pasados estos días. Solo aplica a las formaciones marcadas para medir eficacia, que son la excepción y no la regla."
+            >
               <Input
                 id="pref-efficacy"
                 type="number"
@@ -154,8 +175,9 @@ export default function PreferenciasPage() {
             </Field>
             <Field
               htmlFor="pref-desempeno"
-              label="Recordar el ciclo de desempeno (dias antes)"
+              label="Recordar el ciclo de desempeño (días antes)"
               hint="Solo a quien no ha respondido, y una vez. 0 = sin recordatorio."
+              ayuda="Cuántos días antes de que cierre el ciclo se le recuerda a quien todavía no ha entregado sus evaluaciones. En una campaña de seis semanas, tres días llegan tarde; en una de dos, avisar con diez es avisar el primer día."
             >
               <Input
                 id="pref-desempeno"
@@ -181,7 +203,12 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, expirationDigestDays: num(e.target.value, 0, 180, 45) })}
               />
             </Field>
-            <Field htmlFor="pref-pills" label="Pildoras por semana" hint="Cadencia gobernada por el sistema (2-3 recomendado).">
+            <Field
+              htmlFor="pref-pills"
+              label="Píldoras por semana"
+              hint="Cadencia gobernada por el sistema (2-3 recomendado)."
+              ayuda="Cuántas píldoras como máximo se le ofrecen a una persona en una semana, aunque tenga diez pendientes. Es lo que impide que estrenar el catálogo le caiga encima a todo el mundo de golpe: lo que sobra espera a la semana siguiente."
+            >
               <Input
                 id="pref-pills"
                 type="number"
@@ -191,7 +218,12 @@ export default function PreferenciasPage() {
                 onChange={(e) => setSettings({ ...settings, pillCadencePerWeek: num(e.target.value, 1, 7, 3) })}
               />
             </Field>
-            <Field htmlFor="pref-cap" label="Tope de notificaciones por semana" hint="Proteccion anti-spam por usuario.">
+            <Field
+              htmlFor="pref-cap"
+              label="Tope de notificaciones por semana"
+              hint="Por persona, no por empresa."
+              ayuda="El máximo de avisos que recibe una persona en una semana. Pasado el tope se dejan de enviar: más vale que se pierda el quinto recordatorio a que la gente aprenda a ignorarlos todos, incluido el que traía una habilitación por vencer."
+            >
               <Input
                 id="pref-cap"
                 type="number"
@@ -245,7 +277,7 @@ export default function PreferenciasPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               htmlFor="sup-name"
-              label="Area o cargo que atiende"
+              label="Área o cargo que atiende"
               hint="Un cargo, no un nombre propio: la persona cambia, el cargo se queda."
             >
               <Input
@@ -268,7 +300,7 @@ export default function PreferenciasPage() {
               />
             </Field>
 
-            <Field htmlFor="sup-phone" label="Telefono o extension">
+            <Field htmlFor="sup-phone" label="Teléfono o extensión">
               <Input
                 id="sup-phone"
                 maxLength={60}
@@ -281,7 +313,7 @@ export default function PreferenciasPage() {
             <Field
               htmlFor="sup-note"
               label="Nota (opcional)"
-              hint="Horario de atencion, por ejemplo. Sale debajo del contacto."
+              hint="Horario de atención, por ejemplo. Sale debajo del contacto."
             >
               <Input
                 id="sup-note"

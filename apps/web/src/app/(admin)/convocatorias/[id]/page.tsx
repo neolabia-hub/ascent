@@ -896,6 +896,7 @@ export default function ConvocatoriaDetallePage() {
       */}
       <SesionEnSala
         offeringId={offering.id}
+        onCambio={() => void load()}
         activa={
           offering.admiteAsistencia &&
           (offering.status === 'PUBLISHED' || offering.status === 'IN_PROGRESS' || offering.status === 'COMPLETED')

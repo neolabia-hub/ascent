@@ -68,7 +68,18 @@ import { usePaginacion } from '@/components/ui/use-paginacion';
 type Pestana = 'ejecucion' | 'analitica' | 'vencimientos';
 
 export default function ReportesPage() {
-  const [pestana, setPestana] = useState<Pestana>('ejecucion');
+  /*
+    LA PESTAÑA SE PUEDE PEDIR POR LA DIRECCION (2026-09-08).
+
+    Inicio dice «3 acreditaciones vencidas» y su enlace tiene que llevar A ESO, no a la pantalla de
+    Seguimiento con la pestaña de Ejecucion y doscientas formaciones delante. Un numero que obliga a
+    buscar dos veces lo que ya te dijeron es un numero que nadie pulsa.
+  */
+  const search = useSearchParams();
+  const pedida = search.get('vista');
+  const [pestana, setPestana] = useState<Pestana>(
+    pedida === 'vencimientos' || pedida === 'analitica' ? pedida : 'ejecucion',
+  );
 
   return (
     <div>

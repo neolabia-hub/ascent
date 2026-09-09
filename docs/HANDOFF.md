@@ -157,6 +157,43 @@ explicación — el número lo exige el servidor, pero un botón muerto no lo ex
 —de hecho lo aceptaba— y el fallo estaba en la interfaz. `e2e/asistencia-adjunto.spec.ts` monta la
 jornada cumplida por API y prueba los tres clics: 13 segundos.
 
+### 6 ter. LO QUE VINO DESPUÉS, MIRANDO LA PANTALLA CON EL CLIENTE
+
+**La lista de asistencia se veía desordenada, y tenía razón.** Tres causas, las tres de maquetación:
+la tabla no tenía anchos de columna, así que **el navegador los repartía según el contenido de cada
+fila** —la que lleva número de certificado y clip empuja hacia un lado, la que lleva la píldora del
+motivo hacia el otro— y las columnas se movían de fila en fila; la píldora del motivo iba **al lado**
+del selector y ensanchaba su columna al doble de su cabecera; y las dos columnas del certificado
+quedaban **en blanco** en las filas de quien no asistió, dejando media tabla vacía. Ahora: anchos
+fijos, celdas alineadas arriba, el motivo **debajo** de su selector, y un guion que dice por qué esa
+persona no lleva certificado. Y «Ponérselo a todos», que en `ghost` y deshabilitado parecía un
+rótulo, es un botón como los otros dos de lote.
+
+**Ya se ve quién va marcándose mientras se proyecta.** La pantalla de la convocatoria carga la lista
+una vez, así que quien proyecta el código no veía entrar a nadie sin recargar — justo cuando hace
+falta saber si ya están todos. La capa proyectada pregunta cada cinco segundos y dice **«Van 12 de
+40»**, o «Ya se marcaron los 40» cuando no falta nadie; y al salir de la proyección, la lista de
+inscritos se vuelve a pedir sola.
+
+**Y ahora la lista dice CÓMO se marcó cada quien** —«Marcada en la lista», «Escaneó el código»,
+«Firmó en pantalla»—. El dato estaba guardado desde el Sprint 5 y ninguna pantalla lo enseñaba. Para
+el cumplimiento da igual por qué puerta entró la marca, y eso es deliberado; para quien revisa la
+evidencia no da igual, y hasta hoy había que abrir el acta para verlo.
+
+**Dos huecos de prueba, cerrados.** `acta-de-lista.mjs` cubre el acta de una jornada marcada **solo
+por el instructor**, con ausentes y con faltas justificadas dentro —que es la que va a generar el
+noventa por ciento de las actas— y comprueba lo que el cliente preguntó: que el acta no depende del
+QR, porque lee la tabla donde escriben los tres mecanismos. Y `e2e/asistencia-a-mano.spec.ts` toma la
+lista **por la pantalla**, con los tres iconos, incluida la justificación que exige motivo.
+
+**Inicio habla el idioma nuevo.** «Ya vencido» y «Lo que viene» ya estaban ahí; lo que faltaba era
+que dijeran las dos cifras por separado —por reconvocar y por perseguir— y que sus enlaces llevaran
+**a la pestaña de Vencimientos** y no a Seguimiento con doscientas formaciones delante.
+
+**Preferencias explica qué hace cada campo.** Eran siete números con una pista corta: «Intentos
+máximos: 3» no decía qué pasa al agotarlos. Cada uno responde ahora la única pregunta que importa
+—qué pasa si lo cambio— y la pantalla quedó con sus tildes.
+
 ### 7. LAS TILDES DE LO QUE DICE EL SERVIDOR
 
 El barrido del 07 corrigió el texto de las **pantallas** y dejó fuera los mensajes de la API — y esos

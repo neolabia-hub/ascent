@@ -25,7 +25,7 @@ como quedo cada uno esta en el `HANDOFF` de ese dia.
 | 2.3 | ~~Quien llega con un certificado de otro empleo~~ **HECHO el 2026-09-08.** La via C, con DOS capas: la formacion declara si su papel es transferible (`admiteConvalidacion`, por defecto **NO** — una induccion no la exime nada) y aceptar cada papel concreto es un acto con nombre, fecha y motivo de 15 caracteres. Queda **CUMPLIDA, no eximida**. Migracion `20260908120000`: el papel vive en la OBLIGACION porque una inscripcion no puede existir sin jornada. Recorrido: `convalidar-papel-ajeno.mjs` | `HANDOFF` 2026-09-08 |
 | 2.4 | ~~Los mecanismos 2 y 3 de la asistencia~~ **HECHO el 2026-09-08 (tarde).** QR de sesión que **rota cada 90 segundos** —un código fijo se fotografía y se manda al grupo— y que además se puede **dictar en voz alta**; firma en pantalla como PNG por puerta propia (`attendance:sign`, 300 KB, dato biométrico); y **acta en PDF** con la lista, las firmas y una huella de lo que el acta AFIRMA, no de los bytes. Los tres mecanismos cierran por el MISMO sitio, así que el informe y la obligación no se enteran de por qué puerta entró la marca. De paso: la evidencia subida **ya se puede volver a abrir** (antes solo se servía lo registrado como contenido). Recorrido: `qr-y-firma.mjs` | `08-evidencia.md` §5, CLAUDE.md §3.7 |
 | 2.5 | ~~Las dos puertas del papel no aplican el mismo criterio~~ **HECHO el 2026-09-08 (tarde).** El criterio «si la dicta la empresa, no hay tercero que certifique» se saco a `certificate-policy.ts` y **las dos puertas lo importan**: copiado se separa, importado no. La fila dice ahora de donde sale (`origen`: del TIPO o de la FICHA) y **abre la formacion y la convocatoria** en pestaña nueva. Con `PROPIOS` la pantalla no pide el numero pero lo explica y deja registrarlo igual —defecto, no compuerta— y si ya hay papel guardado se enseña siempre. Recorrido: `dos-puertas-del-papel.mjs`, con la matriz de cuatro combinaciones · ~~detalle~~ | `HANDOFF` 2026-09-08 (tarde) |
-| 2.6 | **Decision del cliente, no nuestra: ¿debe `INDUCCION_ESPECIFICA` llevar papel de un tercero?** Hoy su tipo dice que si y por eso aparece donde aparece. Casi seguro que no —la dicta la empresa— pero es configuracion del tenant y cambiarla por nuestra cuenta seria tomar una decision en su nombre (#159). Se apaga en Configuracion → Tipos de formacion | `HANDOFF` 2026-09-08 (cierre) |
+| 2.6 | ~~¿Debe `INDUCCION_ESPECIFICA` llevar papel de un tercero?~~ **CERRADO el 2026-09-08: lo apagó el cliente** desde Configuración → Tipos de formación, que es donde tenía que decidirse. La inducción la dicta la propia empresa, así que ya no aparece pidiendo un certificado externo | `HANDOFF` 2026-09-08 (tarde) |
 
 ## 3. El informe de Vencimientos ~~que hoy enseña media verdad~~ — **REHECHO el 2026-09-08 (tarde)**
 
@@ -49,13 +49,26 @@ Recorrido que lo prueba entero, incluida la bandeja: `vencimientos.mjs`.
 | 4.3 | ~~La campaña alcanza a quien acaba de ingresar~~ **YA ESTABA CERRADO desde el 2026-09-04** y esta lista se quedó atrás: la gracia por ingreso reciente existe (`exemptRecentHiresMonths`), la aplica el motor y se configura en Tipos de formación. La semilla la deja en 6 meses para REINDUCCION | `03-reinduccion.md` §9.2 |
 | 4.4 | **La constancia propia y el papel del tercero llevan fechas de vigencia distintas.** Sigue abierto como algo que mirar, no como fallo. Desde el 2026-09-08 el informe de Vencimientos ya no se calla cuál manda: consolida las dos en una fila, se queda con **la que caduca antes** y dice de cuál de los dos documentos salió | `08-evidencia.md` §10.6 |
 
-## 5. Producto, esperando al cliente
+## 5. Producto — **decidido el 2026-09-08: todo esto va DESPUÉS del despliegue**
+
+No es aplazar por aplazar: ninguno de los tres cambia lo que hoy se puede demostrar en una auditoría,
+y dos de ellos se hacen mejor con el piloto andando —uno necesita datos de uso reales y el otro
+depende de un trabajo del Sprint 6—.
 
 | | Qué falta | Detalle |
 |---|---|---|
-| 5.1 | **Repaso / «volver a verlo»**: dejar que alguien repita una formación para reforzar, sin tocar los indicadores. El motor de repetición espaciada ya existe (`spaced-repetition.ts`, Decisión #22). El cliente tiene preguntas antes de decidir | `HANDOFF` 2026-09-05 |
-| 5.2 | **Una fila por persona en Seguimiento, no por ronda.** Decidido: por persona, pero **después** del informe por periodo del Sprint 6 — cambiar el grano antes obligaría a rehacerlo | `HANDOFF` 2026-09-04 |
-| 5.3 | **La matriz de vigencias del trabajador** —exámenes médicos, licencias, EPP— como módulo aparte y cotizado aparte, cuando haya un cliente que lo pida | `HANDOFF` 2026-09-05 |
+| 5.1 | **Repaso / «volver a verlo»**: repetir una formación para reforzar, sin tocar los indicadores. El motor ya existe (`spaced-repetition.ts`, #22). **Después del despliegue**, y además su mejor versión —avisar según lo que cada quien falló— necesita etiquetar las preguntas por tema, que es trabajo del Sprint 6 | `HANDOFF` 2026-09-05 · `ideas-producto.md` §4 |
+| 5.2 | **Una fila por persona en Seguimiento, no por ronda.** Hoy quien lleva tres reinducciones sale tres veces. **Después del despliegue** y después del informe por periodo del Sprint 6: cambiar el grano antes obliga a rehacerlo | `HANDOFF` 2026-09-04 |
+| 5.3 | **La matriz de vigencias del trabajador** —exámenes médicos, licencias de conducción, EPP— como módulo aparte y **cotizado aparte**. Después del despliegue, y solo cuando haya un cliente que lo pida | `HANDOFF` 2026-09-05 |
+
+## 5 bis. Lo que decidió el cliente el 2026-09-08 (tarde)
+
+| Qué | Decisión |
+|---|---|
+| **SCORM** (comprar cursos empaquetados a un proveedor) | **Importante, pero después.** La base ya lo soporta; el reproductor son 3-6 semanas y solo hace falta el día que se compre contenido de fuera |
+| **Contenido y firmantes de la constancia** | **Lo carga el cliente en producción.** Es su plantilla, su logo y sus firmas: se configura en Configuración → Constancias cuando el piloto esté arriba |
+| **Umbral SARLAFT** | Pendiente de su área legal. No es código: si aplica, se resuelve con una regla de audiencia |
+| **Temas, banco y biblioteca no se pueden renombrar** | Anotado por el cliente el 2026-09-08. Un tema se crea y se borra, pero no se edita: falta la puerta de renombrar. **Se hace con el bloque de evaluaciones** |
 
 ## 6. Operación
 

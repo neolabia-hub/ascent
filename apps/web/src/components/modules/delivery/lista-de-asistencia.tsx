@@ -110,6 +110,16 @@ const OPCIONES_ASISTENCIA: ReadonlyArray<SegmentedOption<AsistenciaEstado>> = [
  *  10. **La leyenda y las advertencias, en la cabecera de la columna Asistencia**: no ocupan nada
  *      mientras nadie pregunte. Estuvieron encima de la tabla y al pie antes de acabar ahi.
  */
+/**
+ * Cómo quedó marcada cada persona. Los tres mecanismos escriben en la misma tabla y solo cambian de
+ * método (CLAUDE.md §3.7); esto es lo que traduce el dato a la palabra que se lee.
+ */
+const COMO_SE_MARCO: Record<'INSTRUCTOR' | 'QR' | 'SIGNATURE', string> = {
+  INSTRUCTOR: 'Marcada en la lista',
+  QR: 'Escaneó el código',
+  SIGNATURE: 'Firmó en pantalla',
+};
+
 export function ListaDeAsistencia({
   offeringId,
   roster,
@@ -728,8 +738,14 @@ export function ListaDeAsistencia({
                         onChange={(e) => setVencePorLote(e.target.value)}
                       />
                     </Field>
-                    <Button variant="ghost" size="sm" onClick={repartirVencimiento} disabled={!vencePorLote}>
-                      Ponerselo a todos
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mb-0.5 hover:border-primary/30 hover:bg-primary-soft hover:text-ink-900"
+                      onClick={repartirVencimiento}
+                      disabled={!vencePorLote}
+                    >
+                      Ponérselo a todos
                     </Button>
                   </>
                 ) : null}
@@ -760,8 +776,16 @@ export function ListaDeAsistencia({
             <Table>
               <THead>
                 <Tr>
-                  <Th>Nombre</Th>
-                  <Th>Cargo y area</Th>
+                  {/*
+                    ANCHOS FIJOS, Y NO POR ESTETICA (2026-09-08).
+
+                    Sin ellos el navegador reparte el ancho segun el contenido de cada FILA: la que
+                    tiene numero de certificado y clip empuja hacia un lado, la que tiene la pildora
+                    del motivo hacia el otro, y las columnas se mueven de fila en fila. Con tres
+                    personas ya se nota; con cuarenta, la tabla deja de leerse como una tabla.
+                  */}
+                  <Th className="w-[24%]">Nombre</Th>
+                  <Th className="w-[18%]">Cargo y area</Th>
                   {/*
                     TODO LO QUE HAY QUE SABER DE ESTA COLUMNA, EN SU CABECERA (2026-09-06).
 
@@ -776,7 +800,7 @@ export function ListaDeAsistencia({
                     sobre todo: **no ocupan nada mientras nadie pregunte**, que era el problema de
                     los dos intentos anteriores.
                   */}
-                  <Th>
+                  <Th className={pideCertificado ? 'w-[26%]' : 'w-[58%]'}>
                     <span className="inline-flex items-center gap-1.5">
                       Asistencia
                       <Ayuda sobre="la columna Asistencia">
@@ -808,8 +832,8 @@ export function ListaDeAsistencia({
                       </Ayuda>
                     </span>
                   </Th>
-                  {pideCertificado ? <Th>No. de certificado</Th> : null}
-                  {pideCertificado ? <Th>Vence</Th> : null}
+                  {pideCertificado ? <Th className="w-[18%]">No. de certificado</Th> : null}
+                  {pideCertificado ? <Th className="w-[14%]">Vence</Th> : null}
                 </Tr>
               </THead>
               <TBody>
@@ -821,7 +845,7 @@ export function ListaDeAsistencia({
                   const editaPapel = pideCertificado && (cerrada ? fila.attendanceStatus === 'PRESENT' : estado === 'PRESENT');
                   const pill = comoConsta(fila);
                   return (
-                    <Tr key={fila.id} className={cerrada ? 'bg-paper/60' : undefined}>
+                    <Tr key={fila.id} className={cn('align-top', cerrada && 'bg-paper/60')}>
                       {/*
                         SIN PARTIR PALABRAS, Y QUE RUEDE A LO ANCHO SI NO CABE.
 
@@ -831,24 +855,24 @@ export function ListaDeAsistencia({
                         contenedor ya tiene `overflow-x-auto`: preferimos rodar a lo ancho, que se
                         entiende, antes que un texto roto que parece un fallo.
                       */}
-                      <Td className="whitespace-nowrap">
+                      <Td className="whitespace-nowrap py-3">
                         <div className={!cerrada && estado !== 'PRESENT' ? 'text-ink-500' : 'font-medium text-ink-900'}>
                           {fila.user.fullName}
                         </div>
                         <div className="font-mono text-xs text-ink-500">{fila.user.documentNumber}</div>
                       </Td>
-                      <Td className="whitespace-nowrap text-sm text-ink-700">
+                      <Td className="whitespace-nowrap py-3 text-sm text-ink-700">
                         {fila.user.jobTitle.name}
                         <div className="text-xs text-ink-500">{fila.user.area.name}</div>
                       </Td>
-                      <Td>
+                      <Td className="py-3">
                         {cerrada ? (
                           <div>
                             <StatusPill kind={pill.kind} label={pill.label} />
                             <div className="mt-0.5 text-xs text-ink-500">Ya cumplida</div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-start gap-1.5">
                             <Segmented
                               label={`Asistencia de ${fila.user.fullName}`}
                               size="sm"
@@ -950,6 +974,18 @@ export function ListaDeAsistencia({
                             por correo que en papel, y bloquear el cierre hasta tener el PDF seria
                             retrasar la formacion por el tramite.
                           */}
+                          {!editaPapel ? (
+                            <span
+                              className="text-sm text-ink-300"
+                              title={
+                                cerrada
+                                  ? 'Consta cumplida sin lista de asistencia: el papel se registra desde su ficha'
+                                  : 'Solo se registra el certificado de quien asistio'
+                              }
+                            >
+                              —
+                            </span>
+                          ) : null}
                           {editaPapel ? (
                             <div className="space-y-1.5">
                               <Input
@@ -1060,6 +1096,19 @@ export function ListaDeAsistencia({
                       <Td className="text-ink-500">{fila.assignmentId ? 'Obligacion' : 'Inscripcion directa'}</Td>
                       <Td>
                         <StatusPill kind={pill.kind} label={pill.label} />
+                        {/*
+                          POR QUÉ PUERTA ENTRÓ LA MARCA (2026-09-08).
+
+                          El servidor lo guarda desde el Sprint 5 —`attendance_records.method`— y
+                          ninguna pantalla lo enseñaba. Para el cumplimiento da igual: una formación
+                          cumplida lo está se marcara por lista, por QR o con firma, y eso es
+                          deliberado. Pero para quien revisa la evidencia **no** da igual: «lo marcó
+                          el instructor» y «lo escaneó ella misma a las 8:14» son dos cosas distintas
+                          delante de un auditor, y hasta hoy había que abrir el acta para verlo.
+                        */}
+                        {fila.attendanceMethod ? (
+                          <div className="mt-0.5 text-xs text-ink-500">{COMO_SE_MARCO[fila.attendanceMethod]}</div>
+                        ) : null}
                         {fila.attendanceNote ? (
                           <div className="mt-0.5 text-xs text-ink-500">{fila.attendanceNote}</div>
                         ) : null}

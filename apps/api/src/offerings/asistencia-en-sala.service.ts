@@ -105,6 +105,27 @@ export class AsistenciaEnSalaService {
     };
   }
 
+  /**
+   * CUANTOS VAN, MIENTRAS SE PROYECTA.
+   *
+   * La pantalla de la convocatoria carga la lista UNA vez, asi que quien esta proyectando el codigo
+   * no veia entrar a nadie sin recargar la pagina — y es justo el momento en que hace falta saber si
+   * ya se marcaron todos o falta gente por escanear. Esto es lo minimo para poder decirlo: dos
+   * numeros, no la lista entera, porque se pide cada pocos segundos.
+   *
+   * Se cuentan los PRESENTES sobre los INSCRITOS de esta jornada. Los ausentes y las faltas
+   * justificadas no restan del total: siguen siendo gente convocada, y el instructor necesita ver
+   * que a esas tres las tiene que marcar el a mano.
+   */
+  async conteo(offeringId: string) {
+    const [inscritos, presentes] = await Promise.all([
+      this.prisma.scoped.enrollment.count({ where: { offeringId } }),
+      this.prisma.scoped.attendanceRecord.count({ where: { offeringId, status: 'PRESENT' } }),
+    ]);
+    return { inscritos, presentes };
+  }
+
+
   /** Cerrar la sesion a mano: el codigo deja de servir aunque no haya caducado. */
   async cerrarSesion(actor: AuthUser, offeringId: string) {
     await this.exigirJornadaQueTomaLista(offeringId);

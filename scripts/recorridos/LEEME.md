@@ -28,6 +28,7 @@ node scripts/recorridos/asistencia.mjs              # las tres vias de evidencia
 node scripts/recorridos/asistencia-matriz.mjs       # la asistencia en TODOS los tipos y modalidades, las 5 facetas y el Seguimiento
 node scripts/recorridos/permanente-y-jornada.mjs    # una formacion con convocatoria permanente Y jornada: una sola inscripcion viva
 node scripts/recorridos/qr-y-firma.mjs               # mecanismos 2 y 3: QR de sesion, firma y acta con huella
+node scripts/recorridos/acta-de-lista.mjs            # el acta de una jornada marcada a mano, con ausentes y justificadas
 node scripts/recorridos/dos-puertas-del-papel.mjs    # el papel de un tercero: las dos puertas dicen lo mismo
 node scripts/recorridos/dos-reglas-una-obligacion.mjs # dos reglas vivas, una sola obligacion
 node scripts/recorridos/vencimientos.mjs             # el informe: tres fuentes, eje nuevo y el aviso a la bandeja

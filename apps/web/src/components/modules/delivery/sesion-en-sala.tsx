@@ -8,6 +8,7 @@ import {
   actasDe,
   cerrarSesion,
   generarActa,
+  marcadosDeSesion,
   type ActaDeSesion,
   type SesionAbierta,
 } from '@/lib/delivery-api';
@@ -38,7 +39,20 @@ import { useToast } from '@/components/ui/toast';
  * Es un PDF: se abre en su propia pestaña con el visor del navegador, que es donde se imprime y se
  * guarda. Reimplementarlo sería hacer peor lo que el navegador ya hace.
  */
-export function SesionEnSala({ offeringId, activa }: { offeringId: string; activa: boolean }) {
+export function SesionEnSala({
+  offeringId,
+  activa,
+  onCambio,
+}: {
+  offeringId: string;
+  activa: boolean;
+  /**
+   * Se llama al salir de la proyeccion. Mientras se proyectaba, la gente se estuvo marcando sola:
+   * si la lista de inscritos no se vuelve a pedir, quien cierra la capa ve la pantalla de hace diez
+   * minutos y cree que no entro nadie.
+   */
+  onCambio: () => void;
+}) {
   const { showToast } = useToast();
   const [proyectando, setProyectando] = useState(false);
   const [generando, setGenerando] = useState(false);
@@ -135,7 +149,15 @@ export function SesionEnSala({ offeringId, activa }: { offeringId: string; activ
         </div>
       ) : null}
 
-      {proyectando ? <Proyeccion offeringId={offeringId} onSalir={() => setProyectando(false)} /> : null}
+      {proyectando ? (
+        <Proyeccion
+          offeringId={offeringId}
+          onSalir={() => {
+            setProyectando(false);
+            onCambio();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -166,6 +188,7 @@ function Proyeccion({ offeringId, onSalir }: { offeringId: string; onSalir: () =
   const [sesion, setSesion] = useState<SesionAbierta | null>(null);
   const [restan, setRestan] = useState(0);
   const [fallo, setFallo] = useState<string | null>(null);
+  const [conteo, setConteo] = useState<{ inscritos: number; presentes: number } | null>(null);
   const caja = useRef<HTMLDivElement>(null);
 
   const abrir = useCallback(async () => {
@@ -182,6 +205,36 @@ function Proyeccion({ offeringId, onSalir }: { offeringId: string; onSalir: () =
   useEffect(() => {
     void abrir();
   }, [abrir]);
+
+  /*
+    CUANTOS VAN, CADA CINCO SEGUNDOS.
+
+    Es la pregunta que se hace quien proyecta: ¿ya se marcaron todos o falta gente? Sin esto habia
+    que salir y recargar la convocatoria para saberlo, que es justo lo que no se puede hacer con la
+    sala esperando.
+
+    Cinco segundos y no uno: cuarenta personas escaneando no producen cuarenta cambios por segundo, y
+    una consulta por segundo durante una jornada de dos horas son siete mil peticiones para pintar un
+    numero que se mueve cada medio minuto.
+  */
+  useEffect(() => {
+    let vivo = true;
+    const pedir = () => {
+      void marcadosDeSesion(offeringId)
+        .then((datos) => {
+          if (vivo) setConteo(datos);
+        })
+        .catch(() => {
+          // El contador es un extra: si falla, la proyeccion sigue enseñando el codigo.
+        });
+    };
+    pedir();
+    const tic = setInterval(pedir, 5000);
+    return () => {
+      vivo = false;
+      clearInterval(tic);
+    };
+  }, [offeringId]);
 
   // El foco entra a la capa: sin esto, Escape lo recibiría lo que estuviera enfocado detrás.
   useEffect(() => {
@@ -253,6 +306,26 @@ function Proyeccion({ offeringId, onSalir }: { offeringId: string; onSalir: () =
           <p className="text-2xl text-white/60">
             Cambia en <span className="font-semibold tabular-nums text-white">{restan}s</span>
           </p>
+
+          {/*
+            LA CUENTA DE QUIEN YA SE MARCO, a la vista de la sala.
+
+            Sirve para las dos cosas a la vez: quien dicta sabe si puede cerrar, y quien todavia no
+            ha escaneado ve que los demas ya estan y que falta el. Cuando no falta nadie lo dice con
+            palabras —«ya se marcaron los N»— porque «40 de 40» obliga a comparar dos numeros.
+          */}
+          {conteo ? (
+            <p className="text-xl text-white/70">
+              {conteo.presentes >= conteo.inscritos && conteo.inscritos > 0 ? (
+                <span className="font-semibold text-white">Ya se marcaron los {conteo.inscritos}</span>
+              ) : (
+                <>
+                  Van <span className="font-semibold tabular-nums text-white">{conteo.presentes}</span> de{' '}
+                  <span className="tabular-nums">{conteo.inscritos}</span>
+                </>
+              )}
+            </p>
+          ) : null}
           <p className="max-w-xl text-center text-base text-white/40">
             Escanea con la cámara del teléfono. Si no puedes, entra a la plataforma y escribe el
             código. Para salir, Escape.

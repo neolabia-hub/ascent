@@ -39,6 +39,16 @@ export class AsistenciaEnSalaController {
     return this.sala.abrirSesion(actor, id);
   }
 
+  /**
+   * CUANTOS VAN. La pide la pantalla que proyecta, cada pocos segundos: dos numeros y nada mas.
+   * Devolver el roster entero para pintar "12 de 40" seria mandar cuarenta filas cada cinco segundos.
+   */
+  @Get('offerings/:id/sesion/marcados')
+  @RequirePermissions('attendance:take')
+  marcados(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sala.conteo(id);
+  }
+
   /** Cerrar la sesion: el codigo deja de servir aunque no haya caducado. */
   @Post('offerings/:id/sesion/cerrar')
   @RequirePermissions('attendance:take')

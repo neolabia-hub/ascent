@@ -91,6 +91,14 @@ export default function InicioPage() {
   const porArea = cortes.find((corte) => corte.dimension === 'area');
   const porRegional = cortes.find((corte) => corte.dimension === 'regional');
 
+  /*
+    LAS DOS SERIES, CONTADAS AQUI Y NO PEDIDAS APARTE. El informe ya trae la lista; contar sobre ella
+    es gratis y garantiza que Inicio y Vencimientos digan el mismo numero — que es justo lo que se
+    rompe cuando cada pantalla se calcula lo suyo.
+  */
+  const reprogramar = (vencimientos?.items ?? []).filter((fila) => fila.clase === 'REPROGRAMAR').length;
+  const perseguir = (vencimientos?.items ?? []).filter((fila) => fila.clase === 'PERSEGUIR').length;
+
   return (
     <div className="space-y-8">
       <div>
@@ -108,12 +116,17 @@ export default function InicioPage() {
       <section>
         <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">Necesita atencion</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/*
+            LO VENCIDO ES LO PRIMERO QUE SE VE, y desde el 2026-09-08 lleva DIRECTO a su pestaña.
+            Antes caia en Seguimiento con la lista de ejecucion delante, asi que decir «3 vencidas» y
+            no poder abrirlas de un clic dejaba el aviso en decoracion.
+          */}
           <Alerta
             icono={AlertTriangle}
             valor={puedeVerReportes ? vencimientos?.resumen.vencido : 0}
             etiqueta="Ya vencido"
-            nota="Certificaciones y plazos que ya pasaron"
-            href="/reportes"
+            nota="Acreditaciones y plazos que ya se cayeron"
+            href="/reportes?vista=vencimientos"
             urgente
           />
           <Alerta
@@ -203,7 +216,14 @@ export default function InicioPage() {
               <CalendarClock className="h-5 w-5 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
               <div>
                 <p className="font-display text-[15px] font-semibold text-ink-900">Lo que viene</p>
-                <p className="text-xs text-ink-500">Certificaciones que caducan y formaciones por hacer</p>
+                {/*
+                  LAS DOS CIFRAS SON DOS TRABAJOS OPUESTOS (Decision #162), y por eso se nombran aqui
+                  igual que en el informe: reprogramar ocupa un salon y un dia del año que viene;
+                  perseguir es llamar a alguien esta semana. La suma no significaria nada.
+                */}
+                <p className="text-xs text-ink-500">
+                  {reprogramar} por volver a convocar · {perseguir} que nunca la han hecho
+                </p>
               </div>
             </div>
             <div className="flex gap-6">
@@ -221,7 +241,7 @@ export default function InicioPage() {
               </div>
             </div>
           </div>
-          <Enlace href="/reportes">Ver el calendario de vencimientos</Enlace>
+          <Enlace href="/reportes?vista=vencimientos">Ver el calendario de vencimientos</Enlace>
         </section>
       ) : null}
     </div>
