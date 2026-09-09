@@ -111,7 +111,9 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await loginAsAdmin(page);
     await page.goto('/configuracion/preferencias');
 
-    const field = page.getByLabel('Nota minima de aprobacion (%)');
+    // CON TILDES: el rotulo es texto que se VE, y el texto visible del producto va acentuado. Esta
+    // prueba se cayo el 2026-09-08 justo por eso, al repasar Preferencias.
+    const field = page.getByLabel('Nota mínima de aprobación (%)');
     await expect(field).toHaveValue('90'); // valor exigido por Transprensa (seed)
 
     await field.fill('85');
@@ -119,10 +121,10 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await expect(page.getByText('Preferencias guardadas')).toBeVisible();
 
     await page.reload();
-    await expect(page.getByLabel('Nota minima de aprobacion (%)')).toHaveValue('85');
+    await expect(page.getByLabel('Nota mínima de aprobación (%)')).toHaveValue('85');
 
     // Se restaura el valor real del cliente para no dejar la base alterada.
-    await page.getByLabel('Nota minima de aprobacion (%)').fill('90');
+    await page.getByLabel('Nota mínima de aprobación (%)').fill('90');
     await page.getByRole('button', { name: 'Guardar preferencias' }).click();
     await expect(page.getByText('Preferencias guardadas')).toBeVisible();
   });
