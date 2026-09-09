@@ -31,7 +31,7 @@ import { Popover } from './popover';
  */
 export function Ayuda({
   children,
-  /** Que explica, para el lector de pantalla: "Ver la explicacion de El certificado vence el". */
+  /** Que explica, para el lector de pantalla: "Ver la explicación de El certificado vence el". */
   sobre,
   className,
 }: {
@@ -41,7 +41,7 @@ export function Ayuda({
 }) {
   return (
     <Popover
-      etiqueta={`Ver la explicacion de ${sobre}`}
+      etiqueta={`Ver la explicación de ${sobre}`}
       botonClassName={cn('inline-flex h-4 w-4 items-center justify-center rounded-full', className)}
       ancho="w-72"
       className="text-xs font-normal leading-relaxed text-ink-700"

@@ -111,9 +111,15 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await loginAsAdmin(page);
     await page.goto('/configuracion/preferencias');
 
-    // CON TILDES: el rotulo es texto que se VE, y el texto visible del producto va acentuado. Esta
-    // prueba se cayo el 2026-09-08 justo por eso, al repasar Preferencias.
-    const field = page.getByLabel('Nota mínima de aprobación (%)');
+    /*
+      POR EL ID DEL CAMPO, no por su rotulo.
+
+      Se cayo dos veces el 2026-09-08 al repasar Preferencias: primero porque el rotulo se acentuo
+      —es texto que se VE— y despues porque al ponerle su ⓘ, el boton de ayuda se llama «Ver la
+      explicacion de <rotulo>» y buscar por rotulo encontraba dos elementos. El id no depende de
+      como se llame el campo mañana.
+    */
+    const field = page.locator('#pref-score');
     await expect(field).toHaveValue('90'); // valor exigido por Transprensa (seed)
 
     await field.fill('85');
@@ -121,10 +127,10 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await expect(page.getByText('Preferencias guardadas')).toBeVisible();
 
     await page.reload();
-    await expect(page.getByLabel('Nota mínima de aprobación (%)')).toHaveValue('85');
+    await expect(page.locator('#pref-score')).toHaveValue('85');
 
     // Se restaura el valor real del cliente para no dejar la base alterada.
-    await page.getByLabel('Nota mínima de aprobación (%)').fill('90');
+    await page.locator('#pref-score').fill('90');
     await page.getByRole('button', { name: 'Guardar preferencias' }).click();
     await expect(page.getByText('Preferencias guardadas')).toBeVisible();
   });
