@@ -47,7 +47,7 @@ test.describe('Sprint 2 — catalogo formativo', () => {
     await page.waitForURL('**/evaluaciones/**', { timeout: 20_000 });
 
     await page.getByRole('button', { name: 'Agregar', exact: true }).click();
-    await page.getByRole('button', { name: 'Reutilizar una' }).click();
+    await page.getByRole('button', { name: /Traer una ya escrita|Reutilizar una/ }).click();
     await page.getByLabel('Buscar en el banco').fill(`arnes ${suffix}`);
 
     // Se VE entera antes de meterla: es lo que una lista de enunciados en un cajon no permitia.
