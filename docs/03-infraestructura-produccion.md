@@ -94,3 +94,120 @@ Un equivalente en AWS con el mismo trafico de video quedaria facilmente por enci
 5. Sentry y monitoreo de disponibilidad (ver CLAUDE.md 10.5).
 
 **Advertencia:** los precios citados son de referencia y cambian. Verificarlos al contratar.
+
+---
+
+# Qué comprar, revisado el 2026-09-09
+
+Lo de arriba sigue siendo la decisión; esto es el **precio y el tamaño concretos** con los que se
+firma, y la lista de lo que hay que tener listo antes de contratar nada.
+
+## 1. El tamaño sale de un solo hecho: el vídeo NO pasa por el servidor
+
+Es la consecuencia práctica de la Decisión 1, y conviene tenerla clara antes de mirar precios: con
+R2, el controlador de medios **redirige a una URL prefirmada** y los bytes viajan de Cloudflare al
+navegador. El servidor no los toca. Doscientas personas viendo el mismo vídeo de 50 MB no son 10 GB
+de salida del VPS: son 10 GB de salida de R2, que no se cobran.
+
+Así que la máquina no se dimensiona por el vídeo. Se dimensiona por lo que sí hace:
+
+| Lo que carga la máquina | Cuánto pesa |
+|---|---|
+| API NestJS + web Next.js, ~600-1.100 personas del piloto | Poco, y sobre todo a ratos |
+| PostgreSQL con toda la evidencia | El grueso de la RAM; le sienta bien tener de sobra para caché |
+| **El motor de obligaciones al publicar una campaña** | El pico real: una reinducción son ~1.060 obligaciones creadas de una vez |
+| Generar el acta de una jornada en PDF | Segundos, esporádico |
+| **Convertir un PPTX a diapositivas (LibreOffice)** | ~500 MB-1 GB de RAM por conversión, y hoy **no está en la imagen** |
+
+**Conclusión: 4 vCPU y 8 GB es el mínimo cómodo; el número que importa es la RAM.** Con 16 GB entra
+LibreOffice sin pensarlo y Postgres respira. Disco: 80-160 GB NVMe sobra, porque los medios no viven
+aquí.
+
+## 2. Las opciones, con precio de septiembre de 2026
+
+> **CORRECCIÓN del 2026-09-09, y la lección va primero:** la primera versión de esta tabla puso a
+> Hetzner Ashburn en ~USD 33-40. **Es falso desde el 15 de junio de 2026:** Hetzner subió las tarifas
+> de EE.UU. **hasta 3,1 veces** en las líneas CPX, y el CPX41 que costaba ~USD 36 en enero ronda hoy
+> los **USD 140**. Lo cazó el cliente al ir a comprarlo, no nosotros. **Un precio en un documento
+> caduca**: el aviso del final —"verificar al contratar"— no es una formalidad, es la única parte de
+> esta sección en la que se puede confiar seis meses después.
+>
+> Con eso, **Hetzner en EE.UU. queda descartado**: su única ventaja era dar el doble de máquina por
+> menos dinero, y ya no lo hace.
+
+| Opción | Qué da | Aprox. al mes | Latencia a Colombia |
+|---|---|---|---|
+| **Vultr High Performance, Miami** | 4 vCPU / 8 GB / 180 GB NVMe, CPU de 4 GHz+ | **USD ~48** | **~40-60 ms** — la mejor |
+| Vultr High Frequency, Miami | 3 vCPU / 8 GB / 256 GB NVMe, CPU de 3 GHz+ | USD ~48 | ~40-60 ms |
+| DigitalOcean Premium AMD, Nueva York | 4 vCPU / 8 GB | ~USD 54 | ~70-90 ms |
+| ~~Hetzner CPX41, Ashburn~~ | 8 vCPU / 16 GB | ~~USD 36~~ → **~USD 140** | ~80-110 ms |
+| Hetzner CX32, Alemania | 4 vCPU / 8 GB | ~USD 8-18 | ~150-200 ms — se nota |
+| Contabo | El doble de máquina por el mismo dinero | ~USD 15-25 | Rendimiento **inconsistente**: no con un cliente en producción |
+
+### La recomendación, y por qué
+
+**Vultr High Performance en Miami, 4 vCPU / 8 GB / 180 GB (USD ~48).**
+
+El pedido fue *«que esté bien, sin quejas de rendimiento»*, y en un panel de administración lo que se
+siente como lento casi nunca es la CPU: es la **ida y vuelta**. Cada pantalla encadena varias
+llamadas, así que 50 ms contra 110 ms se multiplican por cada una. Miami es el mejor sitio para
+Colombia.
+
+**Y entre las dos líneas rápidas de Vultr, la High Performance.** La diferencia es la generación del
+procesador —*High Frequency* es Intel de 3 GHz+, *High Performance* es AMD EPYC o Xeon de 4 GHz+— y
+en Miami se ofrecen: HF con 3 vCPU y 256 GB de disco, HP con 4 vCPU y 180 GB, al mismo precio.
+**Se cambian 76 GB de disco por un núcleo y 1 GHz, y es un buen negocio**, porque el disco que sobra
+no lo usa nadie: los medios viven en R2 y la base del piloto entero son unos pocos GB.
+
+Que el anfitrión sea **AMD o Intel es indiferente** para Node y PostgreSQL; donde se nota algo, AMD
+EPYC rinde un poco mejor por dólar.
+
+### Qué es el *bandwidth* del plan, y por qué aquí casi da igual
+
+Es el **tráfico de SALIDA** incluido al mes: los bytes que el servidor manda a los navegadores (la
+entrada no se cuenta). Pasarse se cobra por GB.
+
+Aquí es casi irrelevante, y es la consecuencia de la Decisión 1: **el vídeo no sale de esta máquina**,
+sale de R2 con una URL firmada y R2 no cobra salida. Del VPS solo salen pantallas y datos —unos pocos
+GB al mes con mil personas—, así que los varios TB que trae cualquier plan sobran. Es exactamente el
+motivo por el que se montó con R2 desde el principio: si los medios salieran de aquí, el plan de
+tráfico sería el techo de cuánta gente puede ver una formación a la vez.
+## 3. Presupuesto mensual completo
+
+| Concepto | Aprox. |
+|---|---|
+| VPS (Vultr **High Performance** Miami, 4 vCPU / 8 GB) | USD ~48 |
+| Cloudflare R2 — 100 GB de vídeo almacenado, salida gratis | USD ~1,5 |
+| Cloudflare DNS/TLS/caché | USD 0 |
+| Dominio propio | USD ~1 (12 al año) |
+| Correo transaccional (Resend, plan gratuito hasta 3.000/mes) | USD 0 |
+| Sentry (plan gratuito) | USD 0 |
+| **Total** | **~USD 50 al mes** |
+
+**No hay alternativa más barata que merezca la pena** desde que Hetzner subió sus tarifas de EE.UU.:
+lo que ahorra Alemania (~USD 30 al mes) se paga en ~100 ms de latencia en cada llamada, y lo que
+ahorra Contabo se paga en no saber qué rendimiento vas a tener el martes.
+
+## 4. Antes de contratar: lo que hay que tener listo
+
+El procedimiento entero está en `docs/04-despliegue-piloto.md` y no cambia. Lo que falta es esto:
+
+| | Qué | Estado | Por qué bloquea |
+|---|---|---|---|
+| 1 | **Un remoto de git** (`PENDIENTES` 6.1) | **FALTA** | El despliegue clona el repositorio en la máquina y las imágenes se publican en un registro. Sin remoto hay que subir por `rsync`, y además el trabajo de tres semanas vive en un solo disco |
+| 2 | **Dominio propio** + DNS comodín en Cloudflare | FALTA | Sin él no hay subdominio por empresa. Con un cliente se puede vivir con `?tenant=transprensa`, pero el correo y el QR de las constancias quedan con una URL que no es de nadie |
+| 3 | **Bucket R2 + token** de lectura/escritura | FALTA | Es lo que hace que el vídeo no pase por el servidor. Sin esto, el ancho de banda de la máquina se vuelve el techo de cuánta gente puede ver una formación a la vez |
+| 4 | **Secretos**: llaves RS256, `REFRESH_TOKEN_PEPPER`, `MEDIA_URL_SECRET`, contraseñas de Postgres | FALTA | Se generan **en la máquina** (`docs/04` §4). Una llave privada dentro de una imagen se filtra el día que alguien la comparte |
+| 5 | **Sentry** (DSN) y un vigilante de disponibilidad | FALTA | Sin esto, el primer aviso de que algo se cayó lo da el cliente |
+| 6 | **LibreOffice en la imagen de la API** | Decisión | Hoy subir un PPTX se rechaza pidiendo el PDF. Son ~500 MB de imagen y ~1 GB de RAM al convertir: con 8 GB entra, con 1 GB no. **Decidir si el piloto lo necesita** |
+| 7 | **Copia de seguridad probada** | Los scripts están | `backup.sh` al cron y **restaurar de verdad** con `restaurar-prueba.sh` antes de dar la salida por buena |
+| 8 | **Lo que carga el cliente**: plantilla de constancia, logo, firmas, catálogos | FALTA | Decidido el 2026-09-08: es suyo y se configura con el piloto arriba |
+
+**El orden importa:** 1 y 3 primero (remoto y R2), porque los demás pasos los dan por hechos.
+
+## 5. Cuando llegue el segundo cliente
+
+Nada de lo de arriba cambia. Lo que hay que mirar entonces está en `docs/04` §8: el cron vive dentro
+del proceso de la API, así que **escalar a dos réplicas exige antes sacar el disparador a un worker**
+—mover el disparo, no rehacer la lógica—, y el contador del límite por IP tiene que pasar a Redis,
+que ya está levantado esperando.

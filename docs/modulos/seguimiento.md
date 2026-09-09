@@ -418,3 +418,66 @@ ahí se llega al mismo editor de siempre, sin duplicar el formulario.
 | Indicadores agregados: cobertura por proceso, matriz de competencia, vencimientos | Media | Es el grueso del Sprint 6 |
 | Cortar por área, proceso o regional | Media | Hoy solo se filtra por estado y por texto |
 | Materializar el avance si un plan pasa de ~300 renglones | Baja | Con 30 no se nota. Sería optimizar algo que nadie ha medido |
+
+---
+
+## Los dos informes del 2026-09-09: la evolución y el conocimiento
+
+Salieron de repasar el Sprint 6 con el cliente delante. Su frase fue *«métricas, KPIs, aún no hay
+dashboard»*, y el inventario honesto dijo que sí había —Inicio, siete cortes de analítica,
+vencimientos, medición del plan, matriz cargo × inducción— pero que **faltaban dos preguntas que
+ningún informe contestaba**.
+
+### 1. «¿Vamos mejor que en enero?» — la evolución
+
+Todo lo demás es una **foto de hoy**. Sirve para «¿cómo vamos?» y no para «¿mejoramos?», que es la
+del comité mensual y la que dice si lo que se hizo sirvió de algo.
+
+**Qué mide, exactamente:** cada mes cuenta **las obligaciones que vencían en ese mes** y cuántas se
+cumplieron. **No es el histórico del indicador**: nadie guardó cuánto marcaba el 1 de marzo, y
+reconstruirlo sería inventarlo. Es la pregunta de al lado y es la útil.
+
+**Tres decisiones que se ven en la pantalla:**
+
+- **Dos colores y no tres.** Iba a llevar tres tramos —a tiempo verde, tarde ámbar, sin cumplir
+  rojo— y el validador de paletas lo tumbó con un número: **ámbar y rojo están a ΔE 5,5 para un
+  deuteranope** (8,5 con visión normal). En una barra apilada serían el mismo color para una de cada
+  doce personas. Quedan dos tramos separados por ΔE 26, y el «a tiempo o tarde» vive en el detalle,
+  con palabras. *Se comprobó ejecutando el validador, no mirando.*
+- **Un mes sin nada que venciera no es un cero: es un mes sin barra.** Pintarlo a cero dibujaría un
+  valle que no existió — exactamente lo que pasaría con enero.
+- **Solo se rotulan dos meses**, el actual y el peor. Doce porcentajes en fila tapan la forma, que es
+  lo único que la gráfica aporta sobre una tabla. La tabla está debajo, y no es un extra: el gris de
+  «sin cumplir» queda bajo 3:1 de contraste y esa deuda se salda con los números escritos.
+
+`GET /reportes/evolucion?year=` · `reports:read_scope` · `evolucion.tsx`
+
+### 2. «¿Qué falla la gente?» — el conocimiento
+
+Los informes dicen **cuántos aprobaron**; ninguno decía **qué fallaron**. Y es lo único de todos los
+informes que se convierte directamente en un renglón del plan: *«el 68 % falla lo de alturas»* es una
+formación que pedir; *«el 91 % aprobó»* no es nada que hacer.
+
+- Se cuenta **por puntos**, no por preguntas acertadas: una de cinco puntos y una de uno no pesan
+  igual en el examen, y contarlas iguales diría algo distinto de lo que dijo la nota.
+- **Fuera lo anulado** (midió que la pregunta estaba mal, no lo que alguien sabe) y **fuera lo no
+  calificado** (una abierta sin leer no es un cero).
+- **Las preguntas sin tema salen aparte y se dicen.** El tema es opcional (#84), así que al principio
+  son la mayoría: repartirlas o callarlas daría un cuadro de cobertura falso.
+- **Las preguntas más falladas llevan suelo de cinco respuestas.** Sin él, la peor del informe sería
+  siempre una que contestó una sola persona, y el informe mandaría a formar a toda la empresa por eso.
+  Su lectura es doble y por eso va el número de respuestas al lado: una pregunta que casi todos
+  fallan **o no se enseñó, o está mal redactada** — dos arreglos, en dos sitios distintos.
+
+Se agrupa en la **base** (`groupBy` por versión de pregunta): con 900 personas y diez preguntas por
+examen, traerse las respuestas una a una serían decenas de miles de filas para calcular veinte
+promedios.
+
+`GET /reportes/conocimiento` · `reports:read_scope` · `conocimiento.tsx`
+
+### Dónde viven: dentro de Analítica, y en ese orden
+
+No son pestañas nuevas porque **no son un público nuevo**: quien abre Analítica viene a decidir. El
+orden de la pantalla es el del razonamiento — primero **si mejora o empeora** (evolución), después
+**dónde está el problema** (los siete cortes), y al final **qué falla por dentro** (conocimiento).
+Al revés se decide sobre una foto sin saber si es la mejor del año o la peor.

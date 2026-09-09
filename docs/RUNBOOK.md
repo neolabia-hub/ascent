@@ -51,6 +51,29 @@ La forma del fallo importa mas que el caso: **`findFirst` sobre algo que puede t
 decision tomada por la base de datos**. Si hay que elegir, se eligen todas y se decide en el codigo
 —aqui, la vigencia mas corta— o se ordena explicitamente.
 
+
+## No encadenar `mirar.ps1` con las pruebas en la misma consola (2026-09-09)
+
+`.\scripts\mirar.ps1; pnpm test:e2e` falla con `EADDRINUSE :::3012`, y el mensaje no dice por que.
+La causa: `mirar.ps1` hace `$env:PORT = '3012'` para su propio stack, y **esa variable se queda en la
+consola**. Playwright levanta despues su API heredandola, intenta escuchar en 3012 —donde ya esta la
+de `mirar`— y muere antes de correr una sola prueba.
+
+Las dos formas de evitarlo:
+- Correr la suite en una consola NUEVA (una llamada aparte), que es lo natural.
+- O limpiar antes: `Remove-Item Env:PORT, Env:NEXT_DIST_DIR -ErrorAction SilentlyContinue`.
+
+
+**Y la variante silenciosa, que cuesta una corrida entera:** `mirar.ps1` tambien exporta
+`NEXT_DIST_DIR=.next-mirar`. Si en esa misma consola se hace `pnpm build`, la web se compila **en la
+carpeta de mirar** y `.next` —la que usan las pruebas— se queda con el build anterior. No falla nada:
+la suite arranca, corre y prueba **el codigo viejo**. El sintoma es una prueba que pide algo que ya
+existe en el codigo y la pantalla no tiene; se pierde media hora buscandolo en el sitio equivocado.
+
+La leccion general: un script que exporta variables para su proceso las deja puestas para todo lo que
+venga detras en esa consola. `mirar.ps1` lo hace a proposito —los hijos las heredan al arrancar— y el
+precio es este.
+
 ## Comandos canonicos (desde la raiz del repo, PowerShell)
 
 ```
@@ -79,6 +102,14 @@ Credenciales seed (solo dev): tenant `transprensa`.
 - Aislamiento multi-tenant: `pnpm db:verify-rls`. Compuerta DURA del CI; si falla, no se mergea.
 - E2E (Playwright, en `e2e/`): un archivo por sprint, acumulativo. Localizar por `id` cuando el
   campo es obligatorio: el asterisco del label cambia el texto accesible y `getByLabel(..., {exact:true})` falla.
+
+**Antes de correr la suite, dos comprobaciones que ahorran una hora cada una** (las dos nacieron de
+un rojo que no era una regresion; el detalle, en Incidentes):
+
+| Cuando | Que hacer |
+|---|---|
+| **Siempre**, si la base lleva dias de corridas | `pnpm --filter @neo-pulse/api dev:limpiar-reglas`. Con mas de 30 reglas activas, crear una persona expira y fallan pruebas que no tocan asignaciones |
+| **Despues de renombrar cualquier rotulo** | `node scripts/sincronizar-selectores.mjs` y luego `node scripts/selectores-huerfanos.mjs`. El primero arrastra el cambio a las pruebas; el segundo comprueba que ninguna quedo pidiendo un texto que la pantalla ya no dice |
 - CI (`.github/workflows/ci.yml`): job `calidad` (lint/typecheck/build/unit) + job `integracion`
   (Postgres de servicio, migrate, RLS via psql, seed, verify-rls, e2e con reporte adjunto si falla).
 
@@ -3465,3 +3496,168 @@ repositorio NO esta formateado con prettier**, aunque `package.json` tenga el sc
 
 Si hace falta formatear algo puntual: `--print-width 120 --single-quote`, que es lo que se parece al
 codigo de al lado. Y mejor a mano si son pocas lineas.
+
+### 2026-09-09 — Renombrar un rotulo deja ciegas a las pruebas, y sincronizarlas tiene tres trampas
+
+**El sintoma.** Se corrigen las tildes de la interfaz, se corre la suite y salen ocho rojos. Ninguno
+es una regresion: son pruebas citando una pantalla que ya no existe, porque buscan por texto
+(`getByRole('button', { name: 'Quienes' })`). Ha pasado **tres veces esta semana**, y cada vez costo
+media hora distinguir el rojo de vocabulario del rojo de verdad.
+
+**Lo que NO funciona:** volver a pasar el diccionario de tildes por encima de los `.spec.ts`.
+Corrige tambien los textos que en la web se quedaron a proposito sin tilde —los nombres de catalogo,
+por ejemplo— y vuelve a desincronizar, en la direccion contraria.
+
+**Lo que si:** leer el `git diff` de `apps/web/src` recien hecho, sacar las cadenas que **cambiaron
+de verdad**, y sustituir esas mismas, literales, en `e2e/` y `scripts/recorridos/`. Lo que no cambio
+en la pantalla no se toca en la prueba. Las tres trampas, en el orden en que se pisaron:
+
+| Version | Que hizo | Por que |
+|---|---|---|
+| 1 | Propuso `Escape -> Enter` | Emparejaba las cadenas por posicion dentro del bloque del diff; si una linea cambio dos cosas a la vez, las cruza |
+| 2 | Renombro la funcion `montarFormacion` a `montarFormación` | Un rotulo de pantalla y el nombre de una funcion se escriben igual; sustituia en todo el archivo |
+| 3 | Renombro `${reglaArea.estado}` dentro de una plantilla | Respetaba las comillas, pero **dentro de las comillas de una plantilla tambien hay codigo** |
+| 4 | Cambio `Areas completas`, un rotulo que NO se habia tocado | `Area` es un trozo de `Areas`: hay que exigir **palabra entera** |
+
+El script quedo en **`scripts/sincronizar-selectores.mjs`**, con las cuatro guardas. Exige: que las dos formas sean **la misma palabra sin acentos**
+(`NFD` y quitar diacriticos), que el reemplazo caiga **dentro de comillas**, y que se salten los
+tramos `${...}` y las lineas de comentario. Cualquier cambio de texto que no sea de acentos se
+sincroniza a mano: es justo cuando hay que mirarlo.
+
+**Y una frontera que no cruza ningun script:** los nombres de catalogo —«Gestion Humana»,
+«Capacitacion del plan», «Director de Gestion Humana»— **son datos, no codigo**. Estan en
+`apps/api/prisma/seed.ts` y, sobre todo, en la base de cada tenant. La suite corre contra la base de
+desarrollo **sin volver a sembrarla** (el `webServer` de `playwright.config.ts` solo arranca api y
+web), asi que acentuar la semilla no cambia lo que la prueba encuentra: solo rompe el selector. Se
+escriben bien desde Configuracion, en cada empresa.
+
+**Comprobacion despues de sincronizar**, siempre, porque las tres versiones malas pasaban el
+typecheck: `git diff e2e scripts/recorridos | grep '^+' | grep -v "['\\\"\`]"` — si sale algo, se
+toco codigo y no un selector.
+
+### 2026-09-09 — El contraste de superficies se comprueba mirando, no calculando
+
+El fondo y las tarjetas estaban a 1,5 puntos de luminancia. Se subio a 7 —que sobre el papel resuelve
+el caso—, y el cliente volvio a decir *"el contraste no lo veo"*. Tenia razon: entre el fondo y la
+tarjeta hay **un borde claro, una sombra suave y mucho aire**, y cada uno se come parte de la
+diferencia. Con dos superficies que se tocan, 7 puntos bastan; separadas por un borde, no.
+
+Quedo en ~11 (`--paper: #dfe5ee`), y el borde bajo con el (`--line`, `--line-strong`) para no
+perderse contra el fondo nuevo. **El numero sirve para descartar lo evidente —1,5 no puede
+funcionar—, no para dar algo por bueno.**
+
+### 2026-09-09 — La guarda del limpiador de reglas se comio al limpiador
+
+**Sintoma.** `alcance-analista` expira esperando el dialogo "Contraseña generada" al crear una
+persona — el mismo sintoma exacto del 2026-08-31, que ya estaba escrito y ya estaba "cerrado por el
+otro extremo" con el `global-teardown`. La base de desarrollo: **131 reglas activas y 453.091
+obligaciones**. Y `dev:limpiar-reglas` respondia **"Desactivadas 0"**.
+
+**Causa.** La guarda que el propio script se puso el 2026-09-03 —*no tocar una regla cuya formacion
+tenga una version PUBLICADA*, puesta despues de dejar sin regla una induccion real del cliente— se
+justificaba con una frase: *"eso deja alguna regla de prueba viva, y esta bien: son unas cuantas de
+mas"*. **Fueron 104 de 131.** Hoy casi todas las specs publican su formacion, asi que la excepcion
+dejo de ser una esquina y paso a ser el caso normal: el limpiador respetaba casi todo lo que tenia
+que limpiar, y lo decia con un mensaje que sonaba tranquilizador.
+
+**Arreglo.** No quitar la guarda —protege trabajo de verdad— sino **afinarla por el NOMBRE**: lo que
+deja la suite acaba en un espacio y seis o mas digitos (`Induccion E2E 04084758`, `Con papel adjunto
+22943513`); lo que escribe una persona, no. La induccion que se perdio aquel dia se llamaba como la
+llamo su autor y sigue a salvo. **131 -> 29 reglas activas**, y el mensaje de lo respetado ahora
+dice por que se respeto.
+
+**La leccion, y no es sobre reglas de asignacion:** una excepcion que se justifica con *"son unas
+pocas"* **caduca el dia que dejan de ser pocas**, y nadie vuelve a mirarla — porque el codigo sigue
+corriendo, sigue informando exito y el numero que la invalidaba no lo imprime nadie. Cuando se
+escriba una guarda con esa forma, hay que dejar impreso **el recuento de lo que se salta**, siempre y
+aunque sea cero. Aqui el "Desactivadas 0 / Respetadas 104" contaba la historia entera; sin la
+segunda linea habria pasado por un script que no encuentra nada que hacer.
+
+**Comprobacion rapida del estado de la base** (con `DIRECT_DATABASE_URL`, que salta la RLS):
+
+```sql
+select count(*) from assignment_rules where active;   -- si pasa de 30, limpiar antes de correr
+select a.name, count(*) from assignment_rules r
+  join activities a on a.id = r.target_id
+ where r.active group by a.name order by 2 desc limit 20;
+```
+
+Si los nombres llevan sufijo numerico, es basura de la suite: `pnpm --filter @neo-pulse/api
+dev:limpiar-reglas`. **Y no correr la suite antes de hacerlo:** el rojo que sale no dice nada de la
+version que se quiere medir.
+
+### 2026-09-09 — Cinco specs pedian un boton que la pantalla no tenia, y ya estaba asi en el commit
+
+**Sintoma.** `convocatoria-version` expira esperando `getByRole('button', { name: 'Nueva lección' })`.
+Se mira la pantalla: el boton dice **"Nueva leccion"**, sin tilde. Y no era del cambio del dia — en
+`HEAD`, sin tocar nada, la prueba pedia una cosa y la pantalla decia otra:
+
+```
+git grep -n "Nueva lecci" HEAD -- apps/web/src e2e
+HEAD:apps/web/src/app/(admin)/lecciones/page.tsx:99:  Nueva leccion      <- la pantalla
+HEAD:e2e/sprint-3.spec.ts:42: name: 'Nueva lección'                     <- la prueba
+```
+
+**Causa.** Una pasada de tildes se aplico a los dos lados; despues la pasada se revirtio **solo en
+el lado de la web** (`git checkout -- apps/web/src`, porque el script habia estropeado comentarios) y
+las pruebas se quedaron citando una pantalla que ya no existia. Cinco specs —`convocatoria-version`,
+`quienes-desde-la-ficha`, `sprint-2`, `sprint-3`, `sprint-4`— llevaban rojas desde entonces, y su
+rojo se parecia al de siempre: un tiempo de espera agotado, que es lo que sale cuando algo se
+renombro y cuando la base esta lenta.
+
+**Herramienta para que no vuelva a hacer falta un fallo para verlo:**
+
+```
+node scripts/selectores-huerfanos.mjs
+```
+
+Compara los dos lados **sin correr nada**: coge las cadenas con acento que aparecen dentro de un
+selector por texto y comprueba que existan, literales, en `apps/web/src`. Encontro los 14 de una vez.
+Los rotulos compuestos en tiempo de ejecucion (`Versión ${n} publicada`) salen como falsos positivos
+y se reconocen de un vistazo; revisar cinco lineas cuesta menos que una suite roja por vocabulario.
+
+**Se corrigio en la PANTALLA, no en las pruebas:** las pruebas ya decian lo correcto. Y va con
+`scripts/sincronizar-selectores.mjs` en el mismo orden de trabajo:
+
+1. Se corrigen los rotulos en la web.
+2. `node scripts/sincronizar-selectores.mjs` — arrastra el cambio a las pruebas.
+3. `node scripts/selectores-huerfanos.mjs` — comprueba que no quedo ninguno colgando.
+4. `git diff e2e scripts/recorridos | grep "^+" | grep -v "['\"\`]"` — que no se toco codigo.
+
+**La leccion:** revertir a medias deja el sistema mas roto que no haber tocado nada, porque el rojo
+que produce **no señala al sitio del error**. Cuando haya que revertir una pasada que toco dos lados,
+o se revierten los dos o se comprueba el otro antes de seguir.
+
+### 2026-09-09 — Cambiar una pestaña de sitio le cambia el ROL, y ningun typecheck lo dice
+
+**Sintoma.** Doce specs expiran en `getByRole('button', { name: 'Contenido', exact: true })`. La
+pestaña esta ahi, se ve, se pulsa con el raton.
+
+**Causa.** La ficha de la formacion tenia sus propias pestañas —`<button>` a pelo, rol implicito
+`button`— y paso a usar el componente `ViewTabs`, que declara `role="tab"` dentro de un
+`role="tablist"`. Semanticamente es lo correcto: hay un tablist con sus paneles. Pero **un elemento
+con rol explicito `tab` ya no responde a `getByRole('button')`**, y el fallo que produce es un tiempo
+de espera —el mismo aspecto que tiene una base lenta o un rotulo renombrado—.
+
+**Arreglo.** Las pruebas, no el componente: `getByRole('tab', { name: '...', exact: true })`. Once
+selectores en cinco specs.
+
+**Y un segundo fallo dentro del mismo, que si era del producto:** el nombre accesible del boton
+incluia el numero de la parada, asi que era "2 Contenido" y no "Contenido". Eso no es una
+particularidad de la prueba: quien navegue con lector de pantalla oiria el adorno antes que el sitio
+al que va. Las paradas llevan `aria-hidden`; lo que dicen —el orden, el estado— ya lo dicen
+`aria-selected` y el orden de los propios botones.
+
+**La regla, para la proxima vez que una pantalla adopte un componente compartido:** cambiar de
+elemento propio a componente del sistema puede cambiar **el rol**, **el nombre accesible** y **el
+orden del foco** sin cambiar ni una linea de las pruebas ni fallar el typecheck. Antes de dar el
+cambio por hecho:
+
+```
+node scripts/selectores-huerfanos.mjs     # textos que las pruebas piden y la pantalla no dice
+grep -rn "getByRole('button', { name: '<el rotulo>'" e2e
+```
+
+Y si el rol nuevo es el correcto —lo es casi siempre, porque el componente compartido lo pensó
+alguien—, **se corrige la prueba**. Si no lo es, es el componente el que esta mintiendo sobre lo que
+es.

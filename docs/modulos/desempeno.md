@@ -465,3 +465,65 @@ del ciclo tiene **buscador** a partir de ocho.
 Sección **propia** en la barra lateral (`Desempeño`), no dentro de Formaciones ni de Seguimiento. El
 cliente pidió que no se mezcle, y la navegación es donde primero se mezclan las cosas: un módulo
 metido bajo «Formaciones» acaba compartiendo filtros, indicadores y, tarde o temprano, tablas.
+
+---
+
+## 8. El análisis del ciclo (2026-09-09): de «cuántas van» a «qué formación pido»
+
+Lo que el consolidado contestaba hasta hoy era **seguimiento de la campaña**: cuántas evaluaciones se
+generaron, cuántas se entregaron y con qué promedio. El cliente lo dijo en dos frases seguidas:
+*«ya se ejecutó, pero dónde se ve seguimiento, datos, métricas»* y, al ver las cifras,
+*«no dice un resultado por competencia ni nada de ese tipo de análisis... por cargo, área, los
+diferentes análisis que se puedan sacar, que la información le sirva para tomar decisiones... para el
+plan»*.
+
+Las dos frases dicen cosas distintas y las dos eran ciertas:
+
+1. **Los resultados existían y no se encontraban.** Vivían detrás de un botón fantasma llamado
+   «Ver como va», entre dos botones llenos. Se llama **«Ver resultados»**, va resaltado, y las cifras
+   básicas —entregadas de total, promedio, firmadas— salen ahora **en la fila de la campaña**, sin
+   abrir nada. Para quien mira, un dato que hay que ir a buscar es un dato que no está.
+2. **Y lo que había dentro no servía para decidir.** Una lista de 900 notas no es un diagnóstico:
+   nadie saca un patrón de ahí.
+
+### Los tres cortes, y qué pregunta contesta cada uno
+
+| Corte | Pregunta | Decisión que habilita |
+|---|---|---|
+| `porCompetencia` | ¿En **qué** estamos flojos? | Qué formación hace falta |
+| `porArea` | ¿**Dónde**? | A qué área llevarla primero |
+| `porCargo` | ¿A **quién**? | Con qué formulario y a qué cargo |
+
+Y **dentro de cada competencia**, su propio corte por área y por cargo: la media de la empresa
+esconde justo lo que se necesita saber. *«Seguridad vial: 71 %»* no dice nada; *«71 %, y en Logística
+52 %»* dice a quién formar primero.
+
+### Las reglas del cálculo, que no son neutrales
+
+- Cada respuesta se lleva a **su porcentaje de escala** antes de promediar (`notaDeRespuesta`, la
+  misma función que usa `calcularNota`): un 4 de 5 vale 80 y un «cumple» vale 100. Promediar los
+  números crudos haría que una competencia de sí/no hundiera a las de 1 a 5. **Las dos cuentas
+  comparten función a propósito**: si divergieran, la nota de una persona y el promedio de su
+  competencia dirían cosas distintas sobre los mismos números.
+- **Solo cuentan las entregadas.** Una a medio llenar todavía no es una opinión.
+- **Lo que dijo el jefe y lo que dijo la persona van separados**, y su diferencia se enseña en
+  puntos. Es el dato que más se usa en la reunión: si el jefe puntúa por debajo hay una conversación
+  pendiente; si por encima, alguien que se subestima. Mezclarlos borra las dos.
+- Las competencias de **solo texto no tienen nota**: `promedio: null`, no cero.
+- Todo se ordena **de lo más flojo a lo más fuerte**, porque la lista se lee para decidir en qué
+  reforzar. Lo que no tiene nota va al final: no compite en un orden que no tiene.
+
+### Y aquí se cierra el círculo con el plan
+
+`PerformanceCompetency.suggestedActivityId` —«qué formación fortalece esta competencia»— existía en
+el catálogo desde el primer día **y no lo leía nadie**. Ahora sale al desplegar una competencia, con
+su nota baja delante y enlace a la ficha. Es la frase que convierte un diagnóstico en un renglón del
+plan del año siguiente, que era la razón de haber añadido esa columna.
+
+### Lo que NO se hizo, y por qué
+
+- **La matriz completa competencia × área** (una tabla de 12 × 10). Se enseñan las **tres peores** de
+  cada corte: la matriz entera se lee celda a celda y esto se abre para decidir, no para estudiar.
+  El Excel lleva el detalle si alguien lo necesita.
+- **Comparar contra el ciclo anterior.** Es el análisis que sigue —«¿mejoramos en seguridad vial tras
+  la formación?»— y necesita dos ciclos cerrados. Cuando exista el segundo.

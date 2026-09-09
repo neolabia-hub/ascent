@@ -38,7 +38,7 @@ conocido es que a menudo no hay capacidad ARM y hay que reintentar.
 
 ## 2. Antes de empezar (una vez)
 
-- **Una máquina** con Ubuntu 22.04 o 24.04 y Docker, con los puertos **80 y 443** abiertos.
+- **Una máquina** con Ubuntu LTS (22.04, 24.04 o 26.04) y Docker, con los puertos **80 y 443** abiertos.
 - **Un nombre DNS** apuntando a su IP. Gratis: [DuckDNS](https://www.duckdns.org). De pago (~USD 12
   al año): un dominio propio, que además habilita `transprensa.neopulse.app`.
 - **Cloudflare R2** (opcional pero recomendado): un bucket y un token con permiso de lectura y
@@ -50,6 +50,85 @@ conocido es que a menudo no hay capacidad ARM y hay que reintentar.
 > es peor que dejarlo vacío: el sistema buscaría una empresa que no existe.
 
 ---
+
+---
+
+## 2 bis. Qué marcar al contratar la máquina (Vultr, decidido el 2026-09-09)
+
+**Plan: Vultr High Performance, Miami, 2 vCPU / 4 GB (~USD 24).** Se empieza pequeño a propósito:
+subir de plan es un reinicio de dos minutos —misma IP, mismo disco, se paga la diferencia por horas—
+y **bajar no se puede**, porque el disco no encoge. El detalle del porqué y las señales que dicen
+cuándo subir están en `docs/03-infraestructura-produccion.md`.
+
+| Campo del formulario | Qué poner | Por qué |
+|---|---|---|
+| **Imagen / SO** | **Ubuntu LTS x64** — 24.04 o 26.04, da igual | Todo corre en Docker: del anfitrion solo se usan el kernel y el propio Docker. La 26.04 tiene soporte hasta 2031. **Lo unico que comprobar en una LTS recien salida** es que `get.docker.com` ya reconozca su nombre en clave; si no, se instala Docker del repositorio oficial a mano |
+| **Hostname** | `neopulse` | Sale en los registros y en el prompt |
+| **Label** | `neo-pulse-prod` | Que diga **prod**: el día que haya un segundo servidor, esa palabra evita el error caro |
+| **SSH Key** | **Sí.** `ssh-keygen -t ed25519 -C "neo-pulse"` y se pega el `.pub` | Entrar sin contraseña, y dejar de depender de una |
+| **Limited User Login** | **Sí** | Se trabaja como `linuxuser` con sudo, no como root. Docker funciona igual |
+| **Firewall (el de Vultr)** | **Sí**: 22, 80 y 443. Nada más | Es gratis, y lo que de verdad protege es que Postgres (5432) y Redis (6379) no queden expuestos si algún día un contenedor se publica mal |
+| **VPC Network** | **No** | Es red privada entre VARIOS servidores. Con uno no aporta nada |
+| **Automatic Backups (USD 4,80)** | **Sí** | Es lo único que respalda la MÁQUINA: `.env.prod`, las llaves RS256, la configuración. `backup.sh` salva la base y no eso, y rehacer un servidor a mano con el cliente esperando es donde se van las horas |
+| **DDoS Protection (USD 10)** | **No** | Cloudflare va delante (Decisión 3) y eso ya lo absorbe, gratis. Es el 40 % del servidor por lo que el CDN gratuito hace |
+| **Cloud-Init User Data** | El guion de abajo | La máquina llega con Docker, swap y cortafuegos puestos |
+
+**Total: USD 28,80 al mes.**
+
+```yaml
+#cloud-config
+package_update: true
+packages: [ca-certificates, curl, ufw]
+runcmd:
+  # Docker, del instalador oficial
+  - curl -fsSL https://get.docker.com | sh
+  - usermod -aG docker linuxuser
+  # SWAP de 2 GB. Con 4 GB de RAM, Postgres y Node se pelean en los picos y el que pierde muere EN
+  # SILENCIO: la pantalla dice "no pudimos conectar" y en los registros no hay ningun error, solo un
+  # contenedor que se reinicio. Es el mismo remedio del §4 de este documento, puesto antes.
+  - fallocate -l 2G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  # Cortafuegos del sistema, ademas del de Vultr. Cinturon y tirantes.
+  - ufw allow OpenSSH
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+```
+
+**Y una decisión de contenido que va con esto:** se arranca **sin LibreOffice** (no cabe en 4 GB), así
+que un `.pptx` se rechaza pidiendo el PDF. No le quita nada al cliente: PowerPoint exporta a PDF en
+dos clics y el resultado se ve **mejor** que la conversión automática, porque el PDF lleva la
+tipografía incrustada y no hay fuentes que se sustituyan ni viñetas que se muevan.
+
+---
+
+## 2 ter. La máquina del piloto, tal como quedó (2026-09-09)
+
+| | |
+|---|---|
+| **Proveedor / región** | Vultr High Performance · **Miami** |
+| **Plan** | 2 vCPU / 4 GB (3,3 GB útiles) / 94 GB NVMe · USD 24 + 4,80 de copias |
+| **Sistema** | **Ubuntu 26.04.1 LTS** x64 |
+| **Usuario** | `linuxuser` (Limited User Login), en el grupo `docker` |
+| **Entrada** | `ssh -i ~/.ssh/ascent linuxuser@<ip>` — clave **ed25519 propia de este proyecto** |
+| **Docker** | 29.8.0 · Compose v5.5.1, instalado con `get.docker.com` |
+| **Swap** | **8 GB, ya venían en la imagen de Vultr.** No hubo que crearlo |
+| **Cortafuegos** | `ufw` activo: 22, 80 y 443 (v4 y v6). El resto, cerrado |
+
+**Tres cosas que aprendimos montándola, y valen para la siguiente:**
+
+1. **El `cloud-init` se quedó desactivado** al crear la instancia y no pasó nada: los cuatro pasos que
+   automatizaba se hacen a mano en dos minutos. Y de esos cuatro, **dos ya venían resueltos** —el swap
+   de la imagen de Vultr y `ufw` activo—, así que en la práctica solo faltaba Docker y abrir 80/443.
+2. **La versión de Ubuntu da igual mientras sea LTS.** Todo corre en contenedores: del anfitrión solo
+   se usan el kernel y Docker. La 26.04, recién salida, la reconoció el instalador oficial sin
+   problema — que era el único riesgo real de estrenar una LTS.
+3. **El panel puede mentir un rato.** Marcó `pending` con IP `0.0.0.0` y luego `stopped` mientras la
+   máquina ya respondía por SSH. Lo que manda es si contesta, no lo que dice la pantalla; y si dice
+   `stopped` de verdad, conviene mirar que no haya **dos instancias** creadas y cobrándose.
 
 ## 3. Construir las imágenes FUERA de la máquina
 

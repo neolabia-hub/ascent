@@ -7,7 +7,7 @@ Existe porque los pendientes estaban repartidos entre siete documentos —el HAN
 `00-el-motor.md` §9, `08-evidencia.md` §10, `seguimiento.md` §11, `05-cumplimiento.md`— y para saber
 qué falta había que leerlos todos. Cada punto dice **dónde está el detalle**, para no repetirlo.
 
-Al 2026-09-08 (tarde).
+Al 2026-09-09.
 
 ---
 
@@ -85,6 +85,42 @@ depende de un trabajo del Sprint 6—.
 
 ---
 
+## 7. Evaluaciones — la sesión del 2026-09-09 (tarde)
+
+Lo que estaba abierto por la mañana se cerró por la tarde, con el cliente mirando la pantalla. El
+detalle está en el `HANDOFF` de ese día (§10).
+
+| | Qué falta | Por qué está abierto |
+|---|---|---|
+| 7.1 | ~~El gestor de temas se abre desde un enlace de texto~~ **HECHO.** Pasa a **icono en la cabecera, arriba a la derecha** (`Tags`), que es donde lo pidió. Y de paso deja de depender del bloque al azar: allí solo existía si ese bloque era el paso activo, pero un tema también se le pone a una pregunta suelta, así que la puerta tenía que estar siempre | Petición literal del 2026-09-09 |
+| 7.2 | ~~Decidir la descripción al agregar contenido~~ **HECHO: fuera en evaluación y encuesta.** La descripción la lee quien cursa **junto al contenido** en el reproductor; en un examen lo que se abre es el examen y nadie la ve. En lección, vídeo, documento y enlace se queda | El cliente lo dejó a nuestro criterio (*«si crees que es necesario déjalo, si no quítalo»*) |
+| 7.3 | **Editar el texto de una pregunta desde el gestor de temas.** Sigue sin poderse, **a propósito**: se trae a una evaluación con «Traer una ya escrita» y se corrige allí. Lo que sí se arregló es que no se veía cómo llegar a las preguntas de un tema —*«dónde se editan las preguntas de ese tema no la veo»*—: ahora cada tema tiene su botón **«N preguntas»** en vez de desplegarse pulsando el nombre, que no parecía pulsable | Editar allí crearía una versión nueva (#6) desde un sitio donde no se ve el examen que la usa. **Decisión de producto: no se hace** |
+| 7.4 | ~~«Tema nuevo» era un campo de crear y la lista no se podía filtrar~~ **HECHO.** Un solo campo que **busca y crea**: filtra según se escribe y, solo si lo escrito no coincide con ningún tema, ofrece «Crear ...». El nombre no se pide dos veces | Petición del 2026-09-09 |
+| 7.5 | ~~Crear una evaluación desde una formación pedía tema y cuántas al azar~~ **HECHO: solo el título.** Los dos campos eran obligatorios y se pedían **antes de que existiera una sola pregunta**; sin temas en la empresa, el botón Agregar no se dejaba pulsar y **no había forma de crear una evaluación desde ahí**. Ahora nace vacía y se abre su editor, como una lección | El cliente preguntó si no era mejor «solo nombre y ya». Lo era |
+
+
+## 8. La interfaz
+
+| | Qué falta | Detalle |
+|---|---|---|
+| 8.1 | ~~El acento del tenant solo llega a dos pantallas~~ **RETIRADO el 2026-09-09: lo tumbó el cliente.** El acento de TRANSPRENSA es verde (`#367d17`) y los dos botones que lo llevaban —Publicar cambios, Dar por cumplida a N— se leían como un semáforo y no como el paso siguiente. Vuelven al color principal; la variante sigue en `button.tsx` sin usarse. El verde de esta empresa se queda para los **sí/no de la ficha**, donde el color sí significa algo | Decisión #166, retirada |
+| 8.2 | ~~El recorrido por etapas solo lo usa la ficha de la formación~~ **RETIRADO el 2026-09-09: lo tumbó el cliente** (*«el selector de formación no me gustó nada»*). Las cinco vistas vuelven a **pastillas**, la forma del resto del producto, y el selector se muda a **su propia fila** — que es lo que de verdad arreglaba la queja de las tres formas anteriores: compartía fila con Publicar y Eliminar. `Etapas` se **borró** de `view-tabs.tsx`: una variante que no usa nadie invita a volver a usarla, y un recorrido afirma un orden que estas cinco vistas no tienen | Decisión #165, retirada |
+| 8.3 | **El título de Inicio podría reconocer un logro**, no solo lo que falta: «Nadie tiene nada vencido: 41 días seguidos». Hoy dice la primera cosa que importa —vencidas, atrasadas, por aprobar, o «Todo al día»—. Ofrecido al cliente el 2026-09-09, **sin decidir**; necesita una cifra que no se calcula: días seguidos sin nada vencido | `HANDOFF` 2026-09-09 §16 |
+
+## 9. Sprint 6 — lo que se revisó el 2026-09-09
+
+El cliente pidió repasarlo antes de producción (*«métricas, KPIs, aún no hay dashboard»*). El
+inventario honesto: **sí había** —Inicio con sus cuatro avisos y el % de cumplimiento, Analítica con
+siete cortes, Vencimientos, medición del plan, matriz cargo × inducción— pero faltaban tres cosas, y
+las tres están **HECHAS**. El detalle en `HANDOFF` 2026-09-09 y en `docs/modulos/seguimiento.md`.
+
+| | Qué | Estado |
+|---|---|---|
+| 9.1 | ~~**El expediente de una persona.** Es la Definición de Terminado del propio sprint: «el auditor obtiene, para una persona cualquiera, su historial completo con soportes en menos de un minuto». Los datos estaban en tres pantallas y había que unirlos a mano~~ | **HECHO.** Botón «Expediente» en cada fila de Usuarios: lo que le falta arriba, lo cumplido debajo, y sus constancias y papeles de terceros al final. Es de LECTURA: no reemplaza a los dos cajones de al lado, que son para hacer |
+| 9.2 | ~~**La evolución en el tiempo.** Todo era una foto de hoy: no se podía contestar «¿vamos mejor que en enero?»~~ | **HECHO.** «Cómo fue el año» encima de los cortes de Analítica. Mide lo que VENCÍA cada mes y cuánto se cumplió — no el histórico del indicador, que nadie guardó |
+| 9.3 | ~~**Conocimiento por tema.** Los informes decían cuántos aprobaron, ninguno qué fallaron~~ | **HECHO.** «En qué falla la gente», con las preguntas más falladas aparte: la que casi todos fallan o no se enseñó, o está mal redactada |
+| 9.4 | **Transcripción automática de los vídeos** (subtítulos con Whisper). Decidido el 2026-09-09: los vídeos se quedan en R2 —no en YouTube— porque la evidencia tiene que servirse con URL firmada atada a la sesión, y eso obliga a poner los subtítulos nosotros | **ESPERA.** Va después del despliegue. ~USD 36 una vez por todo el catálogo, con revisión humana antes de publicar. Necesita una clave de API |
+| 9.5 | **Lo demás del Sprint 6**: visor del registro de auditoría, retención y anonimización, IA de borradores desde PDF, exportes de auditor por lote | Ninguno bloquea el piloto |
 ## Lo que NO está pendiente, para no volver a abrirlo
 
 Cosas que se decidieron y conviene no reabrir sin motivo nuevo:

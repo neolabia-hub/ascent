@@ -40,6 +40,7 @@ servidor y de una decisión de producto a la vez, es un módulo.
 | Módulo | Qué cubre |
 |---|---|
 | [`modulos/certificacion.md`](modulos/certificacion.md) | Qué formaciones acreditan, cómo se diseña el papel, cómo nace al terminar, y qué significa vigente / vencida / anulada al verificarlo |
+| [`modulos/evaluaciones.md`](modulos/evaluaciones.md) | El examen: banco de preguntas, temas, bloques fijos y al azar, y por que editar una pregunta crea una version en vez de cambiarla |
 | [`modulos/encuestas.md`](modulos/encuestas.md) | Satisfacción y eficacia: quién responde cada una, cómo se califica, y por qué la eficacia la responde el jefe del área |
 | [`modulos/seguimiento.md`](modulos/seguimiento.md) | Quién hizo cada formación, quién no y **por qué no**. Los seis estados y la diferencia entre «atrasada» y «esperando convocatoria» |
 | [`modulos/plataforma.md`](modulos/plataforma.md) | La capa del proveedor por encima de todos los clientes: cuenta aparte, ingreso propio y por qué los dos tokens no se cruzan |
