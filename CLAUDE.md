@@ -22,6 +22,13 @@
 >   una (incluido "no lo haría" y por qué). Consúltalo antes de proponer funcionalidad nueva:
 >   varias ya están modeladas sin construir, y otras están descartadas con razón.
 >
+> ### Producción — LEER ANTES DE TOCAR EL SERVIDOR DEL CLIENTE
+> - `docs/05-reglas-de-despliegue.md` — **qué NO se hace nunca.** Los seis comandos que borran datos,
+>   lo que deja a la gente sin acceso sin que se note (la semilla, las llaves, los secretos), el
+>   despliegue paso a paso, cómo se restaura una copia y qué se vigila.
+> - `docs/04-despliegue-piloto.md` — el procedimiento y la máquina tal como quedó.
+> - `docs/03-infraestructura-produccion.md` — qué se compró y por qué.
+>
 > ### Histórico
 > - `docs/HANDOFF.md` — **DIARIO DE SESIONES.** En qué iba esto, qué quedó a medias y con qué
 >   continuar. Se anexa por arriba (lo más reciente primero). Léelo al empezar una sesión.
