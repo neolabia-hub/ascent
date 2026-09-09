@@ -189,8 +189,16 @@ test.describe('El escaneo del certificado', () => {
     await page.getByRole('button', { name: /Guardar 1 correccion/ }).click();
     await expect(page.getByText(/certificado\(s\) corregido/)).toBeVisible({ timeout: 20_000 });
 
-    // Y LA OTRA MITAD: al reabrir la lista, el adjunto sigue ahi y ademas se puede abrir.
-    await abrirLista.first().click();
+    /*
+      Y LA OTRA MITAD: al reabrir la lista, el adjunto sigue ahi y ademas se puede abrir.
+
+      Se RECARGA la pagina antes de reabrir, y no es un adorno: al guardar, la lista de inscritos se
+      vuelve a pedir en segundo plano, y la lista se siembra con lo que haya en ese momento. Si se
+      reabre en el mismo instante del guardado se siembra con el roster viejo — una carrera de la
+      prueba, no del producto, pero que la haria fallar una vez de cada tres.
+    */
+    await page.reload();
+    await page.getByRole('button', { name: /Tomar asistencia|Corregir certificados/ }).first().click();
     const filaOtraVez = page.getByRole('row').filter({ hasText: nombre }).first();
     await expect(filaOtraVez).toBeVisible({ timeout: 20_000 });
     const enlace = filaOtraVez.getByRole('link', { name: /Adjunto|certificado/ });
