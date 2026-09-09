@@ -102,27 +102,68 @@ function permissionDescription(code: PermissionCode): string {
 
 // ─────────────────────────────── 1. Tenant ───────────────────────────────
 
+/*
+  ═══════════════════════════════════════════════════════════════════════════════════════════════
+  LA REGLA DE ESTA SEMILLA (generalizada el 2026-09-09): APORTA DEFECTOS, NO VERDADES.
+  ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+  Crea lo que falta y **NUNCA pisa lo que el cliente puede editar en pantalla**. Ni el logo, ni los
+  colores, ni la nota minima, ni el nombre de un area, ni los permisos que un administrador dio a
+  mano.
+
+  ─── POR QUE ESTA ESCRITO EN GRANDE ───
+
+  Este proyecto ya se comio el mismo fallo tres veces, y las tres fueron perdida de datos silenciosa
+  —nada se rompe, simplemente vuelve el valor de fabrica y nadie se entera hasta que alguien lo echa
+  de menos—:
+
+    1. **2026-09-04**: resembrar tras una migracion **borro la encuesta de satisfaccion** de cuatro
+       tipos de formacion, y esas formaciones se publicaron sin encuesta sin que nadie dijera nada.
+       Se arreglo... solo para `activityType.config`.
+    2. **2026-09-08**: el `db:seed` **reemplaza el juego completo de permisos de cada rol**. Por eso
+       existe `dev:sincronizar-permisos`, que solo anade. Quedo documentado en el RUNBOOK y el
+       `deleteMany` siguio ahi.
+    3. **2026-09-09**: el cliente lo vio en desarrollo — *«a veces borraba el logo y el color
+       secundario»*. Era esto: `tenant.upsert` mandaba `branding` entero en el `update`, y ese objeto
+       no lleva `logoKey`. Cada corrida borraba el logo subido y devolvia los colores de fabrica.
+       De paso pisaba `settings`: la nota minima y los intentos de la empresa.
+
+  La leccion no es «cuidado con el seed»: es que **un `update` en un `upsert` es una escritura sobre
+  datos vivos**, y hay que justificarlo cada vez. Por eso ahora casi todos van vacios.
+
+  ─── LO UNICO QUE SI SE ACTUALIZA, Y POR QUE ───
+
+  El catalogo de PERMISOS (`permissions`): son codigos del producto, no datos del cliente — nadie los
+  edita en pantalla y su descripcion tiene que poder corregirse.
+*/
+
 async function seedTenant(): Promise<{ id: string; slug: string }> {
-  const settings = tenantSettingsSchema.parse({
+  const settingsPorDefecto = tenantSettingsSchema.parse({
     passingScoreDefault: 90,
     maxAttemptsDefault: 3,
   });
-  const branding = tenantBrandingSchema.parse({
+  const brandingPorDefecto = tenantBrandingSchema.parse({
     companyDisplayName: 'TRANSPRENSA',
     primaryColor: '#1f3a5f',
     accentColor: '#e8734a',
   });
 
+  /*
+    SI YA EXISTE, LO SUYO MANDA. Se mezcla al reves de lo que parece: los defectos primero y lo
+    guardado encima, para que una clave NUEVA llegue a un tenant que ya existe sin pisar ninguna de
+    las que ya tenia valor. Es la misma mecanica que `activityType.config`.
+  */
+  const existente = await prisma.tenant.findUnique({
+    where: { slug: TENANT_SLUG },
+    select: { settings: true, branding: true },
+  });
+  const settings = { ...settingsPorDefecto, ...((existente?.settings ?? {}) as object) };
+  const branding = { ...brandingPorDefecto, ...((existente?.branding ?? {}) as object) };
+
   const tenant = await prisma.tenant.upsert({
     where: { slug: TENANT_SLUG },
-    update: {
-      name: 'TRANSPRENSA',
-      timezone: 'America/Bogota',
-      plan: 'pilot',
-      active: true,
-      settings,
-      branding,
-    },
+    // Nombre, zona horaria y plan tampoco se tocan: son del cliente en cuanto existe.
+    update: { settings, branding },
     create: {
       name: 'TRANSPRENSA',
       slug: TENANT_SLUG,
@@ -173,7 +214,8 @@ async function seedRoles(tenantId: string): Promise<Record<string, string>> {
   for (const definition of ROLE_DEFINITIONS) {
     const role = await prisma.role.upsert({
       where: { tenantId_code: { tenantId, code: definition.code } },
-      update: { name: definition.name, isSystem: true, active: true },
+      // Ni el nombre ni si esta activo: los dos se editan en Configuracion -> Roles.
+      update: { isSystem: true },
       create: {
         tenantId,
         code: definition.code,
@@ -202,12 +244,22 @@ async function seedRoles(tenantId: string): Promise<Record<string, string>> {
       return { roleId, permissionId, tenantId };
     });
 
-    // Clave compuesta sin valor de negocio propio: se reemplaza el set completo del rol
-    // en cada corrida para reflejar exactamente SEED_ROLE_PERMISSIONS (idempotente).
-    await prisma.rolePermission.deleteMany({ where: { roleId } });
-    if (data.length > 0) {
-      await prisma.rolePermission.createMany({ data });
-    }
+    /*
+      SOLO SE AÑADE LO QUE FALTA. NUNCA SE QUITA (2026-09-09).
+
+      Aqui habia un `deleteMany` + `createMany`: se reemplazaba el juego COMPLETO de permisos de cada
+      rol para «reflejar exactamente SEED_ROLE_PERMISSIONS». Suena razonable y es una bomba: **todo
+      permiso que un administrador haya dado a mano desaparece en la siguiente resembrada**, sin
+      error, sin aviso y sin que nadie lo note hasta que alguien no puede entrar a lo suyo.
+
+      Ya estaba escrito en el RUNBOOK del 2026-09-08 —por eso existe `dev:sincronizar-permisos`, que
+      solo añade— y el `deleteMany` seguia aqui.
+
+      Con `skipDuplicates` el resultado es el que la semilla debe dar: los roles nuevos nacen con lo
+      suyo, un permiso nuevo del producto llega a los que ya existen, y lo que el cliente concedio
+      sigue donde estaba. Quitar un permiso es una decision de una persona, en su pantalla.
+    */
+    await prisma.rolePermission.createMany({ data, skipDuplicates: true });
   }
 
   console.log(`SEED roles OK: ${ROLE_DEFINITIONS.length} roles`);
@@ -237,7 +289,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
   for (const [index, item] of AREAS.entries()) {
     const area = await prisma.area.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: { name: item.name, displayOrder: index, active: true },
+      update: {}, // El cliente renombra y desactiva sus catalogos: no se le pisa.
       create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
     });
     areaIdByCode[item.code] = area.id;
@@ -261,7 +313,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
   for (const [index, item] of PROCESSES.entries()) {
     await prisma.process.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: { name: item.name, displayOrder: index, active: true },
+      update: {}, // El cliente renombra y desactiva sus catalogos: no se le pisa.
       create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
     });
   }
@@ -275,7 +327,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
   for (const [index, item] of JOB_TITLE_TYPES.entries()) {
     const jobTitleType = await prisma.jobTitleType.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: { name: item.name, displayOrder: index, active: true },
+      update: {}, // El cliente renombra y desactiva sus catalogos: no se le pisa.
       create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
     });
     jobTitleTypeIdByCode[item.code] = jobTitleType.id;
@@ -297,7 +349,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
     }
     const jobTitle = await prisma.jobTitle.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: { name: item.name, jobTitleTypeId, displayOrder: index, active: true },
+      update: {}, // El cliente renombra y reasigna sus cargos: no se le pisa.
       create: {
         tenantId,
         code: item.code,
@@ -318,7 +370,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
   for (const [index, item] of SERVICES.entries()) {
     await prisma.service.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: { name: item.name, displayOrder: index, active: true },
+      update: {}, // El cliente renombra y desactiva sus catalogos: no se le pisa.
       create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
     });
   }
@@ -334,7 +386,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
   for (const [index, item] of REGIONALS.entries()) {
     await prisma.regional.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: { name: item.name, displayOrder: index, active: true },
+      update: {}, // El cliente renombra y desactiva sus catalogos: no se le pisa.
       create: { tenantId, code: item.code, name: item.name, displayOrder: index, active: true },
     });
   }
@@ -353,12 +405,7 @@ async function seedCatalogs(tenantId: string): Promise<CatalogSeedResult> {
   for (const [index, item] of NORMS.entries()) {
     await prisma.norm.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: {
-        name: item.name,
-        annualHoursRequired: item.annualHoursRequired,
-        displayOrder: index,
-        active: true,
-      },
+      update: {}, // Las horas exigidas por una norma las ajusta el cliente: no se le pisan.
       create: {
         tenantId,
         code: item.code,
@@ -586,14 +633,10 @@ async function seedActivityTypes(tenantId: string): Promise<void> {
 
     await prisma.activityType.upsert({
       where: { tenantId_code: { tenantId, code: item.code } },
-      update: {
-        name: item.name,
-        colorHex: item.colorHex,
-        config: configMezclada,
-        isSystem: true,
-        active: true,
-        displayOrder: index,
-      },
+      // Solo el config mezclado —para que una clave nueva llegue a los tenants que ya existen— y
+      // la marca de sistema. El nombre, el color y si esta activo los decide el cliente: el 2026-09-08
+      // apago INDUCCION_ESPECIFICA desde Configuracion, y una resembrada no puede revertirselo.
+      update: { config: configMezclada, isSystem: true },
       create: {
         tenantId,
         code: item.code,
@@ -633,12 +676,7 @@ async function seedRetention(tenantId: string): Promise<void> {
   for (const policy of POLICIES) {
     await prisma.retentionPolicy.upsert({
       where: { tenantId_recordClass: { tenantId, recordClass: policy.recordClass } },
-      update: {
-        retentionYears: policy.retentionYears,
-        legalBasis: policy.legalBasis,
-        actionOnExpiry: 'ANONYMIZE',
-        active: true,
-      },
+      update: {}, // Los años de retencion son una decision legal del cliente: no se le pisan.
       create: {
         tenantId,
         recordClass: policy.recordClass,
