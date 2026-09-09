@@ -362,6 +362,30 @@ export function createQuestionCategory(name: string, parentId?: string | null) {
   return apiFetch<QuestionCategory>('/question-categories', { method: 'POST', body: { name, parentId } });
 }
 
+/**
+ * Renombrar un tema. No reescribe historia: el nombre es una etiqueta y lo que un intento guarda es
+ * el enunciado de la pregunta. Queda en la auditoria con el nombre viejo y el nuevo.
+ */
+export function renombrarQuestionCategory(id: string, name: string) {
+  return apiFetch<QuestionCategory>(`/question-categories/${id}`, { method: 'PATCH', body: { name } });
+}
+
+/**
+ * RETIRAR UNA PREGUNTA DEL BANCO.
+ *
+ * No la borra: la marca inactiva. Lo que alguien respondio el año pasado apunta a la VERSION que
+ * respondio, y borrar la pregunta dejaria ese intento sin enunciado — que es justo lo que un auditor
+ * pide ver. Deja de ofrecerse para evaluaciones nuevas y nada mas.
+ */
+export function retirarQuestion(id: string) {
+  return apiFetch<{ ok: boolean }>(`/questions/${id}`, { method: 'DELETE' });
+}
+
+/** Solo si esta vacio: con preguntas dentro, el servidor lo rechaza y dice cuantas tiene. */
+export function borrarQuestionCategory(id: string) {
+  return apiFetch<{ ok: boolean }>(`/question-categories/${id}`, { method: 'DELETE' });
+}
+
 export function listQuestions(params: { categoryId?: string; q?: string; page?: number }) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {

@@ -319,8 +319,14 @@ export function AddContentDrawer({
             <div role="radiogroup" aria-label="Origen" className="flex gap-1 rounded-md bg-paper p-1">
               {(
                 [
-                  ['new', type === 'LESSON' ? 'Crear una nueva' : 'Crear una nueva'],
-                  ['library', 'Traer de la biblioteca'],
+                  /*
+                    «BIBLIOTECA» NO LE DECIA NADA A NADIE (2026-09-09, lo pregunto el cliente).
+                    No es un sitio al que se vaya: son las lecciones y las evaluaciones que YA
+                    existen en la empresa, que se pueden poner en varias formaciones sin volver a
+                    escribirlas. Se dice con esas palabras y se acabo la pregunta.
+                  */
+                  ['new', 'Crear una nueva'],
+                  ['library', type === 'LESSON' ? 'Traer una leccion ya creada' : 'Traer una evaluacion ya creada'],
                 ] as Array<[Mode, string]>
               ).map(([value, label]) => (
                 <button

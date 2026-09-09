@@ -40,6 +40,14 @@ export class AssessmentsController {
     return this.questions.createCategory(actor, input.name, input.parentId ?? null);
   }
 
+  /** Renombrar: un tema mal escrito el primer dia se quedaba mal escrito para siempre. */
+  @Patch('question-categories/:id')
+  @RequirePermissions('questions:manage')
+  renameCategory(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const input = createQuestionCategorySchema.pick({ name: true }).parse(body);
+    return this.questions.renameCategory(actor, id, input.name);
+  }
+
   @Delete('question-categories/:id')
   @RequirePermissions('questions:manage')
   deleteCategory(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {

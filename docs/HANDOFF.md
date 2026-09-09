@@ -24,6 +24,63 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-09 — El fondo que no separaba, y las evaluaciones explicadas
+
+Sesión corta, toda con el cliente leyendo la pantalla.
+
+### 1. EL FONDO Y LAS TARJETAS ESTABAN A 1,5 PUNTOS
+
+Lo dijo mirando: *«no hace contraste con las tarjetas»*. Y era medible: fondo `#f7f8fa` contra
+tarjeta blanca — **1,5% de luminancia**. A esa distancia el ojo no separa dos superficies, así que la
+tarjeta dejaba de leerse como tarjeta y la pantalla entera parecía una hoja con líneas encima.
+
+El fondo baja a `#eceff4` (~7 puntos). **Se mueve el fondo y no la tarjeta**, a propósito: la tarjeta
+es donde se lee y se escribe, y el blanco puro es lo que le da al texto el máximo contraste. El borde
+baja un paso con él, o se habría perdido contra el fondo nuevo. En oscuro no se toca nada: allí la
+separación ya era de nueve puntos, que es justo lo que faltaba en claro.
+
+### 2. LAS EVALUACIONES: TRES PALABRAS QUE NO EXPLICABAN NADA
+
+Las tres preguntas del cliente fueron, literalmente, *«qué es tema»*, *«qué es biblioteca»* y *«de
+dónde se administra el banco»*. Las tres tenían la misma forma: el producto usaba una palabra suya
+sin decir qué significaba **en el sitio donde aparece**.
+
+- **Tema.** Es una etiqueta de la pregunta y sirve para **una sola cosa**: que un bloque al azar
+  pueda decir «saca 10 de este montón». No cambia la pregunta, no sale en el examen y no altera lo ya
+  respondido. Ahora lo dice el propio campo, y el del bloque al azar también.
+- **Banco.** «Reutilizar una / De las ya escritas» pasa a **«Traer una ya escrita / Del banco: todas
+  las preguntas de la empresa»**. La palabra ya no hay que adivinarla.
+- **Biblioteca.** Era lo peor: no es un sitio al que se vaya. Pasa a **«Traer una lección ya creada»**.
+
+**Y lo que faltaba de verdad no era vocabulario, eran dos puertas:**
+
+1. **Un tema no se podía renombrar.** Se creaba al vuelo tecleándolo y se podía borrar —si estaba
+   vacío—, así que uno mal escrito el primer día se quedaba mal escrito para siempre. Ahora hay un
+   gestor con la lista, **cuántas preguntas tiene cada uno**, renombrar y borrar. Vive **dentro del
+   editor** y no en una pestaña propia, por lo mismo que la Decisión #84 quitó el banco: nadie entra
+   a «administrar temas», entra a armar un examen y se topa con que el tema está mal.
+2. **Una pregunta no se podía sacar del banco.** El endpoint existía desde el Sprint 2 y ninguna
+   pantalla lo usaba: la lista solo crecía. Ahora se retira desde el buscador — y **retirar no es
+   borrar**: lo que alguien respondió apunta a la versión que respondió, y borrarla dejaría ese
+   intento sin enunciado, que es lo que un auditor pide ver.
+
+**Y una comprobación que evitó trabajo:** el cliente dijo que crear una evaluación pedía «nombre y
+descripción». Se miró: pide **solo el título** —«las preguntas se escriben dentro, viendo cómo van a
+quedar»—. Lo de nombre y descripción es de **crear una lección**. No se tocó nada.
+
+### 3. Y DOS RESPUESTAS QUE NO ERAN CÓDIGO
+
+**«¿El acta se genera igual si la lista la tomó el instructor?»** Sí, y ya estaba: el acta no lee el
+QR, lee la tabla donde escriben los tres mecanismos. Se le puso su recorrido (`acta-de-lista.mjs`)
+para no volver a contestarlo de memoria.
+
+**«¿Para qué pedir asistencia si la evaluación y la encuesta se hacen en la plataforma?»** Tiene
+razón en el caso normal, y por eso está anotado como `PENDIENTES` 2.7: hoy la jornada elige una de
+las dos vías y no puede llevar lista *además*. Lo que falta es decidir si se ofrece una tercera —
+asistencia como **evidencia**, sin que cierre nada—, que es una decisión suya y no nuestra.
+
+---
+
 ## 2026-09-08 (tarde) — Los seis pendientes que eran nuestros, y dos fallos que las pruebas destaparon
 
 Sesión larga: todo lo de `PENDIENTES` que no dependía de una decisión del cliente. Seis puntos

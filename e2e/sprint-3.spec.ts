@@ -66,7 +66,7 @@ async function publishedActivity(
   await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
   await page.locator('#c-title').fill('Bienvenida');
   // Paso 2: se reutiliza una leccion de la biblioteca en vez de crear una nueva.
-  await page.getByRole('radio', { name: 'Traer de la biblioteca' }).click();
+  await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
   const lessonValue = await page
     .locator('#c-lesson option', { hasText: `Leccion ${name} ${suffix}` })
     .first()

@@ -54,6 +54,43 @@ export class QuestionsService {
     return category;
   }
 
+  /**
+   * RENOMBRAR UN TEMA (2026-09-09).
+   *
+   * Se podia crear y borrar, y no cambiar de nombre — asi que un tema mal escrito el primer dia se
+   * quedaba mal escrito para siempre, o habia que borrarlo (imposible: tiene preguntas) o crear otro
+   * y mover las preguntas a mano. Lo cazo el cliente: *"las bibliotecas o banco o temas no se pueden
+   * editar"*.
+   *
+   * El nombre no es evidencia de nada —es una etiqueta para agrupar preguntas— asi que renombrarlo
+   * no reescribe historia: los intentos ya presentados guardan la pregunta con su enunciado, no el
+   * nombre del tema. Queda en la auditoria con el nombre viejo y el nuevo, que es lo que hace falta
+   * para explicar por que un informe de hace un año decia otra cosa.
+   */
+  async renameCategory(actor: AuthUser, id: string, name: string) {
+    const antes = await this.prisma.scoped.questionCategory.findUnique({
+      where: { id },
+      select: { name: true },
+    });
+    if (!antes) throw new NotFoundException({ code: 'CATEGORY_NOT_FOUND' });
+
+    const category = await this.prisma.scoped.questionCategory.update({
+      where: { id },
+      data: { name },
+      select: { id: true, name: true, parentId: true, _count: { select: { questions: true } } },
+    });
+    await this.audit.record({
+      tenantId: this.prisma.currentTenantId,
+      userId: actor.id,
+      action: 'QUESTION_CATEGORY_RENAMED',
+      resourceType: 'question_categories',
+      resourceId: id,
+      oldValues: { name: antes.name },
+      newValues: { name },
+    });
+    return category;
+  }
+
   async deleteCategory(actor: AuthUser, id: string) {
     const [questions, children] = await Promise.all([
       this.prisma.scoped.question.count({ where: { categoryId: id } }),
@@ -62,7 +99,10 @@ export class QuestionsService {
     if (questions > 0 || children > 0) {
       throw new ConflictException({
         code: 'CATEGORY_IN_USE',
-        message: 'La categoria tiene preguntas o subcategorias.',
+        message:
+          questions > 0
+            ? `Este tema tiene ${questions} pregunta(s) dentro. Quitales el tema o cambiaselo antes de borrarlo: borrarlo con preguntas dejaria los bloques al azar que lo usan sin de donde sacar.`
+            : 'Este tema tiene subtemas dentro. Borra primero los subtemas.',
       });
     }
     await this.prisma.scoped.questionCategory.delete({ where: { id } });

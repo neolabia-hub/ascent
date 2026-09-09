@@ -29,6 +29,7 @@ import {
   getAssessment,
   getQuestion,
   listQuestionCategories,
+  retirarQuestion,
   listQuestions,
   reviseQuestion,
   setQuestionCategory,
@@ -43,6 +44,7 @@ import {
 } from '@/lib/catalog-api';
 import type { AnswerInput } from '@/lib/learner-api';
 import { emptyPayload, loQueFaltaEnLaPregunta, QTYPE_HINT, QTYPE_LABEL } from '@/components/assessments/question-model';
+import { AdministrarTemas } from '@/components/assessments/temas';
 import { QuestionCanvas } from '@/components/assessments/question-canvas';
 import { ExamStage, type StageQuestion } from '@/components/assessments/exam-stage';
 import {
@@ -139,6 +141,18 @@ export default function EvaluacionEditorPage() {
   const [pasos, setPasos] = useState<Paso[]>([]);
   const [presentation, setPresentation] = useState<Presentation>(PRESENTATION_DEFAULT);
   const [categories, setCategories] = useState<QuestionCategory[]>([]);
+  /*
+    EL GESTOR DE TEMAS, A UN CLIC DE DONDE SE USAN (2026-09-09).
+
+    Se podian crear al vuelo desde el campo de la pregunta y nada mas: un tema mal escrito el primer
+    dia no habia forma de arreglarlo, y nadie sabia cuantas preguntas tenia cada uno. Lo cazo el
+    cliente. Vive aqui dentro y no en una pestaña propia por lo mismo que se quito el banco
+    (Decision #84): nadie entra a "administrar temas", entra a armar un examen.
+  */
+  const [temasAbierto, setTemasAbierto] = useState(false);
+  const recargarTemas = useCallback(async () => {
+    setCategories(await listQuestionCategories().catch(() => []));
+  }, []);
   const [seleccion, setSeleccion] = useState<Seleccion>({ tipo: 'CALIFICA' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -646,8 +660,8 @@ export default function EvaluacionEditorPage() {
                     <OpcionAgregar icono={PenLine} titulo="Escribir pregunta" pista="La mas comun." onClick={escribir} />
                     <OpcionAgregar
                       icono={Library}
-                      titulo="Reutilizar una"
-                      pista="De las ya escritas."
+                      titulo="Traer una ya escrita"
+                      pista="Del banco: todas las preguntas de la empresa."
                       onClick={reutilizar}
                     />
                     <OpcionAgregar
@@ -724,6 +738,16 @@ export default function EvaluacionEditorPage() {
                 onCategoria={setBancoCategoria}
                 categories={categories}
                 excluidas={yaEnElExamen}
+                onRetirar={async (id) => {
+                  try {
+                    await retirarQuestion(id);
+                    setBanco(await listQuestions({ q: bancoQuery, categoryId: bancoCategoria }).catch(() => banco));
+                    setCategories(await listQuestionCategories().catch(() => categories));
+                    showToast({ kind: 'success', title: 'Retirada del banco', description: 'Deja de ofrecerse. Lo ya respondido no se toca.' });
+                  } catch (fallo) {
+                    showToast({ kind: 'danger', title: 'No se pudo retirar', description: motivoDelError(fallo) });
+                  }
+                }}
                 onElegir={async (pregunta) => {
                   if (!pregunta.qtype) return;
                   /*
@@ -766,6 +790,7 @@ export default function EvaluacionEditorPage() {
                 onChange={(cambio) =>
                   tocar(pasos.map((p) => (p.localId === pasoActivo.localId ? { ...pasoActivo, ...cambio } : p)))
                 }
+                onAdministrarTemas={() => setTemasAbierto(true)}
               />
             ) : (
               <QuestionCanvas
@@ -775,6 +800,17 @@ export default function EvaluacionEditorPage() {
               />
             )}
           </div>
+
+          {/*
+            EL GESTOR DE TEMAS, montado una vez para toda la pantalla: se abre desde el campo Tema de
+            una pregunta y desde el bloque al azar, que son los dos sitios donde un tema significa algo.
+          */}
+          <AdministrarTemas
+            open={temasAbierto}
+            onOpenChange={setTemasAbierto}
+            categories={categories}
+            onCambio={recargarTemas}
+          />
 
           {/* ─────────────── AJUSTES DE LA PREGUNTA ─────────────── */}
           {pasoActivo?.kind === 'Q' ? (
@@ -1041,7 +1077,8 @@ function AjustesPregunta({
         <Field
           htmlFor="ap-tema"
           label="Tema"
-          hint="Opcional. Solo hace falta si algun examen quiere sacar preguntas al azar de este monton."
+          hint="Opcional. Es una etiqueta: no cambia la pregunta ni sale en el examen."
+          ayuda="Ponerle un tema a esta pregunta la mete en ese montón, y con eso un bloque al azar puede decir «saca 10 de aquí». Eso es todo lo que hace: no la cambia, no sale en el examen y no altera lo ya respondido. Si tus evaluaciones eligen las preguntas a mano, déjala en «Sin tema» — no falta nada."
         >
           {creandoTema ? (
             <div className="flex gap-1.5">
@@ -1143,11 +1180,13 @@ function BloqueAlAzar({
   categories,
   disabled,
   onChange,
+  onAdministrarTemas,
 }: {
   bloque: Extract<Paso, { kind: 'RANDOM' }>;
   categories: QuestionCategory[];
   disabled: boolean;
   onChange: (cambio: Partial<Extract<Paso, { kind: 'RANDOM' }>>) => void;
+  onAdministrarTemas: () => void;
 }) {
   const disponibles = categories.find((c) => c.id === bloque.categoryId)?._count.questions ?? 0;
   const corto = bloque.pickCount > disponibles;
@@ -1170,7 +1209,11 @@ function BloqueAlAzar({
       </p>
 
       <div className="mt-7 grid gap-4 sm:grid-cols-[1fr_8rem]">
-        <Field htmlFor="ba-tema" label="Del tema">
+        <Field
+          htmlFor="ba-tema"
+          label="Del tema"
+          ayuda="Un tema es una etiqueta que se le pone a las preguntas: no cambia la pregunta ni sale en el examen. Sirve justo para esto — que el bloque pueda decir «saca 10 de este montón». El número entre paréntesis es cuántas preguntas hay etiquetadas con él."
+        >
           <Select
             id="ba-tema"
             value={bloque.categoryId}
@@ -1207,6 +1250,21 @@ function BloqueAlAzar({
           ? `Solo hay ${disponibles} preguntas en ese tema: no alcanza y no se podra publicar.`
           : `Hay ${disponibles} preguntas en ese tema. Cada persona recibira ${bloque.pickCount}, distintas entre si.`}
       </p>
+
+      {/*
+        LA SALIDA CUANDO EL TEMA NO ES EL QUE HACE FALTA (2026-09-09).
+
+        Aqui es donde se descubre que el tema esta mal escrito, que sobra o que falta uno — y hasta
+        hoy no habia por donde arreglarlo sin salirse de la evaluacion. El boton no compite con nada:
+        va debajo del aviso, en texto, porque es la excepcion y no el camino.
+      */}
+      <button
+        type="button"
+        className="focus-ring mt-3 rounded-md text-sm text-ink-500 underline underline-offset-2 hover:text-ink-900"
+        onClick={onAdministrarTemas}
+      >
+        Crear, renombrar o borrar temas
+      </button>
     </div>
   );
 }
@@ -1220,6 +1278,7 @@ function ElegirDelBanco({
   categories,
   excluidas,
   onElegir,
+  onRetirar,
   onCancelar,
 }: {
   banco: QuestionsPage | null;
@@ -1230,6 +1289,8 @@ function ElegirDelBanco({
   categories: QuestionCategory[];
   excluidas: Set<string>;
   onElegir: (pregunta: QuestionsPage['items'][number]) => void | Promise<void>;
+  /** Retira del banco una pregunta que sobra. No la borra: la marca inactiva. */
+  onRetirar: (id: string) => void | Promise<void>;
   onCancelar: () => void;
 }) {
   const disponibles = (banco?.items ?? []).filter(
@@ -1289,18 +1350,38 @@ function ElegirDelBanco({
                 renglon de una lista dentro de un cajon. Elegir a ciegas era como acababan colandose
                 duplicados con distinta redaccion.
               */}
-              <button
-                type="button"
-                onClick={() => void onElegir(pregunta)}
-                className="focus-ring w-full rounded-xl border border-line bg-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:border-line-strong"
-              >
-                <p className="text-sm text-ink-900">{pregunta.stem}</p>
-                <p className="mt-1 text-xs text-ink-500">
-                  {pregunta.qtype ? QTYPE_LABEL[pregunta.qtype] : 'Sin version'} · {pregunta.points}{' '}
-                  {pregunta.points === 1 ? 'punto' : 'puntos'}
-                  {pregunta.categoryName ? ` · ${pregunta.categoryName}` : ' · sin tema'}
-                </p>
-              </button>
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={() => void onElegir(pregunta)}
+                  className="focus-ring w-full rounded-xl border border-line bg-surface p-4 pr-12 text-left transition-all hover:-translate-y-0.5 hover:border-line-strong"
+                >
+                  <p className="text-sm text-ink-900">{pregunta.stem}</p>
+                  <p className="mt-1 text-xs text-ink-500">
+                    {pregunta.qtype ? QTYPE_LABEL[pregunta.qtype] : 'Sin version'} · {pregunta.points}{' '}
+                    {pregunta.points === 1 ? 'punto' : 'puntos'}
+                    {pregunta.categoryName ? ` · ${pregunta.categoryName}` : ' · sin tema'}
+                  </p>
+                </button>
+                {/*
+                  RETIRAR DEL BANCO (2026-09-09). Era la puerta que faltaba: se podian escribir y
+                  reutilizar preguntas, y no habia forma de sacar del banco una que sobra o que se
+                  escribio mal — asi que la lista solo crecia.
+
+                  NO la borra: la marca inactiva. Lo que alguien respondio apunta a la version que
+                  respondio, y borrarla dejaria ese intento sin enunciado, que es lo que un auditor
+                  pide ver. Deja de ofrecerse y nada mas.
+                */}
+                <button
+                  type="button"
+                  aria-label={`Retirar del banco: ${pregunta.stem.slice(0, 60)}`}
+                  title="Retirar del banco"
+                  className="focus-ring absolute right-3 top-3 rounded-md p-1.5 text-ink-300 opacity-0 transition-opacity duration-150 hover:text-danger focus:opacity-100 group-hover:opacity-100"
+                  onClick={() => void onRetirar(pregunta.id)}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             </li>
           ))}
         </ul>

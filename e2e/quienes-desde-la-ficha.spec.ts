@@ -140,7 +140,7 @@ test.describe('Quienes, desde la ficha de la formacion', () => {
     await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
     await page.locator('#c-title').fill('Bienvenida');
     // Se reutiliza la leccion de la biblioteca, igual que en sprint-3.
-    await page.getByRole('radio', { name: 'Traer de la biblioteca' }).click();
+    await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
     const lessonValue = await page
       .locator('#c-lesson option', { hasText: `Leccion auto ${suffix}` })
       .first()

@@ -69,7 +69,7 @@ depende de un trabajo del Sprint 6—.
 | **SCORM** (comprar cursos empaquetados a un proveedor) | **Importante, pero después.** La base ya lo soporta; el reproductor son 3-6 semanas y solo hace falta el día que se compre contenido de fuera |
 | **Contenido y firmantes de la constancia** | **Lo carga el cliente en producción.** Es su plantilla, su logo y sus firmas: se configura en Configuración → Constancias cuando el piloto esté arriba |
 | **Umbral SARLAFT** | Pendiente de su área legal. No es código: si aplica, se resuelve con una regla de audiencia |
-| **Temas, banco y biblioteca no se pueden renombrar** | Anotado por el cliente el 2026-09-08. Un tema se crea y se borra, pero no se edita: falta la puerta de renombrar. **Se hace con el bloque de evaluaciones** |
+| ~~Temas, banco y biblioteca no se pueden renombrar~~ | **HECHO el 2026-09-09.** Un tema se crea, se **renombra** y se borra desde el propio editor de la evaluación («Crear, renombrar o borrar temas»), con su número de preguntas a la vista; una pregunta se puede **retirar del banco** desde el buscador; y «biblioteca» pasó a llamarse «Traer una lección ya creada», que es lo que es |
 
 ## 6. Operación
 

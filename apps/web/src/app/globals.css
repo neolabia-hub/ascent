@@ -18,10 +18,21 @@
   --ink-700: #2a3138;
   --ink-500: #5b6572;
   --ink-300: #aab3bd;
-  --paper: #f7f8fa;
+  /*
+    EL FONDO Y LA HOJA, CON DISTANCIA SUFICIENTE (2026-09-09).
+
+    Estaban a 1,5 puntos de luminancia —#f7f8fa contra blanco— y el cliente lo vio antes que nadie:
+    "no hace contraste con las tarjetas". A esa distancia el ojo no separa dos superficies y la
+    pantalla se lee como una sola hoja con lineas encima.
+
+    Se mueve el FONDO, no la tarjeta: la tarjeta es donde se lee y se escribe, y el blanco puro es
+    lo que le da al texto el maximo contraste. El borde baja un paso con el, o se perderia contra
+    el fondo nuevo.
+  */
+  --paper: #eceff4;
   --surface: #ffffff;
-  --line: #e5e8ec;
-  --line-strong: #cdd3da;
+  --line: #dfe3e9;
+  --line-strong: #c6cdd6;
 
   /* Plataforma — semanticos (color + fondo suave) */
   --ok: #1a7f4e;

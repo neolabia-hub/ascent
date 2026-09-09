@@ -37,7 +37,7 @@ async function publishedActivity(page: import('@playwright/test').Page, suffix: 
   await page.getByRole('button', { name: 'Agregar contenido' }).first().click();
   await page.getByRole('button', { name: 'Leccion en tarjetas' }).click();
   await page.locator('#c-title').fill('Bienvenida');
-  await page.getByRole('radio', { name: 'Traer de la biblioteca' }).click();
+  await page.getByRole('radio', { name: /Traer una leccion ya creada|Traer de la biblioteca/ }).click();
   const lessonValue = await page
     .locator('#c-lesson option', { hasText: `Leccion ${name} ${suffix}` })
     .first()
