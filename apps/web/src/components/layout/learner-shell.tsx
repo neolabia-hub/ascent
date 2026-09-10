@@ -35,12 +35,24 @@ import { LearnerTopbar } from './learner-topbar';
 interface NavItem {
   href: string;
   label: string;
+  /**
+   * Como se llama EN LA BARRA DE ABAJO, cuando el nombre entero no cabe.
+   *
+   * La barra reparte el ancho del telefono entre sus items, y con el de Desempeño puesto son
+   * CINCO: a 402px tocan a 80px cada uno. «Mi aprendizaje» necesita mas, asi que se partia en dos
+   * lineas y se montaba encima del item de al lado — con la barra fija a su alto, el texto salia
+   * por fuera. No era un rotulo apretado: eran dos palabras encima de otras dos.
+   *
+   * En el carril de escritorio no pasa —hay 264px de ancho— y por eso ahi se sigue leyendo
+   * entero. Es la misma pieza diciendo lo mismo con las palabras que caben en cada sitio.
+   */
+  corto?: string;
   icon: LucideIcon;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/hoy', label: 'Inicio', icon: House },
-  { href: '/mi-formacion', label: 'Mi aprendizaje', icon: GraduationCap },
+  { href: '/mi-formacion', label: 'Mi aprendizaje', corto: 'Aprender', icon: GraduationCap },
   { href: '/repaso', label: 'Repaso', icon: Repeat2 },
   { href: '/perfil', label: 'Perfil', icon: CircleUser },
 ];
@@ -123,7 +135,27 @@ export function LearnerShell({ children }: { children: ReactNode }) {
       precio conocido de desplazar por dentro es que la barra del navegador movil ya no se recoge
       al bajar; se acepta porque la alternativa era perder la cabecera.
     */
-    <div className="learner-surface h-[100dvh] overflow-hidden bg-paper lg:flex">
+    /*
+      EN TELEFONO TAMBIEN ES UNA COLUMNA FLEXIBLE, y esto era el fallo de fondo.
+
+      Ponia `lg:flex`, asi que en telefono la raiz NO era flex: era un bloque corriente. Y entonces
+      el `flex-1` de la columna de dentro no significaba nada —`flex-1` solo lo entiende un padre
+      flexible—, asi que esa columna crecia con su contenido en vez de medir la pantalla. Con ella,
+      el `flex-1` de `<main>` tampoco tenia contra que repartir: `main` acababa midiendo lo mismo
+      que su contenido, nunca desbordaba y **su `overflow-y-auto` no llegaba a desplazar nada**.
+
+      El resultado no era una barra que tapa: era que la raiz, con `h-[100dvh] overflow-hidden`,
+      RECORTABA todo lo que pasara de la pantalla y no habia forma de llegar a ello. Medido: la
+      pagina entera daba 874px de alto en un telefono de 874px, y cero elementos desplazables.
+
+      Por eso «no deja bajar» y por eso el boton de «Empezar» de una formacion no se podia pulsar:
+      no estaba debajo de la barra, estaba fuera de la parte visible del documento. En escritorio
+      no se veia porque ahi `lg:flex` si estaba puesto.
+
+      `flex flex-col lg:flex-row` es lo mismo de antes en escritorio —una fila con el carril al
+      lado— y arregla el telefono, que es donde vive el 95% de esta gente.
+    */
+    <div className="learner-surface flex h-[100dvh] flex-col overflow-hidden bg-paper lg:flex-row">
       {/* Carril lateral: solo escritorio. */}
       {/*
         UNA SOLA SUPERFICIE (Decision #89). La barra comparte fondo con el cuerpo y se separa por
@@ -243,7 +275,14 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         */}
         <LearnerTopbar greeting={saludoDe()} onSearch={() => setPaletteOpen(true)} wide={cine} />
 
-        <main className="min-h-0 flex-1 overflow-y-auto pb-24 lg:pb-10">
+        {/*
+          EL HUECO DE ABAJO LO DICE LA BARRA, no un numero escrito a ojo (`--barra-espacio`, en
+          globals.css). Con `pb-24` faltaba casi un centimetro en cualquier telefono con area
+          segura, y lo ultimo de cada pantalla quedaba DEBAJO de la barra: el boton «Empezar» de una
+          formacion y la tarjeta de «Sigue donde ibas» de Inicio se veian a medias y no se dejaban
+          pulsar, porque la barra flota encima y se queda los toques.
+        */}
+        <main className="min-h-0 flex-1 overflow-y-auto pb-[var(--barra-espacio)] lg:pb-10">
           {cine ? (
             children
           ) : (
@@ -262,23 +301,27 @@ export function LearnerShell({ children }: { children: ReactNode }) {
           flota sobre el contenido, con el mismo radio y la misma sombra que la barra lateral: una
           persona que usa el telefono y el computador ve el MISMO producto, no dos.
 
-          Se separa del borde tambien por abajo (`bottom-3` + el area segura), que es lo que la
-          aleja de la barra de gestos del telefono: pegada al filo, el gesto de "volver atras" de
-          iOS y Android se come los toques del primer y del ultimo icono.
+          Se separa del borde tambien por abajo, que es lo que la aleja de la barra de gestos del
+          telefono: pegada al filo, el gesto de "volver atras" de iOS y Android se come los toques
+          del primer y del ultimo icono.
+
+          CUANTO se separa lo dice `--barra-hueco` (globals.css), y es un `max()` y no una suma:
+          antes era `area-segura + 12px`, que cuenta dos veces el mismo espacio y dejaba la barra
+          flotando muy por encima del filo en cualquier telefono con gestos.
         */
-        className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-30 rounded-2xl border border-line bg-surface/90 shadow-card-hover backdrop-blur-lg lg:hidden"
+        className="fixed inset-x-3 bottom-[var(--barra-hueco)] z-30 rounded-2xl border border-line bg-surface/90 shadow-card-hover backdrop-blur-lg lg:hidden"
       >
         <ul className="mx-auto flex w-full items-stretch p-1">
           {navItems.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
             return (
-              <li key={item.href} className="flex-1">
+              <li key={item.href} className="min-w-0 flex-1">
                 <Link
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'focus-ring relative flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-medium transition-colors duration-150 ease-pulse',
+                    'focus-ring relative flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[11px] font-medium transition-colors duration-150 ease-pulse',
                     active ? 'text-ink-900' : 'text-ink-500',
                   )}
                 >
@@ -291,12 +334,18 @@ export function LearnerShell({ children }: { children: ReactNode }) {
                     />
                   ) : null}
                   <Icon
-                    className="relative h-5 w-5"
+                    className="relative h-5 w-5 shrink-0"
                     strokeWidth={active ? 2 : 1.75}
                     aria-hidden="true"
                     style={active ? { color: 'var(--brand-primary)' } : undefined}
                   />
-                  <span className="relative">{item.label}</span>
+                  {/*
+                    `truncate` es la red de seguridad, no la solucion: lo que hace que quepa es el
+                    nombre corto. Pero un rotulo que no puede partirse en dos lineas NUNCA vuelve a
+                    montarse encima del de al lado, aunque mañana entre un item mas o alguien
+                    traduzca «Repaso» a una palabra de doce letras.
+                  */}
+                  <span className="relative w-full truncate text-center">{item.corto ?? item.label}</span>
                 </Link>
               </li>
             );

@@ -94,7 +94,7 @@ function Notifications() {
           tres cosas pegadas.
         */
         className={cn(
-          'focus-ring group/bell relative flex h-10 w-10 items-center justify-center rounded-full border shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
+          'focus-ring group/bell relative shrink-0 flex h-10 w-10 items-center justify-center rounded-full border shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:shadow-card-hover',
           open ? 'border-transparent text-ink-900' : 'border-line text-ink-500 hover:border-line-strong hover:text-ink-900',
         )}
         // Ver la nota del tono en `barras`: 5% de marca en reposo, --primary-soft al abrir.
@@ -324,6 +324,7 @@ export function LearnerTopbar({
   leadingControls,
   trailing,
   wide = false,
+  buscador = true,
 }: {
   greeting?: string;
   onSearch: () => void;
@@ -332,6 +333,18 @@ export function LearnerTopbar({
   leadingControls?: ReactNode;
   trailing?: ReactNode;
   wide?: boolean;
+  /**
+   * SE APAGA EN EL REPRODUCTOR, y por dos motivos.
+   *
+   * El de producto: mientras alguien cursa, buscar otra formacion es la definicion de una
+   * invitacion a irse. Esa pantalla se diseño sin navegacion a proposito y el buscador era lo
+   * ultimo que quedaba de ella.
+   *
+   * El de fallo: alli el reproductor pasaba `onSearch={onExit}`, asi que la lupa del telefono no
+   * buscaba nada — SALIA DE LA FORMACION. Un icono de lupa que te echa de la leccion es peor que
+   * no tener buscador.
+   */
+  buscador?: boolean;
 }) {
   const profile = useLearnerProfile();
   const pathname = usePathname();
@@ -393,23 +406,47 @@ export function LearnerTopbar({
       )}
     >
       <div className={cn('flex h-16 w-full items-center gap-3 px-5 lg:px-8', wide ? '' : 'mx-auto max-w-[1100px]')}>
+        {/*
+          EL SALUDO CEDE EL SITIO, Y EN TELEFONO CEDE LA MITAD.
+
+          Llevaba `shrink-0`, que con `truncate` al lado es una contradiccion: `truncate` solo
+          recorta si algo le limita el ancho, y `shrink-0` es precisamente la orden de no ceder
+          nunca. Asi que el saludo se quedaba su ancho entero —«Buenos dias, Miguel» son unos
+          150px— y empujaba a los demas. En escritorio no se notaba porque el buscador del centro
+          se comia el sobrante; en telefono ese buscador esta oculto (`lg:flex`), asi que **no
+          habia nada flexible en la fila** y lo ultimo, que es el avatar, se salia de la pantalla.
+
+          Ahora en telefono el saludo es el unico elemento elastico: se lleva el hueco que sobra y
+          se recorta cuando no cabe. En `lg` vuelve a su ancho natural, que es donde el buscador
+          tiene que quedarse el centro (Decision #90).
+
+          Y en las pantallas estrechas se cae la formula de cortesia y queda el nombre. No es lo
+          mismo recortar que abreviar: «Buenos di…» no saluda a nadie, y «Miguel» si.
+
+          EL CORTE ESTA EN 560px Y NO EN 400, y el numero sale de mirarlo. A 402px —un telefono
+          corriente— la fila ya lleva la racha y tres botones redondos, asi que al saludo le
+          quedaban 60px y salia «Buen…». Que es peor que no saludar. Desde 560px sobra sitio para
+          la frase entera; por debajo, el nombre solo, que es lo que importa de un saludo.
+        */}
         {leading ?? (
-          <p className="min-w-0 shrink-0 truncate">
-            <span className="text-sm text-ink-500">{greeting}, </span>
+          <p className="min-w-0 flex-1 truncate lg:flex-none lg:shrink-0">
+            <span className="hidden text-sm text-ink-500 min-[560px]:inline">{greeting}, </span>
             <span className="font-display text-base font-semibold text-ink-900">
               {profile.fullName.split(/\s+/)[0]}
             </span>
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={onSearch}
-          aria-label="Buscar"
-          className="focus-ring flex h-10 w-10 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900 lg:hidden"
-        >
-          <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
-        </button>
+        {buscador ? (
+          <button
+            type="button"
+            onClick={onSearch}
+            aria-label="Buscar"
+            className="focus-ring shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900 lg:hidden"
+          >
+            <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        ) : null}
 
         {/*
           EL BUSCADOR OCUPA EL CENTRO y se lleva el espacio sobrante (Decision #90).
@@ -430,15 +467,21 @@ export function LearnerTopbar({
           la barra de arriba es un parpadeo en el rabillo del ojo durante toda la jornada, y esto lo
           mira gente que esta leyendo otra cosa.
         */}
-        <button
-          type="button"
-          onClick={onSearch}
-          className="aurora-focus focus-ring hidden h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-transparent hover:text-ink-700 lg:flex"
-        >
-          <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-          <span className="flex-1 truncate text-left">Buscar una formación</span>
-          <kbd className="shrink-0 rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
-        </button>
+        {buscador ? (
+          <button
+            type="button"
+            onClick={onSearch}
+            className="aurora-focus focus-ring hidden h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-line bg-surface px-4 text-sm text-ink-500 transition-colors duration-150 hover:border-transparent hover:text-ink-700 lg:flex"
+          >
+            <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <span className="flex-1 truncate text-left">Buscar una formación</span>
+            <kbd className="shrink-0 rounded border border-line px-1.5 text-[11px] text-ink-300">Ctrl K</kbd>
+          </button>
+        ) : (
+          // Sin buscador nadie se lleva el hueco del centro, y el bloque de la persona se quedaria
+          // pegado al titulo. Este relleno hace ese trabajo y no dibuja nada.
+          <span aria-hidden="true" className="hidden flex-1 lg:block" />
+        )}
 
         {/*
           `leadingControls` son los controles de la PANTALLA (plegar un panel, por ejemplo) y van

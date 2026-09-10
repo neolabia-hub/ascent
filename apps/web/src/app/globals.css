@@ -145,6 +145,35 @@
 .learner-surface {
   font-size: 16px;
   overscroll-behavior-y: contain;
+
+  /*
+   * LA BARRA INFERIOR SE MIDE UNA SOLA VEZ, AQUI.
+   *
+   * Antes su alto estaba en dos sitios: la barra se colocaba con `bottom-[...+12px]` y el
+   * contenido se apartaba con un `pb-24` escrito a ojo. Dos numeros que tienen que cuadrar y que
+   * nadie vuelve a comparar. No cuadraban:
+   *
+   *   barra = 3.5rem del item + 0.5rem de relleno  = 4rem
+   *   hueco = 0.75rem + el area segura del telefono (hasta 2.125rem en un iPhone)
+   *   total = hasta 6.875rem   ...contra un `pb-24` de 6rem
+   *
+   * Faltaba casi un centimetro, asi que la barra tapaba lo ultimo de cada pantalla: el boton
+   * «Empezar» de una formacion y la tarjeta de «Sigue donde ibas» de Inicio. Y no era solo que no
+   * se vieran — es que NO SE PODIAN PULSAR, porque la barra flota por encima y se queda los toques.
+   *
+   * Ahora los tres valores salen de aqui y no pueden separarse.
+   *
+   * EL HUECO ES `max()` Y NO UNA SUMA, y esa es la otra mitad del arreglo. Sumar
+   * `area-segura + 12px` cuenta dos veces lo mismo: el area segura YA ES el espacio que el telefono
+   * reserva para su barra de gestos. En un movil con gestos eso dejaba la barra a mas de un
+   * centimetro y medio del filo, flotando en mitad de la nada — que es exactamente el «sale muy
+   * arriba» que se vio. Con `max()`, un telefono sin area segura la deja flotando sus 12px y uno
+   * con area segura la apoya justo encima de ella. Que es lo que hace una aplicacion.
+   */
+  --barra-hueco: max(0.75rem, env(safe-area-inset-bottom));
+  /* 3.5rem del item + 0.5rem de relleno + los 2px de sus dos bordes. Medido, no estimado. */
+  --barra-alto: calc(4rem + 2px);
+  --barra-espacio: calc(var(--barra-hueco) + var(--barra-alto) + 1rem);
 }
 
 /*
