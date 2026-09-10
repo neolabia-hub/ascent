@@ -84,6 +84,43 @@ export const PERMISSIONS = [
 
 export type PermissionCode = (typeof PERMISSIONS)[number];
 
+/**
+ * LOS PERMISOS QUE SOLO ALCANZAN A LO PROPIO.
+ *
+ * Tener unicamente permisos de esta lista significa: esta persona no administra nada. De ahi
+ * cuelgan dos decisiones de la interfaz, y las dos se equivocaron a la vez el 2026-09-10:
+ *
+ *   1. A DONDE ENTRA al iniciar sesion. Quien solo tiene lo suyo va a `/hoy`; mandarlo al panel
+ *      de administracion es mandarlo a una pantalla donde todo esta prohibido.
+ *   2. SI VE EL CONMUTADOR de vuelta al panel. Para el 95% del personal operativo la superficie
+ *      del aprendiz es la unica que existe, y una puerta de mas es una pantalla prohibida a un
+ *      toque.
+ *
+ * QUE PASO. La lista vivia suelta en `apps/web/src/lib/landing.ts` y tenia UN elemento,
+ * `enrollments:read_own`. Cuando el rol Usuario crecio a tres permisos —le llegaron
+ * `performance:read_own` (ver su evaluacion de desempeno) y `attendance:sign` (firmar su propia
+ * asistencia)— nadie volvio a mirar esa lista. A partir de ese dia, **un conductor iniciaba sesion
+ * y aterrizaba en el panel de administracion**, y ademas le salia el conmutador. Ninguna de las
+ * dos cosas dio error: las dos "funcionaban".
+ *
+ * POR QUE AHORA VIVE AQUI Y NO ALLI. Al lado del catalogo de permisos, que es lo unico que la
+ * puede dejar vieja. Y se DERIVA en vez de escribirse: todo lo que acabe en `:read_own` entra
+ * solo, asi que un permiso nuevo de esa forma no hay que acordarse de clasificarlo. Lo que no
+ * sigue el patron se declara a mano, abajo, con su motivo.
+ *
+ * Y hay una prueba que lo sujeta: `apps/api/src/auth/aprendiz-solo.spec.ts` falla si el rol
+ * Usuario de la semilla deja de ser enteramente "de lo suyo". Es la comprobacion que faltaba.
+ */
+const PROPIOS_QUE_NO_SIGUEN_EL_PATRON = new Set<PermissionCode>([
+  // Firmar SU asistencia (escanear el QR de la sesion, firmar en su telefono). Es de todo usuario
+  // autenticado y sobre si mismo; tomar la lista de los demas es `attendance:take`, que es otro.
+  'attendance:sign',
+]);
+
+export const LEARNER_ONLY_PERMISSIONS: readonly PermissionCode[] = PERMISSIONS.filter(
+  (permission) => permission.endsWith(':read_own') || PROPIOS_QUE_NO_SIGUEN_EL_PATRON.has(permission),
+);
+
 /** Roles semilla del tenant y sus permisos por defecto (el admin puede ajustarlos por UI). */
 export const SEED_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]> = {
   // Control total del tenant.
