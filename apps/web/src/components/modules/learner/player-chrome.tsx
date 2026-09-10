@@ -5,9 +5,11 @@ import {
   CircleUser,
   GraduationCap,
   House,
+  ListTree,
   PanelRightClose,
   PanelRightOpen,
   Repeat2,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -214,18 +216,51 @@ export function PlayerShell({
   subtitle,
   indexOpen,
   onToggleIndex,
+  sheetOpen,
+  onToggleSheet,
   onExit,
   index,
   children,
 }: {
   activityName: string;
   subtitle: string | null;
+  /** El carril de la derecha, en escritorio. Es una preferencia y se recuerda. */
   indexOpen: boolean;
   onToggleIndex: () => void;
+  /**
+   * EL CAJON DEL TELEFONO, que es un estado aparte y NO se recuerda.
+   *
+   * Son dos cosas distintas aunque enseñen lo mismo. En escritorio el indice es una columna que
+   * convive con el contenido, asi que dejarla abierta es comodo y tiene sentido recordarlo. En
+   * telefono TAPA la pantalla: abrirlo solo se hace para mirar donde voy o saltar a otra parte, y
+   * abrir el reproductor con el cajon puesto seria empezar cada leccion con el contenido tapado.
+   *
+   * Y son dos botones, no uno: asi cual actua lo decide el CSS —uno es `lg:hidden` y el otro
+   * `hidden lg:flex`— y no hay que preguntarle a JavaScript por el ancho de la pantalla, que es lo
+   * que provoca que la primera pintada no coincida con la del servidor.
+   */
+  sheetOpen: boolean;
+  onToggleSheet: () => void;
   onExit: () => void;
-  index: ReactNode;
+  /**
+   * El indice, pedido segun donde se vaya a pintar. Es una funcion y no un nodo porque hace falta
+   * en dos envoltorios distintos —columna y cajon— y montar dos copias del mismo arbol para tener
+   * las dos a mano seria pedir dos veces lo mismo.
+   */
+  index: (presentacion: 'carril' | 'hoja') => ReactNode;
   children: ReactNode;
 }) {
+  // Escape cierra el cajon. En telefono no hay teclado, pero esta pantalla tambien se abre en un
+  // portatil estrecho, y un panel que tapa sin salida por teclado es una trampa.
+  useEffect(() => {
+    if (!sheetOpen) return undefined;
+    const alPulsar = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') onToggleSheet();
+    };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, [sheetOpen, onToggleSheet]);
+
   return (
     /*
       `h-screen` con `overflow-hidden`, no `min-h-screen`: lo unico que se desplaza es el
@@ -239,6 +274,7 @@ export function PlayerShell({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <LearnerTopbar
           wide
+          buscador={false}
           onSearch={onExit}
           leading={
             <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -271,28 +307,89 @@ export function PlayerShell({
             que es donde todo el mundo busca "atras".
           */
           leadingControls={
-            <button
-              type="button"
-              onClick={onToggleIndex}
-              aria-label={indexOpen ? 'Ocultar el contenido de la formación' : 'Ver el contenido de la formación'}
-              aria-pressed={indexOpen}
-              className="focus-ring hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-500 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:text-ink-900 hover:shadow-card-hover lg:flex"
-              style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
-            >
-              {indexOpen ? (
-                <PanelRightClose className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
-              ) : (
-                <PanelRightOpen className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
-              )}
-            </button>
+            <>
+              {/*
+                EN TELEFONO TAMBIEN HAY PUERTA AL CONTENIDO, y hasta hoy no la habia.
+
+                El boton era `hidden lg:flex` y el indice tambien, asi que quien cursaba desde el
+                telefono —que es casi todo el mundo aqui— no tenia forma de saber por que parte iba,
+                cuanto le faltaba, ni de volver a una parte anterior. Se cursaba a ciegas.
+
+                Lleva la lista y no el icono de panel: en telefono no se abre un panel lateral, se
+                despliega un cajon, y una lista dice «aqui esta el indice» sin conocer el lenguaje
+                de los paneles de escritorio.
+              */}
+              <button
+                type="button"
+                onClick={onToggleSheet}
+                aria-label="Ver el contenido de la formación"
+                aria-expanded={sheetOpen}
+                className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-500 shadow-card transition-all duration-200 ease-pulse lg:hidden"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+              >
+                <ListTree className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleIndex}
+                aria-label={indexOpen ? 'Ocultar el contenido de la formación' : 'Ver el contenido de la formación'}
+                aria-pressed={indexOpen}
+                className="focus-ring hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-500 shadow-card transition-all duration-200 ease-pulse hover:-translate-y-px hover:border-line-strong hover:text-ink-900 hover:shadow-card-hover lg:flex"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+              >
+                {indexOpen ? (
+                  <PanelRightClose className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+                ) : (
+                  <PanelRightOpen className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+                )}
+              </button>
+            </>
           }
         />
 
         <div className="flex min-h-0 flex-1">
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</main>
-          {indexOpen ? index : null}
+          {indexOpen ? index('carril') : null}
         </div>
       </div>
+
+      {/*
+        EL CAJON DEL TELEFONO.
+
+        Entra desde la derecha, que es el lado donde vive el indice en escritorio: quien use las dos
+        superficies encuentra lo mismo en el mismo sitio. Deja ver un poco del contenido detras —no
+        ocupa el ancho entero— porque lo que se hace aqui es MIRAR donde voy sin perder de vista lo
+        que estaba cursando.
+
+        El velo es un boton de verdad y no un `div` con `onClick`: tocar fuera para cerrar tiene que
+        funcionar tambien para quien navega con teclado o lector de pantalla.
+      */}
+      {sheetOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Cerrar el contenido de la formación"
+            onClick={onToggleSheet}
+            className="absolute inset-0 h-full w-full bg-ink-900/40 backdrop-blur-[2px]"
+          />
+          <div
+            className="animate-slide-next absolute inset-y-0 right-0 flex w-[min(86vw,340px)] flex-col border-l shadow-card-hover"
+            style={{ borderColor: 'var(--reading-line)', backgroundColor: 'var(--reading-paper)' }}
+          >
+            <button
+              type="button"
+              onClick={onToggleSheet}
+              aria-label="Cerrar"
+              className="focus-ring absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full"
+              style={{ color: 'var(--reading-muted)', backgroundColor: 'var(--reading-paper)' }}
+            >
+              <X className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            {index('hoja')}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

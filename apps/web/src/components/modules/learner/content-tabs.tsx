@@ -1,9 +1,9 @@
 'use client';
 
 import { AlignLeft, Download, FileText, Paperclip, type LucideIcon } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useMediaUrl } from '@/lib/use-media-url';
-import { toScore, type EnrollmentContent, type OpenEnrollment } from '@/lib/learner-api';
+import type { EnrollmentContent, OpenEnrollment } from '@/lib/learner-api';
 import { cn } from '@/components/ui/cn';
 import { contentMeta } from './course-index';
 
@@ -28,14 +28,31 @@ type TabId = 'resumen' | 'material';
 
 export function ContentTabs({
   description,
-  requirement,
+  condicion,
   course,
   currentContentId,
   /** El archivo de la pieza actual, cuando lo que se reproduce es una conversion (presentacion). */
   original,
 }: {
   description: string | null;
-  requirement: ReactNode;
+  /**
+   * UNA LINEA, Y SOLO SI CAMBIA ALGO EN LA PANTALLA.
+   *
+   * Aqui habia un bloque titulado «Para darla por vista» con un parrafo por tipo de pieza: que
+   * queda registrado, que la plataforma lo mide, que si el video esta alojado fuera consta como
+   * declaracion. Todo cierto y todo de mas: quien abre esto viene a cursar, no a leer como
+   * funciona la evidencia.
+   *
+   * Lo que SI hay que decir es lo que explica algo que la persona va a ver: **por que el boton de
+   * seguir todavia no se deja pulsar**. Sin esa linea, un video que no avanza parece averiado y la
+   * llamada a soporte llega igual. Con ella, se entiende sola.
+   *
+   * Por eso es `null` para un documento o un enlace —ahi no hay umbral que explicar, se confirma y
+   * ya— y es una linea suelta y no un bloque con titulo: acompaña a la descripcion, no compite
+   * con ella.
+   */
+  condicion: string | null;
+  /** Sigue haciendo falta para el material de apoyo, que es de la FORMACION y no de la pieza. */
   course: OpenEnrollment | null;
   currentContentId: string;
   original: { storageKey: string; originalName: string } | null;
@@ -106,30 +123,21 @@ export function ContentTabs({
                 </p>
               )}
 
-              <Block title="Para darla por vista">{requirement}</Block>
+              {condicion ? (
+                <p className="text-[15px] leading-relaxed" style={{ color: 'var(--reading-muted)' }}>
+                  {condicion}
+                </p>
+              ) : null}
 
               {/*
-                DE DONDE SALE la obligacion. Se dudo si aporta: aporta, y es lo unico de la
-                pantalla que responde "¿por que me exigen esto?" —la norma y el proceso solo se
-                veian en el panel de administracion—. Lo que no aporta es una tabla de cinco
-                filas, asi que va como una linea de etiquetas: se lee de un golpe y no compite con
-                la descripcion, que es lo que la persona vino a leer.
+                AQUI VIVIA TAMBIEN «DE DONDE VIENE» —proceso, tipo, norma, version, nota minima—.
+                Retirado el 2026-09-10 y sin sustituto, a diferencia de la linea de arriba.
+
+                El motivo es el que dio el cliente y es bueno: al ENTRAR ya se sabe a que se entra.
+                Esa procedencia es contexto administrativo —util en el perfil de la persona y en el
+                panel, donde se decide— y aqui solo empujaba el contenido hacia abajo. La regla que
+                queda: en el reproductor solo va lo que cambia lo que la persona ve o hace ahora.
               */}
-              {course ? (
-                <Block title="De donde viene">
-                  <div className="flex flex-wrap gap-2">
-                    <Tag label="Proceso" value={course.enrollment.processName} />
-                    <Tag label="Tipo" value={course.enrollment.activityType.name} />
-                    {course.enrollment.normNames.map((norm) => (
-                      <Tag key={norm} label="Norma" value={norm} />
-                    ))}
-                    <Tag label="Versión" value={`${course.enrollment.versionNumber}`} />
-                    {toScore(course.enrollment.passingScore) ? (
-                      <Tag label="Nota mínima" value={`${toScore(course.enrollment.passingScore)}%`} />
-                    ) : null}
-                  </div>
-                </Block>
-              ) : null}
             </div>
           ) : (
             <div role="tabpanel" id="panel-material" className="space-y-2">
@@ -221,37 +229,6 @@ function Tab({
         </span>
       ) : null}
     </button>
-  );
-}
-
-function Block({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div>
-      <h3
-        className="text-[11px] font-semibold uppercase tracking-[0.08em]"
-        style={{ color: 'var(--reading-muted)' }}
-      >
-        {title}
-      </h3>
-      <div className="mt-2.5 text-[15px] leading-relaxed" style={{ color: 'var(--reading-ink)' }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/** Etiqueta de procedencia: el rotulo en gris y el dato en tinta, dentro de la misma pastilla. */
-function Tag({ label, value }: { label: string; value: string }) {
-  return (
-    <span
-      className="inline-flex items-baseline gap-1.5 rounded-full border px-3 py-1.5 text-[13px]"
-      style={{ borderColor: 'var(--reading-line)' }}
-    >
-      <span style={{ color: 'var(--reading-muted)' }}>{label}</span>
-      <span className="font-medium" style={{ color: 'var(--reading-ink)' }}>
-        {value}
-      </span>
-    </span>
   );
 }
 

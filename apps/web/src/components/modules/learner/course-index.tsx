@@ -131,6 +131,7 @@ export function CourseIndex({
   furthest,
   onJumpCard,
   onJumpContent,
+  presentacion = 'carril',
 }: {
   course: OpenEnrollment | null;
   currentContentId: string;
@@ -139,6 +140,18 @@ export function CourseIndex({
   furthest: number;
   onJumpCard: (target: number) => void;
   onJumpContent: (contentId: string) => void;
+  /**
+   * DOS SITIOS, EL MISMO CONTENIDO.
+   *
+   * `carril` es la columna de 340px de la derecha, que en escritorio esta siempre ahi.
+   * `hoja` es el cajon que se despliega en telefono, donde una columna fija no cabe.
+   *
+   * Se hace con una variante y no con dos componentes porque lo que se enseña es exactamente lo
+   * mismo —el anillo, las partes, las tarjetas de la parte actual y a donde se puede saltar—; lo
+   * unico que cambia es el envoltorio. Dos componentes serian dos sitios donde corregir la misma
+   * regla de "a que partes se deja saltar", que es la clase de duplicado que se separa sola.
+   */
+  presentacion?: 'carril' | 'hoja';
 }) {
   if (!course) return null;
 
@@ -147,11 +160,8 @@ export function CourseIndex({
   const donePct = total === 0 ? 0 : Math.round((done / total) * 100);
   const nextId = course.contents.find((content) => content.status !== 'COMPLETED')?.id;
 
-  return (
-    <aside
-      className="hidden w-[340px] shrink-0 flex-col border-l lg:flex"
-      style={{ borderColor: 'var(--reading-line)' }}
-    >
+  const cuerpo = (
+    <>
       {/* Cabecera fija: el avance no se pierde al bajar por una formacion larga. */}
       <div
         className="flex shrink-0 items-center gap-3.5 border-b px-5 py-4"
@@ -186,6 +196,20 @@ export function CourseIndex({
           />
         ))}
       </ol>
+    </>
+  );
+
+  // En el cajon del telefono el envoltorio ya lo pone el armazon: aqui solo se apila.
+  if (presentacion === 'hoja') {
+    return <div className="flex h-full min-h-0 flex-col">{cuerpo}</div>;
+  }
+
+  return (
+    <aside
+      className="hidden w-[340px] shrink-0 flex-col border-l lg:flex"
+      style={{ borderColor: 'var(--reading-line)' }}
+    >
+      {cuerpo}
     </aside>
   );
 }

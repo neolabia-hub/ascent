@@ -2,7 +2,7 @@
 
 import { ChevronRight } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   answerSurvey,
   getSurveyToAnswer,
@@ -64,6 +64,13 @@ export default function ContentPlayerPage() {
   /** Porcentaje de diapositivas distintas vistas, cuando el contenido es una presentacion. */
   const [watchedSlides, setWatchedSlides] = useState(0);
   const [indexOpen, toggleIndex] = useIndexPanel();
+  /*
+    El cajon del indice en telefono. Empieza CERRADO siempre y no se recuerda entre sesiones: tapa
+    el contenido, asi que abrir una leccion con el puesto seria empezar con la pantalla cubierta.
+    Es la diferencia con `indexOpen`, que en escritorio es una columna que convive con lo que se
+    esta cursando y por eso si tiene sentido recordarla.
+  */
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   /** Segundos vistos que el servidor todavia no confirmo (incluye los de envios fallidos). */
   const unsentSeconds = useRef(0);
@@ -225,9 +232,12 @@ export default function ContentPlayerPage() {
       subtitle={course ? `Parte ${(course.contents.findIndex((c) => c.id === params.contentId) + 1) || 1} de ${totalParts}` : null}
       indexOpen={indexOpen}
       onToggleIndex={toggleIndex}
+      sheetOpen={sheetOpen}
+      onToggleSheet={() => setSheetOpen((abierto) => !abierto)}
       onExit={() => void leave()}
-      index={
+      index={(presentacion) => (
         <CourseIndex
+          presentacion={presentacion}
           course={course}
           currentContentId={params.contentId}
           cards={cards}
@@ -236,10 +246,17 @@ export default function ContentPlayerPage() {
           onJumpCard={(target) => {
             setIndex(target);
             setInteracted(false);
+            /*
+              Saltar a una tarjeta CIERRA el cajon. Al cambiar de parte no hace falta —la ruta
+              cambia y el componente se monta de nuevo—, pero saltar dentro de la misma parte no
+              navega a ningun sitio: sin esto, la tarjeta a la que se acaba de saltar se queda
+              detras del cajon que la eligio.
+            */
+            setSheetOpen(false);
           }}
           onJumpContent={(contentId) => router.push(`/aprender/${params.enrollmentId}/contenido/${contentId}`)}
         />
-      }
+      )}
     >
       {/*
         UNA PRESENTACION NO ES UN DOCUMENTO. Se reproduce diapositiva a diapositiva con el
@@ -285,7 +302,7 @@ export default function ContentPlayerPage() {
           </div>
           <ContentTabs
             description={detail.content.description ?? listed?.description ?? null}
-            requirement={requirementFor(detail, listed, null)}
+            condicion={condicionDe(detail, listed)}
             course={course}
             currentContentId={params.contentId}
             original={
@@ -395,59 +412,37 @@ export default function ContentPlayerPage() {
 }
 
 /**
- * QUE SE EXIGE para dar la pieza por vista, dicho en castellano y en el sitio donde se decide.
+ * LA LINEA QUE EXPLICA POR QUE EL BOTON DE SEGUIR AUN NO SE DEJA PULSAR.
  *
- * Se dice siempre, no solo cuando la noticia es mala: que un video enlazado ahora se mida es lo
- * que convierte esta pantalla en evidencia, y quien la cursa tiene derecho a saber que se cuenta.
+ * Es lo que queda de `requirementFor`, que redactaba un bloque entero titulado «Para darla por
+ * vista» con un parrafo por tipo de pieza: que queda registrado, que la plataforma lo mide, que un
+ * video alojado fuera consta como declaracion. Todo cierto y casi todo de mas.
+ *
+ * El criterio nuevo, y vale para toda esta pantalla: **en el reproductor solo va lo que cambia lo
+ * que la persona ve o hace ahora.** Un umbral lo cambia —sin la linea, un video que no avanza
+ * parece averiado y la llamada a soporte llega igual—. Que el registro sea evidencia, no: eso se
+ * cuenta en la guia, no encima del contenido.
+ *
+ * Por eso devuelve `null` para un documento o un enlace: ahi no hay umbral, se confirma y ya.
  */
-function requirementFor(
-  detail: ContentDetail,
-  listed: EnrollmentContent | null,
-  measuredVideo: boolean | null,
-): ReactNode {
+function condicionDe(detail: ContentDetail, listed: EnrollmentContent | null): string | null {
   const config = (detail.content.config ?? {}) as { minWatchPct?: number; minSeconds?: number };
-  const minSeconds = typeof config.minSeconds === 'number' && config.minSeconds > 0 ? config.minSeconds : null;
-  const tail = minSeconds ? ` Ademas hay que dedicarle al menos ${Math.ceil(minSeconds / 60)} min.` : '';
+  const minutos =
+    typeof config.minSeconds === 'number' && config.minSeconds > 0 ? Math.ceil(config.minSeconds / 60) : null;
+  const cola = minutos ? ` Y dedicarle al menos ${minutos} min.` : '';
 
   switch (detail.content.type) {
-    case 'PRESENTATION':
-      return (
-        <p>
-          Se da por vista cuando pases por <strong>todas</strong> las diapositivas
-          {listed?.size.slides ? ` (${listed.size.slides})` : ''}. Queda registrado cual viste y cuanto tiempo, y por
-          eso no hace falta que confirmes nada.
-          {tail}
-        </p>
-      );
-    case 'VIDEO':
-      if (measuredVideo === false) {
-        return (
-          <p>
-            Este video esta alojado fuera y la plataforma no puede comprobar que lo hayas visto: se registra como una{' '}
-            <strong>declaracion tuya</strong>, y asi consta.
-            {tail}
-          </p>
-        );
-      }
-      return (
-        <p>
-          Se cuentan los segundos que reproduces <strong>de verdad</strong>: adelantar deja huecos y no suma. Se
-          habilita al {typeof config.minWatchPct === 'number' ? config.minWatchPct : 90}%.
-          {tail}
-        </p>
-      );
-    case 'DOCUMENT':
-      return (
-        <p>
-          De un documento en un visor lo unico que se puede afirmar es que lo abriste y lo confirmaste: eso es lo que
-          queda registrado, ni mas ni menos.
-          {tail}
-        </p>
-      );
-    case 'LINK':
-      return <p>Se registra tu confirmacion de que abriste el recurso.{tail}</p>;
+    case 'PRESENTATION': {
+      const cuantas = listed?.size.slides ? ` (${listed.size.slides})` : '';
+      return `Se habilita al pasar por todas las diapositivas${cuantas}.${cola}`;
+    }
+    case 'VIDEO': {
+      const umbral = typeof config.minWatchPct === 'number' ? config.minWatchPct : 90;
+      return `Se habilita al ${umbral} % del video. Adelantar deja huecos y no suma.${cola}`;
+    }
     default:
-      return <p>Se completa al recorrerla entera.{tail}</p>;
+      // Documento, enlace y demas: no hay umbral que explicar. Si hay un minimo de tiempo, se dice.
+      return cola ? cola.trim() : null;
   }
 }
 
@@ -782,7 +777,7 @@ function MediaRunner({
 
       <ContentTabs
         description={detail.content.description ?? listed?.description ?? null}
-        requirement={requirementFor(detail, listed, type === 'VIDEO' ? measuredVideo : null)}
+        condicion={condicionDe(detail, listed)}
         course={course}
         currentContentId={currentContentId}
         original={null}
@@ -890,13 +885,7 @@ function AssessmentGate({
 
       <ContentTabs
         description={detail.content.description ?? listed?.description ?? null}
-        requirement={
-          <p>
-            Se aprueba con {passingScore ?? 'la nota mínima de la empresa'}
-            {passingScore ? '%' : ''} o mas. Los intentos son limitados y al agotarlos la formacion queda bloqueada
-            hasta que tu analista habilite un refuerzo.
-          </p>
-        }
+        condicion={condicionDe(detail, listed)}
         course={course}
         currentContentId={currentContentId}
         original={null}
