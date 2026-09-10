@@ -934,7 +934,7 @@ ni su historial.
 aprobacion, los intentos permitidos, los colores, el logo, los tipos de actividad. Ninguna regla
 de un cliente vive en el codigo.
 
-**Como entra cada empresa:** por su propio subdominio (`transprensa.neopulse.app`), que ademas
+**Como entra cada empresa:** por su propio subdominio (`transprensa.ascentio.app`), que ademas
 permite mostrar su marca desde la pantalla de ingreso.
 
 **Como se protege:** cada empresa solo ve lo suyo, garantizado en dos capas independientes (la

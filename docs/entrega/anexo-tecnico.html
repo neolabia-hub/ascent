@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ficha técnica y de servicio — Ascent · TRANSPRENSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
+
+<!--
+  HTML compatible con Word (tablas, estilos en línea, colores literales,
+  tamaños en puntos, fuentes con respaldo). Se convierte a .docx y .pdf
+  con scripts\convertir.ps1. No añadir flex, grid ni sombras.
+-->
+
+<style>
+  body {
+    margin: 0; padding: 0; background: #EDEAE4; color: #2B2A33;
+    font-family: 'Inter', 'Segoe UI', Calibri, Arial, sans-serif;
+    font-size: 10.5pt; line-height: 1.6;
+  }
+  .hoja { max-width: 780px; margin: 0 auto; background: #FFFFFF; padding: 0 0 48pt; }
+  h1, h2, h3 { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; color: #0B0715; }
+  h2 {
+    font-size: 15pt; font-weight: 600; margin: 26pt 0 8pt;
+    padding-bottom: 5pt; border-bottom: 1pt solid #CFC8BE; page-break-after: avoid;
+  }
+  h3 { font-size: 11.5pt; font-weight: 600; margin: 16pt 0 4pt; page-break-after: avoid; }
+  p { margin: 0 0 9pt; }
+  strong { color: #0B0715; }
+  ul { margin: 0 0 10pt; padding-left: 18pt; }
+  li { margin-bottom: 4pt; }
+  table.datos, table.rejilla { width: 100%; border-collapse: collapse; margin: 10pt 0 14pt; font-size: 10pt; }
+  table.datos td, table.rejilla td, table.rejilla th { border: 1pt solid #D8D2CA; padding: 7pt 10pt; vertical-align: top; }
+  table.rejilla th {
+    background: #F3F1EC; text-align: left; font-weight: 700; font-size: 8.5pt;
+    letter-spacing: 1pt; text-transform: uppercase; color: #5B5866;
+  }
+  table.datos td.clave { background: #F7F5F2; font-weight: 600; color: #0B0715; width: 32%; }
+  .hueco { background: #FFF0D6; color: #6B4A05; font-weight: 700; padding: 0 4pt; }
+  .nota { border-left: 3pt solid #E8734A; background: #FFF6F1; padding: 10pt 14pt; margin: 12pt 0 14pt; }
+  .nota p:last-child { margin-bottom: 0; }
+  td.marco { padding: 0 52pt; }
+  @media (max-width: 700px) { td.marco { padding: 0 20pt; } }
+  @media print {
+    body { background: #FFFFFF; }
+    .hoja { max-width: none; }
+    @page { margin: 16mm 18mm; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hoja">
+
+<table class="banda" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1E0958;color:#FFFFFF;">
+  <tr>
+    <td style="padding:34pt 52pt 30pt 52pt;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="banda-marca" style="font-family:'Fraunces',Georgia,serif;font-size:15pt;font-weight:700;letter-spacing:5pt;color:#FFFFFF;text-transform:uppercase;">Ascent</td>
+          <td class="banda-etiqueta" align="right" style="font-size:8pt;letter-spacing:2pt;text-transform:uppercase;color:#B9A9E8;">Anexo técnico</td>
+        </tr>
+      </table>
+      <p class="banda-titulo" style="font-family:'Fraunces',Georgia,serif;font-size:26pt;font-weight:600;line-height:1.12;color:#FFFFFF;margin:26pt 0 0;">
+        Ficha técnica<br>y de servicio
+      </p>
+      <p class="banda-bajada" style="font-size:10.5pt;color:#C9BCEC;margin:12pt 0 0;">
+        Dónde vive la plataforma, cómo se cuidan los datos y qué pasa el día que algo falle.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="marco">
+
+<h2>1. Para qué sirve este documento</h2>
+
+<p>
+  Está escrito para dos lectores a la vez: <strong>quien firma</strong> —y necesita saber qué riesgo
+  asume— y <strong>quien audita o revisa sistemas</strong> —y necesita el detalle—. Cada apartado
+  empieza por lo primero y termina por lo segundo.
+</p>
+
+<!-- ════════ DÓNDE VIVE ════════ -->
+<h2>2. Dónde vive la plataforma</h2>
+
+<p>
+  Ascent se presta como <strong>servicio en la nube</strong>. TRANSPRENSA no instala nada ni
+  administra ningún servidor: entra por navegador a una dirección propia, y la infraestructura la
+  opera AION.
+</p>
+
+<table class="datos">
+  <tr><td class="clave">Dirección de TRANSPRENSA</td><td>https://transprensa.ascentio.app</td></tr>
+  <tr><td class="clave">Servidor</td><td>Servidor virtual dedicado en Miami, Estados Unidos. Recursos de uso exclusivo, no compartidos con otros inquilinos de cómputo.</td></tr>
+  <tr><td class="clave">Por qué Miami</td><td>Cerca de cuarenta milisegundos de latencia hasta Colombia, frente a unos doscientos desde Europa. En vídeo, esa diferencia es la que hay entre «arranca» y «carga».</td></tr>
+  <tr><td class="clave">Sistema</td><td>Linux, con cada componente en su propio contenedor: aplicación web, servidor de la aplicación, base de datos PostgreSQL, memoria intermedia y servidor de entrada.</td></tr>
+  <tr><td class="clave">Cifrado en tránsito</td><td>TLS con certificado renovado automáticamente. No hay tráfico sin cifrar; el acceso por HTTP se redirige a HTTPS.</td></tr>
+  <tr><td class="clave">Vídeo y archivos</td><td>Almacenamiento de objetos independiente del servidor. Se sirve por enlaces firmados con caducidad, atados a la sesión de quien los abre.</td></tr>
+  <tr><td class="clave">Correo saliente</td><td>Servicio especializado de envío, con dominio autenticado para que los avisos no acaben en la carpeta de no deseados.</td></tr>
+</table>
+
+<h3>Qué significa esto en el día a día</h3>
+<p>
+  Que <strong>ver un vídeo no compite con usar la plataforma</strong>. El vídeo se sirve desde un
+  almacenamiento independiente del servidor, así que una convocatoria con cincuenta personas viendo
+  la misma lección a la vez no ralentiza a quien está cargando personal o sacando un informe.
+</p>
+
+<!-- ════════ SEGURIDAD ════════ -->
+<h2>3. Cómo están protegidos los datos</h2>
+
+<table class="rejilla">
+  <tr><th style="width:30%">Frente a qué</th><th>Qué hay puesto</th></tr>
+  <tr>
+    <td><strong>Que otra empresa vea sus datos</strong></td>
+    <td>Doble barrera independiente. La primera, en la capa de acceso a datos, obliga a filtrar por empresa en <em>toda</em> consulta. La segunda, dentro de la propia base de datos, rechaza cualquier consulta que se salga de la empresa aunque la primera fallara. Hay pruebas automáticas que lo verifican en cada cambio.</td>
+  </tr>
+  <tr>
+    <td><strong>Que alguien entre sin permiso</strong></td>
+    <td>Sesión firmada con criptografía asimétrica, válida quince minutos y renovada con un testigo que rota en cada uso y se guarda cifrado. Límite de intentos por cuenta y por origen combinados, para que una red corporativa entera no bloquee a nadie por culpa de un tercero.</td>
+  </tr>
+  <tr>
+    <td><strong>Que alguien vea lo que no le toca</strong></td>
+    <td>Permisos por módulo y por acción. El analista solo alcanza su área o proceso, y sus cambios sobre contenido ya publicado requieren aprobación del administrador con justificación registrada.</td>
+  </tr>
+  <tr>
+    <td><strong>Que se filtre un vídeo o un documento</strong></td>
+    <td>Ningún archivo tiene dirección pública permanente. Cada apertura genera un enlace firmado que caduca. Un enlace reenviado no abre nada.</td>
+  </tr>
+  <tr>
+    <td><strong>Que se copie un examen</strong></td>
+    <td>Las respuestas correctas nunca viajan al navegador. La corrección ocurre en el servidor.</td>
+  </tr>
+  <tr>
+    <td><strong>Que suban un archivo dañino</strong></td>
+    <td>Se comprueba el contenido real del archivo, no su extensión, y se aplican límites de tamaño por tipo.</td>
+  </tr>
+  <tr>
+    <td><strong>Que alguien altere un registro</strong></td>
+    <td>Las versiones publicadas son inmutables y la auditoría no admite modificación. Editar crea una versión nueva; lo que una persona cursó sigue apuntando a lo que vio.</td>
+  </tr>
+  <tr>
+    <td><strong>Que se falsifique una constancia</strong></td>
+    <td>Página pública de verificación por código, sin sesión, con respuestas homogéneas y límite de consultas para impedir que alguien pruebe códigos al azar.</td>
+  </tr>
+</table>
+
+<!-- ════════ COPIAS ════════ -->
+<h2>4. Copias de seguridad y recuperación</h2>
+
+<table class="datos">
+  <tr><td class="clave">Qué se copia</td><td>La base de datos completa —que es donde vive todo lo que se ha registrado— y, aparte, una imagen de la máquina entera.</td></tr>
+  <tr><td class="clave">Cada cuánto</td><td>Copia de la base de datos <strong>diaria y automática</strong>. Imagen de la máquina, automática según el proveedor de infraestructura.</td></tr>
+  <tr><td class="clave">Dónde queda</td><td>Comprimida y guardada <strong>fuera del servidor</strong>, en el almacenamiento de objetos. Una copia que vive en la misma máquina no es una copia.</td></tr>
+  <tr><td class="clave">Registro</td><td>Cada ejecución deja constancia con fecha, tamaño y resultado.</td></tr>
+  <tr><td class="clave">Prueba de restauración</td><td>Ejecutada. El procedimiento restaura la copia en una base desechable, cuenta los registros y la elimina; producción no se toca en ningún momento.</td></tr>
+  <tr><td class="clave">Pérdida máxima de datos</td><td>Hasta 24 horas —lo transcurrido desde la última copia—, salvo que se pacte una frecuencia mayor.</td></tr>
+  <tr><td class="clave">Tiempo estimado de recuperación</td><td><span class="hueco">[N horas]</span> ante una pérdida total del servidor, reconstruyendo la máquina y restaurando la última copia.</td></tr>
+</table>
+
+<div class="nota">
+  <p>
+    <strong>La diferencia entre tener copias y creer que se tienen es haberlas restaurado.</strong>
+    Por eso el procedimiento de restauración está escrito y probado, y no solo el de copia.
+  </p>
+</div>
+
+<!-- ════════ RETENCIÓN ════════ -->
+<h2>5. Retención y salida de la información</h2>
+
+<table class="datos">
+  <tr><td class="clave">Registros de formación</td><td>El Decreto 1072 de 2015 obliga a <strong>la empresa</strong> a conservarlos <strong>veinte años tras el retiro</strong> del trabajador. La plataforma está construida para poder cumplirlo: aplica esa política de retención y no borra registros de formación. El plazo es de TRANSPRENSA; lo que aporta Ascent es que se pueda cumplir sin papel — y la exportación completa, para que ese deber no dependa de quién sea el proveedor de software.</td></tr>
+  <tr><td class="clave">Borrado</td><td>No hay borrado físico de historia. Cuando una persona se retira y procede suprimir sus datos personales, se anonimiza lo identificable y <strong>el registro formativo se conserva íntegro</strong>: sin él no se puede demostrar la capacitación exigida.</td></tr>
+  <tr><td class="clave">Dato biométrico</td><td>La firma digitalizada es un dato sensible. Se recoge con autorización expresa y se guarda con acceso restringido.</td></tr>
+  <tr><td class="clave">Exportación</td><td>TRANSPRENSA puede solicitar en cualquier momento la salida completa de su información en formato de uso corriente. <strong>Los datos son suyos, no del proveedor.</strong></td></tr>
+  <tr><td class="clave">Al terminar el servicio</td><td>Se entrega la exportación completa y, transcurrido el plazo que se pacte, se suprime la información salvo lo que deba conservarse por mandato legal.</td></tr>
+</table>
+
+<!-- ════════ REQUISITOS ════════ -->
+<h2>6. Qué hace falta del lado de TRANSPRENSA</h2>
+
+<table class="datos">
+  <tr><td class="clave">Navegador</td><td>Chrome, Edge, Firefox o Safari en versión reciente. No hay que instalar programas ni extensiones.</td></tr>
+  <tr><td class="clave">Teléfonos</td><td>Android 8 o superior, iOS 14 o superior. La plataforma se instala desde el navegador («Añadir a pantalla de inicio») y funciona con señal intermitente: guarda el avance y lo envía al reconectar.</td></tr>
+  <tr><td class="clave">Red</td><td>Salida a internet por HTTPS. Si la empresa filtra tráfico, hay que permitir el dominio de la plataforma y el del almacenamiento de vídeo.</td></tr>
+  <tr><td class="clave">Ancho de banda</td><td>Para vídeo, unos 3 a 5 megabits por persona simultánea. La navegación normal consume muy poco.</td></tr>
+  <tr><td class="clave">Correo</td><td>Para que los avisos lleguen, conviene que el correo de la empresa no rechace el dominio de envío. Se entrega la información necesaria para incluirlo en la lista de confianza.</td></tr>
+</table>
+
+<!-- ════════ OPERACIÓN ════════ -->
+<h2>7. Cómo se opera y cómo se actualiza</h2>
+
+<h3>Reglas de despliegue</h3>
+<p>
+  Existe un procedimiento escrito y de obligado cumplimiento para tocar producción. Sus puntos
+  centrales:
+</p>
+<ul>
+  <li><strong>Copia de seguridad antes de cada actualización</strong>, siempre, sin excepción.</li>
+  <li><strong>Nada se despliega sin verse antes en el entorno de pruebas.</strong> Regla exigida por
+      el propio cliente y aplicable a todo cambio, por pequeño que parezca.</li>
+  <li>Las operaciones capaces de destruir datos están <strong>expresamente prohibidas</strong> sobre
+      el entorno de producción.</li>
+  <li>Toda migración de la base de datos <strong>se prueba desde una base vacía</strong> antes de
+      subirla. Una cadena de cambios que solo funciona sobre una base con historia no es fiable.</li>
+</ul>
+
+<h3>Ventanas y avisos</h3>
+<p>
+  Las actualizaciones se programan fuera del horario laboral y se avisan con antelación. Una
+  actualización corriente supone menos de un minuto sin servicio.
+</p>
+
+<h3>Vigilancia</h3>
+<p>
+  Existe una dirección pública de salud del servicio, consultable en cualquier momento, que responde
+  si la aplicación y su base de datos están operativas.
+</p>
+<h3>Atención</h3>
+
+<table class="datos">
+  <tr><td class="clave">WhatsApp</td><td>+57 315 289 3163</td></tr>
+  <tr><td class="clave">Correo</td><td>miguelabad066@gmail.com</td></tr>
+  <tr><td class="clave">Atención directa</td><td>Lunes a viernes, de 8:00 a 17:00.</td></tr>
+  <tr><td class="clave">Fuera de ese horario</td><td>Asistente automático disponible 24/7, que resuelve las consultas de uso y deja registrada la incidencia para su revisión en el siguiente día hábil.</td></tr>
+</table>
+
+<div class="nota">
+  <p>
+    <strong>Dicho sin adornos, porque conviene que sea una decisión y no una sorpresa:</strong> el
+    asistente automático atiende <em>preguntas</em> a cualquier hora, pero una avería del servicio
+    fuera del horario de atención directa se resuelve al día hábil siguiente. La vigilancia
+    automática con aviso proactivo —la que avisaría a AION antes de que lo note nadie—
+    <span class="hueco">[está prevista para (fecha)]</span>.
+  </p>
+</div>
+
+<!-- ════════ CUMPLIMIENTO ════════ -->
+<h2>8. Cumplimiento normativo cubierto</h2>
+
+<table class="rejilla">
+  <tr><th style="width:26%">Norma</th><th>Qué exige</th><th style="width:34%">Respuesta de la plataforma</th></tr>
+  <tr><td>Decreto 1072/2015<br>art. 2.2.4.6.11</td><td>Inducción previa al inicio de labores, a toda persona vinculada.</td><td>Obligación generada desde la fecha de ingreso, con alerta si no está cumplida antes del primer día.</td></tr>
+  <tr><td>Decreto 1072/2015<br>art. 2.2.4.6.13</td><td>Registros retenidos veinte años tras el retiro; se admite el medio electrónico.</td><td>Retención por tipo de registro con base legal y sin borrado físico.</td></tr>
+  <tr><td>Resolución 0312/2019<br>ítems 1.2.1–1.2.2</td><td>Programa anual con soportes y listas de participantes.</td><td>Plan anual con indicadores y actas de asistencia exportables.</td></tr>
+  <tr><td>PESV<br>Res. 40595/2022, paso 10</td><td>Formación por actor vial, intensidad teórica y práctica, competencia documentada.</td><td>Actor vial por persona, horas desglosadas y matriz de cargo contra formación real.</td></tr>
+  <tr><td>SARLAFT</td><td>Capacitación anual con constancias de asistentes, fechas y temas.</td><td>Actividad recurrente anual y constancia verificable con esos datos.</td></tr>
+  <tr><td>BASC V6:2022</td><td>Programa anual documentado y evaluación anual de eficacia.</td><td>Plan etiquetado y flujo de eficacia respondido por el jefe del área.</td></tr>
+  <tr><td>ISO 9001 · 45001 · 14001<br>cl. 7.2–7.3</td><td>Competencia, eficacia e información documentada.</td><td>Matriz de competencia, eficacia diferida e historial por persona.</td></tr>
+  <tr><td>Resolución 2674/2013<br>art. 12</td><td>Diez horas anuales por manipulador de alimentos e idoneidad del capacitador.</td><td>Acumulador de horas por persona, norma y año, con vigencia anual y perfil del capacitador adjuntable.</td></tr>
+  <tr><td>Ley 1581/2012<br>Decreto 1377/2013</td><td>Autorización, política, derechos del titular y datos sensibles.</td><td>Consentimiento versionado en el alta y tratamiento diferenciado del dato biométrico.</td></tr>
+  <tr><td>Ley 527/1999<br>Decreto 2364/2012</td><td>Validez de la firma electrónica.</td><td>Acuerdo de firma aceptado, sello de tiempo, huella criptográfica y registro inmutable.</td></tr>
+</table>
+
+<!-- ════════ TECNOLOGÍA ════════ -->
+<h2>9. Anexo para el área de sistemas</h2>
+
+<table class="datos">
+  <tr><td class="clave">Interfaz de usuario</td><td>Next.js sobre React, con TypeScript en modo estricto. Aplicación web progresiva instalable, con trabajador de servicio propio y cola de reenvío para operar sin conexión.</td></tr>
+  <tr><td class="clave">Servidor de aplicación</td><td>NestJS sobre Node.js. API REST versionada.</td></tr>
+  <tr><td class="clave">Base de datos</td><td>PostgreSQL 15, con seguridad a nivel de fila activada por empresa.</td></tr>
+  <tr><td class="clave">Trabajos en segundo plano</td><td>Redis con colas de trabajo: recurrencias y vencimientos, reevaluación de audiencias, repaso espaciado, avisos y retención documental.</td></tr>
+  <tr><td class="clave">Autenticación</td><td>JWT firmado con RS256. Sesión de quince minutos y testigo de renovación de siete días, con rotación y almacenamiento cifrado.</td></tr>
+  <tr><td class="clave">Almacenamiento de objetos</td><td>Compatible con S3, con enlaces prefirmados de una hora.</td></tr>
+  <tr><td class="clave">Documentos PDF</td><td>Generados en el servidor a partir de plantillas HTML.</td></tr>
+  <tr><td class="clave">Despliegue</td><td>Contenedores orquestados con Docker Compose sobre servidor dedicado. Integración continua en GitHub Actions.</td></tr>
+  <tr><td class="clave">Calidad</td><td>Comprobación de tipos y análisis estático en cada cambio; 502 pruebas unitarias y 23 recorridos completos automatizados sobre la aplicación compilada.</td></tr>
+</table>
+
+<p style="margin-top:34pt;font-size:8.5pt;color:#8A8794;border-top:1pt solid #E4DFD8;padding-top:8pt;">
+  Ascent — un producto de AION · Ficha técnica y de servicio · Transportadora La Prensa del Valle
+  S.A.S. · Documento confidencial.
+</p>
+
+</td></tr></table><!-- /marco -->
+</div><!-- /hoja -->
+
+</body>
+</html>

@@ -7,7 +7,7 @@ Existe porque los pendientes estaban repartidos entre siete documentos —el HAN
 `00-el-motor.md` §9, `08-evidencia.md` §10, `seguimiento.md` §11, `05-cumplimiento.md`— y para saber
 qué falta había que leerlos todos. Cada punto dice **dónde está el detalle**, para no repetirlo.
 
-Al 2026-09-09.
+Al 2026-09-09 (noche), con Ascent ya en producción.
 
 ---
 
@@ -75,7 +75,7 @@ depende de un trabajo del Sprint 6—.
 
 | | Qué falta | Por qué importa |
 |---|---|---|
-| 6.1 | **No hay remoto en git.** `git remote -v` está vacío: los commits protegen contra editar mal un archivo, **no contra que muera el disco**. Es lo más urgente de la lista y no es técnico | — |
+| 6.1 | ~~No hay remoto en git~~ **HECHO el 2026-09-09.** El repositorio vive en `github.com/neolabia-hub/ascent` (privado), y la máquina de producción lo clona con una **llave de despliegue de solo lectura** distinta de la del PC: si un día hay que revocar una, la otra sigue viva | `HANDOFF` 2026-09-09 (noche) §2 |
 | 6.2 | ~~Limpiar los datos de prueba~~ **HECHO el 2026-09-07.** `e2e/global-teardown.ts` corre los dos scripts al terminar la suite, asi que ya no hay que acordarse. A mano: `pnpm --filter @neo-pulse/api dev:limpiar-pruebas` (ensayo) y `-- --si`. Queda como IDEA, no como pendiente: un borrado de verdad por prefijo para vaciar la base de vez en cuando — otro trabajo y con otro riesgo, porque en cascada se lleva evidencia por delante | `HANDOFF` 2026-09-07 |
 | 6.3 | ~~Un aviso de lint de siempre~~ **HECHO el 2026-09-07.** `autoPlan` entra en las dependencias del `useEffect`. Se omitia porque quien abre el cajon le pasa siempre el mismo valor, pero eso es una promesa de quien LLAMA y nada la sostiene: el dia que alguien lo calcule, el cajon se queda con el plan de la apertura anterior y no pide el motivo. **Lint del proyecto: cero avisos** | — |
 | 6.4 | ~~Las tildes comidas~~ **HECHO el 2026-09-07 para lo que se VE**, que es lo que pidio el cliente (*"los comentarios no importan"*). 1.103 correcciones en 185 archivos con un barrido que solo toca cadenas, prosa y comentarios — **nunca identificadores**: `const tamano` y `const campana` existen de verdad y renombrarlos es otro trabajo. Un rastreo posterior solo del texto visible da **0 hallazgos**. Quedan sin tilde algunos comentarios sueltos, a proposito | `HANDOFF` 2026-09-07 |
@@ -116,11 +116,26 @@ las tres están **HECHAS**. El detalle en `HANDOFF` 2026-09-09 y en `docs/modulo
 
 | | Qué | Estado |
 |---|---|---|
-| 9.1 | ~~**El expediente de una persona.** Es la Definición de Terminado del propio sprint: «el auditor obtiene, para una persona cualquiera, su historial completo con soportes en menos de un minuto». Los datos estaban en tres pantallas y había que unirlos a mano~~ | **HECHO.** Botón «Expediente» en cada fila de Usuarios: lo que le falta arriba, lo cumplido debajo, y sus constancias y papeles de terceros al final. Es de LECTURA: no reemplaza a los dos cajones de al lado, que son para hacer |
+| 9.1 | ~~**El perfil de una persona.** Es la Definición de Terminado del propio sprint: «el auditor obtiene, para una persona cualquiera, su historial completo con soportes en menos de un minuto». Los datos estaban en tres pantallas y había que unirlos a mano~~ | **HECHO, y rehecho el 2026-09-09 (noche): es una PÁGINA** (`/usuarios/[id]`), no una ventana — *«página completa, es tipo perfil con todo lo importante»*. Banda de la marca, las cuatro cifras, lo que le falta, su trayectoria, sus constancias y sus papeles. Es de LECTURA: no reemplaza a los cajones de la fila, que son para hacer |
 | 9.2 | ~~**La evolución en el tiempo.** Todo era una foto de hoy: no se podía contestar «¿vamos mejor que en enero?»~~ | **HECHO.** «Cómo fue el año» encima de los cortes de Analítica. Mide lo que VENCÍA cada mes y cuánto se cumplió — no el histórico del indicador, que nadie guardó |
 | 9.3 | ~~**Conocimiento por tema.** Los informes decían cuántos aprobaron, ninguno qué fallaron~~ | **HECHO.** «En qué falla la gente», con las preguntas más falladas aparte: la que casi todos fallan o no se enseñó, o está mal redactada |
 | 9.4 | **Transcripción automática de los vídeos** (subtítulos con Whisper). Decidido el 2026-09-09: los vídeos se quedan en R2 —no en YouTube— porque la evidencia tiene que servirse con URL firmada atada a la sesión, y eso obliga a poner los subtítulos nosotros | **ESPERA.** Va después del despliegue. ~USD 36 una vez por todo el catálogo, con revisión humana antes de publicar. Necesita una clave de API |
 | 9.5 | **Lo demás del Sprint 6**: visor del registro de auditoría, retención y anonimización, IA de borradores desde PDF, exportes de auditor por lote | Ninguno bloquea el piloto |
+## 10. Producción — abierto desde el despliegue del 2026-09-09
+
+Ascent está viva en `https://transprensa.ascentio.app`. Lo que queda no es código de producto: es lo
+que rodea a un sistema que ya tiene un cliente dentro. El detalle, en `HANDOFF` 2026-09-09 (noche),
+`docs/05-reglas-de-despliegue.md` y `ASCENT - CREDENCIALES Y ACCESOS.md`.
+
+| | Qué falta | Por qué importa |
+|---|---|---|
+| 10.1 | **Rotar las credenciales de R2** (las cuatro variables `R2_*` de `/opt/ascent/.env.prod`) y **la contraseña de la cuenta de plataforma** | Las dos se escribieron en una conversación. Una credencial que salió de su sitio ya no vuelve a estar secreta: se cambia, no se borra el rastro. Cómo, en el archivo de credenciales §2 y §3 |
+| 10.2 | **Decidir el correo de soporte de verdad.** `soporte@ascentio.app` existe y recibe, pero **no lo atiende nadie** | Es lo que el cliente ve cuando algo le falla. Un contacto que no responde es peor que no dar ninguno: promete atención que no existe. Hasta decidirlo, no debería prometer plazo |
+| 10.3 | **Limpiar los datos de prueba en producción**: el contacto de soporte de TRANSPRENSA dice «administrador de todo el mundo» y «lunes a viernes no llame» | Lo va a leer su gente el día que algo no funcione. Se corrige en *Configuración*, sin desplegar nada |
+| 10.4 | **Vigilancia: no hay ninguna.** Hoy el primer aviso de una caída lo daría el cliente | Sentry (gratis hasta 5.000 sucesos) más un vigilante de disponibilidad sobre `/v1/health`. Es una tarde, y la misma cuenta sirve para Ascent **y** para SAC-NEO. Decidir si se centraliza o cada producto lleva el suyo |
+| 10.5 | **LibreOffice no está instalado**: un `.pptx` se rechaza pidiendo el PDF | Es una decisión, no un olvido: no cabe en 4 GB. Si molesta, `libreoffice-impress` y la máquina de 8 GB (USD 24 más) |
+| 10.6 | **Entregar formalmente al cliente**: credenciales de administrador, guías y la sesión de arranque | Las guías están al día (6.7) y el administrador ya entra. Falta el paquete y la fecha |
+
 ## Lo que NO está pendiente, para no volver a abrirlo
 
 Cosas que se decidieron y conviene no reabrir sin motivo nuevo:

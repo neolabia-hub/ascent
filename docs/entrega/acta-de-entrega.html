@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acta de entrega — Ascent · TRANSPRENSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
+
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  ESCRITO EN HTML COMPATIBLE CON WORD, A PROPÓSITO.
+
+  Este documento se entrega en tres formatos —.html, .docx y .pdf— y los
+  tres salen de ESTE archivo. Por eso no usa nada que Word no sepa leer:
+  maquetación con tablas, estilos en línea, colores literales (sin
+  variables CSS), tamaños en puntos y ninguna fuente sin respaldo.
+
+  La regla práctica: 'Fraunces', Georgia, serif — el navegador coge
+  Fraunces, Word coge Georgia, y los dos se ven bien. Si algún día se
+  edita esto, no se añada flex, grid ni sombras: se rompe el .docx y
+  nadie se entera hasta que el cliente lo abre.
+
+  Se convierte con  scripts\convertir.ps1  (Word COM).
+  ═══════════════════════════════════════════════════════════════════
+-->
+
+<style>
+  body {
+    margin: 0; padding: 0; background: #EDEAE4; color: #2B2A33;
+    font-family: 'Inter', 'Segoe UI', Calibri, Arial, sans-serif;
+    font-size: 10.5pt; line-height: 1.6;
+  }
+  .hoja {
+    max-width: 780px; margin: 0 auto; background: #FFFFFF;
+    padding: 0 0 48pt;
+  }
+  h1, h2, h3 { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; color: #0B0715; }
+  h2 {
+    font-size: 15pt; font-weight: 600; margin: 26pt 0 8pt;
+    padding-bottom: 5pt; border-bottom: 1pt solid #CFC8BE;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 11.5pt; font-weight: 600; margin: 16pt 0 4pt; page-break-after: avoid; }
+  p { margin: 0 0 9pt; }
+  strong { color: #0B0715; }
+  ul { margin: 0 0 10pt; padding-left: 18pt; }
+  li { margin-bottom: 4pt; }
+  table.datos, table.rejilla { width: 100%; border-collapse: collapse; margin: 10pt 0 14pt; font-size: 10pt; }
+  table.datos td, table.rejilla td, table.rejilla th { border: 1pt solid #D8D2CA; padding: 7pt 10pt; vertical-align: top; }
+  table.rejilla th {
+    background: #F3F1EC; text-align: left; font-weight: 700; font-size: 8.5pt;
+    letter-spacing: 1pt; text-transform: uppercase; color: #5B5866;
+  }
+  table.datos td.clave { background: #F7F5F2; font-weight: 600; color: #0B0715; width: 32%; }
+  .hueco { background: #FFF0D6; color: #6B4A05; font-weight: 700; padding: 0 4pt; }
+  .nota { border-left: 3pt solid #E8734A; background: #FFF6F1; padding: 10pt 14pt; margin: 12pt 0 14pt; }
+  .nota p:last-child { margin-bottom: 0; }
+  td.marco { padding: 0 52pt; }
+  @media (max-width: 700px) { td.marco { padding: 0 20pt; } }
+  @media print {
+    body { background: #FFFFFF; }
+    .hoja { max-width: none; }
+    @page { margin: 16mm 18mm; }
+    h2 { page-break-after: avoid; }
+    table, .firma { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hoja">
+
+<!-- ════════ BANDA DE PORTADA ════════
+     Tabla y no un div con gradiente: Word entiende bgcolor en una celda
+     y no entiende un radial-gradient. -->
+<table class="banda" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#1E0958;color:#FFFFFF;">
+  <tr>
+    <td style="padding:34pt 52pt 30pt 52pt;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td class="banda-marca" style="font-family:'Fraunces',Georgia,serif;font-size:15pt;font-weight:700;letter-spacing:5pt;color:#FFFFFF;text-transform:uppercase;">
+            Ascent
+          </td>
+          <td class="banda-etiqueta" align="right" style="font-size:8pt;letter-spacing:2pt;text-transform:uppercase;color:#B9A9E8;">
+            Un producto de AION
+          </td>
+        </tr>
+      </table>
+      <p class="banda-titulo" style="font-family:'Fraunces',Georgia,serif;font-size:26pt;font-weight:600;line-height:1.12;color:#FFFFFF;margin:26pt 0 0;">
+        Acta de entrega<br>y puesta en producción
+      </p>
+      <p class="banda-bajada" style="font-size:10.5pt;color:#C9BCEC;margin:12pt 0 0;">
+        Plataforma de formación corporativa · Transportadora La Prensa del Valle S.A.S.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="marco">
+
+<!-- ════════ PARTES ════════ -->
+<h2>1. Partes</h2>
+
+<table class="datos">
+  <tr>
+    <td class="clave">Quien entrega</td>
+    <td>
+      <strong>AION</strong> — <span class="hueco">[razón social completa]</span><br>
+      NIT <span class="hueco">[NIT]</span> · Domicilio <span class="hueco">[ciudad]</span><br>
+      Representada por <span class="hueco">[nombre]</span>, en calidad de <span class="hueco">[cargo]</span>.
+    </td>
+  </tr>
+  <tr>
+    <td class="clave">Quien recibe</td>
+    <td>
+      <strong>Transportadora La Prensa del Valle S.A.S.</strong> — en adelante TRANSPRENSA<br>
+      NIT <span class="hueco">[NIT]</span> · Domicilio <span class="hueco">[ciudad]</span><br>
+      Representada por <span class="hueco">[nombre]</span>, en calidad de <span class="hueco">[cargo]</span>.
+    </td>
+  </tr>
+  <tr>
+    <td class="clave">Fecha del acta</td>
+    <td><span class="hueco">[día]</span> de <span class="hueco">[mes]</span> de 2026</td>
+  </tr>
+  <tr>
+    <td class="clave">Contrato de referencia</td>
+    <td>Contrato de licencia y servicios de software SaaS suscrito entre las partes el <span class="hueco">[fecha]</span>.</td>
+  </tr>
+</table>
+
+<!-- ════════ OBJETO ════════ -->
+<h2>2. Objeto</h2>
+
+<p>
+  Dejar constancia de que <strong>AION entrega a TRANSPRENSA la plataforma Ascent en funcionamiento
+  y en ambiente de producción</strong>, con sus accesos, su documentación y las verificaciones que
+  se relacionan en este documento, y de que TRANSPRENSA la recibe a satisfacción.
+</p>
+<p>
+  Este acta no modifica ni reemplaza el contrato de referencia. Donde diga algo distinto de aquel,
+  <strong>manda el contrato</strong>.
+</p>
+
+<!-- ════════ IDENTIFICACIÓN ════════ -->
+<h2>3. Qué se entrega, identificado</h2>
+
+<table class="datos">
+  <tr><td class="clave">Producto</td><td>Ascent — plataforma SaaS de formación corporativa (LMS multiempresa)</td></tr>
+  <tr><td class="clave">Instancia de TRANSPRENSA</td><td>https://transprensa.ascentio.app</td></tr>
+  <tr><td class="clave">En producción desde</td><td>9 de septiembre de 2026</td></tr>
+  <tr><td class="clave">Versión entregada</td><td><span class="hueco">[v1.0]</span> · referencia interna de código <code>8249d8b</code></td></tr>
+  <tr><td class="clave">Modalidad</td><td>Servicio en la nube (SaaS). El programa se ejecuta en infraestructura administrada por AION; TRANSPRENSA accede por navegador, sin instalar nada.</td></tr>
+  <tr><td class="clave">Aislamiento</td><td>La información de TRANSPRENSA está separada de la de cualquier otro cliente por doble control en la base de datos, y su dirección propia identifica la empresa antes incluso de iniciar sesión.</td></tr>
+</table>
+
+<!-- ════════ ALCANCE ════════ -->
+<h2>4. Alcance funcional entregado</h2>
+
+<p>
+  Todo lo que sigue está <strong>en producción y operativo</strong>. Lo que no aparezca en esta
+  tabla no forma parte de la entrega; el apartado 8 lo detalla.
+</p>
+
+<table class="rejilla">
+  <tr>
+    <th style="width:24%">Módulo</th>
+    <th>Qué comprende</th>
+  </tr>
+  <tr>
+    <td><strong>Configuración de la empresa</strong></td>
+    <td>Identidad visual propia (logotipo y dos colores), catálogos de áreas, cargos, regionales, procesos y sedes, tipos de formación configurables, políticas de retención documental y contacto de soporte visible para el personal.</td>
+  </tr>
+  <tr>
+    <td><strong>Personas y accesos</strong></td>
+    <td>Alta individual y carga masiva desde plantilla; perfil completo por persona; roles de administrador, analista, instructor y usuario final con permisos por módulo; restablecimiento de contraseña; bloqueo y reactivación; aceptación de tratamiento de datos y de firma electrónica en el primer ingreso.</td>
+  </tr>
+  <tr>
+    <td><strong>Catálogo formativo</strong></td>
+    <td>Lecciones en tarjetas con texto, imagen, vídeo, documentos y presentaciones; editor con vista previa móvil; publicación que <strong>congela una versión inmutable</strong>; biblioteca de lecciones reutilizables entre formaciones.</td>
+  </tr>
+  <tr>
+    <td><strong>Evaluaciones</strong></td>
+    <td>Banco de preguntas por tema con versionado, exámenes con bloques fijos y bloques al azar, nota mínima y número de intentos heredables de la empresa o exigibles por examen, corrección en el servidor y bloqueo tras agotar intentos.</td>
+  </tr>
+  <tr>
+    <td><strong>Convocatorias y asistencia</strong></td>
+    <td>Sesiones con fecha, instructor, lugar y cupo; participantes proyectados calculados y congelados al publicar; asistencia por código QR, registrada por el instructor o firmada en pantalla; <strong>acta de asistencia exportable</strong>.</td>
+  </tr>
+  <tr>
+    <td><strong>Asignación automática</strong></td>
+    <td>Reglas por cargo, área, regional o proceso; obligación que nace con el ingreso de la persona y antes de su primer día; recurrencias («cada N meses»); vencimientos; retiro automático de la obligación cuando alguien deja de pertenecer al grupo destinatario.</td>
+  </tr>
+  <tr>
+    <td><strong>Plan anual de capacitación</strong></td>
+    <td>Renglones del año con horas e indicadores de ejecutadas contra programadas y de cobertura, medidos de forma aislada de lo que ocurre fuera del plan.</td>
+  </tr>
+  <tr>
+    <td><strong>Encuestas y eficacia</strong></td>
+    <td>Encuesta de satisfacción al participante y evaluación de eficacia diferida que responde el jefe del área, no el propio alumno.</td>
+  </tr>
+  <tr>
+    <td><strong>Constancias y certificados</strong></td>
+    <td>Diseño del documento por tipo de formación, emisión automática al cumplir, vigencia y vencimiento, anulación con motivo, y <strong>página pública de verificación por código</strong> abierta a terceros.</td>
+  </tr>
+  <tr>
+    <td><strong>Seguimiento e indicadores</strong></td>
+    <td>Estado de cada persona y formación con el motivo del incumplimiento; informe de vencimientos separando lo que hay que reprogramar de lo que hay que perseguir; análisis por área, cargo, regional, servicio, proceso, tipo y norma; evolución mes a mes; y en qué preguntas falla la gente.</td>
+  </tr>
+  <tr>
+    <td><strong>Perfil de la persona</strong></td>
+    <td>Página única con la trayectoria formativa completa, lo que le falta, sus constancias y los papeles emitidos por terceros. Responde a la petición «demuéstreme lo de esta persona» sin abrir otra pantalla.</td>
+  </tr>
+  <tr>
+    <td><strong>Experiencia del trabajador</strong></td>
+    <td>Aplicación instalable en el teléfono, pensada para señal intermitente; lecciones en tarjetas; repaso de lo que falló; sus pendientes, vencimientos y constancias.</td>
+  </tr>
+  <tr>
+    <td><strong>Avisos</strong></td>
+    <td>Avisos dentro de la plataforma y por correo: asignación nueva, vencimiento próximo, inducción incompleta antes del ingreso, intentos agotados, solicitud y resultado de aprobación, convocatoria próxima, eficacia pendiente y constancia emitida. Resumen semanal de vencimientos a quien corresponda.</td>
+  </tr>
+</table>
+
+<!-- ════════ INFRAESTRUCTURA ════════ -->
+<h2>5. Infraestructura y servicio</h2>
+
+<table class="datos">
+  <tr><td class="clave">Servidor</td><td>Servidor dedicado en Miami (Estados Unidos), elegido por latencia hacia Colombia. Uso exclusivo para esta plataforma.</td></tr>
+  <tr><td class="clave">Dominio y cifrado</td><td>Dominio propio con certificado TLS renovado automáticamente. Todo el tráfico va cifrado.</td></tr>
+  <tr><td class="clave">Vídeo y archivos</td><td>Almacenamiento de objetos independiente del servidor, servido mediante enlaces firmados con caducidad y atados a la sesión de quien los abre.</td></tr>
+  <tr><td class="clave">Copias de seguridad</td><td>Copia completa diaria de la base de datos, cifrada y guardada fuera del servidor, con registro de cada ejecución. Además, copia automática de la máquina completa.</td></tr>
+  <tr><td class="clave">Restauración</td><td>Procedimiento de restauración documentado y <strong>probado</strong> sobre una base desechable, sin tocar producción.</td></tr>
+  <tr><td class="clave">Comprobación de estado</td><td>Dirección pública de salud del servicio, consultable en cualquier momento.</td></tr>
+</table>
+
+<!-- ════════ ACCESOS ════════ -->
+<h2>6. Accesos entregados</h2>
+
+<p>
+  Se entrega a TRANSPRENSA <strong>una cuenta de administrador con control total sobre su empresa</strong>.
+</p>
+
+<div class="nota">
+  <p>
+    <strong>Las contraseñas no viajan en este documento.</strong> Se entregan por un canal distinto —WhatsApp al <strong>+57 315 289 3163</strong>— en el documento <em>«Ficha de acceso»</em>, y al primer
+    ingreso la plataforma <strong>obliga a cambiarlas</strong>. A partir de ese momento, la
+    contraseña del administrador de TRANSPRENSA <strong>no la conoce nadie de AION</strong>.
+  </p>
+</div>
+
+<p>
+  El administrador puede, desde ese momento y sin intervención de AION: crear el resto de las
+  cuentas, asignar roles y permisos, restablecer la contraseña de cualquier persona, y bloquear o
+  reactivar accesos.
+</p>
+
+<!-- ════════ DOCUMENTACIÓN ════════ -->
+<h2>7. Documentación entregada</h2>
+
+<table class="rejilla">
+  <tr><th style="width:38%">Documento</th><th>Qué responde</th></tr>
+  <tr><td>Página de bienvenida</td><td>Los accesos, qué resuelve la plataforma, la evidencia que cubre cada norma y el plan de los primeros treinta días.</td></tr>
+  <tr><td>Esta acta</td><td>Qué se entrega, qué se verificó y en qué condiciones.</td></tr>
+  <tr><td>Ficha técnica y de servicio</td><td>Dónde vive la plataforma, cómo se cuidan los datos, cada cuánto se copian y qué ocurre el día que algo falle.</td></tr>
+  <tr><td>Ficha de acceso</td><td>Las credenciales de administración. Se entrega por canal aparte.</td></tr>
+  <tr><td>Guía de alta y gestión de personas</td><td>El alta una a una y la masiva, altas y bajas, y cómo se recupera un acceso.</td></tr>
+  <tr><td>Guía para montar una formación</td><td>De los documentos sueltos a la lección publicada, con examen y constancia.</td></tr>
+  <tr><td>Guía de los tipos de formación</td><td>Qué distingue cada tipo y cuándo usar cada uno.</td></tr>
+  <tr><td>Guía de las cifras</td><td>Qué significa cada número, qué acción pide y por qué dos porcentajes pueden no coincidir.</td></tr>
+  <tr><td>Guía de asistencia</td><td>Los tres mecanismos de toma de lista y cómo sale el acta.</td></tr>
+  <tr><td>Guía de evaluación de desempeño</td><td>El paso a paso completo, qué significa firmar y cómo se calcula la nota.</td></tr>
+</table>
+
+<!-- ════════ VERIFICACIONES ════════ -->
+<h2>8. Verificaciones realizadas antes de esta entrega</h2>
+
+<p>No se declara «funciona»: se declara qué se comprobó y cómo.</p>
+
+<table class="rejilla">
+  <tr><th style="width:38%">Comprobación</th><th>Resultado</th></tr>
+  <tr>
+    <td>Pruebas automatizadas de recorrido completo, ejecutadas sobre la aplicación compilada</td>
+    <td><strong>23 de 23 correctas.</strong> Cubren los circuitos de punta a punta: alta de personas, montaje y publicación de una formación, convocatoria, asistencia, examen, constancia y permisos por rol.</td>
+  </tr>
+  <tr>
+    <td>Pruebas unitarias de la lógica del servidor</td>
+    <td><strong>502 de 502 correctas.</strong></td>
+  </tr>
+  <tr>
+    <td>Aislamiento entre empresas</td>
+    <td>Verificado con pruebas específicas: ninguna consulta puede alcanzar datos de otra empresa, ni siquiera por un error de programación.</td>
+  </tr>
+  <tr>
+    <td>Instalación desde cero</td>
+    <td>La base de datos se construye completa desde vacío. Comprobado en un entorno limpio, no sobre la base de desarrollo.</td>
+  </tr>
+  <tr>
+    <td>Copia de seguridad y restauración</td>
+    <td>Copia generada, subida al almacenamiento externo y <strong>restaurada en una base desechable</strong>, con recuento de registros. Producción no se tocó.</td>
+  </tr>
+  <tr>
+    <td>Servicio en línea</td>
+    <td>Dirección de salud respondiendo, certificado válido y renovación automática comprobada.</td>
+  </tr>
+</table>
+
+<!-- ════════ EXCLUSIONES ════════ -->
+<h2>9. Lo que esta entrega no comprende</h2>
+
+<p>
+  Se enumera para que no haya expectativa donde no hay compromiso. Nada de esto es un defecto:
+  son alcances que no entraron en esta fase.
+</p>
+
+<ul>
+  <li><strong>Contenido formativo.</strong> La plataforma se entrega con su estructura y su
+      configuración, no con los cursos. El contenido —tarjetas, vídeos, preguntas— lo produce
+      TRANSPRENSA, salvo pacto expreso y aparte.</li>
+  <li><strong>Carga de datos históricos.</strong> Las capacitaciones dictadas antes de la puesta en
+      marcha no se migran en esta fase.</li>
+  <li><strong>Subtítulos y transcripción automática de vídeo.</strong> Prevista para una fase
+      posterior.</li>
+  <li><strong>Contenido en formato SCORM</strong> comprado a terceros. No se ejecuta en esta fase.</li>
+  <li><strong>Avisos por WhatsApp.</strong> Los avisos van dentro de la plataforma y por correo.</li>
+  <li><strong>Integración con nómina u otros sistemas.</strong> Las personas se cargan por plantilla;
+      no hay sincronización automática con otro sistema.</li>
+  <li><strong>Firma digital certificada por entidad autorizada.</strong> Se implementa firma
+      electrónica con sello de tiempo, huella criptográfica y registro inmutable, conforme a la
+      Ley 527 de 1999. No es lo mismo que un certificado digital emitido por una entidad de
+      certificación acreditada.</li>
+  <li><strong>Conversión automática de presentaciones.</strong> Las presentaciones se adjuntan en
+      PDF.</li>
+</ul>
+
+<!-- ════════ OBLIGACIONES ════════ -->
+<h2>10. Lo que queda del lado de TRANSPRENSA</h2>
+
+<ul>
+  <li><strong>Custodiar sus credenciales</strong> y mantener actualizada la lista de quién tiene
+      acceso de administración. Una cuenta de administrador puede modificar y borrar configuración
+      de toda la empresa.</li>
+  <li><strong>Cargar y mantener los datos de su personal</strong>: altas, cambios de cargo y
+      retiros. Las obligaciones de formación se calculan a partir de esos datos; si están
+      desactualizados, los indicadores lo estarán.</li>
+  <li><strong>Producir y aprobar el contenido formativo</strong> y responder por su exactitud
+      técnica y legal.</li>
+  <li><strong>Actuar como responsable del tratamiento</strong> de los datos personales de su
+      personal, incluidos los datos sensibles —la firma digitalizada lo es—, y mantener vigente su
+      política de tratamiento y sus autorizaciones.</li>
+  <li><strong>Designar un interlocutor</strong> para el soporte, con nombre y cargo.</li>
+</ul>
+
+<!-- ════════ SOPORTE ════════ -->
+<h2>11. Soporte, garantía y continuidad</h2>
+
+<table class="datos">
+  <tr><td class="clave">Garantía de corrección</td><td><span class="hueco">[N]</span> días desde la firma de este acta para la corrección sin costo de defectos atribuibles al programa entregado.</td></tr>
+  <tr><td class="clave">Canal de soporte</td><td>WhatsApp <strong>+57 315 289 3163</strong> · correo <strong>miguelabad066@gmail.com</strong></td></tr>
+  <tr><td class="clave">Horario de atención</td><td>Atención directa de <strong>lunes a viernes, de 8:00 a 17:00</strong>. Fuera de ese horario, asistente automático disponible 24/7 para consultas de uso, con registro de la incidencia para el siguiente día hábil.</td></tr>
+  <tr><td class="clave">Tiempo de primera respuesta</td><td><span class="hueco">[N horas hábiles]</span></td></tr>
+  <tr><td class="clave">Disponibilidad comprometida</td><td><span class="hueco">[% mensual]</span>, medida sobre la dirección pública de salud del servicio.</td></tr>
+  <tr><td class="clave">Ventanas de mantenimiento</td><td>Se avisan con <span class="hueco">[N]</span> horas de antelación y se programan fuera del horario laboral.</td></tr>
+  <tr><td class="clave">Salida de los datos</td><td>TRANSPRENSA puede solicitar en cualquier momento la exportación completa de su información en formato de uso corriente. <strong>Los datos son suyos.</strong></td></tr>
+</table>
+
+<div class="nota">
+  <p>
+    <strong>Estos siete valores tienen que coincidir con el contrato de referencia.</strong> Si el
+    contrato dice otra cosa, se corrigen aquí antes de firmar; no se firman dos documentos que
+    prometen cosas distintas.
+  </p>
+</div>
+
+<!-- ════════ DATOS PERSONALES ════════ -->
+<h2>12. Tratamiento de datos personales</h2>
+
+<p>
+  Para efectos de la Ley 1581 de 2012, <strong>TRANSPRENSA es responsable</strong> del tratamiento de
+  los datos personales de su personal y <strong>AION actúa como encargado</strong>, tratándolos
+  únicamente conforme a sus instrucciones y para prestar el servicio.
+</p>
+<p>
+  AION no cede ni comercializa esa información, aplica las medidas de seguridad descritas en la ficha
+  técnica y, terminada la relación contractual, devuelve o suprime los datos según instruya
+  TRANSPRENSA, salvo los que deban conservarse por mandato legal —señaladamente los registros de
+  formación en seguridad y salud en el trabajo, con retención de veinte años tras el retiro del
+  trabajador, conforme al Decreto 1072 de 2015—.
+</p>
+
+<!-- ════════ CONSTANCIA ════════ -->
+<h2>13. Constancia</h2>
+
+<p>
+  TRANSPRENSA declara haber recibido la plataforma en funcionamiento, con los accesos y la
+  documentación relacionados, y haberla revisado a satisfacción. AION declara haber entregado lo
+  aquí descrito y ejecutado las verificaciones del apartado 8.
+</p>
+<p>
+  Se firma en <span class="hueco">[ciudad]</span>, a los <span class="hueco">[día]</span> días del
+  mes de <span class="hueco">[mes]</span> de 2026, en dos ejemplares del mismo tenor.
+</p>
+
+<!-- ════════ FIRMAS ════════ -->
+<table class="firma" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:44pt;">
+  <tr>
+    <td width="45%" style="border-top:1pt solid #0B0715;padding-top:8pt;vertical-align:top;">
+      <p style="margin:0;font-weight:700;color:#0B0715;">Por AION</p>
+      <p style="margin:6pt 0 0;font-size:9.5pt;color:#6B6875;">
+        Nombre: <span class="hueco">[nombre]</span><br>
+        Cargo: <span class="hueco">[cargo]</span><br>
+        Documento: <span class="hueco">[C.C.]</span>
+      </p>
+    </td>
+    <td width="10%">&nbsp;</td>
+    <td width="45%" style="border-top:1pt solid #0B0715;padding-top:8pt;vertical-align:top;">
+      <p style="margin:0;font-weight:700;color:#0B0715;">Por Transportadora La Prensa del Valle S.A.S.</p>
+      <p style="margin:6pt 0 0;font-size:9.5pt;color:#6B6875;">
+        Nombre: <span class="hueco">[nombre]</span><br>
+        Cargo: <span class="hueco">[cargo]</span><br>
+        Documento: <span class="hueco">[C.C.]</span>
+      </p>
+    </td>
+  </tr>
+</table>
+
+<p style="margin-top:34pt;font-size:8.5pt;color:#8A8794;border-top:1pt solid #E4DFD8;padding-top:8pt;">
+  Ascent — un producto de AION · Acta de entrega · Transportadora La Prensa del Valle S.A.S. ·
+  Documento confidencial.
+</p>
+
+</td></tr></table><!-- /marco -->
+</div><!-- /hoja -->
+
+</body>
+</html>

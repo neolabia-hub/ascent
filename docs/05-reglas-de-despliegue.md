@@ -113,6 +113,36 @@ es la vía más corta a perder datos.
 
 ---
 
+## 3 bis. Antes de producción, SIEMPRE se ve en dev (2026-09-09)
+
+Lo pidió el cliente después de que un cambio de interfaz llegara al servidor sin que él lo hubiera
+visto: *«muestra los cambios en dev antes de subirlo a producción»*. Tiene razón, y el motivo no es
+de confianza: **en producción hay un cliente mirando**, y un despliegue que hay que revertir cuesta
+mucho más que dos minutos de compilación local.
+
+El orden queda así, sin excepciones para «cambios pequeños» —que son justo los que se saltan la
+comprobación y rompen algo—:
+
+```powershell
+# 1. Levantar el stack local y MIRARLO con los ojos.
+.\scripts\mirar.ps1
+#    → http://localhost:3200/login?tenant=transprensa
+
+# 2. La suite completa, en una consola NUEVA (mirar.ps1 deja PORT y NEXT_DIST_DIR puestas).
+pnpm build ; pnpm test:e2e
+
+# 3. Solo entonces: confirmar, subir y desplegar (los cinco pasos del §3).
+```
+
+**Qué se mira en el paso 1, y no es «que cargue»:** la pantalla concreta que se tocó, con los ojos,
+haciendo el gesto que hace el cliente. Las pruebas dicen que la aplicación funciona; no dicen que un
+icono se vea, que un texto quepa o que una animación no maree. Eso solo lo dice mirarlo.
+
+**Y si el cambio es visual, se enseña al cliente antes de subirlo.** El coste de enseñarlo es un
+mensaje; el de descubrir en producción que no le gusta es un despliegue de vuelta.
+
+---
+
 ## 4. Migraciones: las tres reglas
 
 1. **Una migración aplicada no se edita.** Si ya corrió en cualquier base, cambiar su SQL rompe el

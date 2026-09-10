@@ -1,4 +1,4 @@
-# NEO PULSE — Despliegue del piloto
+# ASCENT — Despliegue del piloto
 
 Como sale esto a Internet, a costo cero, sin comprometer el diseño y **sin que mudarse a un VPS de
 pago sea otro proyecto**. La decisión de fondo y los precios de la etapa de pago están en

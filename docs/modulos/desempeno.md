@@ -294,7 +294,7 @@ es aceptar una nota injusta no firma — y la empresa se queda sin la evidencia 
 
 ## 6 quater. La guía para el cliente
 
-`docs/guia-desempeno.html`, escrita para quien lo usa y no para quien lo construye: el paso a paso
+`docs/guias/guia-desempeno.html`, escrita para quien lo usa y no para quien lo construye: el paso a paso
 completo, qué significa cada opción del ciclo, **qué es firmar y cómo**, el cálculo de la nota con un
 ejemplo numérico, lo que el sistema no deja hacer y por qué, y qué se hace con el resultado. Los
 ejemplos usan usuarios genéricos a propósito.

@@ -1,4 +1,4 @@
-# NEO PULSE — RUNBOOK (memoria operativa)
+# ASCENT — RUNBOOK (memoria operativa)
 
 Solo se ANEXA o se corrige; no se reescribe entre sesiones. Lo aprendido rompiendo algo va aqui.
 El diario de sesiones (que se hizo cada dia, que quedo abierto) vive en `docs/HANDOFF.md`.
@@ -73,6 +73,179 @@ existe en el codigo y la pantalla no tiene; se pierde media hora buscandolo en e
 La leccion general: un script que exporta variables para su proceso las deja puestas para todo lo que
 venga detras en esa consola. `mirar.ps1` lo hace a proposito —los hijos las heredan al arrancar— y el
 precio es este.
+
+## PRODUCCIÓN (desde 2026-09-09)
+
+Lo operativo del día a día. Las **reglas** —qué no se hace nunca y por qué— viven aparte, en
+`docs/05-reglas-de-despliegue.md`, y son de lectura obligatoria antes de tocar la máquina. Las
+credenciales viven fuera del repo, en `C:\Users\Prueba\Documents\ASCENT - CREDENCIALES Y ACCESOS.md`.
+
+### Qué hay montado
+
+| | |
+|---|---|
+| Máquina | Vultr High Performance, Miami · 2 vCPU / 4 GB · `45.63.107.34` · usuario `linuxuser` |
+| Carpeta | `/opt/ascent` (el repo clonado) · secretos en `/opt/ascent/.env.prod` (permisos 600) |
+| Stack | Compose `docker/docker-compose.prod.yml`: `caddy` + `web` + `api` + `postgres` + `redis` + `migrate` |
+| Dominios | `ascentio.app` (marca y API) y `*.ascentio.app` (un subdominio por empresa) |
+| TLS | Caddy, automático. **No hay certificados que renovar a mano** |
+| Archivos | Cloudflare R2, bucket `ascent-media`, enlaces firmados |
+| Copias | `scripts/backup.sh` por cron, diario 03:00 UTC → R2 · registro en `/opt/ascent/backups/backup.log` |
+
+`migrate` es un servicio **de una sola ejecución**: corre `scripts/release.sh` (que aplica
+`prisma migrate deploy`) y termina. Que aparezca como `Exited (0)` es lo correcto, no un fallo.
+
+### Los comandos de la máquina
+
+```bash
+ssh -i C:\Users\Prueba\.ssh\ascent linuxuser@45.63.107.34
+cd /opt/ascent
+alias dc='docker compose -f docker/docker-compose.prod.yml --env-file .env.prod'
+
+dc ps                    # ¿está todo arriba?
+dc logs -f api           # qué está diciendo la API
+dc restart api           # reinicio suave (NO borra nada)
+curl -s localhost/v1/health
+```
+
+### Tres cosas que hay que saber antes de tocar nada
+
+**1. Las migraciones viajan DENTRO de la imagen de la API.** Corregir un `.sql` en el disco de la
+máquina no cambia lo que se va a ejecutar: hay que **reconstruir la imagen**. Es lo que costó media
+hora el día del despliegue, buscando por qué el arreglo no surtía efecto.
+
+**2. `NEXT_PUBLIC_API_URL` se deja VACÍA.** Se hornea en el JavaScript del navegador en tiempo de
+compilación; con un valor puesto, el navegador de `transprensa.ascentio.app` pedía a `ascentio.app`,
+el CORS lo paraba y la pantalla decía *«No pudimos conectar con el servidor»*. Vacía, la web llama a
+rutas relativas y cada subdominio habla consigo mismo.
+
+**3. `RUN_SEED` se queda en `false`.** Desde el 2026-09-09 la semilla ya no pisa datos del cliente
+(ver más abajo), pero sigue sin tener nada que hacer en una base que ya existe.
+
+### Toda migración se prueba desde una base VACÍA
+
+`migrate dev` en desarrollo aplica lo nuevo sobre una base con meses de historia, así que una
+migración puede depender de algo que otra creó **después** y nadie lo nota. En producción, sobre una
+base vacía, la cadena se lee en orden y revienta. Pasó exactamente así el 2026-09-09
+(`column "responsible_user_id" does not exist`).
+
+```powershell
+# En el PC, antes de subir: un Postgres de usar y tirar
+docker run --rm -d --name pg-prueba -e POSTGRES_PASSWORD=x -p 5499:5432 postgres:16
+$env:DATABASE_URL = 'postgresql://postgres:x@localhost:5499/postgres'
+pnpm --filter @neo-pulse/api exec prisma migrate deploy   # tiene que llegar al final
+docker rm -f pg-prueba
+```
+
+Y toda migración de datos se escribe **idempotente**: `ADD COLUMN IF NOT EXISTS`,
+`CREATE INDEX IF NOT EXISTS`, y las restricciones dentro de un `DO` que consulte `pg_constraint`.
+
+### Si una migración falla a medias
+
+```bash
+dc run --rm --entrypoint sh api -c "cd /app/apps/api && npx prisma migrate resolve --rolled-back <nombre>"
+# corregir el .sql en el PC → subir → RECONSTRUIR la imagen → volver a desplegar
+```
+
+### Restablecer la cuenta de plataforma
+
+```bash
+dc run --rm --entrypoint sh api -c \
+  "cd /app/apps/api && node --import tsx scripts/crear-admin-plataforma.ts --email=<correo> --reset"
+```
+
+Enseña la contraseña **una sola vez**. Sin `--reset` no toca una cuenta que ya exista.
+
+### Comprobar que la copia sirve
+
+Una copia que nunca se restauró no es una copia. `scripts/restaurar-prueba.sh` restaura en una base
+de usar y tirar, cuenta las filas y la borra: **producción no se toca**.
+
+```bash
+bash scripts/restaurar-prueba.sh /opt/ascent/backups/<archivo>.dump
+```
+
+## El vídeo no se reproduce en producción: el bucket no tenía CORS (2026-09-10)
+
+**Síntoma.** El aprendiz abre una lección con vídeo y la pantalla se queda. En la consola:
+
+```
+GET https://<cuenta>.r2.cloudflarestorage.com/ascent-media/... net::ERR_FAILED 206 (Partial Content)
+Access to video at 'https://<cuenta>.r2.cloudflarestorage.com/...'
+  (redirected from 'https://transprensa.ascentio.app/v1/media/file/...')
+  has been blocked by CORS policy:
+  No 'Access-Control-Allow-Origin' header is present on the requested resource
+```
+
+**Lo que engaña del síntoma: el 206.** R2 sirvió el archivo — devolvió el rango pedido y todo. Quien
+tira la respuesta es el navegador, después. Así que en el panel de red parece que funcionó y en la
+pantalla no hay vídeo.
+
+**La causa.** El camino del archivo son dos saltos y el segundo cruza de origen:
+
+1. El `<video>` pide `https://<tenant>.ascentio.app/v1/media/file/<clave>?e=..&t=..` — mismo origen
+   que la página. La API comprueba nuestra firma y resuelve el paquete.
+2. La API responde **302** hacia una URL prefirmada de R2 (`media.controller.ts`), que es **otro
+   origen**.
+3. La petición viaja en modo CORS porque el elemento lleva `crossOrigin="anonymous"` —puesto el
+   2026-08-28 porque sin él Chrome abandona la carga en silencio cuando la web y la API están en
+   origenes distintos, que es el caso en desarrollo—. Y **el bucket no tenía ninguna política CORS**.
+
+**Solo puede aparecer desplegando.** En desarrollo el almacenamiento es local: `isLocal` es cierto,
+no hay 302 y no hay bucket. Va con las otras de su clase — la cadena de migraciones y
+`NEXT_PUBLIC_API_URL`.
+
+**El arreglo**, en el servidor. No hay que reiniciar nada ni volver a desplegar; las URL ya firmadas
+siguen valiendo:
+
+```bash
+cd /opt/ascent
+bash scripts/r2-cors.sh          # la pone
+bash scripts/r2-cors.sh --ver    # solo la enseña
+```
+
+**Por qué el origen va en `*` y no en una lista**, que es lo que uno escribiría:
+
+- **La lista no serviría.** Cuando una petición en modo CORS sigue un redireccionamiento hacia otro
+  origen, el navegador puede mandar `Origin: null`. Una lista de origenes concretos no casa con
+  `null`.
+- **Aquí no protege nada.** CORS no da ni quita acceso al archivo: dice qué navegador puede *leer* la
+  respuesta. Quien da acceso es la firma, que caduca en una hora y va atada a esa clave. Con la URL
+  firmada, `curl` se lo baja igual. **La puerta es la firma, no el origen.**
+- Y una práctica: el producto da **un subdominio por empresa**. Con una lista habría que acordarse de
+  añadir el subdominio de cada cliente nuevo el día del alta, y eso se descubre cuando a un cliente
+  no le funciona el vídeo.
+
+**Lo que se olvida siempre y aquí no:** `ExposeHeaders` con `Content-Range` y `Accept-Ranges`. Sin
+eso el navegador recibe los bytes pero no puede leer cuánto dura el archivo, así que **el vídeo se ve
+y la barra de progreso no funciona** — un fallo distinto, más difícil de atar a esto.
+
+## La semilla APORTA DEFECTOS, NO VERDADES (2026-09-09)
+
+El síntoma lo trajo el cliente: *«a veces borraba el logo y el color secundario»*. No era «a veces»:
+era **cada ejecución de la semilla**. `prisma/seed.ts` usaba `upsert` con un `update` lleno de
+valores, y **el `update` de un `upsert` es una escritura sobre datos vivos**. Devolvía el logo y el
+color a los de fábrica y la nota mínima que el cliente había puesto en 90, al 75 por defecto.
+
+La regla, escrita en la primera línea del archivo:
+
+> **Crea lo que falta. Nunca corrige lo que existe.** Si la fila ya está, la semilla no la toca.
+
+En la práctica, cuatro formas:
+
+| Caso | Cómo se escribe |
+|---|---|
+| Ajustes que el cliente edita (`settings`, `branding`) | Leer con `findUnique` y mezclar: `{ ...porDefecto, ...existente }` |
+| Catálogos, roles, políticas | `update: {}` — vacío, literal |
+| Config estructural de un tipo de actividad | Mezclar la `config`, forzar solo lo que es estructura (`isSystem`) |
+| Permisos de un rol | `createMany({ skipDuplicates: true })`, **nunca** `deleteMany` + volver a crear |
+
+**Por qué `deleteMany` era lo peor de todo:** borraba los permisos del rol para reescribirlos, y con
+ellos **las excepciones dadas a mano** a personas concretas. Se restauraban los de fábrica y el
+cliente perdía sin aviso lo que había configurado.
+
+Antes de tocar `seed.ts`, la pregunta es una: *¿esta línea puede pisar algo que decidió un cliente?*
+Si la respuesta no es un no rotundo, va como defecto, no como verdad.
 
 ## Comandos canonicos (desde la raiz del repo, PowerShell)
 

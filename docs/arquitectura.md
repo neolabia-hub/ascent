@@ -1,4 +1,4 @@
-# Arquitectura tecnica — NEO PULSE
+# Arquitectura tecnica — ASCENT
 
 Referencia VIVA del sistema: como esta construido HOY. Se corrige cuando cambia el diseño; no es
 un historico (para eso estan `docs/sprints/`).
@@ -12,7 +12,7 @@ Para el significado de los conceptos de negocio, ver `docs/glosario.md`.
 ```
 NAVEGADOR
   |
-  |  transprensa.neopulse.app  (el subdominio identifica la empresa ANTES del login)
+  |  transprensa.ascentio.app  (el subdominio identifica la empresa ANTES del login)
   v
 apps/web  — Next.js 14 (App Router)
   |  Cliente HTTP tipado (lib/api.ts, lib/admin-api.ts, lib/catalog-api.ts)
@@ -977,194 +977,58 @@ paso de mas de 5 minutos a 22 segundos). Detalle en `docs/RUNBOOK.md`.
 
 ---
 
-## 9. Produccion
+## 9. Produccion (viva desde el 2026-09-09)
 
-Decidido y analizado en `docs/03-infraestructura-produccion.md`. En resumen:
-
-- **VPS propio** con todo en contenedores. No comparte nada con el entorno de SAC-NEO.
-- **Cloudflare R2 para archivos**, por su trafico de salida sin costo: es la decision que evita
-  que el video dispare la factura.
-- **AWS descartado** para esta etapa: se paga el ecosistema sin usarlo y su trafico de salida
-  castiga justo lo que mas consume el producto.
-- Copias de seguridad diarias con copia fuera del servidor, y **restauracion probada** antes de
-  salir a produccion.
-
-- **La imagen de la API necesita LibreOffice** si se quiere aceptar PowerPoint: sin el, solo se
-  podran subir presentaciones en PDF y la pantalla lo dira. En Debian/Ubuntu basta
-  `libreoffice-impress` (arrastra bastante; es el precio de convertir PPTX en el servidor).
-
-**Lo que falta antes de desplegar:** el adaptador de R2 (hoy lanza un error explicito a proposito,
-para que sea imposible desplegar sin completarlo), la definicion de contenedores de produccion,
-los guiones de despliegue y respaldo, el dominio con subdominios comodin, y el monitoreo de
-disponibilidad.
-
----
-
-## 10. Deuda tecnica conocida
-
-Honesta y priorizada:
-
-| Deuda | Impacto | Cuando resolverla |
-|---|---|---|
-| **El aprendiz no ve NADA de la jornada a la que lo convocan** | Alta para el uso real: se le inscribe en la sesion del 12 de marzo a las 8 a. m. en el Auditorio Norte, y en su tarjeta solo aparece el titulo y la fecha limite. Ni fecha de sesion, ni hora, ni lugar, ni instructor —tampoco en el correo de inscripcion, que solo lleva el codigo de la convocatoria—. Para una formacion presencial eso significa que la persona no sabe cuando ni donde presentarse | Con la asistencia (Sprint 5): son los mismos datos que hay que enseñar para que alguien se presente y firme |
-| ~~Adaptador de almacenamiento en la nube~~ | **Hecho el 2026-09-01.** R2 cableado con @aws-sdk/client-s3. Con R2 los bytes NO pasan por la API: el controlador de medios redirige a una URL prefirmada, que es lo que evita que cada video viaje dos veces y que el ancho de banda del servidor sea el techo de cuanta gente ve una formacion a la vez | — |
-| El despachador de correo recorre todas las empresas cada 30 segundos | Irrelevante con una empresa; con decenas conviene una cola real | Cuando haya varias empresas |
-| La integracion continua nunca se ha ejecutado de verdad (no hay repositorio remoto) | El flujo esta escrito pero no probado | Al publicar el repositorio |
-| Redis sin usar: sin cache de permisos ni colas | Rendimiento bajo carga; hoy el envio de correo y el motor de obligaciones usan tareas programadas en proceso | Cuando el volumen lo pida |
-| El ciclo de obligaciones recorre requisito por requisito y persona por persona | Correcto y legible, pero con miles de personas y decenas de requisitos conviene resolverlo por lotes en la base | Cuando una pasada tarde mas de unos segundos |
-| Un requisito solo puede exigir una **actividad** (no rutas ni certificaciones) | El modelo ya las soporta; el motor no. Devuelve un error explicito en vez de fingir | Sprints 4-5 |
-| El cache sin señal guarda lo que la persona **ya visito**; no descarga por adelantado las lecciones que tiene asignadas | Quien nunca abrio la pildora con señal no puede cursarla sin señal | Cuando se sepa el peso real del contenido de Transprensa: es una precarga al entrar a los pendientes |
-| Los videos y documentos no se cachean para uso sin señal | Un video de 3 minutos multiplica lo que se guarda en el telefono. La leccion de tarjetas —el formato principal— si funciona sin señal | Segun el peso del contenido real |
-| Sin notificaciones push: el aviso de pildora sale por correo y bandeja in-app | El recordatorio llega, pero no al bloqueo de pantalla | Exige claves VAPID y permiso del usuario; se decide con el cliente |
-| Un video de **Vimeo o de cualquier otro enlace** que no sea YouTube no se puede verificar: queda como declaracion de la persona | Baja: YouTube —el caso real del cliente— ya se mide desde el 2026-08-27; para el resto, la pantalla lo dice y la recomendacion es subir el archivo | Cada plataforma exige su propio SDK. Se cierra cuando exista una formacion que de verdad viva en Vimeo |
-| Al migrar una convocatoria a la version nueva, un examen **ya aprobado sigue aprobado**: la version N+1 hereda el mismo `assessment_version_id` | Baja: es lo correcto mientras el examen no cambie. Si cambia, es otra version de evaluacion y hay que volver a rendirlo | Nada que hacer hoy; se documenta para que nadie lo lea como un fallo de `RESTART_NEW` |
-| La franja horaria del aviso se deduce en cada pasada de los ultimos 60 dias de eventos (tope 5.000) | Suficiente para el piloto | Con miles de personas, materializar la hora en una columna |
-| Las **diapositivas** de una presentacion no se cachean para uso sin señal, como los videos y documentos | Una presentacion de 20 diapositivas en WebP pesa poco comparada con un video, pero sigue siendo peso en el telefono | Con el mismo criterio que el video: segun el peso del contenido real |
-| La imagen de produccion de la API todavia no incluye LibreOffice | Sin el, PPT/PPTX/ODP se rechazan con un mensaje que dice que suban el PDF. No rompe nada, limita | Al definir los contenedores de produccion |
-| No hay prueba de navegador que cubra una PRESENTACION | Baja: se verifico a mano de punta a punta el 2026-08-28 (subir, convertir, publicar, migrar y reproducir 6 diapositivas), pero nada impide que una regresion pase sin que salte | Exige un PDF de prueba en el repositorio; el generador esta escrito y cabe en un script del seed |
-| La LECCION de tarjetas no lleva las pestanas de Resumen y Material: la pila ocupa el alto de la pantalla | Baja: la descripcion de una leccion no tiene donde mostrarse hoy | Cuando se decida donde va sin pelear con la lectura de la pila: probablemente un desplegable en la barra superior, no una franja debajo |
-| Especificacion de API generada desde los contratos | Util al integrar terceros | Baja |
-| Plantillas de notificacion editables desde la interfaz | Hoy los textos viven en el codigo | Baja |
-| SCORM sin motor | Solo importa si el cliente tiene contenido comprado en ese formato | Segun respuesta del cliente |
-
----
-
-*Este documento se corrige cuando cambia la arquitectura. La historia de como se llego aqui esta
-en `docs/sprints/`.*
-
-### Cancelar un renglon: se retira lo que obligaba
-
-Cancelar (`PATCH /plans/items/:id` con `status: CANCELLED`) saca el renglon del indicador
-—`computePlanMetrics` filtra los cancelados antes de dividir— **y retira sus obligaciones
-abiertas**, dejandolas en `WITHDRAWN_PLAN_ITEM_CANCELLED`.
-
-Se **retiran, no se borran**, a diferencia de borrar el plan entero (ahi el renglon desaparece y la
-asignacion no puede quedar apuntando a nada): a esas personas se les anuncio la formacion y ese
-aviso sigue en su bandeja, asi que sin la traza la pregunta "me asignaron esto y ya no esta" no
-tiene respuesta. **Lo ya empezado no se toca** (`IN_PROGRESS`): ese avance es de la persona.
-
-El estado nuevo cae solo de todas las consultas porque lo abierto se pide siempre por lista blanca
-(`PENDING | IN_PROGRESS | OVERDUE`), nunca excluyendo los retirados uno a uno.
-
-### La META, y por que es un numero
-
-`training_plans.goal_pct` (1..100) es el porcentaje de CUMPLIMIENTO que la empresa se compromete a
-alcanzar en el año. Antes era `goals`, texto libre, y por eso el plan enseñaba "62% de cumplimiento"
-sin nada contra que compararlo: un indicador sin meta deja al lector sin saber si eso esta bien, que
-es exactamente lo que el auditor viene a preguntar.
-
-Se mide contra el CUMPLIMIENTO (ejecutadas / programadas) y no contra la cobertura porque es el
-indicador del item 1.2.1 de la Res. 0312 —"¿se hizo el programa anual?"—. La cobertura se enseña al
-lado, sin meta: son dos preguntas distintas y darles una sola meta las confundiria.
-
-Es opcional: un plan puede armarse antes de que la meta este acordada, y la tarjeta lo dice ("Sin
-meta definida") en vez de inventarse un 100%.
-
-### Salir de un plan CERRADO
-
-Cerrar convierte el plan en la evidencia del año, asi que durante meses fue un estado terminal:
-ni se editaba, ni se borraba, ni se reabria. Con UNO POR ANO (Decision #71) eso dejo de ser
-estricto y paso a ser una TRAMPA — el año queda ocupado por un plan que no admite nada—, y por eso
-hay dos salidas, cada una para un caso distinto:
-
-| Situacion | Salida | Por que |
-|---|---|---|
-| Cerrado y **sin una sola obligacion** | **se borra** | No es evidencia de nada: es un ensayo. No hay registro de personas que proteger |
-| Cerrado y **ya obligo a gente** | **se reabre** (`POST /plans/:id/reopen`, motivo obligatorio) | Reabrir deja rastro en la auditoria; borrar no dejaria ninguno |
-
-Reabrir devuelve el plan a **EN EJECUCION**, no a BORRADOR: sus renglones ya materializaron
-obligaciones reales, y marcarlo como no aprobado diria que el año esta sin aprobar mientras hay
-gente con la formacion encima. Va con `plans:approve`, el mismo permiso que cerrarlo.
-
-### Como entra la gente a una capacitacion del plan, y por que no es como en las demas
-
-Es la diferencia que mas confunde, asi que conviene verla en una tabla. La pregunta "a quienes" se
-hace siempre en el mismo sitio —la pestana Quienes de la formacion— y siempre guarda una AUDIENCIA
-y un REQUISITO. Lo que cambia es **quien dispara la obligacion**, y eso lo dice `trigger`:
-
-| Tipo de formacion | `trigger` | Quien crea la obligacion | Cuando vence |
-|---|---|---|---|
-| Induccion general, reinduccion | `ON_HIRE` | el motor, al ingresar cada persona | dias respecto al ingreso |
-| Induccion especifica | `ON_JOIN` | el motor, al entrar al cargo | dias desde que se le empieza a exigir |
-| Extraordinaria, pildora | `ON_JOIN` | el motor, al guardar el requisito | dias desde ahora |
-| **Capacitacion del plan** | **`PLAN`** | **el plan, al aprobar el renglon** | **ultimo dia del mes programado** |
-
-En los cuatro casos hay requisito y hay audiencia. En los tres primeros el requisito **dispara**: el
-motor lo evalua y crea las obligaciones, y sigue haciendolo con quien llegue despues. En el cuarto
-**no dispara**: guarda a quienes —que hay que poder consultar antes de aprobar el plan— y se queda
-quieto.
-
-Por que no puede disparar (Decision #76), con el caso concreto:
-
-> Se exige "Manejo defensivo" a los 20 conductores y se programa para marzo.
->
-> **Antes:** al guardar Quienes nacian 20 obligaciones con vencimiento "a los 30 dias". Al aprobar
-> el plan nacian **otras 20** con vencimiento "31 de marzo". Cada conductor veia la formacion dos
-> veces en sus pendientes; al hacerla se le cerraba una y la otra vencia, asi que figuraba
-> incumplido despues de cumplir. Y si su inscripcion quedaba atada a la del requisito —la de
-> vencimiento mas cercano—, **la cobertura del plan no lo contaba**: podia marcar 0% con los 20
-> capacitados. Ademas, quien entrara de conductor en septiembre quedaba obligado a la jornada de
-> marzo, que la regla de oro 2 prohibe expresamente.
->
-> **Ahora:** al guardar Quienes no nace ninguna obligacion —la pantalla lo dice: "20 personas
-> quedan en el alcance, sus obligaciones nacen al aprobar el plan"—. Al aprobar el plan nacen 20,
-> una por persona, con vencimiento el 31 de marzo. Y quien entre en septiembre no entra: el plan
-> congelo su gente al aprobarse.
-
-Y por eso la pestana Quienes **no pregunta** disparador, plazo ni recurrencia cuando la formacion
-es del plan: no son decisiones, son consecuencias. Los campos no se ocultan, se quitan — uno que se
-ve y no hace nada es peor que no tenerlo, porque quien lo rellena cree que decidio algo.
-
-El disparador lo fuerza el SERVIDOR (`setActivityRequirement`) ignorando lo que mande el cliente:
-es una consecuencia del tipo, y por una llamada directa a la API volveria a colarse un requisito
-que dispara solo.
-
-### Publicar el contenido y publicar la convocatoria: dos puertas, y solo una bloquea antes
-
-Es la pregunta que mas ralentiza el trabajo si se responde mal: **¿hace falta publicar la formacion
-para poder programarla?** No (Decision #77). Hacen falta las dos cosas para ABRIRLA a la gente, y
-esa es la unica puerta que se cierra antes de tiempo:
-
-| Se puede... | ¿Con el contenido en borrador? | Por que |
-|---|---|---|
-| Crear la convocatoria | **si** | reservar el sitio en el calendario no cita a nadie |
-| Meterla en el plan como renglon | **si** | un renglon de un plan en borrador no obliga a nadie |
-| **Publicar la convocatoria** | **no** | publicar CITA a la gente y CONGELA los proyectados |
-| Aprobar el plan | **no** | exige que todas sus convocatorias esten publicadas |
-
-El invariante que se defiende es **nadie queda citado a contenido que todavia puede cambiar**, y lo
-sostiene `publish()` —que ya lo comprobaba— no `create()`. La validacion al crear solo imponia un
-orden: primero termina el contenido, despues planea. Y el año se planea al reves: en enero se
-aparta "Manejo defensivo, marzo, Cali" y el contenido se arma en febrero.
-
-En la pantalla, la pestana Convocatorias de una formacion sin publicar ya no es un muro: programa y
-avisa de hasta donde llega. Y el desplegable del plan marca las versiones en borrador
-(`(v1 — contenido en borrador)`): ofrecerlas sin decirlo seria peor que no ofrecerlas.
-
-### Que pasa cuando una jornada no se va a dictar
-
-Son dos acciones distintas y durante meses solo existio media (Decision #79):
-
-| Accion | Cuando | Que hace |
-|---|---|---|
-| **Quitar del plan** | plan en BORRADOR, sin obligaciones | borra el renglon. La convocatoria SIGUE existiendo |
-| **Cancelar la jornada** | siempre que la convocatoria sea cancelable | cancela la CONVOCATORIA, y eso arrastra todo lo demas |
-
-Cancelar la jornada es lo que ocurre de verdad, y llega hasta las personas:
+El analisis que llevo hasta aqui esta en `docs/03-infraestructura-produccion.md`; las **reglas** de
+operacion —lo que no se hace nunca— en `docs/05-reglas-de-despliegue.md`, y la memoria operativa en
+`docs/RUNBOOK.md` (seccion PRODUCCION). Esto es el mapa de lo que hay montado.
 
 ```
-cancelOffering(reason)
-  -> offering.status = CANCELLED
-  -> sus plan_items PLANNED -> CANCELLED        (sale del cumplimiento, ni a favor ni en contra)
-  -> assignments source=PLAN abiertas -> WITHDRAWN_PLAN_ITEM_CANCELLED
-  -> aviso a cada persona INSCRITA, con el motivo
+                    Cloudflare  (DNS + proxy + R2)
+                          |
+                    ascentio.app  y  *.ascentio.app
+                          v
+   ┌──────────────── Vultr HP Miami, 2 vCPU / 4 GB ─────────────────┐
+   │                                                                │
+   │   caddy      TLS automatico (Let´s Encrypt, HTTP-01)           │
+   │     |—— /v1/*  ────────────────>  api      (NestJS, :3002)     │
+   │     └—— resto  ────────────────>  web      (Next.js, :3000)    │
+   │                                     |                          │
+   │                              postgres    redis                 │
+   │                                                                │
+   │   migrate   una sola ejecucion: scripts/release.sh y termina   │
+   └────────────────────────────────────────────────────────────────┘
+                          |
+                 Cloudflare R2 · bucket ascent-media
+                 (video y documentos, con enlaces firmados)
 ```
 
-Las dos ultimas lineas son nuevas. Antes cancelar movia dos estados y dejaba a la gente igual:
-quien estaba convocado seguia creyendo que tenia sesion el 12 de marzo, y quien tenia la obligacion
-del plan la conservaba viva, venciendo el ultimo dia de un mes cuya jornada ya no existia. **Lo ya
-EMPEZADO no se toca**: ese avance es de la persona.
+- **Una maquina, todo en contenedores** (`docker/docker-compose.prod.yml`, proyecto `neo-pulse`).
+  No comparte nada con SAC-NEO.
+- **El vídeo NO sale de la maquina.** R2 no cobra trafico de salida: es la razon entera de elegirlo.
+  Si saliera del servidor, su ancho de banda seria el techo de cuanta gente puede ver una formacion a
+  la vez.
+- **Cada empresa entra por su subdominio** (`transprensa.ascentio.app`), y el subdominio identifica
+  al tenant **antes** del ingreso. `NEXT_PUBLIC_API_URL` va **vacia** para que cada subdominio hable
+  consigo mismo por rutas relativas; con un valor puesto, el CORS corta a todos los tenants menos al
+  del dominio raiz.
+- **`migrate` aparece como `Exited (0)` y esta bien**: es un servicio de una sola ejecucion.
+- **Las migraciones viajan dentro de la imagen de la API.** Corregir un `.sql` en el disco de la
+  maquina no cambia lo que se ejecuta: hay que reconstruir la imagen.
 
-El motivo es obligatorio (minimo 10 caracteres) porque lo leen las personas citadas, no solo el
-auditor. Y el cajon dice ANTES de pulsar a cuantas se avisa y cuantas obligaciones se retiran: son
-tres consecuencias y ninguna se veia.
+### Copias de seguridad
+
+| | |
+|---|---|
+| `scripts/backup.sh` | `pg_dump` comprimido a R2, por cron a las 03:00 UTC · registro en `/opt/ascent/backups/backup.log` |
+| `scripts/restaurar-prueba.sh` | Restaura en una base de usar y tirar, cuenta filas y la borra. **Produccion no se toca** |
+| Copias de la maquina (Vultr) | Lo unico que respalda los secretos que viven solo ahi: `private.pem`, `REFRESH_TOKEN_PEPPER`, `MEDIA_URL_SECRET` |
+
+La restauracion **se probo** antes de entregar. Una copia que nunca se restauro no es una copia.
+
+### Lo que la maquina NO tiene, y es a proposito
+
+- **LibreOffice**: no cabe en 4 GB. Un `.pptx` se rechaza pidiendo el PDF, y la pantalla lo dice. Si
+  hace falta, `libreoffice-impress` y la maquina de 8 GB (USD 24 mas).
+- **Vigilancia**: hoy no hay nada. El primer aviso de una caida lo daria el cliente. Pendiente:
+  Sentry mas un vigilante de disponibilidad sobre `/v1/health`.

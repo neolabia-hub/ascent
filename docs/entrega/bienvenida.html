@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ascent — Entrega a TRANSPRENSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   ASCENT · IDENTIDAD DE ENTREGA
+
+   NO es la identidad de las guías (Manrope + Inter sobre gris frío).
+   Las guías son manuales: se consultan. Esto se ENTREGA, y se lee una
+   vez con alguien mirando por encima del hombro. Por eso cambia todo:
+
+   · Índigo profundo #1E0958 — el color que la propia empresa tiene
+     configurado como principal en la plataforma. No es un color nuestro.
+   · Papel crema #F7F5F2 en vez de gris — un documento, no una pantalla.
+   · Serif de display (Fraunces) — lo que separa un acta de un informe.
+   · Los anillos concéntricos son los MISMOS del ingreso a la plataforma:
+     en este producto significan «algo avanza». No es un adorno importado.
+
+   Los tokens llevan los nombres del sistema de diseño de la aplicación
+   a propósito: esta página está pensada para pasar a `apps/web` como un
+   módulo de bienvenida sin reescribir una línea de CSS.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --ink:        #0B0715;
+  --ink-2:      #171029;
+  --brand:      #1E0958;
+  --brand-lift: #3A1B8F;
+  --brand-soft: #EFEBFA;
+  --accent:     #E8734A;
+  --cream:      #F7F5F2;
+  --surface:    #FFFFFF;
+  --line:       #E4DFD8;
+  --line-2:     #CFC8BE;
+  --text:       #2B2A33;
+  --muted:      #6B6875;
+  --ok:         #1A7F4E;
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --body:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--cream); color: var(--text);
+  font-family: var(--body); font-size: 16px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--brand-lift); }
+
+.marco { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+
+/* ─────────────── PORTADA ─────────────── */
+/* EL FONDO SE ARMA CON CUATRO CAPAS, y cada una hace un trabajo distinto.
+   Un solo degradado da una mancha; cuatro dan profundidad, que es lo que
+   separa una portada de un rectángulo de color.
+
+   1. El foco violeta arriba a la derecha — de donde «viene la luz».
+   2. Un verde muy tenue abajo a la izquierda: es el color de acento que
+      TRANSPRENSA tiene configurado en su plataforma. Al 14 % no se lee como
+      verde, se lee como que el fondo tiene fondo.
+   3. Un coral igual de tenue por abajo, que es el acento de la casa.
+   4. Un velo blanco en el borde superior: la luz que roza el papel. */
+.portada {
+  position: relative; overflow: hidden;
+  background: var(--ink);
+  background-image:
+    radial-gradient(118% 82% at 76% 10%, rgba(78,38,178,.70) 0%, rgba(11,7,21,0) 60%),
+    radial-gradient(78% 58% at 2% 98%,  rgba(54,125,23,.14) 0%, rgba(11,7,21,0) 55%),
+    radial-gradient(92% 66% at 44% 112%, rgba(232,115,74,.13) 0%, rgba(11,7,21,0) 58%),
+    linear-gradient(180deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,0) 32%);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.10);
+  color: #fff;
+}
+.portada .marco { position: relative; z-index: 2; padding-top: 64px; padding-bottom: 76px; }
+
+/* Anillos: el gesto del producto. Latido MUY lento — a 22 s nadie lo ve
+   moverse, se percibe que la página está viva. Más rápido distrae. */
+.anillos { position: absolute; right: -18rem; top: 46%; z-index: 1; pointer-events: none; }
+.anillo {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  border: 1px solid rgba(255,255,255,.085); border-radius: 999px;
+  animation: latir 22s ease-in-out infinite;
+}
+@keyframes latir {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);    opacity: .55; }
+  50%      { transform: translate(-50%, -50%) scale(1.06); opacity: .95; }
+}
+@media (prefers-reduced-motion: reduce) { .anillo { animation: none; } }
+
+/* LAS DOS MARCAS JUNTAS, y en este orden: quien entrega, «para», quien recibe.
+   Es la forma de un documento de entrega y no la de una alianza — por eso no
+   van al mismo tamaño ni separadas por una raya neutra. */
+.lockup { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.lockup__union {
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+  color: rgba(255,255,255,.32); padding: 0 2px;
+}
+@media (max-width: 560px) { .lockup__union { display: none; } }
+
+.marca { display: flex; align-items: center; gap: 14px; }
+.sello {
+  width: 42px; height: 42px; border-radius: 12px; flex: none;
+  background: linear-gradient(150deg, #6E44D6 0%, #1E0958 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+  display: grid; place-items: center;
+}
+.sello svg { display: block; }
+/* El logotipo del cliente ya trae su propio fondo azul marino; sobre el índigo
+   de la portada se fundiría, así que lleva un filo claro que lo despega. */
+.logo-cliente {
+  width: 42px; height: 42px; border-radius: 12px; flex: none; object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 6px 16px -8px rgba(0,0,0,.7);
+}
+.marca__nombre {
+  font-family: var(--display); font-size: 20px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; line-height: 1;
+}
+.marca__pie { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.45); margin-top: 5px; }
+
+.portada h1 {
+  font-family: var(--display); font-weight: 600;
+  font-size: clamp(38px, 6.2vw, 66px); line-height: 1.04; letter-spacing: -.025em;
+  margin: 54px 0 0; max-width: 17ch; text-wrap: balance;
+}
+.portada h1 em { font-style: normal; color: #C9B6FF; }
+.portada .bajada {
+  font-size: 18px; line-height: 1.6; color: rgba(255,255,255,.66);
+  margin: 22px 0 0; max-width: 54ch;
+}
+
+.datos-portada {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px; background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 14px; overflow: hidden;
+  margin-top: 46px;
+}
+.dato { background: rgba(11,7,21,.55); padding: 18px 20px; }
+.dato dt { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.42); margin: 0 0 6px; }
+.dato dd { margin: 0; font-size: 15px; font-weight: 500; color: #fff; }
+.dato dd.mono { font-family: var(--mono); font-size: 13.5px; }
+
+/* ─────────────── ESTRUCTURA ─────────────── */
+section { padding: 78px 0 0; }
+section:last-of-type { padding-bottom: 90px; }
+.rotulo {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--accent); margin: 0 0 16px;
+}
+.rotulo::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+h2 {
+  font-family: var(--display); font-weight: 600; font-size: clamp(27px, 3.4vw, 36px);
+  line-height: 1.15; letter-spacing: -.02em; color: var(--ink); margin: 0 0 14px; text-wrap: balance;
+}
+h3 { font-family: var(--body); font-size: 16px; font-weight: 700; color: var(--ink); margin: 0 0 6px; }
+p { margin: 0 0 16px; }
+p.intro { font-size: 17.5px; color: var(--muted); max-width: 66ch; }
+strong { color: var(--ink); font-weight: 600; }
+
+/* ─────────────── ACCESO ─────────────── */
+.acceso {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+  padding: 30px; margin-top: 26px;
+  display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 26px; align-items: center;
+  box-shadow: 0 1px 2px rgba(11,7,21,.04), 0 14px 34px -22px rgba(11,7,21,.30);
+}
+@media (max-width: 700px) { .acceso { grid-template-columns: 1fr; } }
+.acceso .url {
+  font-family: var(--mono); font-size: clamp(15px, 2.6vw, 20px); font-weight: 500;
+  color: var(--ink); word-break: break-all; margin: 6px 0 0;
+}
+.boton {
+  display: inline-block; background: var(--brand); color: #fff; text-decoration: none;
+  font-weight: 600; font-size: 15px; padding: 15px 26px; border-radius: 11px;
+  white-space: nowrap; box-shadow: 0 10px 22px -12px rgba(30,9,88,.7);
+}
+.boton:hover { background: var(--brand-lift); }
+
+.puertas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 18px; }
+.puerta { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 18px 20px; }
+.puerta h3 { font-size: 14px; }
+.puerta p { font-size: 14px; color: var(--muted); margin: 0; }
+
+.nota {
+  border-left: 3px solid var(--accent); background: #FFF6F1;
+  padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 22px 0 0; font-size: 15px;
+}
+.nota p:last-child { margin-bottom: 0; }
+
+/* ─────────────── CAPACIDADES ─────────────── */
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 16px; margin-top: 28px; }
+.pieza {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 15px; padding: 24px;
+  position: relative;
+}
+.pieza .num {
+  font-family: var(--display); font-size: 13px; font-weight: 700; color: var(--accent);
+  letter-spacing: .06em; display: block; margin-bottom: 12px;
+}
+.pieza h3 { font-size: 17px; margin-bottom: 8px; }
+.pieza p { font-size: 14.5px; color: var(--muted); margin: 0; }
+.pieza .responde {
+  display: block; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-2);
+  font-size: 13px; color: var(--ink); font-style: italic;
+}
+
+/* ─────────────── TABLA ─────────────── */
+.tabla-marco { overflow-x: auto; margin-top: 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 660px; }
+thead th {
+  text-align: left; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; padding: 15px 20px; border-bottom: 1px solid var(--line-2);
+  background: #FBFAF8;
+}
+tbody td { padding: 15px 20px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody td:first-child { font-weight: 600; color: var(--ink); white-space: nowrap; }
+tbody td:last-child { color: var(--muted); }
+
+/* ─────────────── LÍNEA DE TIEMPO ─────────────── */
+.ruta { list-style: none; margin: 30px 0 0; padding: 0; position: relative; }
+.ruta::before { content: ''; position: absolute; left: 19px; top: 12px; bottom: 12px; width: 2px; background: var(--line-2); }
+.hito { position: relative; padding: 0 0 30px 60px; }
+.hito:last-child { padding-bottom: 0; }
+.hito::before {
+  content: ''; position: absolute; left: 12px; top: 5px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--surface); border: 3px solid var(--brand);
+}
+.hito .cuando { font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); }
+.hito h3 { margin: 5px 0 6px; font-size: 17px; }
+.hito p { font-size: 14.5px; color: var(--muted); margin: 0; }
+
+/* ─────────────── DOCUMENTOS ─────────────── */
+.docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 26px; }
+.doc {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 20px 22px;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.doc:hover { border-color: var(--brand); transform: translateY(-2px); }
+.doc .tipo { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.doc h3 { margin: 8px 0 5px; font-size: 15.5px; }
+.doc p { font-size: 13.5px; color: var(--muted); margin: 0; }
+
+/* ─────────────── CUIDADO ─────────────── */
+.cuidado { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 26px; margin-top: 30px; }
+.cifra { font-family: var(--display); font-size: 40px; font-weight: 600; color: var(--ink); line-height: 1; letter-spacing: -.02em; }
+.cifra small { display: block; font-family: var(--body); font-size: 13.5px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-top: 10px; line-height: 1.5; }
+
+/* ─────────────── SOPORTE ─────────────── */
+.soporte {
+  margin-top: 30px; background: var(--ink); color: #fff; border-radius: 18px; padding: 38px 34px;
+  background-image: radial-gradient(100% 120% at 88% 0%, rgba(58,27,143,.6) 0%, rgba(11,7,21,0) 60%);
+}
+.soporte h2 { color: #fff; margin-bottom: 10px; }
+.soporte p { color: rgba(255,255,255,.68); }
+.soporte .canales { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 26px; }
+.canal dt { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.42); margin-bottom: 6px; }
+.canal dd { margin: 0; font-size: 15.5px; color: #fff; font-weight: 500; }
+
+/* Hueco por rellenar: se ve, y por eso no se envía sin rellenar. */
+.hueco {
+  background: #FFF0D6; border-bottom: 2px solid #E0A93A; color: #6B4A05;
+  padding: 1px 7px; border-radius: 4px; font-weight: 600; font-size: .94em;
+}
+
+footer { border-top: 1px solid var(--line-2); padding: 34px 0 60px; }
+footer p { font-size: 13.5px; color: var(--muted); margin: 0 0 6px; }
+
+/* ─────────────── IMPRESIÓN ───────────────
+   Se imprime, aunque no sea su destino: alguien la llevará a un comité. */
+@media print {
+  body { background: #fff; font-size: 11pt; }
+  .portada { background: var(--ink) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .anillos, .boton { display: none; }
+  section { padding-top: 34px; break-inside: avoid; }
+  .pieza, .doc, .hito, .acceso { break-inside: avoid; }
+  @page { margin: 14mm; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ PORTADA ══════════════════ -->
+<header class="portada">
+  <span class="anillos" aria-hidden="true">
+    <span class="anillo" style="width:17rem;height:17rem;animation-delay:0s"></span>
+    <span class="anillo" style="width:28rem;height:28rem;animation-delay:1.8s"></span>
+    <span class="anillo" style="width:39rem;height:39rem;animation-delay:3.6s"></span>
+    <span class="anillo" style="width:50rem;height:50rem;animation-delay:5.4s"></span>
+  </span>
+
+  <div class="marco">
+    <div class="lockup">
+      <div class="marca">
+        <span class="sello" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 3.2 17 16.8H3L10 3.2Z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M10 9.4 13.4 16.8H6.6L10 9.4Z" fill="#fff" fill-opacity=".9"/>
+          </svg>
+        </span>
+        <div>
+          <div class="marca__nombre">Ascent</div>
+          <div class="marca__pie">Un producto de AION</div>
+        </div>
+      </div>
+
+      <span class="lockup__union">para</span>
+
+      <div class="marca">
+        <!-- El logotipo va INCRUSTADO en el propio archivo (base64) y no como
+             un enlace a `ltrna.jpg`. Si fuera un enlace, este documento dejaría
+             de verse en cuanto saliera de esta carpeta: adjunto en un correo,
+             copiado a un pendrive o abierto por el cliente desde su escritorio.
+             Son 3,6 KB; la portabilidad vale mucho más que eso. -->
+        <img class="logo-cliente" width="42" height="42" alt="TRANSPRENSA"
+             src="data:image/jpeg;base64,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">
+        <div>
+          <div class="marca__nombre">Transprensa</div>
+          <div class="marca__pie">Transportadora La Prensa del Valle</div>
+        </div>
+      </div>
+    </div>
+
+    <h1>Su plataforma de formación <em>ya está en línea.</em></h1>
+    <p class="bajada">
+      Todo lo que TRANSPRENSA forma —inducciones, reinducciones, el plan anual, las capacitaciones
+      extraordinarias y las píldoras— vive desde hoy en un solo sitio, con la evidencia lista para
+      cuando la pidan.
+    </p>
+
+    <dl class="datos-portada">
+      <div class="dato"><dt>Cliente</dt><dd>Transportadora La Prensa del Valle S.A.S.</dd></div>
+      <div class="dato"><dt>Dirección</dt><dd class="mono">transprensa.ascentio.app</dd></div>
+      <div class="dato"><dt>Entrega</dt><dd>9 de septiembre de 2026</dd></div>
+      <!-- Aquí iba la fecha de puesta en producción, que es la misma que la de
+           entrega: dos casillas diciendo lo mismo no informan, ocupan. En su
+           lugar, el dato que alguien va a necesitar de verdad y que si no está
+           aquí hay que ir a buscar al final del documento. -->
+      <div class="dato"><dt>Soporte</dt><dd>+57 315 289 3163</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main class="marco">
+
+<!-- ══════════════════ ACCESO ══════════════════ -->
+<section id="acceso">
+  <p class="rotulo">01 · Por dónde se entra</p>
+  <h2>Una sola dirección, para todos.</h2>
+  <p class="intro">
+    Desde el gerente hasta el conductor que la abre en el teléfono a las cinco de la mañana: la
+    misma puerta. Lo que cada persona ve dentro lo decide su rol, no una dirección distinta.
+  </p>
+
+  <div class="acceso">
+    <div>
+      <p style="margin:0;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600">La dirección de TRANSPRENSA</p>
+      <p class="url">https://transprensa.ascentio.app</p>
+    </div>
+    <a class="boton" href="https://transprensa.ascentio.app/login">Entrar a la plataforma</a>
+  </div>
+
+  <div class="puertas">
+    <div class="puerta">
+      <h3>Se entra con la cédula</h3>
+      <p>No hay usuario que memorizar ni correo corporativo que crear. El número de documento y una contraseña.</p>
+    </div>
+    <div class="puerta">
+      <h3>Se instala en el teléfono</h3>
+      <p>Desde el navegador: «Añadir a pantalla de inicio». Queda como una aplicación y funciona con señal intermitente.</p>
+    </div>
+    <div class="puerta">
+      <h3>Sigue donde se quedó</h3>
+      <p>Una lección empezada en el computador se termina en el teléfono. El avance es de la persona, no del aparato.</p>
+    </div>
+  </div>
+
+  <div class="nota">
+    <p>
+      <strong>Las claves no viajan en este documento.</strong> La cuenta de administración se entrega
+      por WhatsApp al <strong>+57 315 289 3163</strong>, y al primer ingreso la plataforma
+      <strong>obliga a cambiarla</strong> y a aceptar el tratamiento de datos y el acuerdo de firma
+      electrónica. Desde ese momento nadie de AION conoce esa contraseña, y así debe ser.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════ QUÉ HACE ══════════════════ -->
+<section id="capacidades">
+  <p class="rotulo">02 · Qué resuelve</p>
+  <h2>Seis piezas, un solo motor.</h2>
+  <p class="intro">
+    Una inducción general, una reinducción, una capacitación del plan y una píldora de tres minutos
+    comparten contenido, evaluación, encuesta, constancia y rastro de auditoría. Lo único que cambia
+    entre ellas es la configuración — y la configura usted, sin llamarnos.
+  </p>
+
+  <div class="rejilla">
+    <article class="pieza">
+      <span class="num">01</span>
+      <h3>Catálogo formativo</h3>
+      <p>Lecciones en tarjetas de tres a siete minutos, con vídeo, documentos y presentaciones. Publicar congela una versión: lo que alguien cursó no cambia nunca más.</p>
+      <span class="responde">«¿Qué vio exactamente esta persona?»</span>
+    </article>
+    <article class="pieza">
+      <span class="num">02</span>
+      <h3>Plan anual de capacitación</h3>
+      <p>Los renglones del año con su presupuesto de horas, lo ejecutado contra lo programado y la cobertura real por área, cargo y regional.</p>
+      <span class="responde">«¿Vamos cumpliendo el plan que presentamos?»</span>
+    </article>
+    <article class="pieza">
+      <span class="num">03</span>
+      <h3>Convocatorias y asistencia</h3>
+      <p>Sesiones con fecha, instructor y lugar; lista de asistencia por QR, por el instructor o firmada en tableta; acta lista para descargar.</p>
+      <span class="responde">«Demuéstreme quién asistió el 12 de marzo.»</span>
+    </article>
+    <article class="pieza">
+      <span class="num">04</span>
+      <h3>Evaluaciones y encuestas</h3>
+      <p>Banco de preguntas por tema, exámenes con bloques fijos o al azar, intentos y nota mínima. Encuesta de satisfacción y evaluación de eficacia al jefe del área.</p>
+      <span class="responde">«¿Aprendió, o solo asistió?»</span>
+    </article>
+    <article class="pieza">
+      <span class="num">05</span>
+      <h3>Constancias verificables</h3>
+      <p>Cada constancia lleva un código público. Quien la reciba —un cliente, un auditor, otra empresa— comprueba en línea si está vigente, vencida o anulada.</p>
+      <span class="responde">«¿Este certificado es real?»</span>
+    </article>
+    <article class="pieza">
+      <span class="num">06</span>
+      <h3>Seguimiento y vencimientos</h3>
+      <p>Quién no ha hecho lo suyo <em>y por qué no</em>: si está atrasado o si todavía no hay convocatoria. Lo que vence, con aviso los lunes a quien corresponde.</p>
+      <span class="responde">«¿A quién tengo que perseguir esta semana?»</span>
+    </article>
+  </div>
+</section>
+
+<!-- ══════════════════ AUDITORÍA ══════════════════ -->
+<section id="auditoria">
+  <p class="rotulo">03 · La razón de fondo</p>
+  <h2>La carpeta que se arma la noche antes de la auditoría.</h2>
+  <p class="intro">
+    Esa carpeta deja de armarse. Cada registro de formación nace ya como evidencia: inmutable,
+    fechado, firmado y atado a la versión exacta que la persona cursó. Esto es lo que responde,
+    norma por norma.
+  </p>
+
+  <div class="tabla-marco">
+    <table>
+      <thead>
+        <tr><th>Norma</th><th>Qué exige</th><th>Dónde sale en la plataforma</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Decreto 1072<br><small style="font-weight:400;color:var(--muted)">art. 2.2.4.6.11</small></td>
+          <td>Inducción <strong>previa</strong> al inicio de labores, a todo el que entre, sea cual sea su vinculación.</td>
+          <td>La obligación nace con la fecha de ingreso y avisa si no está cumplida antes del primer día.</td>
+        </tr>
+        <tr>
+          <td>Decreto 1072<br><small style="font-weight:400;color:var(--muted)">art. 2.2.4.6.13</small></td>
+          <td>Registros de capacitación retenidos <strong>20 años</strong> tras el retiro.</td>
+          <td>Nada se borra. Al retirarse alguien se anonimiza lo personal y el registro formativo se conserva íntegro.</td>
+        </tr>
+        <tr>
+          <td>Resolución 0312<br><small style="font-weight:400;color:var(--muted)">ítems 1.2.1–1.2.2</small></td>
+          <td>Programa anual con soportes y lista de participantes de inducción y reinducción.</td>
+          <td>Plan anual con ejecutadas contra programadas, y actas de asistencia exportables.</td>
+        </tr>
+        <tr>
+          <td>PESV<br><small style="font-weight:400;color:var(--muted)">Res. 40595, paso 10</small></td>
+          <td>Formación por <strong>actor vial</strong>, con intensidad teórica y práctica y competencia documentada.</td>
+          <td>Actor vial en la ficha de cada persona, horas desglosadas y matriz de cargo contra formación real.</td>
+        </tr>
+        <tr>
+          <td>BASC V6:2022</td>
+          <td>Programa anual documentado y evaluación anual de eficacia.</td>
+          <td>Renglones del plan etiquetados y flujo de eficacia que responde el jefe del área, no el alumno.</td>
+        </tr>
+        <tr>
+          <td>SARLAFT</td>
+          <td>Capacitación anual con constancias que digan asistentes, fechas y temas.</td>
+          <td>Actividad recurrente anual y constancia con esos tres datos, verificable por código.</td>
+        </tr>
+        <tr>
+          <td>ISO 9001<br>45001 · 14001</td>
+          <td>Competencia, eficacia e información documentada (cl. 7.2–7.3).</td>
+          <td>Matriz de competencia, eficacia diferida en el tiempo e historial completo por persona.</td>
+        </tr>
+        <tr>
+          <td>Ley 1581<br><small style="font-weight:400;color:var(--muted)">Habeas Data</small></td>
+          <td>Autorización del titular, política, derechos y trato especial del dato biométrico.</td>
+          <td>Consentimiento versionado en el alta; la firma digitalizada se trata como dato sensible con autorización expresa.</td>
+        </tr>
+        <tr>
+          <td>Ley 527<br><small style="font-weight:400;color:var(--muted)">firma electrónica</small></td>
+          <td>Validez jurídica de la firma electrónica.</td>
+          <td>Acuerdo de firma aceptado en el alta, sello de tiempo, huella criptográfica y registro inmutable.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota">
+    <p>
+      <strong>Las cuatro preguntas que hunden una auditoría</strong> —qué vio esta persona, qué
+      respondió, qué se le exigía y si estaba vigente en tal fecha— se contestan abriendo su perfil.
+      No hay que reconstruir nada, porque nunca se perdió.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════ PRIMEROS DÍAS ══════════════════ -->
+<section id="arranque">
+  <p class="rotulo">04 · Cómo se arranca</p>
+  <h2>Los primeros treinta días.</h2>
+  <p class="intro">
+    No hay que subirlo todo el primer día. Este orden existe porque cada paso apoya al siguiente:
+    sin personas cargadas no hay a quién asignar, y sin una formación publicada no hay nada que
+    convocar.
+  </p>
+
+  <ol class="ruta">
+    <li class="hito">
+      <span class="cuando">Día 1 · con nosotros al teléfono</span>
+      <h3>Entrar, cambiar la clave y ponerle su cara</h3>
+      <p>El administrador entra, cambia su contraseña y revisa <em>Configuración</em>: el logo, los dos colores de la empresa, el contacto de soporte que verá su gente y la nota mínima con la que se aprueba. Quince minutos.</p>
+    </li>
+    <li class="hito">
+      <span class="cuando">Semana 1</span>
+      <h3>La organización y la gente</h3>
+      <p>Áreas, cargos, regionales y procesos primero; las personas después, con la plantilla de carga masiva. El orden importa: cada persona se cuelga de un cargo y de un área que ya tienen que existir.</p>
+    </li>
+    <li class="hito">
+      <span class="cuando">Semana 2</span>
+      <h3>La inducción general, de punta a punta</h3>
+      <p>Una sola formación, completa: sus tarjetas, su examen, su constancia. Publicarla y hacerla usted mismo como si fuera un empleado nuevo. Es la prueba real de que todo el circuito funciona.</p>
+    </li>
+    <li class="hito">
+      <span class="cuando">Semanas 3 y 4</span>
+      <h3>Las reglas, el plan y la primera convocatoria de verdad</h3>
+      <p>Qué exige cada cargo, cada cuánto se repite, qué vence. Se carga el plan del año y se convoca al primer grupo real. A partir de aquí la plataforma empieza a perseguir sola.</p>
+    </li>
+  </ol>
+</section>
+
+<!-- ══════════════════ DOCUMENTOS ══════════════════ -->
+<section id="documentos">
+  <p class="rotulo">05 · Lo que se entrega por escrito</p>
+  <h2>Las guías, escritas para quien opera.</h2>
+  <p class="intro">
+    Ninguna es un manual de botones. Cada una responde a una pregunta que se hace de verdad, y se
+    corrige el mismo día en que cambia lo que explica.
+  </p>
+
+  <div class="docs">
+    <a class="doc" href="../guias/guia-usuarios.html">
+      <span class="tipo">Guía</span>
+      <h3>Dar de alta y gestionar personas</h3>
+      <p>El alta una a una y la carga masiva, qué pasa cuando alguien entra o sale, y cómo se recupera un acceso perdido.</p>
+    </a>
+    <a class="doc" href="../guias/guia-montar-formaciones.html">
+      <span class="tipo">Guía</span>
+      <h3>Montar una formación</h3>
+      <p>De la carpeta de PDF a la lección publicada: tarjetas, vídeo, examen y constancia.</p>
+    </a>
+    <a class="doc" href="../guias/guia-formaciones.html">
+      <span class="tipo">Guía</span>
+      <h3>Los tipos de formación</h3>
+      <p>Qué distingue una inducción de una reinducción, de una del plan o de una píldora, y cuándo usar cada una.</p>
+    </a>
+    <a class="doc" href="../guias/guia-numeros.html">
+      <span class="tipo">Guía</span>
+      <h3>Qué significa cada cifra</h3>
+      <p>Los números de Seguimiento y del plan anual, qué acción pide cada uno, y por qué dos porcentajes sobre lo mismo pueden no coincidir.</p>
+    </a>
+    <a class="doc" href="../guias/guia-desempeno.html">
+      <span class="tipo">Guía</span>
+      <h3>Evaluación de desempeño</h3>
+      <p>El paso a paso completo: qué significa firmar, cómo se calcula la nota y qué pasa después con el resultado.</p>
+    </a>
+    <a class="doc" href="../guias/asistencia.html">
+      <span class="tipo">Guía</span>
+      <h3>Tomar asistencia</h3>
+      <p>Los tres mecanismos —QR, instructor y firma— y cómo sale el acta que se lleva a la auditoría.</p>
+    </a>
+  </div>
+
+  <div class="docs" style="margin-top:14px">
+    <a class="doc" href="acta-de-entrega.html" style="border-color:var(--line-2);background:#FBFAF8">
+      <span class="tipo">Documento formal</span>
+      <h3>Acta de entrega</h3>
+      <p>Qué se entrega, qué se verificó, qué no incluye esta fase y en qué condiciones se soporta. Para firma.</p>
+    </a>
+    <a class="doc" href="anexo-tecnico.html" style="border-color:var(--line-2);background:#FBFAF8">
+      <span class="tipo">Anexo</span>
+      <h3>Ficha técnica y de servicio</h3>
+      <p>Dónde vive la plataforma, cómo se cuidan los datos, cada cuánto se copian y qué pasa el día que algo falle.</p>
+    </a>
+  </div>
+</section>
+
+<!-- ══════════════════ CUIDADO ══════════════════ -->
+<section id="cuidado">
+  <p class="rotulo">06 · Cómo está cuidado</p>
+  <h2>Lo que no se ve, y es lo que importa el día malo.</h2>
+
+  <div class="cuidado">
+    <div>
+      <p class="cifra">Diaria
+        <small>Copia de seguridad completa, cifrada y fuera del servidor. <strong>Y probada</strong>: se restaura en una base de usar y tirar y se cuentan las filas. Tener copias y creer que se tienen no es lo mismo.</small>
+      </p>
+    </div>
+    <div>
+      <p class="cifra">20 años
+        <small>Es lo que el Decreto 1072 le exige guardar <strong>a la empresa</strong> tras el retiro de un trabajador; no es un plazo que pongamos nosotros. La plataforma está hecha para poder cumplirlo —no borra un registro de formación, nunca— y <strong>usted puede exportarlo todo cuando quiera</strong>, para que ese deber no dependa de quién sea su proveedor de software.</small>
+      </p>
+    </div>
+    <div>
+      <p class="cifra">Aislada
+        <small>Los datos de TRANSPRENSA viven tras dos barreras independientes en la base de datos. Ninguna consulta puede salirse de su empresa, ni por error de programación.</small>
+      </p>
+    </div>
+    <div>
+      <p class="cifra">Firmado
+        <small>Cada vídeo y cada documento se sirve con un enlace firmado y con caducidad, atado a la sesión de quien lo abre. Un enlace reenviado no abre nada.</small>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ SOPORTE ══════════════════ -->
+<section id="soporte">
+  <div class="soporte">
+    <h2>Si algo no funciona, esto es lo que hay que hacer.</h2>
+    <p style="max-width:60ch">
+      Escríbanos con tres cosas: <strong>qué estaba haciendo</strong>, <strong>qué esperaba que
+      pasara</strong> y <strong>una captura de la pantalla</strong>. Con eso se resuelve casi siempre
+      en la primera respuesta; sin eso, la primera respuesta es una pregunta.
+    </p>
+    <dl class="canales">
+      <div class="canal"><dt>WhatsApp</dt><dd>+57 315 289 3163</dd></div>
+      <div class="canal"><dt>Correo</dt><dd style="font-size:14px">miguelabad066@gmail.com</dd></div>
+      <div class="canal"><dt>Atención directa</dt><dd style="font-size:14.5px">Lunes a viernes,<br>8:00 a 17:00</dd></div>
+      <div class="canal"><dt>Fuera de ese horario</dt><dd style="font-size:14.5px">Asistente automático,<br>24/7</dd></div>
+    </dl>
+
+    <p style="margin:26px 0 0;font-size:13.5px;color:rgba(255,255,255,.5)">
+      El estado del servicio se consulta en cualquier momento en
+      <span style="font-family:var(--mono);color:rgba(255,255,255,.72)">ascentio.app/v1/health</span>.
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer class="marco">
+  <p><strong style="color:var(--ink)">Ascent</strong> — plataforma de formación corporativa. Un producto de AION.</p>
+  <p>Documento de entrega para Transportadora La Prensa del Valle S.A.S. · 9 de septiembre de 2026</p>
+</footer>
+
+</body>
+</html>

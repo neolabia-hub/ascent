@@ -1,4 +1,4 @@
-# NEO PULSE — Infraestructura de produccion (decision y analisis)
+# ASCENT — Infraestructura de produccion (decision y analisis)
 
 Contexto: produccion NO comparte nada con el entorno de SAC-NEO (que es piloto/demo). NEO PULSE
 va a un VPS propio, con criterio de costo-beneficio: rapido y fluido, pero economico.
@@ -79,7 +79,7 @@ Se migra a base gestionada solo cuando el volumen lo exija, no antes.
 
 Un equivalente en AWS con el mismo trafico de video quedaria facilmente por encima de USD 200.
 
-## Que falta cablear (pendiente del sprint de produccion)
+## Que falta cablear (revisado el 2026-09-09: solo queda el punto 5)
 
 1. ~~`R2StorageAdapter`~~ **HECHO** (2026-09-01). Ademas de subir y borrar, la decision que
    importa: con R2 los bytes **no pasan por la API**, el controlador de medios redirige a una URL
@@ -90,8 +90,12 @@ Un equivalente en AWS con el mismo trafico de video quedaria facilmente por enci
 3. ~~Script de despliegue y de backup~~ **HECHO**: `scripts/release.sh`, `scripts/backup.sh` y
    `scripts/restaurar-prueba.sh` (este ultimo restaura de verdad en una base de usar y tirar: un
    volcado que nunca se restauro no es una copia de seguridad).
-4. Dominio y DNS comodin para los subdominios por tenant.
-5. Sentry y monitoreo de disponibilidad (ver CLAUDE.md 10.5).
+4. ~~Dominio y DNS comodin para los subdominios por tenant~~ **HECHO** (2026-09-09):
+   `ascentio.app` en Namecheap con el DNS en Cloudflare, `A` para la raiz y `A` comodin para
+   `*.ascentio.app`, los dos con proxy. Los `MX` del correo van en **Solo DNS**: un registro MX
+   nunca va con proxy.
+5. **Sentry y monitoreo de disponibilidad: SIGUE ABIERTO** y es lo unico que falta de esta lista.
+   Hoy el primer aviso de una caida lo daria el cliente. Ver `docs/PENDIENTES.md` 10.4.
 
 **Advertencia:** los precios citados son de referencia y cambian. Verificarlos al contratar.
 

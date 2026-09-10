@@ -1,5 +1,12 @@
-# NEO PULSE — Plataforma SaaS de Formación Corporativa (LMS Multi-tenant)
-**Desarrollado por:** NEO IO | **Cliente piloto:** TRANSPRENSA | **Versión:** 1.0 (Documento maestro inicial)
+# ASCENT — Plataforma SaaS de Formación Corporativa (LMS Multi-tenant)
+**Desarrollado por:** AION | **Cliente piloto:** TRANSPRENSA | **En producción desde:** 2026-09-09
+
+> **El producto se llamaba NEO PULSE y desde el 2026-09-09 se llama ASCENT** (`ascentio.app`).
+> Cambió lo que ve una persona y el repositorio (`neolabia-hub/ascent`). **NO cambió lo interno**:
+> los paquetes siguen siendo `@neo-pulse/*`, el proyecto de Compose `neo-pulse` y los roles de
+> Postgres `neopulse*` — porque los volúmenes y los roles **son datos**: renombrar el proyecto de
+> Compose en producción crearía volúmenes nuevos y vacíos, y la plataforma arrancaría sin nada.
+> Ver `docs/HANDOFF.md` (2026-09-09 noche) §1.
 
 ---
 
@@ -575,7 +582,7 @@ Capa 1 — Prisma Client Extension: fuerza where.tenant_id en toda lectura y lo 
          escritura. Un handler no puede "olvidar" el filtro.
 Capa 2 — PostgreSQL RLS: políticas por tabla USING (tenant_id = current_setting('app.tenant_id')::uuid);
          el TenantInterceptor ejecuta SET LOCAL por request. Desde Fase 1, ANTES del riesgo.
-Acceso por SUBDOMINIO por tenant (Decisión #32): transprensa.neopulse.app identifica el tenant
+Acceso por SUBDOMINIO por tenant (Decisión #32): transprensa.ascentio.app identifica el tenant
 ANTES del login (necesario porque el login es por cédula, única solo dentro del tenant); el
 branding carga desde la pantalla de login; cookies aisladas por subdominio. DNS wildcard.
 ```
@@ -1044,7 +1051,7 @@ neo-pulse/
 | 29 | Intentos limitados; agotados → bloqueo + notificación a analista/jefe + rehabilitación auditada | La evaluación mide; el indicador no se infla solo |
 | 30 | Intensidad horaria SIEMPRE desglosada teórica/práctica; actividad tributa a N normas | PESV Paso 10 y acumulador BPM 10 h/año |
 | 31 | BD/código en inglés; UI en español FIJO en F1 (rótulo por tenant previsto en settings, sin UI) | Cerrado con el cliente 2026-08-25; los rótulos son datos, no riesgo |
-| 32 | Acceso por SUBDOMINIO por tenant (transprensa.neopulse.app): el tenant se identifica ANTES del login | El login por cédula es ambiguo sin contexto de tenant; branding desde la pantalla de login; cookies aisladas |
+| 32 | Acceso por SUBDOMINIO por tenant (transprensa.ascentio.app): el tenant se identifica ANTES del login | El login por cédula es ambiguo sin contexto de tenant; branding desde la pantalla de login; cookies aisladas |
 | 33 | Un colaborador tiene UN cargo y UN área vigentes; cambio de cargo reevalúa audiencias; ejecuciones y certificados guardan SNAPSHOT de cargo/área del momento | El histórico no se reescribe; auditoría exige el cargo que tenía al capacitarse |
 | 34 | Español único en F1: sin tablas de traducción de UI ni de contenido | i18n hoy es sobreingeniería para el mercado objetivo; se agrega cuando exista el cliente que lo pida |
 | 35 | **Motor de obligaciones idempotente**: índice único (requisito, persona, ronda) + `skipDuplicates`. Corre en caliente al alta/cambio de cargo y en frío cada hora | El alta y el cron pueden dispararlo a la vez; duplicar obligaciones corrompe todo indicador de cumplimiento |
@@ -1123,6 +1130,10 @@ neo-pulse/
 | 164 | **Un rotulo de pantalla y un nombre de catalogo no son la misma clase de cosa, y solo uno de los dos se arregla con codigo.** Las tildes de la interfaz se corrigen en el repositorio; «Gestion Humana», «Capacitacion del plan» o «Director de Gestion Humana» son **datos del tenant** y se escriben desde Configuracion | Salio corrigiendo la ortografia de todo el sistema a peticion del cliente. La tentacion era acentuar tambien `apps/api/prisma/seed.ts` y dejarlo «todo bien escrito», y habria sido peor que no hacer nada: la semilla no toca ninguna base que ya exista —ni la de desarrollo, contra la que corre la suite sin volver a sembrarla, ni la de ningun cliente—, asi que el unico efecto real habria sido **romper los selectores** de las pruebas que piden esos nombres tal como estan guardados. Y hay un motivo de producto encima del tecnico: el nombre de un area o de un tipo es de la empresa, no del producto; otro tenant llamara a eso «Talento Humano». La regla practica: **si el texto cambia de empresa a empresa, no se arregla en el codigo — se arregla donde se escribio**. En la misma pasada, la frontera dentro del propio codigo: una cadena con espacio o detras de `label:` es una PALABRA y se acentua; `key: 'quienes'` es un NOMBRE, viaja en `?tab=` y acentuarla rompe los enlaces guardados |
 | 165 | **La forma de un selector dice si lo que separa lleva ORDEN. Pestañas para vistas sueltas; recorrido con paradas para etapas que van una detras de otra** | `ViewTabs` gano `forma`, con `pastillas` por defecto y `etapas` en la ficha de una formacion (Ficha · Contenido · Quienes · Convocatorias · Versiones), que **si** es un recorrido: no se publica sin contenido ni se convoca sin publicar. Se llego por eliminacion, con el cliente tumbando las dos primeras formas mirando la pantalla: **subrayadas** —*"el boton se parece a esos selectores"*, con los botones de accion al lado un trazo de 2 px no distingue *donde estoy* de *que puedo hacer*— y **pastilla rellena** —*"no me gusta cuadrado cuando esta en el medio"*, un bloque de color en mitad de la fila parte el recorrido en dos en vez de señalar un punto dentro de el—. La forma buena es la de cualquier envio: una **linea** que cruza la fila, de color hasta donde estas y gris despues, con **paradas** encima (visto las pasadas, anillo la actual, numero las que faltan); el avance se lee sin contar nada y la etapa activa es un punto, no un bloque. **El movimiento tiene que significar algo:** lo unico que se anima es la linea al cambiar de etapa y un pulso corto en la parada nueva — en un registro que va a auditoria, una animacion decorativa es ruido sobre una evidencia. Y **no se generaliza**: el resto del sistema sigue con `pastillas`, porque una lista de vistas que no llevan orden dibujada como recorrido afirma una secuencia que no existe **Y la forma de la parada la fijo una referencia que trajo el cliente:** cuadrado redondeado y no circulo —un `rounded-[12px]` de 36 px tiene la forma de un icono de aplicacion y se reconoce como algo que se pulsa; el circulo perfecto se lee como el punto de un mapa—, con **el icono de la pestaña dentro** en vez de un numero: *"que la seleccion actual tenga icono y nombre"*. El numero solo repetia el orden, que la linea ya cuenta; el icono dice QUE hay dentro, y lo ya recorrido conserva el visto porque ahi no importa que habia sino que no hay que volver. Las paradas van `aria-hidden`: sin ocultarlas el nombre accesible del boton pasa a ser "2 Contenido" y quien navegue con lector de pantalla oiria el adorno antes que el sitio. Y adoptar el componente compartido cambio el rol de esos botones de `button` a `tab` —lo correcto, hay un tablist— sin que lo dijera ningun typecheck: once selectores de las pruebas hubo que pasarlos a `getByRole('tab')`. |
 | 166 | **La empresa configura DOS colores y cada uno tiene un trabajo. El primario es la ESTRUCTURA —donde estas—; el acento es lo que AVANZA** | `tenants.branding` guarda `primaryColor` y `accentColor` desde el Sprint 1, y hasta hoy el segundo solo vivia en el lado del aprendiz: la barra de una leccion, la cobertura del plan, el boton de continuar. Siempre diciendo lo mismo sin que nadie lo hubiera escrito — **algo avanza**. En la administracion no aparecia nunca, y el cliente lo noto: *"tienes que usar el color secundario del tenant, algunos botones podrian ser de ese color... sin tener muchos colores"*. La variante `acento` del boton extiende esa idea con una regla y no con un gusto: **pinta la accion que lleva el trabajo a su siguiente estado**, una por pantalla —Publicar cambios en la ficha, Dar por cumplida a N en la lista de asistencia—. Lo que NO se hizo, que es la mitad de la decision: repintar los botones primarios. Si el acento pinta un "Guardar" cualquiera, deja de significar *avance* y pasa a significar *boton*, que es lo que ya dice ser un boton; la frase del cliente —*"sin tener muchos colores"*— es exactamente ese limite. El criterio vive en el propio `button.tsx` y no en un documento aparte, porque la pregunta se hace al escribir el boton. Detalle de aplicacion: cuando lleva halo, el halo se pinta del MISMO color que el relleno — uno naranja con resplandor azul se lee como un error de pintura, no como un realce |
+| 167 | **La semilla APORTA DEFECTOS, NO VERDADES: crea lo que falta y nunca corrige lo que existe** | El `update` de un `upsert` es una escritura sobre datos vivos, y `prisma/seed.ts` estaba lleno de ellos. Cada ejecución con `RUN_SEED=true` devolvía el logo y el color secundario de un cliente a los de fábrica y su nota mínima de 90 al 75 por defecto; el `deleteMany` de permisos por rol borraba de paso **las excepciones dadas a mano** a personas concretas. El cliente lo venía diciendo desde dev —*«a veces borraba el logo y el color secundario, no sé por qué»*— y no era «a veces»: era cada vez. Ahora los ajustes editables se **mezclan** (`{ ...porDefecto, ...existente }`, lo del cliente gana), los catálogos y roles llevan `update: {}` literal, y los permisos se añaden con `createMany({ skipDuplicates: true })`. Es una decisión irreversible porque la alternativa no es un fallo que se arregla: son datos de un cliente que ya no están. La pregunta antes de tocar `seed.ts` es una sola — *¿esta línea puede pisar algo que decidió un cliente?* |
+| 168 | **Toda migración se prueba desde una base VACÍA, y toda migración de datos se escribe idempotente** | `migrate dev` aplica lo nuevo sobre una base con meses de historia, así que una migración puede depender de algo que otra creó **después** sin que nadie lo note. El primer despliegue a producción murió en `column "responsible_user_id" does not exist`: la cadena solo funcionaba sobre una base con pasado. Y recuperarla no fue editar el `.sql` —las migraciones viajan **dentro** de la imagen de la API—, sino `migrate resolve --rolled-back` más reconstruir la imagen. De ahí las dos mitades de la regla: se prueba contra un Postgres de usar y tirar antes de subir, y se escribe con `IF NOT EXISTS` y restricciones dentro de un `DO` que consulte `pg_constraint`, para que aplicarla dos veces sea inofensivo |
+| 169 | **La primera cuenta de PLATAFORMA se crea a mano, con un script, y su contraseña se enseña una sola vez. Nunca se siembra** | El módulo de plataforma sabía autenticar, refrescar sesiones y bloquear cuentas, pero `platform_users` estaba vacía en producción y no había forma de crear la primera: ni semilla, ni script, ni endpoint. Se descubrió por un camino largo —el cliente vació el contacto de soporte de su empresa esperando ver el de la plataforma, que se configura precisamente en `/plataforma`—. La salida obvia (sembrarla) es la mala: una cuenta con acceso a **todas** las empresas y contraseña conocida sería una puerta abierta en cada instalación del producto. `apps/api/scripts/crear-admin-plataforma.ts` la crea con nombre y correo de una persona real, genera 24 caracteres aleatorios, los imprime una vez y no los vuelve a mostrar |
+| 170 | **Lo de una persona es una PÁGINA, no una ventana. Y en una fila conviven cuatro acciones: las tres de todos los días y una puerta a lo excepcional** | Fueron cuatro formas y el cliente tumbó tres. Siete iconos por fila eran ciento cuarenta objetos pulsables en pantalla y ninguno se leía; desplegarlos *en* la fila cambiaba el gesto y no el problema (*«hace lo mismo que antes»*); un menú con palabras metía una tarjeta encima de la tabla. Quedan **editar, estado y perfil** siempre visibles —el estado fuera del menú porque entra y sale gente todos los días— y los tres puntos abriendo **círculos que flotan sin tarjeta ni fondo**, escalonados, con su palabra en el globo. Y el expediente pasó a ser `/usuarios/[id]`: *«página completa, es tipo perfil con todo lo importante»*. Una ventana obliga a cerrarla para seguir; una página se comparte por enlace, se abre en otra pestaña y se imprime — y lo que se mira de una persona (trayectoria, cifras, constancias) es justo lo que alguien quiere enviar a otro |
 
 ---
 
@@ -1262,6 +1273,10 @@ Idénticas a SAC-NEO (estándar del equipo):
 
 ## 13. Variables de Entorno Críticas
 
+En producción viven en `/opt/ascent/.env.prod` (permisos 600) y **no están respaldadas en ningún
+otro sitio** salvo las copias automáticas de la máquina. Qué pasa si se pierde cada secreto, en
+`ASCENT - CREDENCIALES Y ACCESOS.md` §4.
+
 ```env
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
@@ -1269,14 +1284,20 @@ JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
 REFRESH_TOKEN_SECRET=...
 MEDIA_URL_SECRET=...              # firma de las URL de archivos (si falta, reusa el pepper de refresco)
-R2_ACCOUNT_ID=... / R2_ACCESS_KEY_ID=... / R2_SECRET_ACCESS_KEY=... / R2_BUCKET_NAME=neo-pulse-files
-RESEND_API_KEY=... / RESEND_FROM_EMAIL=noreply@neopulse.app
+R2_ACCOUNT_ID=... / R2_ACCESS_KEY_ID=... / R2_SECRET_ACCESS_KEY=... / R2_BUCKET_NAME=ascent-media
+RESEND_API_KEY=... / RESEND_FROM_EMAIL=noreply@ascentio.app
 ANTHROPIC_API_KEY=...            # generación de borradores (AIAdapter)
-PUBLIC_VERIFY_BASE_URL=https://app.neopulse.app/verificar
-NEXT_PUBLIC_API_URL=https://...  # se HORNEA al construir el web; cambiarla exige reconstruir
-NEXT_PUBLIC_ROOT_HOST=neopulse.app  # dominio raiz: de el cuelga el subdominio por empresa.
+PUBLIC_VERIFY_BASE_URL=https://ascentio.app/verificar
+NEXT_PUBLIC_API_URL=            # VACÍA EN PRODUCCIÓN, y no es un olvido. Se hornea en el JavaScript
+                                 # del navegador al construir; con un valor puesto, el navegador de
+                                 # transprensa.ascentio.app pedía a ascentio.app, el CORS lo paraba y
+                                 # la pantalla decía "No pudimos conectar con el servidor". Vacía, la
+                                 # web llama a rutas relativas y cada subdominio habla consigo mismo
+NEXT_PUBLIC_ROOT_HOST=ascentio.app  # dominio raiz: de el cuelga el subdominio por empresa.
                                  # VACIO en un host de tercer nivel (duckdns.org, vercel.app):
                                  # ahi no hay subdominio por empresa y se entra con ?tenant=
+RUN_SEED=false                   # SE QUEDA ASÍ. Desde la Decisión #167 la semilla ya no pisa datos
+                                 # del cliente, pero no tiene nada que hacer en una base que existe
 NODE_ENV / PORT=3002 / FRONTEND_URL / APP_TIMEZONE=America/Bogota
 TRUSTED_PROXY_HOPS=2             # proxies propios delante (Cloudflare + proxy inverso). 0 en local.
                                  # De menos: la empresa entera comparte el limite por IP.

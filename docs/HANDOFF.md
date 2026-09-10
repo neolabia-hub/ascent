@@ -1,4 +1,4 @@
-# NEO PULSE — HANDOFF (diario de sesiones)
+# ASCENT — HANDOFF (diario de sesiones)
 
 Lo que se hizo cada dia, que quedo abierto y por que. **Se ANEXA por arriba**: la sesion mas
 reciente primero, para que abrir el archivo responda de una la pregunta que uno se hace al
@@ -21,6 +21,213 @@ un diario, no una referencia.
 
 **Para retomar sin leerse el diario entero: `docs/PENDIENTES.md`.** Nacio el 2026-09-06 porque lo
 abierto estaba repartido en siete documentos y saber que faltaba obligaba a leerlos todos.
+
+---
+
+## 2026-09-09 (noche) — ASCENT EN PRODUCCIÓN: el nombre, la máquina, y los tres fallos que solo se ven desplegando
+
+La sesión más larga del proyecto, y la que más cambió: el producto **dejó de llamarse NEO PULSE y se
+llama ASCENT**, tiene dominio propio, una máquina en Miami, copias de seguridad probadas y un cliente
+entrando por `https://transprensa.ascentio.app`. Y por el camino aparecieron **tres fallos que no
+podían aparecer en desarrollo**, dos de ellos de la clase que borra datos de un cliente.
+
+---
+
+### 1. EL NOMBRE: ASCENT, Y QUÉ NO SE RENOMBRÓ
+
+`ascentio.app` estaba libre y costaba poco. La empresa es **AION**; **Ascent** es el producto.
+
+Lo que **sí** cambió: lo que ve una persona (la pantalla de entrada, los documentos de entrega, el
+dominio) y el repositorio, que ahora es `neolabia-hub/ascent`.
+
+Lo que **NO** cambió, a propósito: el *scope* de los paquetes sigue siendo `@neo-pulse/api`,
+`@neo-pulse/web`, `@neo-pulse/shared`, el proyecto de Compose sigue siendo `neo-pulse`, los roles de
+Postgres siguen siendo `neopulse*` y la carpeta del repo en el disco sigue llamándose
+`Transprensa - NEO PULSE`.
+
+**Por qué no.** Un renombrado de *scope* toca cada `import` del monorepo, los `moduleNameMapper` de
+Jest, los nombres de volumen de Docker y los roles de la base — y **los volúmenes y los roles son
+datos, no código**: renombrar el proyecto de Compose en la máquina de producción haría que
+`docker compose up` creara **volúmenes nuevos y vacíos** y levantara una plataforma sin nada, con la
+base vieja intacta pero desconectada. El nombre interno no lo ve nadie; el riesgo de cambiarlo, sí.
+
+> Si algún día se hace: con la plataforma parada, con copia verificada, renombrando los volúmenes a
+> mano — y nunca el mismo día que otra cosa.
+
+---
+
+### 2. LA MÁQUINA, EL DOMINIO Y EL VÍDEO
+
+| | Qué |
+|---|---|
+| **Servidor** | Vultr High Performance, Miami · 2 vCPU / 4 GB / 128 GB · USD 24 + 4,80 de copias |
+| **IP** | `45.63.107.34` · usuario `linuxuser` (con sudo) · entrada solo por llave |
+| **Dominio** | `ascentio.app` en Namecheap, DNS en Cloudflare |
+| **Certificados** | Caddy, automáticos (Let´s Encrypt, HTTP-01) |
+| **Vídeo y archivos** | Cloudflare R2, bucket `ascent-media`, enlaces firmados |
+
+**Por qué Vultr y no Hetzner**, que era la primera opción: Hetzner subió los precios de sus máquinas
+de Estados Unidos en junio de 2026 y la diferencia se cerró; Miami está a ~40 ms de Colombia y
+Falkenstein a ~200. Para vídeo, esa latencia es la diferencia entre «arranca» y «carga».
+
+**Por qué R2 y no la propia máquina.** Si el vídeo sale del servidor, su ancho de banda es el techo
+de cuánta gente puede ver una formación a la vez: cinco personas viendo un vídeo de 8 Mbps ya son
+40 Mbps sostenidos. R2 no cobra salida —es la razón entera de elegirlo— y la máquina se queda para lo
+que sabe hacer.
+
+**Las tres llaves SSH son tres a propósito**: la del PC al servidor (`ascent`), la del PC a GitHub
+(`github_neolabia`) y la del servidor a GitHub (`deploy_ascent`, de **solo lectura** y solo para este
+repositorio). Si un día hay que revocar una, las otras dos siguen vivas.
+
+---
+
+### 3. EL PRIMER FALLO: LA CADENA DE MIGRACIONES NUNCA SE HABÍA CORRIDO DESDE CERO
+
+El despliegue murió en la migración `20260902010000_area_un_solo_responsable`:
+
+```
+column "responsible_user_id" does not exist
+```
+
+En desarrollo la columna existía **porque una migración posterior la había creado y la base local
+llevaba meses acumulando estados**. Sobre una base vacía, la cadena se lee en orden, y ese orden
+estaba mal. Nadie lo había visto porque **nadie había corrido nunca las migraciones desde cero**: en
+desarrollo, `migrate dev` va aplicando lo nuevo sobre lo que ya hay.
+
+Arreglo: `ADD COLUMN IF NOT EXISTS` antes del `UPDATE`, y la migración hermana
+(`20260902120000_area_responsable`) hecha idempotente entera — la columna, la restricción (dentro de
+un `DO` que consulta `pg_constraint`) y el índice.
+
+Recuperar la máquina fue `prisma migrate resolve --rolled-back` **y reconstruir la imagen**, porque
+las migraciones viajan **dentro** de la imagen de la API: corregir el archivo en el disco no cambia
+lo que hay en el contenedor.
+
+> **REGLA NUEVA, y va en `docs/05-reglas-de-despliegue.md`:** toda migración se prueba **desde una
+> base vacía** antes de subir. Un Postgres de usar y tirar, `prisma migrate deploy`, y que llegue al
+> final. Una cadena que solo funciona sobre una base con historia no es una cadena de migraciones:
+> es una casualidad.
+
+---
+
+### 4. EL SEGUNDO FALLO, Y ESTE ERA EL GRAVE: LA SEMILLA BORRABA LO QUE HACÍA EL CLIENTE
+
+El cliente lo dijo así, y llevaba días diciéndolo: *«lo que noté en dev es que a veces borraba el
+logo y el color secundario, no sé por qué»*.
+
+No era «a veces». Era **cada vez que se ejecutaba la semilla**. `prisma/seed.ts` usaba `upsert` con
+un `update` lleno de valores — y **el `update` de un `upsert` es una escritura sobre datos vivos**.
+Así que cada despliegue con `RUN_SEED=true` devolvía el logo al de fábrica, el color secundario al de
+fábrica, y la **nota mínima de 90 que había puesto el cliente, al 75 por defecto**.
+
+La regla nueva, escrita en la primera línea del archivo para que no se pueda ignorar:
+
+> **LA REGLA DE ESTA SEMILLA: APORTA DEFECTOS, NO VERDADES.**
+> Crea lo que falta. **Nunca corrige lo que existe.** Si una fila ya está, la semilla no la toca.
+
+En código, eso fue:
+
+- El tenant se lee antes con `findUnique` y sus `settings`/`branding` se **mezclan** con los defectos
+  por debajo: `{ ...porDefecto, ...existente }` — lo del cliente gana siempre.
+- Catálogos, roles y políticas de retención: `update: {}`. Vacío, literal. Si existe, no se toca.
+- Los tipos de actividad conservan su `config` mezclada (solo se fuerza `isSystem`, que es
+  estructura, no decisión de nadie).
+- `rolePermission.deleteMany` —que borraba **todos** los permisos de un rol para volver a
+  escribirlos, incluidas las excepciones dadas a mano— pasó a `createMany({ skipDuplicates: true })`.
+
+Y en producción **`RUN_SEED` se queda en `false`**. Ya no borra nada, pero alarga cada despliegue sin
+motivo.
+
+---
+
+### 5. EL TERCER FALLO: LA PLATAFORMA NO TENÍA PUERTA
+
+Se llegó por un camino largo. El cliente vació el contacto de soporte de su empresa esperando que
+saliera el nuestro, y no salió ninguno. La razón: el contacto de la plataforma se configura en
+`/plataforma`… y **`platform_users` estaba vacía**. El módulo sabía autenticar, refrescar sesiones y
+bloquear cuentas, pero **no había manera de crear la primera cuenta**: ni semilla, ni script, ni
+endpoint.
+
+Se resolvió con `apps/api/scripts/crear-admin-plataforma.ts`
+(`pnpm --filter @neo-pulse/api plataforma:crear-admin -- --email=… --nombre="…"`), que genera una
+contraseña de 24 caracteres, la enseña **una vez** y no la vuelve a mostrar. Con `--reset` la
+regenera y de paso desbloquea la cuenta.
+
+**Por qué un script y no una semilla:** una cuenta con acceso a TODAS las empresas no se crea sola al
+desplegar. Sembrarla sería dejar una puerta con contraseña conocida en cada instalación del producto.
+
+---
+
+### 6. Y UN CUARTO, PEQUEÑO Y CARO: `NEXT_PUBLIC_API_URL`
+
+Con `NEXT_PUBLIC_API_URL=https://ascentio.app`, `transprensa.ascentio.app` respondía *«No pudimos
+conectar con el servidor»*. La variable se hornea en el JavaScript del navegador **en tiempo de
+compilación**, así que el navegador de un tenant pedía a otro dominio y el CORS lo paraba. **Se deja
+vacía**: la web llama a rutas relativas y cada subdominio habla consigo mismo. Anotado en el
+`.env.prod` y en las reglas.
+
+---
+
+### 7. LAS COPIAS: LO ÚNICO QUE HACE REVERSIBLE UN ERROR
+
+- `scripts/backup.sh` → `pg_dump` comprimido a **R2**, diario por cron a las 03:00 UTC, con registro
+  en `/opt/ascent/backups/backup.log`.
+- `scripts/restaurar-prueba.sh` → **restaura en una base de usar y tirar**, cuenta las filas y la
+  borra. Producción no se toca. **Se probó**, y esa es la diferencia entre tener copias y creer que
+  se tienen.
+- Encima, las copias automáticas de Vultr (USD 4,80/mes): son lo único que respalda los secretos que
+  viven **solo** en la máquina (`private.pem`, `REFRESH_TOKEN_PEPPER`, `MEDIA_URL_SECRET`).
+
+Y `docs/05-reglas-de-despliegue.md`, escrito a petición explícita del cliente: los seis comandos
+prohibidos —`docker compose down -v` el primero—, qué quita el acceso a la gente sin avisar, los
+cinco pasos de un despliegue con la copia **antes**, y §3 bis: **antes de producción, siempre se ve
+en dev**. Esa última es regla del cliente y aplica a todo, no solo a lo grande.
+
+---
+
+### 8. LA ENTREGA, Y LA RONDA DE INTERFAZ DEL FINAL
+
+**El archivo de credenciales vive FUERA del repositorio**, en
+`C:\Users\Prueba\Documents\ASCENT - CREDENCIALES Y ACCESOS.md`. No es orden: dentro, un `git add .`
+distraído lo sube, y **una credencial que llegó a un repositorio ya no se arregla borrando el
+commit** — hay que rotarla.
+
+Y con el cliente delante, la última ronda de pantalla:
+
+- **La entrada**: se quitó el bloque de texto largo y quedó un lema («Se entra con tu número de
+  cédula») y **una sola cara**: «No puedo entrar» voltea el panel en vez de abrir un desplegable.
+- **Las acciones de una persona: cuatro formas, y las tres primeras las tumbó el cliente con la razón
+  puesta.** Siete iconos por fila → cinco desplegándose en la fila (*«hace lo mismo que antes»*, y
+  era cierto) → un menú con palabras (una tarjeta más encima de la tabla) → **cuatro acciones siempre
+  visibles —editar, estado, perfil y los tres puntos— y las cuatro excepcionales flotando en
+  círculos, sin tarjeta y sin fondo**, saliendo escalonadas del propio botón. El estado salió del
+  menú porque entra y sale gente todos los días, y esconderlo costaba dos gestos.
+- **El expediente pasó a llamarse Perfil y dejó de ser una ventana: es una página**
+  (`/usuarios/[id]`), con banda de la marca, las cuatro cifras, lo que le falta, su trayectoria, sus
+  constancias y sus papeles. La razón del cliente: *«página completa, es tipo perfil con todo lo
+  importante»*. Una ventana obliga a cerrarla para seguir; una página se comparte por enlace, se abre
+  en otra pestaña y se imprime.
+
+---
+
+### 9. EN QUÉ QUEDA Y CON QUÉ SEGUIR
+
+**Producción viva y verificada**, suite en verde, copias probadas. Lo abierto, por orden:
+
+1. **Rotar lo que se escribió en una conversación**: las cuatro claves de R2 y la contraseña de la
+   cuenta de plataforma. Cómo, en el archivo de credenciales §2 y §3.
+2. **Decidir el correo de soporte de verdad.** `soporte@ascentio.app` existe pero **no lo atiende
+   nadie**: si llega un mensaje, se queda ahí. Hasta decidirlo, el contacto que ve el cliente no
+   debería prometer atención.
+3. **Limpiar los datos de prueba en producción**: el contacto de soporte de TRANSPRENSA dice
+   «administrador de todo el mundo» y «lunes a viernes no llame». Se corrige en *Configuración*.
+4. **Vigilancia**: no hay nada. Hoy el primer aviso de que algo se cayó lo daría el cliente. Sentry
+   (gratis hasta 5.000 sucesos) más un vigilante de disponibilidad sobre `/v1/health` es una tarde, y
+   sirve para Ascent **y** para SAC-NEO desde la misma cuenta.
+5. Y lo de siempre: la **transcripción automática** de los vídeos (`PENDIENTES` 9.4), el **repaso**
+   (5.1) y la **fila por persona en Seguimiento** (5.2).
+
+**LibreOffice no está instalado** (no cabe en 4 GB): un `.pptx` se rechaza pidiendo el PDF. Es una
+decisión, no un olvido — si molesta, la máquina de 8 GB cuesta USD 24 más.
 
 ---
 

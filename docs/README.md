@@ -1,4 +1,4 @@
-# Documentación de NEO PULSE
+# Documentación de ASCENT
 
 Por dónde empezar según lo que necesites saber.
 
@@ -8,10 +8,19 @@ Por dónde empezar según lo que necesites saber.
 
 Lo único de esta carpeta escrito para quien usa el producto, no para quien lo construye.
 
+**Todas viven en [`guias/`](guias/README.md)** — trece, con su índice. Estuvieron repartidas entre esa
+carpeta y la raíz de `docs/`, con cinco duplicadas byte a byte; se consolidaron el 2026-09-10, porque
+una guía en dos sitios acaba corregida en uno solo y la otra copia sigue circulando.
+
 | Documento | Responde |
 |---|---|
-| [`guia-numeros-neo-pulse.html`](guia-numeros-neo-pulse.html) | **Qué significa cada cifra** de Seguimiento y del plan anual, qué acción pide cada una, y por qué dos porcentajes sobre lo mismo pueden no coincidir |
-| [`guia-desempeno.html`](guia-desempeno.html) | **El paso a paso** de la evaluación de desempeño: qué es cada opción, qué significa firmar y cómo, cómo se calcula la nota, y qué pasa después con el resultado |
+| [`guias/README.md`](guias/README.md) | **El índice**: qué guía contesta a qué |
+| [`guias/guia-usuarios.html`](guias/guia-usuarios.html) | El alta y la baja de personas, la carga masiva y cómo se recupera un acceso |
+| [`guias/guia-montar-formaciones.html`](guias/guia-montar-formaciones.html) | De los documentos sueltos a la lección publicada, con examen y constancia |
+| [`guias/guia-numeros.html`](guias/guia-numeros.html) | **Qué significa cada cifra** de Seguimiento y del plan anual, qué acción pide cada una, y por qué dos porcentajes sobre lo mismo pueden no coincidir |
+| [`guias/guia-desempeno.html`](guias/guia-desempeno.html) | **El paso a paso** de la evaluación de desempeño: qué es cada opción, qué significa firmar y cómo, cómo se calcula la nota, y qué pasa después con el resultado |
+| [`guias/asistencia.html`](guias/asistencia.html) | Los tres mecanismos de toma de lista y cómo sale el acta |
+| [`entrega/`](entrega/README.md) | **El kit de entrega al cliente**: la página de bienvenida, el acta, la ficha técnica y los dos correos |
 
 > Se mantiene a mano y a proposito: si cambia lo que significa un numero, esta guia se corrige en el
 > mismo cambio. Una guia de usuario desactualizada hace mas daño que no tenerla, porque se cita.
@@ -47,6 +56,24 @@ servidor y de una decisión de producto a la vez, es un módulo.
 
 ---
 
+## Producción — hay un cliente dentro
+
+Ascent está viva desde el **2026-09-09** en `https://transprensa.ascentio.app`. Estos cuatro se
+leen **en este orden** y el segundo es de lectura obligatoria antes de tocar la máquina.
+
+| Documento | Responde |
+|---|---|
+| [`arquitectura.md` §9](arquitectura.md) | **Qué hay montado**: el mapa de la máquina, quién habla con quién, dónde vive el vídeo y qué NO tiene el servidor a propósito |
+| [`05-reglas-de-despliegue.md`](05-reglas-de-despliegue.md) | **Qué no se hace nunca.** Los seis comandos prohibidos, lo que deja a la gente sin acceso sin que lo parezca, los cinco pasos de un despliegue con la copia antes, y las reglas de migración y de copias |
+| [`RUNBOOK.md` § PRODUCCIÓN](RUNBOOK.md) | **Cómo se opera**: los comandos del día a día, cómo se recupera una migración a medias, cómo se restablece la cuenta de plataforma y cómo se comprueba que la copia sirve |
+| [`04-despliegue-piloto.md`](04-despliegue-piloto.md) | **Cómo se montó**, paso a paso, y qué se marcó al contratar la máquina. Sirve para montar la segunda |
+| [`03-infraestructura-produccion.md`](03-infraestructura-produccion.md) | **Por qué esta máquina y no otra**: el cálculo, los precios de septiembre de 2026 y qué cambia cuando llegue el segundo cliente |
+
+> **Las credenciales NO están en el repositorio**, y no es desorden: dentro, un `git add .`
+> distraído las sube, y una credencial que llegó a un repositorio ya no se arregla borrando el
+> commit — hay que rotarla. Viven en `C:\Users\Prueba\Documents\ASCENT - CREDENCIALES Y ACCESOS.md`.
+
+---
 ## Qué pasó y cuándo
 
 Historia. **Envejece a propósito**: lo que dice el Sprint 2 dejará de ser exacto cuando el Sprint 5
@@ -69,8 +96,7 @@ el producto es como es.
 |---|---|
 | [`00-brief-crudo.md`](00-brief-crudo.md) | Lo que pidió el cliente, sin interpretar |
 | [`01-decisiones-preliminares.md`](01-decisiones-preliminares.md) | Las decisiones tomadas antes de escribir código |
-| [`02-aislamiento-proyectos.md`](02-aislamiento-proyectos.md) | Por qué NEO PULSE y SAC-NEO no comparten nada |
-| [`03-infraestructura-produccion.md`](03-infraestructura-produccion.md) | El despliegue previsto |
+| [`02-aislamiento-proyectos.md`](02-aislamiento-proyectos.md) | Por qué Ascent y SAC-NEO no comparten nada |
 | [`ideas-producto.md`](ideas-producto.md) | Lo que se pensó y no se hizo (todavía) |
 
 ---
