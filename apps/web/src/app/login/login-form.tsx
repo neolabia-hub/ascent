@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, HelpCircle, IdCard, Lock, Mail, Phone } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, HelpCircle, IdCard, Lock, Mail, Phone } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { resolveTenantSlug } from '@/lib/tenant';
@@ -52,7 +52,8 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
+  /** Cual de las dos caras de la tarjeta se ve. Ver el comentario en el JSX. */
+  const [cara, setCara] = useState<'entrar' | 'ayuda'>('entrar');
   const [retry, setRetry] = useState(0);
   const [verContrasena, setVerContrasena] = useState(false);
 
@@ -237,13 +238,21 @@ export function LoginForm() {
         <div className="relative mt-10 hidden lg:block">
           <FraseQueSeEscribe />
           {/*
-            LA DESCRIPCION, quieta debajo de la frase que rota. Faltaba: una frase que cambia sola
-            sin nada fijo al lado se lee como un eslogan y no explica nada. Esta se queda, y es la
-            que contesta "¿que es esto?" de una vez.
+            LA DESCRIPCION, quieta debajo de la frase que rota. Y REESCRITA (2026-09-09).
+
+            La anterior —«la plataforma donde X lleva la formacion de su gente: lo obligatorio y lo
+            que suma, con la evidencia lista para cuando la pidan»— es una frase de VENTA: le explica
+            el producto a quien lo compra. Pero quien esta mirando esta pantalla no lo compra: es un
+            conductor a las seis de la mañana que quiere entrar. A esa persona no le importa que la
+            evidencia este lista para una auditoria; le importa que lo suyo este ahi y como se entra.
+
+            Ahora dice eso, y termina con el dato que de verdad hace falta y nadie pone: **con que se
+            entra**. La mitad de las llamadas de soporte del primer dia son esa pregunta.
           */}
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/65">
-            La plataforma donde {branding.companyDisplayName} lleva la formacion de su gente: lo
-            obligatorio y lo que suma, con la evidencia lista para cuando la pidan.
+            Tu formación en {branding.companyDisplayName}, en un solo sitio: lo que tienes que hacer, lo
+            que ya hiciste y el papel que lo prueba.{' '}
+            <span className="text-white/85">Se entra con tu número de cédula.</span>
           </p>
 
         </div>
@@ -266,7 +275,48 @@ export function LoginForm() {
         borde alrededor solo roba ancho al unico contenido que hay.
       */}
       <div className="flex flex-1 items-center justify-center px-5 py-10 lg:px-14">
-        <div className="w-full max-w-[400px] lg:rounded-3xl lg:border lg:border-line lg:bg-surface lg:p-10 lg:shadow-card">
+        {/*
+          DOS CARAS, Y SE PASA DE UNA A OTRA (2026-09-09, pedido del cliente: *«que esa informacion
+          pase con animacion al otro lado, que se sienta vivo»*).
+
+          Antes «No puedo entrar» era un `<details>` que se desplegaba HACIA ABAJO, empujando la
+          tarjeta y, en un telefono, sacando el contacto fuera de la pantalla — justo el dato que la
+          persona vino a buscar.
+
+          Ahora la tarjeta tiene dos caras y se desliza entre ellas. No es un adorno: el movimiento
+          **dice a donde fue lo que estaba** —se fue a la derecha, y con «Volver» regresa—, que es
+          justo lo que un desplegable no cuenta. Y la altura la manda la cara visible, asi que en un
+          telefono la ayuda ocupa la pantalla entera, que es lo que hace falta cuando uno esta
+          atascado.
+
+          SOLO UNA CARA EXISTE A LA VEZ. No se dejan las dos montadas y una escondida con CSS: un
+          campo invisible que sigue recibiendo el foco es una trampa para quien navega con teclado, y
+          aqui hay un formulario entero.
+
+          La animacion es la del reproductor (`slide-next` / `slide-prev`), no una nueva: entrar
+          hacia un lado y volver hacia el otro ya significa algo en este producto.
+        */}
+        <div className="w-full max-w-[400px] overflow-hidden lg:rounded-3xl lg:border lg:border-line lg:bg-surface lg:p-10 lg:shadow-card">
+          {cara === 'ayuda' ? (
+            <div className="animate-slide-next">
+              <button
+                type="button"
+                onClick={() => setCara('entrar')}
+                className="focus-ring -ml-1 inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-ink-500 transition-colors hover:text-ink-900"
+              >
+                <ArrowLeft size={15} strokeWidth={1.75} />
+                Volver
+              </button>
+              <h1 className="mt-4 font-display text-[26px] font-bold leading-tight text-ink-900">
+                ¿No puedes entrar?
+              </h1>
+              <p className="mt-1.5 text-sm text-ink-500">
+                Quien administra en tu empresa puede darte una contraseña nueva.
+              </p>
+              <NoPuedoEntrar tenantSlug={tenantSlug} identifier={identifier} support={support} />
+            </div>
+          ) : (
+            <div className="animate-slide-prev">
           <h1 className="font-display text-[30px] font-bold leading-tight text-ink-900">Ingresa</h1>
           <p className="mt-1.5 text-sm text-ink-500">Con tu cedula o tu correo de la empresa.</p>
 
@@ -341,7 +391,17 @@ export function LoginForm() {
             </Button>
           </form>
 
-          <NoPuedoEntrar tenantSlug={tenantSlug} identifier={identifier} support={support} />
+              {/* La puerta a la otra cara. Icono y texto: un icono solo aqui no se entiende. */}
+              <button
+                type="button"
+                onClick={() => setCara('ayuda')}
+                className="focus-ring mt-6 inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
+              >
+                <HelpCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                No puedo entrar
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -362,7 +422,7 @@ export function LoginForm() {
 const FRASES = [
   'Lo que te toca hacer, y cuando vence.',
   'Tus constancias, siempre a la mano.',
-  'Tu formación, aunque estes en ruta.',
+  'Tu formación, aunque estés en ruta.',
   'Lo aprendido no se olvida: vuelve.',
 ];
 
@@ -495,83 +555,76 @@ function NoPuedoEntrar({
   }
 
   return (
-    <details className="mt-6">
-      <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900">
-        <HelpCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-        No puedo entrar
-      </summary>
+    <div className="mt-5 space-y-3">
+      {/*
+        CASI TODO EL TEXTO SE FUE (Decision #99). Habia cinco parrafos: como se recupera, de quien
+        es el contacto, que pasa si la empresa no lo ha puesto, que el boton no manda contrasenas
+        y que a los cinco fallos se bloquea la cuenta. Todo cierto y todo de mas.
 
-      <div className="animate-card-in mt-3 space-y-3 rounded-xl bg-paper p-4">
-        {/*
-          CASI TODO EL TEXTO SE FUE (Decision #99). Habia cinco parrafos: como se recupera, de quien
-          es el contacto, que pasa si la empresa no lo ha puesto, que el boton no manda contrasenas
-          y que a los cinco fallos se bloquea la cuenta. Todo cierto y todo de mas.
+        Quien abre esto tiene un problema y busca UNA cosa: a quien acudir. Cinco parrafos
+        explicando el mecanismo no se leen —se saltan—, y al saltarlos se salta tambien el
+        telefono, que era lo unico que servia. Queda el contacto y el boton; lo demas se aprende
+        usandolo o no hacia falta.
+      */}
+      {support ? (
+        <div className="rounded-lg border border-line bg-surface p-3.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+            {support.scope === 'tenant' ? 'En tu empresa' : 'Soporte de la plataforma'}
+          </p>
+          {support.contactName ? (
+            <p className="mt-1 font-display text-sm font-semibold text-ink-900">{support.contactName}</p>
+          ) : null}
 
-          Quien abre esto tiene un problema y busca UNA cosa: a quien acudir. Cinco parrafos
-          explicando el mecanismo no se leen —se saltan—, y al saltarlos se salta tambien el
-          telefono, que era lo unico que servia. Queda el contacto y el boton; lo demas se aprende
-          usandolo o no hacia falta.
-        */}
-        {support ? (
-          <div className="rounded-lg border border-line bg-surface p-3.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
-              {support.scope === 'tenant' ? 'En tu empresa' : 'Soporte de la plataforma'}
-            </p>
-            {support.contactName ? (
-              <p className="mt-1 font-display text-sm font-semibold text-ink-900">{support.contactName}</p>
+          <div className="mt-2 space-y-1.5">
+            {support.contactEmail ? (
+              <a
+                href={`mailto:${support.contactEmail}`}
+                className="focus-ring flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <Mail className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                <span className="truncate">{support.contactEmail}</span>
+              </a>
             ) : null}
-
-            <div className="mt-2 space-y-1.5">
-              {support.contactEmail ? (
-                <a
-                  href={`mailto:${support.contactEmail}`}
-                  className="focus-ring flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <Mail className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                  <span className="truncate">{support.contactEmail}</span>
-                </a>
-              ) : null}
-              {support.contactPhone ? (
-                <a
-                  href={`tel:${support.contactPhone.replace(/[^+\d]/g, '')}`}
-                  className="focus-ring flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <Phone className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                  <span className="truncate">{support.contactPhone}</span>
-                </a>
-              ) : null}
-            </div>
-
-            {support.note ? <p className="mt-2 text-xs text-ink-500">{support.note}</p> : null}
+            {support.contactPhone ? (
+              <a
+                href={`tel:${support.contactPhone.replace(/[^+\d]/g, '')}`}
+                className="focus-ring flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <Phone className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                <span className="truncate">{support.contactPhone}</span>
+              </a>
+            ) : null}
           </div>
-        ) : (
-          // Sin contacto configurado no se deja el hueco mudo: sigue estando el boton, pero hay que
-          // decir a que lleva, porque aqui no hay nadie a quien llamar.
-          <p className="text-sm leading-relaxed text-ink-700">
-            Quien administra en tu empresa puede darte una contraseña nueva.
-          </p>
-        )}
 
-        {enviado ? (
-          <p className="rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm text-ink-700">
-            Listo. Quien administra ya tiene tu aviso.
-          </p>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={!puedeAvisar}
-            loading={enviando}
-            onClick={() => void avisar()}
-            // Sin cedula arriba no hay a quien avisar, y un boton apagado sin decir por que es de
-            // lo que mas desespera. Se dice en el propio boton, que es donde se mira.
-            title={puedeAvisar ? undefined : 'Escribe arriba tu cedula o tu correo'}
-          >
-            {puedeAvisar ? 'Avisar a quien administra' : 'Escribe tu cedula arriba'}
-          </Button>
-        )}
-      </div>
-    </details>
+          {support.note ? <p className="mt-2 text-xs text-ink-500">{support.note}</p> : null}
+        </div>
+      ) : (
+        // Sin contacto configurado no se deja el hueco mudo: sigue estando el boton, pero hay que
+        // decir a que lleva, porque aqui no hay nadie a quien llamar.
+        <p className="text-sm leading-relaxed text-ink-700">
+          Quien administra en tu empresa puede darte una contraseña nueva.
+        </p>
+      )}
+
+      {enviado ? (
+        <p className="rounded-lg border border-line bg-surface px-3.5 py-2.5 text-sm text-ink-700">
+          Listo. Quien administra ya tiene tu aviso.
+        </p>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={!puedeAvisar}
+          loading={enviando}
+          onClick={() => void avisar()}
+          // Sin cedula arriba no hay a quien avisar, y un boton apagado sin decir por que es de
+          // lo que mas desespera. Se dice en el propio boton, que es donde se mira.
+          title={puedeAvisar ? undefined : 'Escribe arriba tu cedula o tu correo'}
+        >
+          {puedeAvisar ? 'Avisar a quien administra' : 'Escribe tu cedula arriba'}
+        </Button>
+      )}
+    </div>
   );
 }

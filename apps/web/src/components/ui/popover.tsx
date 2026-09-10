@@ -41,7 +41,11 @@ export function Popover({
   boton: (abierta: boolean) => ReactNode;
   /** Nombre del boton para lectores de pantalla: "Motivo de la falta de Ana Perez". */
   etiqueta: string;
-  children: ReactNode;
+  /**
+   * El contenido del panel. Como FUNCION recibe `cerrar`, que es lo que necesita un menu: al pulsar
+   * una opcion el panel tiene que irse, y el cierre por clic fuera no se entera de un clic dentro.
+   */
+  children: ReactNode | ((cerrar: () => void) => ReactNode);
   /** Clase de ancho del panel. */
   ancho?: string;
   botonClassName?: string;
@@ -138,7 +142,7 @@ export function Popover({
                 className,
               )}
             >
-              {children}
+              {typeof children === 'function' ? children(() => setAbierta(false)) : children}
             </div>,
             document.body,
           )

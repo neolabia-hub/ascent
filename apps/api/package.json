@@ -19,6 +19,7 @@
     "dev:limpiar-reglas": "tsx scripts/limpiar-reglas-de-prueba.ts",
     "dev:limpiar-pruebas": "tsx scripts/limpiar-datos-de-prueba.ts",
     "dev:sincronizar-permisos": "tsx scripts/sincronizar-permisos.ts",
+    "plataforma:crear-admin": "tsx scripts/crear-admin-plataforma.ts",
     "demo:encuesta": "tsx scripts/demo-encuesta.ts",
     "db:verify-rls": "tsx scripts/verify-rls.ts"
   },

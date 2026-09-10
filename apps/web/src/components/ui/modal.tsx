@@ -36,6 +36,14 @@ export interface ModalProps {
    * crear el ciclo» antes de leer nada. Mismo lenguaje que el estado vacio.
    */
   icon?: LucideIcon;
+  /**
+   * CABECERA PROPIA, en vez del titulo con su pastilla.
+   *
+   * Existe para una sola cosa y conviene que siga asi: la ventana que se lee como un PERFIL —el
+   * expediente de una persona—, donde la foto y el nombre SON la cabecera. `title` sigue siendo
+   * obligatorio porque es el nombre accesible del dialogo; simplemente se deja de pintar.
+   */
+  cabecera?: ReactNode;
 }
 
 /**
@@ -66,6 +74,7 @@ export function Modal({
   actions,
   size = 'md',
   icon: Icono,
+  cabecera,
 }: ModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -110,6 +119,14 @@ export function Modal({
             sola cosa.
           */}
           <div className="flex items-start justify-between gap-4 rounded-t-2xl border-b border-line bg-paper px-6 py-4">
+            {/* Con cabecera propia, el titulo solo existe para el lector de pantalla. */}
+            {cabecera ? (
+              <>
+                <Dialog.Title className="sr-only">{title}</Dialog.Title>
+                {description ? <Dialog.Description className="sr-only">{description}</Dialog.Description> : null}
+                <div className="min-w-0 flex-1">{cabecera}</div>
+              </>
+            ) : (
             <div className="flex min-w-0 items-start gap-3">
               {Icono ? (
                 <span
@@ -127,6 +144,7 @@ export function Modal({
                 ) : null}
               </div>
             </div>
+            )}
             <div className="flex shrink-0 items-center gap-1">
               {actions}
               <Dialog.Close asChild>

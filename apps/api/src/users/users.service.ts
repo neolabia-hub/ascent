@@ -31,6 +31,8 @@ const USER_SELECT = {
   active: true,
   lastLogin: true,
   createdAt: true,
+  /** La foto que la persona se puso en su perfil. La usa el expediente, que se lee como un perfil. */
+  avatarKey: true,
   jobTitle: { select: { id: true, code: true, name: true } },
   area: { select: { id: true, code: true, name: true } },
   regional: { select: { id: true, code: true, name: true } },

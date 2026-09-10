@@ -171,6 +171,8 @@ export interface UserRow {
   active: boolean;
   lastLogin: string | null;
   createdAt: string;
+  /** La foto de perfil que se puso la persona. Puede no tenerla. */
+  avatarKey: string | null;
   jobTitle: { id: string; code: string; name: string };
   area: { id: string; code: string; name: string };
   regional: { id: string; code: string; name: string } | null;

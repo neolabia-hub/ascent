@@ -7,12 +7,15 @@ import {
   Copy,
   Download,
   FolderOpen,
+  MoreVertical,
   KeyRound,
   Pencil,
   Plus,
   Search,
   ShieldCheck,
   Upload,
+  UserCheck,
+  UserMinus,
   UserRound,
 } from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
@@ -460,64 +463,16 @@ export default function UsuariosPage() {
                       <StatusPill kind={user.active ? 'ok' : 'neutral'} label={user.active ? 'ACTIVA' : 'INACTIVA'} />
                     </Td>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        {/*
-                          EL EXPEDIENTE: lo primero de la fila porque es lo que mas se abre —«¿que
-                          tiene Juan?»— y porque es la unica que no cambia nada. Las que editan van
-                          detras: en una fila de iconos, el orden dice cual es la accion normal.
-                        */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setExpedienteDe(user)}
-                          aria-label={`Expediente de ${user.fullName}`}
-                          title="Expediente: todo lo de esta persona"
-                        >
-                          <FolderOpen size={14} />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(user)} aria-label={`Editar ${user.fullName}`}>
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setConstanciasDe(user)}
-                          aria-label={`Constancias de ${user.fullName}`}
-                          title="Constancias: descargar o revocar"
-                        >
-                          <Award size={14} />
-                        </Button>
-                        {/*
-                          DOS PAPELES DISTINTOS, DOS BOTONES. El de al lado son las constancias que
-                          emite la EMPRESA; este, los certificados que emite un TERCERO —la ARL— y
-                          que llegan dias despues de la jornada. Juntarlos en un solo cajon obligaria
-                          a explicar la diferencia dentro; separados, cada icono la dice.
-                        */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPapelesDe(user)}
-                          aria-label={`Papeles de un tercero de ${user.fullName}`}
-                          title="Papel de un tercero: registrar el certificado que llego después"
-                        >
-                          <BadgeCheck size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPermissionsFor(user)}
-                          aria-label={`Permisos de ${user.fullName}`}
-                          title="Permisos y excepciones"
-                        >
-                          <ShieldCheck size={14} />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setARestablecer(user)} aria-label={`Nueva contrasena para ${user.fullName}`} title="Generar una contraseña nueva y sacarle de sus sesiones">
-                          <KeyRound size={14} />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => toggleActive(user)}>
-                          {user.active ? 'Desactivar' : 'Activar'}
-                        </Button>
-                      </div>
+                      <AccionesDeFila
+                        user={user}
+                        onExpediente={() => setExpedienteDe(user)}
+                        onEditar={() => openEdit(user)}
+                        onConstancias={() => setConstanciasDe(user)}
+                        onPapeles={() => setPapelesDe(user)}
+                        onPermisos={() => setPermissionsFor(user)}
+                        onContrasena={() => setARestablecer(user)}
+                        onActivar={() => void toggleActive(user)}
+                      />
                     </Td>
                   </Tr>
                 ))}
@@ -1031,5 +986,155 @@ function ScopeOption({
         <span className="mt-0.5 block text-xs text-ink-500">{description}</span>
       </span>
     </label>
+  );
+}
+
+/**
+ * LAS ACCIONES DE UNA PERSONA: dos a la vista y el resto desplegándose (2026-09-09).
+ *
+ * ─── EL PROBLEMA ───
+ *
+ * Eran **siete iconos por fila**. Con veinte filas en pantalla son ciento cuarenta objetos
+ * pulsables compitiendo por la atención, y ninguno se lee: cuando todo pesa igual, hay que pasar el
+ * ratón por encima de cada uno para saber cuál es. El cliente lo dijo en una línea: *«hay muchas,
+ * deja un solo icono o 3 máximo»*.
+ *
+ * ─── POR QUÉ ESTOS DOS Y NO OTROS ───
+ *
+ * **Expediente** es lo que más se abre —«¿qué tiene Juan?»— y es el único que no cambia nada.
+ * **Editar** es la acción normal sobre una persona. Las otras cinco son excepciones: emitir un
+ * papel, registrar el de un tercero, tocar permisos, resetear una contraseña, desactivar a alguien.
+ * Una excepción a un clic de distancia sigue estando a mano; a la vista, solo estorba.
+ *
+ * ─── POR QUÉ SE DESPLIEGAN Y NO ABREN UN MENÚ ───
+ *
+ * Un menú desplegable tapa la fila de al lado y obliga a leer una lista de texto. Desplegar EN SITIO
+ * mantiene el gesto donde estaba la mano y enseña los iconos en el mismo sitio donde van a estar
+ * siempre — así se aprenden sus posiciones. Es el mismo lenguaje del conmutador de espacio.
+ *
+ * El movimiento va **escalonado**, 40 ms entre iconos: salir todos a la vez es un parpadeo; en
+ * cadena se lee como «aquí había más cosas». Y **respeta `prefers-reduced-motion`** vía la
+ * transición del propio navegador: quien pidió menos movimiento ve el cambio, no el viaje.
+ */
+function AccionesDeFila({
+  user,
+  onExpediente,
+  onEditar,
+  onConstancias,
+  onPapeles,
+  onPermisos,
+  onContrasena,
+  onActivar,
+}: {
+  user: UserRow;
+  onExpediente: () => void;
+  onEditar: () => void;
+  onConstancias: () => void;
+  onPapeles: () => void;
+  onPermisos: () => void;
+  onContrasena: () => void;
+  onActivar: () => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+
+  const secundarias = [
+    { icono: Award, etiqueta: `Constancias de ${user.fullName}`, titulo: 'Constancias: descargar o revocar', accion: onConstancias },
+    {
+      icono: BadgeCheck,
+      etiqueta: `Papeles de un tercero de ${user.fullName}`,
+      titulo: 'Papel de un tercero: registrar el certificado que llegó después',
+      accion: onPapeles,
+    },
+    { icono: ShieldCheck, etiqueta: `Permisos de ${user.fullName}`, titulo: 'Permisos y excepciones', accion: onPermisos },
+    {
+      icono: KeyRound,
+      etiqueta: `Nueva contraseña para ${user.fullName}`,
+      titulo: 'Generar una contraseña nueva y sacarle de sus sesiones',
+      accion: onContrasena,
+    },
+    {
+      icono: user.active ? UserMinus : UserCheck,
+      etiqueta: `${user.active ? 'Desactivar' : 'Activar'} a ${user.fullName}`,
+      titulo: user.active ? 'Desactivar: deja de entrar y sale de las obligaciones' : 'Activar: vuelve a entrar',
+      accion: onActivar,
+    },
+  ];
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {/*
+        LAS SECUNDARIAS VAN A LA IZQUIERDA DEL BOTON QUE LAS ABRE: crecen hacia dentro de la fila,
+        que es espacio vacio, en vez de empujar la tabla. `max-w` es lo que se anima —no `width`,
+        que no transiciona— y `overflow-hidden` las recorta mientras viajan.
+      */}
+      <div
+        className={cn(
+          'flex items-center gap-1 overflow-hidden transition-[max-width,opacity] duration-300 ease-pulse',
+          abierto ? 'max-w-[200px] opacity-100' : 'max-w-0 opacity-0',
+        )}
+      >
+        {secundarias.map((accion, indice) => (
+          <button
+            key={accion.etiqueta}
+            type="button"
+            onClick={() => {
+              accion.accion();
+              setAbierto(false);
+            }}
+            aria-label={accion.etiqueta}
+            title={accion.titulo}
+            // Fuera del recorrido del tabulador mientras estan escondidas: un boton invisible que
+            // recibe el foco es una trampa para quien navega con teclado.
+            tabIndex={abierto ? 0 : -1}
+            aria-hidden={!abierto}
+            style={{ transitionDelay: `${abierto ? indice * 40 : 0}ms` }}
+            className={cn(
+              'focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 transition-all duration-200 ease-pulse hover:bg-paper hover:text-ink-900',
+              abierto ? 'translate-x-0 scale-100 opacity-100' : 'translate-x-3 scale-90 opacity-0',
+            )}
+          >
+            <accion.icono size={14} />
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setAbierto((valor) => !valor)}
+        aria-expanded={abierto}
+        aria-label={abierto ? 'Ocultar el resto de acciones' : `Más acciones para ${user.fullName}`}
+        title={abierto ? 'Ocultar' : 'Más acciones'}
+        className={cn(
+          'focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-all duration-300 ease-pulse',
+          abierto ? 'rotate-90 bg-paper text-ink-900' : 'text-ink-300 hover:bg-paper hover:text-ink-700',
+        )}
+      >
+        <MoreVertical size={15} />
+      </button>
+
+      <span className="mx-0.5 h-4 w-px shrink-0 bg-line" aria-hidden />
+
+      <button
+        type="button"
+        onClick={onEditar}
+        aria-label={`Editar ${user.fullName}`}
+        title="Editar los datos de la persona"
+        className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+      >
+        <Pencil size={14} />
+      </button>
+
+      {/* El expediente va el ULTIMO —el sitio de mas a la derecha— porque es el que mas se pulsa. */}
+      <button
+        type="button"
+        onClick={onExpediente}
+        aria-label={`Expediente de ${user.fullName}`}
+        title="Expediente: todo lo de esta persona"
+        className="focus-ring flex h-8 items-center gap-1.5 rounded-md px-2 text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+      >
+        <FolderOpen size={15} />
+        <span className="hidden text-xs font-medium lg:inline">Expediente</span>
+      </button>
+    </div>
   );
 }
