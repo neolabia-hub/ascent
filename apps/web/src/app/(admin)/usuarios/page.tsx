@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Award,
   BadgeCheck,
   Copy,
   Download,
-  FolderOpen,
   MoreVertical,
   KeyRound,
   Pencil,
@@ -38,7 +38,6 @@ import {
 } from '@/lib/admin-api';
 import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
 import { ConstanciasDePersona } from '@/components/modules/admin/constancias-de-persona';
-import { ExpedienteDePersona } from '@/components/modules/admin/expediente-de-persona';
 import { PapelesDePersona } from '@/components/modules/admin/papeles-de-persona';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
@@ -49,6 +48,7 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover } from '@/components/ui/popover';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Table, TablePagination, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
@@ -80,6 +80,7 @@ function apiErrorText(error: unknown): string {
 
 export default function UsuariosPage() {
   const { showToast } = useToast();
+  const router = useRouter();
 
   // Filtros y datos
   const [q, setQ] = useState('');
@@ -121,12 +122,6 @@ export default function UsuariosPage() {
     primer gesto, asi que la descarga tiene que estar donde se acaba de encontrar a Juan.
   */
   const [constanciasDe, setConstanciasDe] = useState<UserRow | null>(null);
-  /*
-    EL EXPEDIENTE (2026-09-09): la vista de LECTURA con todo junto —obligaciones, constancias y
-    papeles de terceros—, que es lo que pide un auditor. No sustituye a los dos cajones de al lado:
-    esos son para HACER (emitir, revocar, registrar) y este no cambia nada.
-  */
-  const [expedienteDe, setExpedienteDe] = useState<UserRow | null>(null);
   /*
     Y LOS PAPELES DE UN TERCERO, en la misma pantalla y por el mismo motivo que las constancias: la
     peticion llega con un NOMBRE delante —"acaba de llegar el certificado de alturas de Juan"— y
@@ -465,7 +460,7 @@ export default function UsuariosPage() {
                     <Td>
                       <AccionesDeFila
                         user={user}
-                        onExpediente={() => setExpedienteDe(user)}
+                        onPerfil={() => router.push(`/usuarios/${user.id}`)}
                         onEditar={() => openEdit(user)}
                         onConstancias={() => setConstanciasDe(user)}
                         onPapeles={() => setPapelesDe(user)}
@@ -499,11 +494,6 @@ export default function UsuariosPage() {
           if (!abierto) setPapelesDe(null);
         }}
       />
-
-
-      {expedienteDe ? (
-        <ExpedienteDePersona persona={expedienteDe} onCerrar={() => setExpedienteDe(null)} />
-      ) : null}
       <ConstanciasDePersona
         userId={constanciasDe?.id ?? null}
         nombre={constanciasDe?.fullName ?? ''}
@@ -990,35 +980,43 @@ function ScopeOption({
 }
 
 /**
- * LAS ACCIONES DE UNA PERSONA: dos a la vista y el resto desplegándose (2026-09-09).
+ * LAS ACCIONES DE UNA PERSONA: cuatro a la vista y el resto flotando en circulos (2026-09-09).
  *
- * ─── EL PROBLEMA ───
+ * ─── EL CAMINO, QUE ES LA EXPLICACION ───
  *
- * Eran **siete iconos por fila**. Con veinte filas en pantalla son ciento cuarenta objetos
- * pulsables compitiendo por la atención, y ninguno se lee: cuando todo pesa igual, hay que pasar el
- * ratón por encima de cada uno para saber cuál es. El cliente lo dijo en una línea: *«hay muchas,
- * deja un solo icono o 3 máximo»*.
+ * Van cuatro formas, y las tres primeras las tumbo el cliente con la razon puesta:
  *
- * ─── POR QUÉ ESTOS DOS Y NO OTROS ───
+ * 1. **Siete iconos en fila.** Con veinte filas son ciento cuarenta objetos pulsables y ninguno se
+ *    lee: cuando todo pesa igual hay que pasar el raton por encima de cada uno para saber cual es.
+ * 2. **Cinco desplegandose EN la fila.** *«Hace lo mismo que antes»* — y era cierto: seguian siendo
+ *    cinco iconos mudos, solo que a un clic, y ademas la fila se ensanchaba al abrirlos.
+ * 3. **Un menu con palabras.** Resolvia la mudez, pero metia una tarjeta con borde encima de la
+ *    tabla: otra superficie que tapa y que hay que cerrar, justo lo que sobraba.
+ * 4. **Esto.** Cuatro acciones siempre a la vista —editar, estado, perfil y los tres puntos— y las
+ *    otras cuatro **flotando en circulos, sin tarjeta y sin fondo**, saliendo del propio boton.
  *
- * **Expediente** es lo que más se abre —«¿qué tiene Juan?»— y es el único que no cambia nada.
- * **Editar** es la acción normal sobre una persona. Las otras cinco son excepciones: emitir un
- * papel, registrar el de un tercero, tocar permisos, resetear una contraseña, desactivar a alguien.
- * Una excepción a un clic de distancia sigue estando a mano; a la vista, solo estorba.
+ * ─── POR QUE ESTAS CUATRO A LA VISTA ───
  *
- * ─── POR QUÉ SE DESPLIEGAN Y NO ABREN UN MENÚ ───
+ * **Editar** y **estado** son las dos cosas de todos los dias sobre una persona: entra gente y sale
+ * gente, y esconder «dar de baja» obligaba a dos gestos para lo mas frecuente. **Perfil** es lo que
+ * mas se abre y lo unico que no cambia nada. Los **tres puntos** guardan lo excepcional: emitir una
+ * constancia, registrar el papel de un tercero, tocar permisos, generar una contrasena.
  *
- * Un menú desplegable tapa la fila de al lado y obliga a leer una lista de texto. Desplegar EN SITIO
- * mantiene el gesto donde estaba la mano y enseña los iconos en el mismo sitio donde van a estar
- * siempre — así se aprenden sus posiciones. Es el mismo lenguaje del conmutador de espacio.
+ * ─── LOS CIRCULOS: POR QUE SIN CAJA ───
  *
- * El movimiento va **escalonado**, 40 ms entre iconos: salir todos a la vez es un parpadeo; en
- * cadena se lee como «aquí había más cosas». Y **respeta `prefers-reduced-motion`** vía la
- * transición del propio navegador: quien pidió menos movimiento ve el cambio, no el viaje.
+ * Un panel con borde y fondo es una superficie nueva encima de la tabla. Los circulos **son los
+ * botones y ya**: aparecen sobre lo que habia, se pulsa uno y se van. Cada uno lleva su globo de
+ * texto al pasar el raton y su nombre completo para el lector de pantalla, asi que la mudez del
+ * segundo intento no vuelve — la palabra esta, solo que a demanda.
+ *
+ * Salen **escalonados 45 ms** y creciendo desde el 55 % de su tamano: en cadena y creciendo se lee
+ * como «esto se desplego desde ahi»; a la vez, seria un parpadeo. Y con `prefers-reduced-motion` se
+ * apagan solas por la regla global de `globals.css`: quien pidio menos movimiento ve el resultado,
+ * no el viaje.
  */
 function AccionesDeFila({
   user,
-  onExpediente,
+  onPerfil,
   onEditar,
   onConstancias,
   onPapeles,
@@ -1027,7 +1025,7 @@ function AccionesDeFila({
   onActivar,
 }: {
   user: UserRow;
-  onExpediente: () => void;
+  onPerfil: () => void;
   onEditar: () => void;
   onConstancias: () => void;
   onPapeles: () => void;
@@ -1035,106 +1033,97 @@ function AccionesDeFila({
   onContrasena: () => void;
   onActivar: () => void;
 }) {
-  const [abierto, setAbierto] = useState(false);
-
-  const secundarias = [
-    { icono: Award, etiqueta: `Constancias de ${user.fullName}`, titulo: 'Constancias: descargar o revocar', accion: onConstancias },
-    {
-      icono: BadgeCheck,
-      etiqueta: `Papeles de un tercero de ${user.fullName}`,
-      titulo: 'Papel de un tercero: registrar el certificado que llegó después',
-      accion: onPapeles,
-    },
-    { icono: ShieldCheck, etiqueta: `Permisos de ${user.fullName}`, titulo: 'Permisos y excepciones', accion: onPermisos },
-    {
-      icono: KeyRound,
-      etiqueta: `Nueva contraseña para ${user.fullName}`,
-      titulo: 'Generar una contraseña nueva y sacarle de sus sesiones',
-      accion: onContrasena,
-    },
-    {
-      icono: user.active ? UserMinus : UserCheck,
-      etiqueta: `${user.active ? 'Desactivar' : 'Activar'} a ${user.fullName}`,
-      titulo: user.active ? 'Desactivar: deja de entrar y sale de las obligaciones' : 'Activar: vuelve a entrar',
-      accion: onActivar,
-    },
+  const flotantes = [
+    { icono: Award, texto: 'Constancias', accion: onConstancias },
+    { icono: BadgeCheck, texto: 'Papel de un tercero', accion: onPapeles },
+    { icono: ShieldCheck, texto: 'Permisos y excepciones', accion: onPermisos },
+    { icono: KeyRound, texto: 'Generar contraseña nueva', accion: onContrasena },
   ];
 
   return (
-    <div className="flex items-center justify-end gap-1">
-      {/*
-        LAS SECUNDARIAS VAN A LA IZQUIERDA DEL BOTON QUE LAS ABRE: crecen hacia dentro de la fila,
-        que es espacio vacio, en vez de empujar la tabla. `max-w` es lo que se anima —no `width`,
-        que no transiciona— y `overflow-hidden` las recorta mientras viajan.
-      */}
-      <div
-        className={cn(
-          'flex items-center gap-1 overflow-hidden transition-[max-width,opacity] duration-300 ease-pulse',
-          abierto ? 'max-w-[200px] opacity-100' : 'max-w-0 opacity-0',
-        )}
-      >
-        {secundarias.map((accion, indice) => (
-          <button
-            key={accion.etiqueta}
-            type="button"
-            onClick={() => {
-              accion.accion();
-              setAbierto(false);
-            }}
-            aria-label={accion.etiqueta}
-            title={accion.titulo}
-            // Fuera del recorrido del tabulador mientras estan escondidas: un boton invisible que
-            // recibe el foco es una trampa para quien navega con teclado.
-            tabIndex={abierto ? 0 : -1}
-            aria-hidden={!abierto}
-            style={{ transitionDelay: `${abierto ? indice * 40 : 0}ms` }}
-            className={cn(
-              'focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 transition-all duration-200 ease-pulse hover:bg-paper hover:text-ink-900',
-              abierto ? 'translate-x-0 scale-100 opacity-100' : 'translate-x-3 scale-90 opacity-0',
-            )}
-          >
-            <accion.icono size={14} />
-          </button>
-        ))}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setAbierto((valor) => !valor)}
-        aria-expanded={abierto}
-        aria-label={abierto ? 'Ocultar el resto de acciones' : `Más acciones para ${user.fullName}`}
-        title={abierto ? 'Ocultar' : 'Más acciones'}
-        className={cn(
-          'focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-all duration-300 ease-pulse',
-          abierto ? 'rotate-90 bg-paper text-ink-900' : 'text-ink-300 hover:bg-paper hover:text-ink-700',
-        )}
-      >
-        <MoreVertical size={15} />
-      </button>
-
-      <span className="mx-0.5 h-4 w-px shrink-0 bg-line" aria-hidden />
-
+    <div className="flex items-center justify-end gap-0.5">
       <button
         type="button"
         onClick={onEditar}
         aria-label={`Editar ${user.fullName}`}
         title="Editar los datos de la persona"
-        className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+        className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-primary-soft hover:text-ink-900"
       >
         <Pencil size={14} />
       </button>
 
-      {/* El expediente va el ULTIMO —el sitio de mas a la derecha— porque es el que mas se pulsa. */}
+      {/*
+        EL ESTADO, FUERA DEL MENU (pedido del cliente). El icono dice hacia donde va, no donde
+        esta: con la persona activa se ve el de darla de baja. Y es el unico sitio de la fila donde
+        el color al pasar no es el de la empresa, porque desactivar y activar no son lo mismo.
+      */}
       <button
         type="button"
-        onClick={onExpediente}
-        aria-label={`Expediente de ${user.fullName}`}
-        title="Expediente: todo lo de esta persona"
-        className="focus-ring flex h-8 items-center gap-1.5 rounded-md px-2 text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900"
+        onClick={onActivar}
+        aria-label={`${user.active ? 'Desactivar a' : 'Activar a'} ${user.fullName}`}
+        title={
+          user.active
+            ? 'Desactivar: deja de entrar y sale de las obligaciones'
+            : 'Activar: vuelve a entrar y a contar'
+        }
+        className={cn(
+          'focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150',
+          user.active
+            ? 'text-ink-500 hover:bg-danger-soft hover:text-danger'
+            : 'text-ink-300 hover:bg-ok-soft hover:text-ok',
+        )}
       >
-        <FolderOpen size={15} />
-        <span className="hidden text-xs font-medium lg:inline">Expediente</span>
+        {user.active ? <UserMinus size={14} /> : <UserCheck size={14} />}
       </button>
+
+      <button
+        type="button"
+        onClick={onPerfil}
+        aria-label={`Perfil de ${user.fullName}`}
+        title="Perfil: todo lo de esta persona en una pagina"
+        className="focus-ring flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-ink-500 transition-colors duration-150 hover:bg-primary-soft hover:text-ink-900"
+      >
+        <UserRound size={15} />
+        <span className="hidden text-xs font-medium lg:inline">Perfil</span>
+      </button>
+
+      <Popover
+        etiqueta={`Más acciones para ${user.fullName}`}
+        ancho="w-auto"
+        // Al panel se le quita la caja entera: aqui no hay tarjeta, solo los circulos flotando.
+        className="border-0 bg-transparent p-0 shadow-none"
+        botonClassName="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-300 transition-colors duration-150 hover:bg-primary-soft hover:text-ink-700"
+        boton={(abierta) => (
+          <MoreVertical
+            size={15}
+            className={cn(
+              'transition-transform duration-300 ease-pulse',
+              abierta && 'rotate-90 text-ink-900',
+            )}
+          />
+        )}
+      >
+        {(cerrar) => (
+          <div className="flex items-center gap-2 pt-1">
+            {flotantes.map((accion, indice) => (
+              <button
+                key={accion.texto}
+                type="button"
+                title={accion.texto}
+                aria-label={`${accion.texto}: ${user.fullName}`}
+                onClick={() => {
+                  accion.accion();
+                  cerrar();
+                }}
+                style={{ animationDelay: `${indice * 45}ms` }}
+                className="focus-ring animate-pop-in flex h-11 w-11 items-center justify-center rounded-full bg-surface text-ink-500 shadow-card-hover transition-colors duration-150 hover:bg-primary-soft hover:text-ink-900"
+              >
+                <accion.icono size={17} strokeWidth={1.75} aria-hidden />
+              </button>
+            ))}
+          </div>
+        )}
+      </Popover>
     </div>
   );
 }

@@ -78,6 +78,17 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        /*
+          Un circulo que SALE DEL BOTON. Empieza pequeno y un poco mas abajo —donde estaba el boton
+          de los tres puntos— y llega a su sitio creciendo: eso es lo que hace leer "esto se
+          desplego desde ahi" en vez de "aparecio una cosa". El retraso escalonado por icono lo
+          convierte en cadena; todos a la vez seria un parpadeo.
+        */
+        'pop-in': {
+          '0%': { opacity: '0', transform: 'scale(0.55) translateY(6px)' },
+          '60%': { opacity: '1', transform: 'scale(1.06) translateY(0)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
         // Se ABRE la accion: el boton que era un medidor pasa a poder pulsarse.
         unlock: {
           '0%': { transform: 'scale(1)' },
@@ -120,6 +131,7 @@ const config: Config = {
       animation: {
         'pulse-ring': 'pulse-ring 320ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         'card-in': 'card-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'pop-in': 'pop-in 300ms cubic-bezier(0.34, 1.3, 0.64, 1) both',
         unlock: 'unlock 320ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         'slide-next': 'slide-next 260ms cubic-bezier(0.2, 0.8, 0.2, 1)',
         'slide-prev': 'slide-prev 260ms cubic-bezier(0.2, 0.8, 0.2, 1)',

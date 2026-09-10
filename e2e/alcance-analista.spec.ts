@@ -104,10 +104,13 @@ test.describe('Alcance del analista', () => {
 
     // --- El cajon de permisos ENSENA el alcance que se dio al crear, no una hoja en blanco.
     // Es donde se ajusta despues, cuando hay novedades, y tiene que decir la verdad de hoy.
-    // Las acciones secundarias viven detras del boton de tres puntos desde el 2026-09-09: siete
-    // iconos por fila no se leian. Se despliegan pulsandolo, igual que lo hace una persona.
+    // Las acciones excepcionales viven detras del boton de tres puntos desde el 2026-09-09:
+    // siete iconos por fila no se leian. Al pulsarlo salen flotando en circulos, y cada circulo
+    // dice su nombre completo para el lector de pantalla: "Permisos y excepciones: <persona>".
     await page.getByRole('button', { name: `Más acciones para Analista Alcance ${suffix}` }).click();
-    await page.getByRole('button', { name: `Permisos de Analista Alcance ${suffix}` }).click();
+    await page
+      .getByRole('button', { name: `Permisos y excepciones: Analista Alcance ${suffix}` })
+      .click();
     const drawer = page.getByRole('dialog').filter({ hasText: 'Alcance' });
     await expect(drawer.getByText('Acotado a 1 proceso', { exact: false })).toBeVisible();
     // El cajon de permisos MUESTRA el alcance —cambia el significado de los permisos de abajo—
