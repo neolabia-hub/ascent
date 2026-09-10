@@ -121,10 +121,41 @@ cat > "$POLITICA" <<'JSON'
 JSON
 
 echo "[r2-cors] aplicando politica a '${R2_BUCKET_NAME}'..."
-aws s3api put-bucket-cors \
+if ! aws s3api put-bucket-cors \
   --bucket "$R2_BUCKET_NAME" \
   --endpoint-url "$ENDPOINT" \
   --cors-configuration "file://$POLITICA"
+then
+  cat <<'AYUDA'
+
+[r2-cors] ACCESO DENEGADO, y probablemente no es un error de configuracion.
+
+El token de R2 que vive en .env.prod tiene permisos sobre los OBJETOS —subir la
+copia de seguridad, firmar la URL de un video— pero no sobre el BUCKET, que es lo
+que pide `PutBucketCors`. Y esta bien que sea asi: ese token esta en un servidor
+expuesto a internet, y darle administracion del bucket para un cambio que se hace
+una vez seria pagar un riesgo permanente por una comodidad de un minuto.
+
+DOS SALIDAS. La primera es la buena:
+
+1) DESDE EL PANEL DE CLOUDFLARE (dos minutos, sin crear credenciales nuevas):
+   R2  ->  bucket `ascent-media`  ->  Settings  ->  CORS Policy  ->  Edit
+   y pegar exactamente esto:
+
+AYUDA
+  cat "$POLITICA"
+  cat <<'AYUDA'
+
+2) Con un token TEMPORAL de "Admin Read & Write" sobre este bucket:
+   exportar R2_ACCESS_KEY_ID y R2_SECRET_ACCESS_KEY con ese token, volver a
+   ejecutar este script, y BORRAR el token al terminar. No dejarlo en .env.prod.
+
+Comprobar despues:  bash scripts/r2-cors.sh --ver
+Y luego recargar el reproductor de una leccion con video.
+
+AYUDA
+  exit 1
+fi
 
 echo "[r2-cors] hecho. Como queda:"
 aws s3api get-bucket-cors --bucket "$R2_BUCKET_NAME" --endpoint-url "$ENDPOINT"

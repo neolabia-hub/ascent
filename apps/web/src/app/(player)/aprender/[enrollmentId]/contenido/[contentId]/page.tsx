@@ -9,7 +9,7 @@ import {
   type SurveyParaResponder,
 } from '@/lib/surveys-api';
 import { SurveyRunner, loQueFaltaEnCliente, type Respuestas } from '@/components/modules/learner/survey-runner';
-import { useMediaUrl } from '@/lib/use-media-url';
+import { CROSS_ORIGIN_MEDIOS, useMediaUrl } from '@/lib/use-media-url';
 import { ApiError } from '@/lib/api';
 import {
   getContent,
@@ -635,9 +635,10 @@ function MediaRunner({
           {type === 'VIDEO' && source ? (
             <video
               src={source}
-              // Sin esto la peticion viaja en modo "no-cors" y Chrome abandona la carga en
-              // silencio: el video se queda girando. Ver `components/ui/media.tsx`.
-              crossOrigin="anonymous"
+              // Solo cuando la API esta en otro origen (desarrollo). En produccion estorba: el 302
+              // hacia el bucket viajaria en modo CORS y el navegador tiraria los bytes.
+              // El porque entero, en `lib/use-media-url.ts`.
+              crossOrigin={CROSS_ORIGIN_MEDIOS}
               controls
               playsInline
               /*

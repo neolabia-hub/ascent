@@ -1,7 +1,7 @@
 'use client';
 
 import type { VideoHTMLAttributes } from 'react';
-import { useMediaUrl } from '@/lib/use-media-url';
+import { CROSS_ORIGIN_MEDIOS, useMediaUrl } from '@/lib/use-media-url';
 
 /**
  * Imagen y video de un archivo del almacenamiento.
@@ -12,12 +12,10 @@ import { useMediaUrl } from '@/lib/use-media-url';
  *
  * Mientras no hay firma no se pinta un elemento roto: se deja el hueco, o se dice lo que pasa.
  *
- * POR QUE LLEVAN `crossOrigin`, y es la otra mitad del arreglo de los archivos que no se veian:
- * la web y la API viven en origenes distintos. Sin ese atributo el navegador pide el archivo en
- * modo "no-cors" y Chrome ABANDONA la carga EN SILENCIO —el video se queda girando para siempre,
- * sin error en consola y sin nada en la pestana de red—. Con `crossOrigin` la peticion viaja como
- * CORS, que es lo que la API si responde. Comprobado el 2026-08-28: mismo archivo, misma URL
- * firmada, sin el atributo `readyState` se queda en 0 y con el llega a 4.
+ * POR QUE LLEVAN `crossOrigin` SOLO A VECES: el porque entero esta en `use-media-url.ts`. En
+ * resumen: hace falta cuando la API esta en otro origen (desarrollo) y ESTORBA cuando no lo esta
+ * (produccion), donde el 302 hacia el bucket acaba bloqueado por CORS. Fijarlo en "anonymous"
+ * arreglaba desarrollo y tumbaba el video del cliente: el 2026-09-10 no se reproducia ninguno.
  */
 
 export function MediaImage({
@@ -34,7 +32,7 @@ export function MediaImage({
   const url = useMediaUrl(storageKey);
   if (!url) return null;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt={alt} className={className} style={style} crossOrigin="anonymous" />;
+  return <img src={url} alt={alt} className={className} style={style} crossOrigin={CROSS_ORIGIN_MEDIOS} />;
 }
 
 export function MediaVideo({
@@ -43,5 +41,5 @@ export function MediaVideo({
 }: { storageKey: string | null | undefined } & VideoHTMLAttributes<HTMLVideoElement>) {
   const url = useMediaUrl(storageKey);
   if (!url) return null;
-  return <video src={url} crossOrigin="anonymous" {...props} />;
+  return <video src={url} crossOrigin={CROSS_ORIGIN_MEDIOS} {...props} />;
 }
