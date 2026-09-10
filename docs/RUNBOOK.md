@@ -165,6 +165,68 @@ de usar y tirar, cuenta las filas y la borra: **producción no se toca**.
 bash scripts/restaurar-prueba.sh /opt/ascent/backups/<archivo>.dump
 ```
 
+## Cada despliegue deja un hueco de 503, y el cliente lo ve (2026-09-10)
+
+**Síntoma.** Terminado el paso 4 del despliegue, con los cinco contenedores en `healthy`, el paso 5
+devuelve `503`. Y en los registros de Caddy, peticiones reales de un teléfono del cliente fallando
+al mismo tiempo:
+
+```
+"msg":"no upstreams available", "host":"transprensa.ascentio.app", "uri":"/v1/public/tenants/transprensa", "status":503
+...
+"msg":"host is up","host":"api:3002"
+```
+
+**La causa.** Caddy lleva un comprobador de salud activo sobre `api:3002`. Al recrear el contenedor
+de la API, su IP cambia; Caddy lo marca caído y **no vuelve a intentarlo hasta el siguiente ciclo de
+comprobación**. Mientras tanto no hay upstream y todo el que entre recibe un 503. Se recupera solo
+—la última línea del registro lo dice—, pero el hueco dura entre medio minuto y un minuto.
+
+**Lo que engaña:** `docker compose ps` dice `healthy` en todo. La aplicación está perfectamente; lo
+que está roto es el camino hasta ella.
+
+**El arreglo, y va al paso 4 del despliegue:** recargar Caddy justo después de levantar.
+
+```bash
+docker compose -f docker/docker-compose.prod.yml --env-file .env.prod up -d
+docker compose -f docker/docker-compose.prod.yml --env-file .env.prod restart caddy   # <-- esto
+sleep 8
+curl -fsS https://ascentio.app/v1/health
+```
+
+Cuesta tres segundos y convierte un hueco de un minuto en uno de tres segundos. **Y despliega fuera
+del horario laboral**, que es lo que dicen las reglas y esta es la razón concreta.
+
+## El vídeo no se reproducía en producción, segunda parte: era `crossOrigin` (2026-09-10)
+
+La política del bucket **no se pudo aplicar**: el token de R2 que vive en `.env.prod` tiene permisos
+sobre los objetos —subir la copia, firmar una URL— pero no sobre el bucket, que es lo que pide
+`PutBucketCors`. Devuelve `AccessDenied`, y está bien que así sea: ese token está en una máquina
+expuesta a internet.
+
+Así que el vídeo se arregló **por el otro lado**, y resulta que era el lado correcto.
+
+El `<video>` llevaba `crossOrigin="anonymous"` fijo. **Ese atributo es lo que obliga a la petición a
+viajar en modo CORS**; sin él, un elemento de medios carga de cualquier origen sin pedir permiso —es
+como funciona cualquier vídeo servido desde una CDN— y el 302 hacia R2 deja de ser un problema.
+
+Se puso el 2026-08-28 por una razón buena: en **desarrollo** la web está en el 3200 y la API en el
+3002, y sin el atributo Chrome abandona la carga en silencio. En **producción** la API se llama por
+ruta relativa —`NEXT_PUBLIC_API_URL` va vacía— así que no hacía falta, y estorbaba.
+
+Ahora sale de `CROSS_ORIGIN_MEDIOS` (`lib/use-media-url.ts`): se pone **solo cuando la API está en
+otro origen**. Comprobado en los dos lados: en dev sigue en `anonymous` con `readyState` 4, y en el
+bundle desplegado **no aparece ni `crossOrigin` ni el literal `anonymous`** en ningún chunk.
+
+> **La política del bucket sigue pendiente**, y no es opcional para siempre: el día que los vídeos
+> lleven subtítulos, una pista `<track>` de otro origen **sí** exige CORS. Se pone desde el panel de
+> Cloudflare (R2 → `ascent-media` → Settings → CORS Policy) con lo que imprime
+> `bash scripts/r2-cors.sh`, que ya explica las dos salidas cuando le deniegan el acceso.
+
+**La lección, y es la de siempre en este proyecto:** el arreglo evidente era darle permiso al bucket.
+El bueno era quitar el atributo que creaba el problema. Cuando algo falla por CORS, la primera
+pregunta no es «¿qué permiso le falta al servidor?» sino «¿por qué esta petición viaja en modo CORS?».
+
 ## El vídeo no se reproduce en producción: el bucket no tenía CORS (2026-09-10)
 
 **Síntoma.** El aprendiz abre una lección con vídeo y la pantalla se queda. En la consola:
