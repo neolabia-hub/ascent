@@ -66,6 +66,7 @@ export const IMPORT_HEADERS = [
   'correo',
   'telefono',
   'cargo',
+  'tipo_cargo',
   'area',
   'regional',
   'servicio',
@@ -79,8 +80,18 @@ export const importRowSchema = z.object({
   nombre_completo: z.string().min(3).max(160),
   correo: z.string().email().max(120).transform((v) => v.toLowerCase()),
   telefono: z.string().max(20).optional().or(z.literal('')),
-  cargo: z.string().min(2).max(40), // code del catalogo job_titles
-  area: z.string().min(2).max(40), // code del catalogo areas
+  cargo: z.string().min(2).max(40), // code o nombre del catalogo job_titles
+  /**
+   * SOLO HACE FALTA SI EL CARGO TODAVIA NO EXISTE.
+   *
+   * Un cargo no se puede crear solo con su nombre: la ficha exige un TIPO —Administrativo,
+   * Operativo o Comercial, tabla `job_title_types`— y adivinarlo por el nombre del cargo seria
+   * clasificar a alguien en silencio. Si esta columna trae el codigo o el nombre de un tipo ya
+   * configurado, el cargo nuevo se crea con esa clasificacion; si no, la fila falla explicando
+   * por que, en vez de crear un cargo sin tipo o inventarle uno al azar.
+   */
+  tipo_cargo: z.string().max(40).optional().or(z.literal('')),
+  area: z.string().min(2).max(40), // code o nombre del catalogo areas
   regional: z.string().max(40).optional().or(z.literal('')),
   // Opcionales las dos: un cliente que no las maneje deja la columna vacia y su carga entra igual.
   servicio: z.string().max(40).optional().or(z.literal('')),

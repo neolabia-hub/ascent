@@ -680,6 +680,8 @@ model UserImportRow {
   raw         Json
   status      ImportRowStatus
   errorDetail String?         @map("error_detail")
+  /// No es un error: avisa que un cargo/area/regional/servicio se creo solo, sobre la marcha.
+  note        String?
   userId      String?         @map("user_id") @db.Uuid
 
   @@map("user_import_rows")

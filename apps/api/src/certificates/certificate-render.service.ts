@@ -184,7 +184,21 @@ export class CertificateRenderService {
       return await toBuffer(`${base}/verificar/${encodeURIComponent(codigo)}`, {
         type: 'png',
         errorCorrectionLevel: 'M',
-        margin: 1,
+        /*
+          MARGEN 4, QUE ES LO QUE MANDA LA NORMA (ISO/IEC 18004), no 1.
+          Estaba en 1 y es la explicacion mas probable de un sintoma que reporto el cliente el
+          2026-09-10: al escanear la constancia, el telefono LEE la direccion pero solo ofrece
+          «copiar el enlace» en vez de abrirlo.
+          Esos cuatro modulos en blanco alrededor —la «zona tranquila»— son lo que le permite al
+          lector saber donde empieza y acaba el codigo. Sin ellos el codigo queda pegado al arte de
+          la constancia; muchos decodificadores todavia sacan la cadena, pero con poca confianza, y
+          entonces la aplicacion la trata como texto suelto y no como un enlace que se puede abrir.
+          El precio es que, al mismo tamaño impreso, los modulos salen algo mas pequeños. Compensa:
+          un QR que se lee regular no lo escanea nadie dos veces.
+          NO SE SUBE a `errorCorrectionLevel: 'Q'` de paso: eso mete mas modulos en el mismo cuadro
+          y los haria mas pequeños todavia. La zona tranquila era lo que estaba fuera de norma.
+        */
+        margin: 4,
         width: 512,
       });
     } catch (error) {

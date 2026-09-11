@@ -108,6 +108,8 @@ export function LearnerShell({ children }: { children: ReactNode }) {
   */
   const cine = pathname === '/hoy';
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Una sola peticion para las dos piezas que lo enseñan (carril en escritorio, burbuja en telefono).
+  const progress = useMiProgreso();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -250,7 +252,7 @@ export function LearnerShell({ children }: { children: ReactNode }) {
           clasificacion y no la va a haber —en formacion obligatoria, competir por puntos empuja a
           pasar rapido, no a aprender—.
         */}
-        <ProgresoPropio />
+        <ProgresoPropio progress={progress} />
         </div>
       </aside>
 
@@ -353,22 +355,49 @@ export function LearnerShell({ children }: { children: ReactNode }) {
         </ul>
       </nav>
 
+      {/*
+        LA RACHA, EN TELEFONO, COMO BURBUJA FLOTANTE (2026-09-11).
+
+        Bajo de la barra de arriba, donde se comia 56px de una fila que a 402px ya iba justa y
+        dejaba el saludo en «Buen…». De los cuatro controles que habia alli, la racha es la que
+        mejor aguanta la mudanza: la campana avisa de cosas con fecha limite, la cuenta es la
+        salida y el buscador acepta escritura; la racha solo INFORMA.
+
+        DONDE: pegada al filo derecho, justo encima de la barra de abajo —su altura sale de las
+        mismas variables, asi que no puede desalinearse— y del lado del pulgar.
+
+        TAPA UN CUADRADO DE 44px DE CONTENIDO y se acepta a proposito: es la esquina de abajo a la
+        derecha, el contenido ya se aparta de la barra, y lo que hay debajo siempre se alcanza
+        desplazando un poco. La alternativa —reservarle sitio— le quitaria alto a todas las
+        pantallas para algo que solo se mira de reojo.
+
+        NO SALE SI NO HAY RACHA. Un «0» con una llama apagada flotando todo el dia no motiva a
+        nadie: recuerda cada vez que se perdio.
+      */}
+      <StreakBubble progress={progress} />
+
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }
 
 /**
- * EL PROGRESO PROPIO: racha, puntos y congelaciones, en la barra lateral.
+ * EL PROGRESO PROPIO, PEDIDO UNA SOLA VEZ.
  *
- * Si falla la peticion no se pinta nada y ya: es un adorno que motiva, no un dato que alguien
- * necesite para trabajar. Un bloque de error aqui seria mas ruido que ausencia.
+ * Lo enseñan dos piezas que nunca conviven —el bloque del carril en escritorio y la burbuja en
+ * telefono— pero las dos se MONTAN siempre: lo que las separa es el CSS, no React. Si cada una
+ * pidiera lo suyo, serian dos llamadas identicas en cada cambio de pantalla, y la mitad para algo
+ * que no se esta viendo.
+ *
+ * Se relee al cambiar de pantalla: al terminar una leccion la racha y los puntos se mueven.
+ *
+ * Si falla no devuelve nada y ya: es un adorno que motiva, no un dato que alguien necesite para
+ * trabajar. Un bloque de error aqui seria mas ruido que ausencia.
  */
-function ProgresoPropio() {
+function useMiProgreso(): MyProgress | null {
   const [progress, setProgress] = useState<MyProgress | null>(null);
   const pathname = usePathname();
 
-  // Se relee al cambiar de pantalla: al terminar una leccion la racha y los puntos se mueven.
   useEffect(() => {
     let cancelled = false;
     getMyProgress()
@@ -381,6 +410,51 @@ function ProgresoPropio() {
     };
   }, [pathname]);
 
+  return progress;
+}
+
+/**
+ * LA RACHA EN TELEFONO: una burbuja que late, encima de la barra de abajo.
+ *
+ * Late de verdad y muy despacio —`animate-breathe`, que ya existe en el sistema— porque es lo
+ * unico que la distingue de un boton mas. Un icono quieto en una esquina se deja de ver a los dos
+ * dias; uno que respira se mira de reojo, que es exactamente la atencion que merece.
+ *
+ * Y late SOLO si la racha esta viva. Con la racha perdida no hay nada que celebrar y la burbuja no
+ * sale: la gamificacion que insiste cuando has fallado no motiva, reprocha.
+ */
+function StreakBubble({ progress }: { progress: MyProgress | null }) {
+  if (!progress || progress.currentStreak <= 0) return null;
+
+  return (
+    <Link
+      href="/perfil"
+      aria-label={`Llevas ${progress.currentStreak} ${progress.currentStreak === 1 ? 'dia seguido' : 'dias seguidos'}. Ver tu progreso`}
+      className="focus-ring animate-card-in fixed right-4 z-20 flex items-center gap-1.5 rounded-full border border-line bg-surface/90 py-1.5 pl-1.5 pr-3 shadow-card-hover backdrop-blur-lg lg:hidden"
+      style={{ bottom: 'calc(var(--barra-hueco) + var(--barra-alto) + 0.75rem)' }}
+    >
+      <span
+        className="flex h-7 w-7 items-center justify-center rounded-full"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-accent) 16%, transparent)' }}
+      >
+        <Flame
+          className="animate-breathe h-[15px] w-[15px]"
+          strokeWidth={2}
+          style={{ color: 'var(--brand-accent)' }}
+          aria-hidden="true"
+        />
+      </span>
+      <span className="font-display text-sm font-bold leading-none tabular-nums text-ink-900">
+        {progress.currentStreak}
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * EL PROGRESO PROPIO: racha, puntos y congelaciones, en la barra lateral de escritorio.
+ */
+function ProgresoPropio({ progress }: { progress: MyProgress | null }) {
   if (!progress) return null;
 
   return (

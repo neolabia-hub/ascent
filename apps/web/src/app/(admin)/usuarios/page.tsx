@@ -901,7 +901,10 @@ export default function UsuariosPage() {
                         <Td className="font-mono text-xs">{row.documento}</Td>
                         <Td>
                           {row.status === 'OK' ? (
-                            <span className="text-sm text-ok">OK{row.generatedPassword ? ` — clave: ${row.generatedPassword}` : ''}</span>
+                            <span className="text-sm text-ok">
+                              OK{row.generatedPassword ? ` — clave: ${row.generatedPassword}` : ''}
+                              {row.note ? <span className="block text-xs text-ink-500">{row.note}</span> : null}
+                            </span>
                           ) : (
                             <span className="text-sm text-danger">{row.error}</span>
                           )}

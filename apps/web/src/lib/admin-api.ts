@@ -237,6 +237,7 @@ export interface ImportRowResult {
   status: 'OK' | 'ERROR';
   documento: string;
   error?: string;
+  note?: string;
   generatedPassword?: string;
 }
 

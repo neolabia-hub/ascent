@@ -3,16 +3,13 @@
 import { Bell, ChevronDown, LogOut, Search, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
 import { getInbox, logout, markAllNotificationsRead, markNotificationRead, type InboxItem } from '@/lib/api';
-import { getMyProgress } from '@/lib/learner-api';
 import { useLearnerProfile } from './learner-session';
 import { clearOfflineData } from '@/components/providers/service-worker-bridge';
 import { managesAnything } from '@/lib/landing';
 import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/components/ui/cn';
 import { SpaceSwitcher } from './space-switcher';
-import { StreakPill } from '@/components/ui/streak-pill';
 import { KIND_LABEL, notificationHref, notificationKind } from '@/lib/notification-kind';
 
 /**
@@ -347,23 +344,6 @@ export function LearnerTopbar({
   buscador?: boolean;
 }) {
   const profile = useLearnerProfile();
-  const pathname = usePathname();
-  const [streak, setStreak] = useState<number | null>(null);
-
-  // Se relee al cambiar de pantalla: al terminar una leccion la racha puede haber avanzado.
-  useEffect(() => {
-    let cancelled = false;
-    getMyProgress()
-      .then((value) => {
-        if (!cancelled) setStreak(value.currentStreak);
-      })
-      .catch(() => {
-        // La racha es un adorno: si falla, la barra sigue siendo util sin ella.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
 
   return (
     /*
@@ -430,7 +410,7 @@ export function LearnerTopbar({
         */}
         {leading ?? (
           <p className="min-w-0 flex-1 truncate lg:flex-none lg:shrink-0">
-            <span className="hidden text-sm text-ink-500 min-[560px]:inline">{greeting}, </span>
+            <span className="hidden text-sm text-ink-500 min-[380px]:inline">{greeting}, </span>
             <span className="font-display text-base font-semibold text-ink-900">
               {profile.fullName.split(/\s+/)[0]}
             </span>
@@ -497,7 +477,21 @@ export function LearnerTopbar({
           bloque de la barra. En telefono no hay barra lateral, asi que ahi si se queda.
           Sigue siendo PRIVADA (Decision #23): es la propia, jamas la de otro.
         */}
-        {streak !== null ? <StreakPill days={streak} className="animate-card-in inline-flex lg:hidden" /> : null}
+        {/*
+          LA RACHA YA NO VIVE AQUI EN TELEFONO (2026-09-11). Bajo a una burbuja flotante sobre la
+          barra de abajo — `StreakBubble`, en `learner-shell`.
+
+          El motivo es de espacio y se ve al medir: a 402px, la fila llevaba nombre, lupa, racha,
+          campana y cuenta. Los cuatro controles se comian 228px de 402, y lo que cedia era el
+          saludo: se quedaba en «Buen...» o directamente en el nombre a secas.
+
+          La racha es lo que mejor aguanta la mudanza de los cuatro. La campana avisa de cosas con
+          fecha limite, la cuenta es la salida y el buscador acepta escritura; la racha solo INFORMA
+          —«llevas 3 dias»— y para eso no hace falta que ocupe sitio en la fila donde esta el nombre
+          de la persona. Abajo se ve igual, esta mas cerca del pulgar y ademas late.
+
+          En escritorio nunca estuvo aqui: vive en el carril, con los puntos y las congelaciones.
+        */}
 
         {/*
           LA VUELTA AL PANEL, solo para quien administra algo. Para el 95% del personal operativo
