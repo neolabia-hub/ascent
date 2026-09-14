@@ -28,6 +28,62 @@ export type EstadoEjecucion =
  */
 export const ESTADOS_RETIRADOS = ['WITHDRAWN_LEFT_AUDIENCE', 'WITHDRAWN_PLAN_ITEM_CANCELLED'] as const;
 
+/** Rondas que ya no piden nada: la persona no tiene ninguna accion pendiente en esa ronda. */
+const ESTADOS_CERRADOS = new Set<EstadoEjecucion>(['TERMINADA', 'REPROBADA', 'NO_REALIZADA', 'EXIMIDA']);
+
+/**
+ * UNA FILA POR PERSONA, NO POR RONDA (PENDIENTES 5.2).
+ *
+ * `ejecucionDeActividad` traia una fila por `assignment` — y una reinduccion con tres ciclos
+ * cerrados le daba tres filas a la MISMA persona en el detalle de Seguimiento. No era un error de
+ * conteo (el resumen ya sumaba bien), era que la tabla mostraba historia donde el auditor pide una
+ * foto: "¿esta persona esta al dia con esta formacion, si o no?" tiene una sola respuesta, no tres.
+ *
+ * LA REGLA ES LA MISMA QUE YA USA VENCIMIENTOS (`expirations.ts`, `gana()`), a proposito: dos
+ * informes resolviendo "cual de varias filas manda" con dos criterios distintos serian dos
+ * versiones de la misma pregunta, y coincidir es lo unico que las hace confiables juntas.
+ *
+ *   1. **Lo abierto manda sobre lo cerrado.** Si hay algo que la persona pueda o deba hacer todavia
+ *      —atrasada, en curso, sin empezar, esperando convocatoria— esa es la fila que importa: es la
+ *      que responde "¿que le falta?".
+ *   2. **Entre varias abiertas, la mas urgente** (la que vence antes; sin fecha, al final).
+ *   3. **Entre varias cerradas, la ronda mas reciente** representa el estado de hoy: quien reprobo
+ *      el ciclo 1 y aprobo el ciclo 2 esta al dia, no reprobado.
+ *
+ * `rondas` se conserva en la fila que gana: la tabla no vuelve a mostrar la historia, pero no la
+ * esconde — un "(3)" al lado dice que hubo mas de una sin obligar a abrir el perfil para saberlo.
+ */
+export function consolidarPorPersona<T extends { userId: string; estado: EstadoEjecucion; dueAt: Date | null; cycleNumber: number }>(
+  filas: readonly T[],
+): Array<T & { rondas: number }> {
+  const porPersona = new Map<string, T & { rondas: number }>();
+
+  for (const fila of filas) {
+    const previa = porPersona.get(fila.userId);
+    if (!previa) {
+      porPersona.set(fila.userId, { ...fila, rondas: 1 });
+      continue;
+    }
+    porPersona.set(fila.userId, { ...ganaFila(previa, fila), rondas: previa.rondas + 1 });
+  }
+
+  return [...porPersona.values()];
+}
+
+function ganaFila<T extends { estado: EstadoEjecucion; dueAt: Date | null; cycleNumber: number }>(a: T, b: T): T {
+  const abiertaA = !ESTADOS_CERRADOS.has(a.estado);
+  const abiertaB = !ESTADOS_CERRADOS.has(b.estado);
+  if (abiertaA !== abiertaB) return abiertaA ? a : b;
+
+  if (abiertaA) {
+    // Dos abiertas: la mas urgente. Sin fecha (p. ej. ESPERANDO) queda al final, no primero.
+    if (a.dueAt && b.dueAt) return a.dueAt <= b.dueAt ? a : b;
+    return a.dueAt ? a : b;
+  }
+  // Dos cerradas: la ronda mas reciente es el estado de hoy.
+  return a.cycleNumber >= b.cycleNumber ? a : b;
+}
+
 /**
  * QUE EJECUCION DESCRIBE A CADA RONDA (2026-09-05).
  *

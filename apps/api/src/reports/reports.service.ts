@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import {
   ESTADOS_RETIRADOS,
+  consolidarPorPersona,
   inscripcionDeCadaRonda,
   resolverEstadoEjecucion,
   resumirEjecucion,
@@ -203,7 +204,18 @@ export class ReportsService {
       };
     });
 
-    return { items, resumen: resumirEjecucion(items.map((item) => item.estado)) };
+    /*
+      UNA FILA POR PERSONA, NO POR RONDA (PENDIENTES 5.2, 2026-09-14).
+
+      Hasta aqui `items` tiene una fila por OBLIGACION (`assignmentId`): una reinduccion con tres
+      ciclos cerrados le daba tres filas a la misma persona. `consolidarPorPersona` se queda con la
+      que de verdad responde "¿como esta esta persona con esta formacion hoy?" — ver el porque
+      completo en `execution-state.ts`. El resumen se calcula DESPUES de consolidar, no antes: son
+      personas, no rondas, las que se cuentan como cumplidas o atrasadas en este detalle.
+    */
+    const porPersona = consolidarPorPersona(items);
+
+    return { items: porPersona, resumen: resumirEjecucion(porPersona.map((item) => item.estado)) };
   }
 
 

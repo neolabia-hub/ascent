@@ -1,8 +1,10 @@
 import {
+  consolidarPorPersona,
   inscripcionDeCadaRonda,
   resolverEstadoEjecucion,
   resumirEjecucion,
   type EntradaDeEstado,
+  type EstadoEjecucion,
 } from './execution-state.js';
 
 function caso(parcial: Partial<EntradaDeEstado> = {}): EntradaDeEstado {
@@ -170,5 +172,62 @@ describe('la inscripcion se pega a su RONDA, no a la persona', () => {
     const rara = { id: 'e3', assignmentId: 'a2', status: 'COMPLETED' as const };
     const mapa = inscripcionDeCadaRonda([{ id: 'a1', completedEnrollmentId: 'e3' }], [rara]);
     expect(mapa.get('a1')).toBe(rara);
+  });
+});
+
+/**
+ * UNA FILA POR PERSONA (PENDIENTES 5.2): quien tiene varias rondas de la misma formacion sale
+ * UNA VEZ en el detalle de Seguimiento, con la ronda que de verdad importa para hoy.
+ */
+describe('consolidarPorPersona', () => {
+  function fila(parcial: {
+    userId: string;
+    estado: EstadoEjecucion;
+    dueAt?: Date | null;
+    cycleNumber: number;
+  }) {
+    return { userId: parcial.userId, estado: parcial.estado, dueAt: parcial.dueAt ?? null, cycleNumber: parcial.cycleNumber };
+  }
+
+  it('lo abierto gana a lo cerrado, sin importar el orden en que llegue', () => {
+    const filas = [
+      fila({ userId: 'p1', estado: 'TERMINADA', cycleNumber: 1 }),
+      fila({ userId: 'p1', estado: 'ATRASADA', cycleNumber: 2, dueAt: new Date('2026-01-10') }),
+    ];
+    const resultado = consolidarPorPersona(filas);
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0]?.estado).toBe('ATRASADA');
+    expect(resultado[0]?.rondas).toBe(2);
+  });
+
+  it('entre dos abiertas, la mas urgente (la que vence antes)', () => {
+    const filas = [
+      fila({ userId: 'p1', estado: 'SIN_EMPEZAR', cycleNumber: 1, dueAt: new Date('2026-06-01') }),
+      fila({ userId: 'p1', estado: 'ATRASADA', cycleNumber: 2, dueAt: new Date('2026-01-10') }),
+    ];
+    expect(consolidarPorPersona(filas)[0]?.estado).toBe('ATRASADA');
+  });
+
+  it('entre dos cerradas, la ronda mas reciente es el estado de hoy', () => {
+    // Reprobo el ciclo 1 y aprobo el ciclo 2: hoy esta al dia, no reprobado.
+    const filas = [
+      fila({ userId: 'p1', estado: 'REPROBADA', cycleNumber: 1 }),
+      fila({ userId: 'p1', estado: 'TERMINADA', cycleNumber: 2 }),
+    ];
+    expect(consolidarPorPersona(filas)[0]?.estado).toBe('TERMINADA');
+  });
+
+  it('una sola ronda no cambia nada, y rondas queda en 1', () => {
+    const filas = [fila({ userId: 'p1', estado: 'EN_CURSO', cycleNumber: 1 })];
+    const resultado = consolidarPorPersona(filas);
+    expect(resultado).toEqual([{ ...filas[0], rondas: 1 }]);
+  });
+
+  it('personas distintas nunca se mezclan', () => {
+    const filas = [
+      fila({ userId: 'p1', estado: 'TERMINADA', cycleNumber: 1 }),
+      fila({ userId: 'p2', estado: 'ATRASADA', cycleNumber: 1 }),
+    ];
+    expect(consolidarPorPersona(filas)).toHaveLength(2);
   });
 });

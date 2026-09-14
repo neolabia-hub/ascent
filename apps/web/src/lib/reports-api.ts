@@ -71,6 +71,8 @@ export interface FilaPersona {
   encuesta: string | null;
   respondioEncuesta: boolean;
   certificadoId: string | null;
+  /** Cuantos ciclos tuvo esta obligacion. La fila es UNA sola (la mas relevante); esto dice si hubo historia detras. */
+  rondas: number;
 }
 
 export function getEjecucionGeneral(): Promise<{ items: FilaGeneral[]; resumen: ResumenEjecucion }> {

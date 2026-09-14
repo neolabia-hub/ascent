@@ -533,7 +533,22 @@ function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
   return (
     <Tr>
       <Td>
-        <p className="font-medium text-ink-900">{persona.fullName}</p>
+        <p className="flex items-center gap-1.5 font-medium text-ink-900">
+          {persona.fullName}
+          {/*
+            LA FILA YA ES UNA SOLA POR PERSONA (no una por ronda): esto solo dice que hubo historia
+            detras, sin obligar a abrir el perfil para saberlo. Sin badge cuando rondas=1: un "(1)"
+            en cada fila no informaria nada, solo repetiria ruido.
+          */}
+          {persona.rondas > 1 ? (
+            <span
+              className="rounded-full bg-paper px-1.5 py-0.5 text-[11px] font-normal text-ink-500"
+              title={`${persona.rondas} ciclos de esta formacion; se muestra el que importa hoy`}
+            >
+              {persona.rondas}×
+            </span>
+          ) : null}
+        </p>
         <p className="text-xs tabular-nums text-ink-500">{persona.documentNumber}</p>
       </Td>
       <Td>
