@@ -3896,3 +3896,11 @@ grep -rn "getByRole('button', { name: '<el rotulo>'" e2e
 Y si el rol nuevo es el correcto —lo es casi siempre, porque el componente compartido lo pensó
 alguien—, **se corrige la prueba**. Si no lo es, es el componente el que esta mintiendo sobre lo que
 es.
+
+## Una carpeta con contraseñas se movio DENTRO del repositorio (2026-09-14)
+
+**Sintoma.** `docs/entrega/ASCENT - ENTREGA TRANSPRENSA/` aparecio como archivos sin trackear dentro del repo, con la ficha de acceso (documento, cedula, contrasena temporal) que **tiene que vivir fuera** — regla explicita del 2026-09-09. El `git status` antes de un commit la mostraba lista para subir.
+
+**No llego a Git.** Se caza en `git status` antes de comitear, nunca despues: por eso la regla de este mismo documento de mirar `git status` antes de cualquier `git add -A` no es ceremonia, es la unica red. Se movio de vuelta a `C:UsersPruebaDocumentsASCENT - ENTREGA TRANSPRENSA` y no hizo falta rotar nada, porque nunca entro al historial.
+
+**Como paso.** Sin confirmar — alguna operacion de archivos la reubico dentro de `docs/entrega/` en vez de al lado. **Leccion:** si algun dia se ve esta carpeta dentro del repo otra vez, sacarla ANTES de comitear nada mas, no despues.
