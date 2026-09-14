@@ -6,6 +6,7 @@ import { NotificationRetentionWorker } from './notification-retention.worker.js'
 import { PerformanceReminderWorker } from './performance-reminder.worker.js';
 import { PillNudgeWorker } from './pill-nudge.worker.js';
 import { RequirementWorker } from './requirement.worker.js';
+import { ReviewDigestWorker } from './review-digest.worker.js';
 
 /** Trabajos programados del sistema. El motor de requisitos llega por AssignmentsModule (global). */
 @Module({
@@ -16,6 +17,7 @@ import { RequirementWorker } from './requirement.worker.js';
     NotificationRetentionWorker,
     PerformanceReminderWorker,
     ExpirationDigestWorker,
+    ReviewDigestWorker,
   ],
 })
 export class WorkersModule {}

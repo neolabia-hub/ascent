@@ -58,7 +58,7 @@ depende de un trabajo del Sprint 6—.
 
 | | Qué falta | Detalle |
 |---|---|---|
-| 5.1 | **Repaso / «volver a verlo»**: repetir una formación para reforzar, sin tocar los indicadores. El motor ya existe (`spaced-repetition.ts`, #22). **Después del despliegue**, y además su mejor versión —avisar según lo que cada quien falló— necesita etiquetar las preguntas por tema, que es trabajo del Sprint 6 | `HANDOFF` 2026-09-05 · `ideas-producto.md` §4 |
+| 5.1 | ~~Repaso: avisar segun lo que cada quien fallo~~ **HECHO el 2026-09-14.** El motor de repeticion espaciada ya existia; lo que faltaba era el AVISO. Nuevo worker diario (`ReviewDigestWorker`) que nombra el TEMA con mas preguntas vencidas —"Tienes 4 preguntas de Seguridad vial esperando repaso"—, no solo el numero. **Parametrizable por tenant desde Preferencias**: `reviewDigestMinDue` (minimo de preguntas vencidas para avisar; 0 = apagado, mismo convenio que `expirationDigestDays`). Probado de punta a punta contra la base de desarrollo: `enviados:2`. 10/10 pruebas nuevas | `engagement/review-digest.ts`, Preferencias |
 | 5.2 | ~~Una fila por persona en Seguimiento, no por ronda~~ **HECHO el 2026-09-14.** `consolidarPorPersona` en `execution-state.ts`: entre varias rondas de la misma persona, gana la ABIERTA mas urgente; si todas estan cerradas, gana la mas RECIENTE. Misma regla que ya usa Vencimientos (`gana()`), a proposito. La fila lleva un `3×` si hubo mas de una ronda, sin volver a mostrar la historia entera. 26/26 pruebas | `execution-state.ts`, `reports.service.ts` |
 | 5.3 | **La matriz de vigencias del trabajador** —exámenes médicos, licencias de conducción, EPP— como módulo aparte y **cotizado aparte**. Después del despliegue, y solo cuando haya un cliente que lo pida | `HANDOFF` 2026-09-05 |
 

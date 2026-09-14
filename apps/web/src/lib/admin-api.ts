@@ -342,6 +342,8 @@ export interface TenantSettings {
   performanceReminderDays: number;
   /** Dias hacia adelante que mira el aviso semanal de vencimientos. 0 = sin aviso. */
   expirationDigestDays: number;
+  /** A partir de cuantas preguntas vencidas de repaso se avisa a la persona. 0 = sin aviso. */
+  reviewDigestMinDue: number;
   labels: Record<string, string>;
   features: Record<string, boolean>;
   /** A quien acude quien no puede entrar. Se publica SIN sesion (Decision #97). */

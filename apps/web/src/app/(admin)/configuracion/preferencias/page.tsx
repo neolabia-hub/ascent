@@ -204,6 +204,21 @@ export default function PreferenciasPage() {
               />
             </Field>
             <Field
+              htmlFor="pref-repaso"
+              label="Avisar de repaso pendiente (mínimo de preguntas)"
+              hint="Un aviso a la persona en su bandeja, nombrando el tema donde más falla. 0 = sin aviso."
+              ayuda="El repaso reaparece cuando fallas una pregunta (1, 2, 7, 14 o 30 días después). Este número dice a partir de cuántas preguntas vencidas se avisa: con una sola no vale la pena interrumpir, pero con varias juntas sí. El aviso dice el tema con más preguntas pendientes, no solo el número."
+            >
+              <Input
+                id="pref-repaso"
+                type="number"
+                min={0}
+                max={20}
+                value={settings.reviewDigestMinDue}
+                onChange={(e) => setSettings({ ...settings, reviewDigestMinDue: num(e.target.value, 0, 20, 3) })}
+              />
+            </Field>
+            <Field
               htmlFor="pref-pills"
               label="Píldoras por semana"
               hint="Cadencia gobernada por el sistema (2-3 recomendado)."

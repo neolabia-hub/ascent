@@ -23,6 +23,8 @@ const KIND_BY_EVENT: Record<string, NotificationKind> = {
   ENROLLED: 'formacion',
   // Le pasa a TU formacion, aunque la decision la tomara otro: la jornada a la que ibas ya no es.
   OFFERING_CANCELLED: 'formacion',
+  // Tu cola de repaso vencio. Lo haces tu, y es sobre lo tuyo.
+  REVIEW_DUE_DIGEST: 'formacion',
   // Lo que tienes que hacer POR OTROS.
   APPROVAL_REQUESTED: 'gestion',
   ATTEMPTS_EXHAUSTED: 'gestion',
@@ -81,6 +83,8 @@ export function notificationHref(item: {
    * queda pendiente ahora, no los datos de una sesion que ya no existe.
    */
   if (eventType === 'OFFERING_CANCELLED') return '/mi-formacion';
+  // Al repaso mismo, no a "mi formacion": es lo unico que este aviso nombra.
+  if (eventType === 'REVIEW_DUE_DIGEST') return '/repaso';
   if (eventType === 'ATTEMPTS_EXHAUSTED' && referenceType === 'activities' && referenceId) {
     return `/contenido-formativo/${referenceId}`;
   }

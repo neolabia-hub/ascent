@@ -58,6 +58,23 @@ export const tenantSettingsSchema = z
      */
     expirationDigestDays: z.number().int().min(0).max(180).default(45),
 
+    /**
+     * A PARTIR DE CUANTAS PREGUNTAS VENCIDAS DE REPASO se avisa a la persona (`PENDIENTES` 5.1).
+     *
+     * El motor de repeticion espaciada ya existe (Decision #22) y ya se ve en la pantalla —Repaso,
+     * "Sigue donde ibas"— pero nadie se entera cuando algo VUELVE a estar vencido: hay que acordarse
+     * de entrar a mirar. Es el mismo argumento que ya resolvio `expirationDigestDays` para quien
+     * administra, aplicado a quien cursa.
+     *
+     * El umbral evita avisar por UNA sola pregunta que vencio ayer —eso pasa todos los dias con
+     * cualquiera que este activo, y un aviso diario por una pregunta enseña a ignorarlo—; con
+     * varias juntas, ya vale la pena interrumpir.
+     *
+     * 0 apaga el aviso: mismo convenio que `expirationDigestDays` y `performanceReminderDays`, para
+     * no inventar un interruptor aparte cuando el numero ya hace ese trabajo.
+     */
+    reviewDigestMinDue: z.number().int().min(0).max(20).default(3),
+
     // Rotulos de UI (Decision #31: fijos en F1; previstos aqui, sin UI de edicion todavia).
     labels: z
       .object({

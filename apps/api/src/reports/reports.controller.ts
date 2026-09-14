@@ -1,6 +1,7 @@
 import { Controller, Get, Header, Param, Post, Query, StreamableFile } from '@nestjs/common';
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
+import { ReviewDigestService } from '../engagement/review-digest.service.js';
 import { ExpirationDigestService } from './expiration-digest.service.js';
 import { ESTADOS_EJECUCION, type EstadoEjecucion } from './execution-state.js';
 import { ReportsService } from './reports.service.js';
@@ -30,6 +31,7 @@ export class ReportsController {
   constructor(
     private readonly reports: ReportsService,
     private readonly digest: ExpirationDigestService,
+    private readonly reviewDigest: ReviewDigestService,
   ) {}
 
   /**
@@ -50,6 +52,19 @@ export class ReportsController {
   @RequirePermissions('config:manage_tenant')
   avisarVencimientos(@CurrentUser() actor: AuthUser) {
     return this.digest.enviar(actor.tenantId, { forzar: true });
+  }
+
+  /**
+   * MANDAR EL AVISO DE REPASO AHORA (`PENDIENTES` 5.1).
+   *
+   * Mismo motivo que `avisarVencimientos`: probar el texto y el umbral sin esperar al cron diario,
+   * y forzarlo si el servidor se cayo justo ese dia. Mismo permiso, por el mismo argumento: no
+   * consulta nada, le escribe en la bandeja a cada aprendiz con suficientes preguntas vencidas.
+   */
+  @Post('repaso/avisar')
+  @RequirePermissions('config:manage_tenant')
+  avisarRepaso(@CurrentUser() actor: AuthUser) {
+    return this.reviewDigest.enviar(actor.tenantId, { forzar: true });
   }
 
   /** Como va TODO. Es la primera pantalla que se abre cada mañana. */
