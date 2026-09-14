@@ -2,6 +2,7 @@ import { Controller, Get, Header, Param, Post, Query, StreamableFile } from '@ne
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { ReviewDigestService } from '../engagement/review-digest.service.js';
+import { ComplianceStreakService } from './compliance-streak.service.js';
 import { ExpirationDigestService } from './expiration-digest.service.js';
 import { ESTADOS_EJECUCION, type EstadoEjecucion } from './execution-state.js';
 import { ReportsService } from './reports.service.js';
@@ -32,6 +33,7 @@ export class ReportsController {
     private readonly reports: ReportsService,
     private readonly digest: ExpirationDigestService,
     private readonly reviewDigest: ReviewDigestService,
+    private readonly complianceStreak: ComplianceStreakService,
   ) {}
 
   /**
@@ -65,6 +67,25 @@ export class ReportsController {
   @RequirePermissions('config:manage_tenant')
   avisarRepaso(@CurrentUser() actor: AuthUser) {
     return this.reviewDigest.enviar(actor.tenantId, { forzar: true });
+  }
+
+  /**
+   * LA RACHA DE CUMPLIMIENTO: dias seguidos con cero vencidos (`PENDIENTES` 8.3).
+   *
+   * Solo LEE lo que el worker diario ya calculo. Bajo `reports:read_scope` como el resto de esta
+   * pantalla: es consulta, no accion.
+   */
+  @Get('racha-cumplimiento')
+  @RequirePermissions('reports:read_scope')
+  rachaCumplimiento(@CurrentUser() actor: AuthUser) {
+    return this.complianceStreak.obtener(actor.tenantId);
+  }
+
+  /** Recalcularla ahora, sin esperar al worker de las 6 de la mañana. Mismo motivo que arriba. */
+  @Post('racha-cumplimiento/recalcular')
+  @RequirePermissions('config:manage_tenant')
+  recalcularRachaCumplimiento(@CurrentUser() actor: AuthUser) {
+    return this.complianceStreak.actualizar(actor.tenantId);
   }
 
   /** Como va TODO. Es la primera pantalla que se abre cada mañana. */

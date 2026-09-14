@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { ReportsModule } from '../reports/reports.module.js';
+import { ComplianceStreakWorker } from './compliance-streak.worker.js';
 import { ExpirationDigestWorker } from './expiration-digest.worker.js';
 import { NotificationRetentionWorker } from './notification-retention.worker.js';
 import { PerformanceReminderWorker } from './performance-reminder.worker.js';
@@ -18,6 +19,7 @@ import { ReviewDigestWorker } from './review-digest.worker.js';
     PerformanceReminderWorker,
     ExpirationDigestWorker,
     ReviewDigestWorker,
+    ComplianceStreakWorker,
   ],
 })
 export class WorkersModule {}

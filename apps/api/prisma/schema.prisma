@@ -1859,6 +1859,21 @@ model UserStreak {
   @@map("user_streaks")
 }
 
+/// LA RACHA DE LA EMPRESA (PENDIENTES 8.3): dias seguidos con CERO vencidos. Es a `UserStreak` lo
+/// que Vencimientos es a Repaso — mismo mecanismo, un nivel mas arriba (tenant, no persona) y sin
+/// protectores: para una persona faltar un dia se perdona, para la evidencia de cumplimiento de
+/// TODA la empresa no hay nada que perdonar, o esta al dia o no lo esta.
+model TenantComplianceStreak {
+  tenantId      String    @id @map("tenant_id") @db.Uuid
+  currentDays   Int       @default(0) @map("current_days")
+  longestDays   Int       @default(0) @map("longest_days")
+  /// Ultimo dia CIVIL (Colombia) en que se comprobo. Solo fecha, igual que `user_streaks`.
+  lastCheckedAt DateTime? @map("last_checked_at") @db.Date
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("tenant_compliance_streaks")
+}
+
 model PointsLedgerEntry {
   id         BigInt   @id @default(autoincrement())
   tenantId   String   @map("tenant_id") @db.Uuid

@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, CalendarClock, CheckSquare, Clock, TrendingD
 import { me, type MeResponse } from '@/lib/api';
 import { listApprovals } from '@/lib/admin-api';
 import { getAnalitica, getVencimientos, type Analitica, type Vencimientos } from '@/lib/analytics-api';
-import type { ResumenEjecucion } from '@/lib/reports-api';
+import { getRachaCumplimiento, type ResumenEjecucion } from '@/lib/reports-api';
 import { BarraEjecucion } from '@/components/modules/admin/barra-ejecucion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/components/ui/cn';
@@ -51,6 +51,7 @@ export default function InicioPage() {
   const [analitica, setAnalitica] = useState<Analitica | null>(null);
   const [vencimientos, setVencimientos] = useState<Vencimientos | null>(null);
   const [pendientes, setPendientes] = useState<number | null>(null);
+  const [diasSinVencidos, setDiasSinVencidos] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -76,6 +77,16 @@ export default function InicioPage() {
       .catch(() => undefined);
     void getVencimientos(12)
       .then(setVencimientos)
+      .catch(() => undefined);
+    /*
+      LA RACHA (`PENDIENTES` 8.3), Y POR QUE SI ES UN ENDPOINT NUEVO A PESAR DE LA REGLA DE ARRIBA.
+      No es un resumen alternativo de lo vencido —eso seguiria siendo prerrogativa de Vencimientos,
+      y esta pantalla lo consume de ahi como todo lo demas—: es "cuantos dias SEGUIDOS lleva en
+      cero", que no se puede derivar de una foto de hoy. Lo calcula un worker diario y se lee tal
+      cual, sin volver a sumar nada aqui.
+    */
+    void getRachaCumplimiento()
+      .then((racha) => setDiasSinVencidos(racha.currentDays))
       .catch(() => undefined);
   }, [puedeVerReportes]);
 
@@ -123,7 +134,15 @@ export default function InicioPage() {
           ? `${porAprobar} ${plural(porAprobar ?? 0, 'decisión espera', 'decisiones esperan')} tu aprobación`
           : !puedeVerReportes && perfil
             ? `Hola, ${perfil.fullName.split(' ')[0]}`
-            : 'Todo al día';
+            : /*
+                EL LOGRO, NO SOLO LA AUSENCIA DE PROBLEMA (`PENDIENTES` 8.3, ofrecido al cliente el
+                2026-09-09). "Todo al día" es neutro y no dice nada la vez 40; nombrar la racha si.
+                Minimo 2 dias: con 1 no hay racha que contar, es simplemente que hoy esta en cero —
+                que es exactamente lo que ya dice "Todo al día".
+              */
+              (diasSinVencidos ?? 0) >= 2
+              ? `Nadie tiene nada vencido: ${diasSinVencidos} días seguidos`
+              : 'Todo al día';
 
   return (
     <div className="space-y-8">

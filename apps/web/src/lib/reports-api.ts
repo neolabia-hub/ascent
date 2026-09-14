@@ -79,6 +79,16 @@ export function getEjecucionGeneral(): Promise<{ items: FilaGeneral[]; resumen: 
   return apiFetch('/reportes/ejecucion', { method: 'GET' });
 }
 
+export interface RachaCumplimiento {
+  currentDays: number;
+  longestDays: number;
+}
+
+/** Dias seguidos con cero vencidos, para el titular de Inicio (`PENDIENTES` 8.3). */
+export function getRachaCumplimiento(): Promise<RachaCumplimiento> {
+  return apiFetch('/reportes/racha-cumplimiento', { method: 'GET' });
+}
+
 export function getEjecucionDeActividad(
   activityId: string,
 ): Promise<{ items: FilaPersona[]; resumen: ResumenEjecucion }> {
