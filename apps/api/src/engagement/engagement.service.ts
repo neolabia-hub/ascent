@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { SubmitReviewInput } from '@neo-pulse/shared';
+import { tenantSettingsSchema, type SubmitReviewInput } from '@neo-pulse/shared';
 import { toLearnerView } from '../assessments/question-payload.js';
 import { gradeQuestion } from '../learning/grading.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
@@ -24,6 +24,17 @@ export class EngagementService {
 
   // ─────────────────────────── Cola de repaso ───────────────────────────
 
+  /**
+   * LOS ESCALONES DEL TENANT, resueltos UNA vez por operacion.
+   *
+   * Nunca se llama dentro de un bucle por pregunta: eso convertiria una carga de 40 preguntas
+   * falladas en 40 idas a la base solo para leer un ajuste que no cambia entre una y la siguiente.
+   */
+  private async intervalosDe(tenantId: string): Promise<number[]> {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    return tenantSettingsSchema.parse(tenant?.settings ?? {}).reviewIntervalsDays;
+  }
+
   /** Las preguntas falladas entran a la cola (o retroceden si ya estaban). */
   async recordFailures(
     db: TenantPrisma,
@@ -34,15 +45,16 @@ export class EngagementService {
   ): Promise<void> {
     if (questionVersionIds.length === 0) return;
     const now = new Date();
-    const existing = await db.reviewQueueItem.findMany({
-      where: { userId, questionVersionId: { in: questionVersionIds } },
-    });
+    const [existing, intervals] = await Promise.all([
+      db.reviewQueueItem.findMany({ where: { userId, questionVersionId: { in: questionVersionIds } } }),
+      this.intervalosDe(tenantId),
+    ]);
     const byQuestion = new Map(existing.map((item) => [item.questionVersionId, item]));
 
     for (const questionVersionId of questionVersionIds) {
       const current = byQuestion.get(questionVersionId);
       if (!current) {
-        const fresh = enterQueue(now);
+        const fresh = enterQueue(now, intervals);
         await db.reviewQueueItem.create({
           data: {
             tenantId,
@@ -58,7 +70,7 @@ export class EngagementService {
         continue;
       }
       // Volver a fallarla la acerca en el tiempo, incluso si ya estaba dominada.
-      const back = nextState({ stage: current.stage, lapses: current.lapses, retired: current.retired }, false, now);
+      const back = nextState({ stage: current.stage, lapses: current.lapses, retired: current.retired }, false, now, intervals);
       await db.reviewQueueItem.update({
         where: { id: current.id },
         data: { stage: back.stage, lapses: back.lapses, retired: false, dueAt: back.dueAt, lastResult: back.lastResult },
@@ -113,12 +125,13 @@ export class EngagementService {
     const now = new Date();
     const questionVersionIds = input.answers.map((answer) => answer.questionVersionId);
 
-    const [items, versions] = await Promise.all([
+    const [items, versions, intervals] = await Promise.all([
       this.prisma.scoped.reviewQueueItem.findMany({ where: { userId, questionVersionId: { in: questionVersionIds } } }),
       this.prisma.scoped.questionVersion.findMany({
         where: { id: { in: questionVersionIds } },
         select: { id: true, qtype: true, correct: true, points: true },
       }),
+      this.intervalosDe(tenantId),
     ]);
     const itemByQuestion = new Map(items.map((item) => [item.questionVersionId, item]));
     const versionById = new Map(versions.map((version) => [version.id, version]));
@@ -135,7 +148,7 @@ export class EngagementService {
         { qtype: version.qtype, correct: version.correct, pointsPossible: Number(version.points) },
         answer.answer as Prisma.JsonValue,
       );
-      const transition = nextState({ stage: item.stage, lapses: item.lapses, retired: item.retired }, grade.correct, now);
+      const transition = nextState({ stage: item.stage, lapses: item.lapses, retired: item.retired }, grade.correct, now, intervals);
 
       await this.prisma.scoped.reviewQueueItem.update({
         where: { id: item.id },

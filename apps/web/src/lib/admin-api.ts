@@ -344,6 +344,8 @@ export interface TenantSettings {
   expirationDigestDays: number;
   /** A partir de cuantas preguntas vencidas de repaso se avisa a la persona. 0 = sin aviso. */
   reviewDigestMinDue: number;
+  /** Escalones de repaso en dias (Leitner): fallar vuelve al primero, acertar sube uno. Creciente, 2 a 8 pasos. */
+  reviewIntervalsDays: number[];
   labels: Record<string, string>;
   features: Record<string, boolean>;
   /** A quien acude quien no puede entrar. Se publica SIN sesion (Decision #97). */

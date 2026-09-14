@@ -204,10 +204,22 @@ export default function PreferenciasPage() {
               />
             </Field>
             <Field
+              htmlFor="pref-escalones"
+              label="Escalones de repaso (días)"
+              hint={`Hoy: falla → vuelve en ${settings.reviewIntervalsDays[0]} día${settings.reviewIntervalsDays[0] === 1 ? '' : 's'}; acertar la aleja hasta ${settings.reviewIntervalsDays[settings.reviewIntervalsDays.length - 1]}.`}
+              ayuda="Cuando alguien falla una pregunta, vuelve a aparecer en el primer número de días; si la acierta, sube al siguiente escalón (se aleja); si la vuelve a fallar, retrocede uno (nunca al principio de golpe). Acertar en el último escalón la da por dominada. Sepáralos con comas, de menor a mayor — cada uno tiene que tardar más días que el anterior. Entre 2 y 8 escalones, cada uno de 1 a 365 días. Una empresa que forma en algo crítico puede querer que una falla vuelva al día siguiente y machaque una semana entera; otra puede preferir un ciclo más relajado."
+            >
+              <EscalonesRepasoInput
+                value={settings.reviewIntervalsDays}
+                onChange={(reviewIntervalsDays) => setSettings({ ...settings, reviewIntervalsDays })}
+                onInvalido={(mensaje) => showToast({ kind: 'danger', title: 'Escalones de repaso', description: mensaje })}
+              />
+            </Field>
+            <Field
               htmlFor="pref-repaso"
               label="Avisar de repaso pendiente (mínimo de preguntas)"
               hint="Un aviso a la persona en su bandeja, nombrando el tema donde más falla. 0 = sin aviso."
-              ayuda="El repaso reaparece cuando fallas una pregunta (1, 2, 7, 14 o 30 días después). Este número dice a partir de cuántas preguntas vencidas se avisa: con una sola no vale la pena interrumpir, pero con varias juntas sí. El aviso dice el tema con más preguntas pendientes, no solo el número."
+              ayuda="El repaso reaparece cuando fallas una pregunta, según los escalones de arriba. Este número dice a partir de cuántas preguntas vencidas se avisa: con una sola no vale la pena interrumpir, pero con varias juntas sí. El aviso dice el tema con más preguntas pendientes, no solo el número."
             >
               <Input
                 id="pref-repaso"
@@ -414,6 +426,88 @@ export default function PreferenciasPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * LOS ESCALONES DE REPASO, como texto separado por comas.
+ *
+ * No hay un editor de "N campos" porque N cambia — de 2 a 8 escalones — y un boton de
+ * agregar/quitar fila para algo que se edita una vez cada mucho tiempo es mas ceremonia que la
+ * tarea merece. Texto libre con validacion al escribir es lo que ya usa el resto de esta pantalla
+ * para numeros sueltos (`num()`); aqui es una LISTA, asi que la validacion es mas que "es un
+ * numero": tiene que ser creciente, con 2 a 8 pasos, cada uno de 1 a 365 dias.
+ *
+ * SOLO SE PROPAGA HACIA ARRIBA (`onChange`) CUANDO ES VALIDO. Mientras la persona esta escribiendo
+ * "1, 2, 7, 1" a medio terminar el ultimo numero, no tiene sentido intentar guardar eso ni marcar
+ * error todavia — se corrige solo al terminar de escribir. El error se avisa en el blur, que es
+ * cuando de verdad se sabe si la persona ya termino.
+ */
+function EscalonesRepasoInput({
+  value,
+  onChange,
+  onInvalido,
+}: {
+  value: number[];
+  onChange: (escalones: number[]) => void;
+  onInvalido: (mensaje: string) => void;
+}) {
+  const [texto, setTexto] = useState(value.join(', '));
+
+  // Si el padre recibe un valor nuevo por fuera (recarga, u otro campo que reinicia todo el
+  // objeto de settings), el texto se sincroniza — pero NUNCA mientras la persona esta escribiendo,
+  // o cada tecla se pelearia con su propio cursor.
+  const valorPrevio = useRef(value);
+  useEffect(() => {
+    if (valorPrevio.current !== value) {
+      valorPrevio.current = value;
+      setTexto(value.join(', '));
+    }
+  }, [value]);
+
+  function validar(crudo: string): number[] | string {
+    const partes = crudo
+      .split(',')
+      .map((parte) => parte.trim())
+      .filter((parte) => parte.length > 0);
+
+    if (partes.length < 2) return 'Hacen falta al menos 2 escalones.';
+    if (partes.length > 8) return 'Como mucho 8 escalones: mas que eso no se distingue al mirarlo.';
+
+    const numeros: number[] = [];
+    for (const parte of partes) {
+      const n = Number(parte);
+      if (!Number.isInteger(n) || n < 1 || n > 365) return `"${parte}" no es un número entero de 1 a 365 días.`;
+      numeros.push(n);
+    }
+    for (let i = 1; i < numeros.length; i += 1) {
+      if ((numeros[i] as number) <= (numeros[i - 1] as number)) {
+        return `Cada escalón debe tardar más días que el anterior (falló en "${numeros[i - 1]}, ${numeros[i]}").`;
+      }
+    }
+    return numeros;
+  }
+
+  function alTerminar() {
+    const resultado = validar(texto);
+    if (typeof resultado === 'string') {
+      onInvalido(resultado);
+      setTexto(value.join(', ')); // se revierte al ultimo valor bueno: no se deja a medio romper
+      return;
+    }
+    valorPrevio.current = resultado;
+    setTexto(resultado.join(', '));
+    onChange(resultado);
+  }
+
+  return (
+    <Input
+      id="pref-escalones"
+      value={texto}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={alTerminar}
+      placeholder="1, 2, 7, 14, 30"
+    />
   );
 }
 

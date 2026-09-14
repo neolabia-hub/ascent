@@ -29,6 +29,33 @@ export const tenantSettingsSchema = z
     notificationWeeklyCap: z.number().int().min(1).max(21).default(5),
     streakFreezesMax: z.number().int().min(0).max(5).default(2),
 
+    /**
+     * LOS ESCALONES DE REPASO, en dias. Motor tipo Leitner (Decision #22,
+     * `engagement/spaced-repetition.ts`): fallar una pregunta la manda al escalon 0; acertarla la
+     * sube un escalon y la aleja en el tiempo; volver a fallarla la baja un escalon, nunca al 0 de
+     * golpe. Acertar en el ULTIMO escalon la da por dominada.
+     *
+     * Antes era una constante fija (`1, 2, 7, 14, 30`) y dejo de serlo porque el compromiso que
+     * representa NO es tecnico: una empresa que forma en seguridad vial puede querer que una falla
+     * en "distancia de frenado" vuelva al dia siguiente y machaque una semana entera; otra, para
+     * politica interna, puede conformarse con un ciclo mas relajado. Es la persona que conoce a su
+     * gente quien decide eso, no quien escribe el codigo — el mismo argumento que ya justifica
+     * `minWatchPctDefault` y `efficacyDaysDefault` aqui mismo.
+     *
+     * ESTRICTAMENTE CRECIENTE, y se valida: un escalon 2 tiene que tardar MAS que el escalon 1, o
+     * "subir de escalon" dejaria de significar "se aleja en el tiempo". Minimo dos escalones —sin
+     * al menos dos no hay progresion que registrar—, maximo ocho — mas que eso es granularidad que
+     * nadie percibe y una cola que tarda meses en vaciar a alguien que ya domina el tema.
+     */
+    reviewIntervalsDays: z
+      .array(z.number().int().min(1).max(365))
+      .min(2)
+      .max(8)
+      .default([1, 2, 7, 14, 30])
+      .refine((dias) => dias.every((valor, indice) => indice === 0 || valor > (dias[indice - 1] as number)), {
+        message: 'Cada escalon debe tardar mas dias que el anterior',
+      }),
+
     // Eficacia diferida (Kirkpatrick nivel 3).
     efficacyDaysDefault: z.number().int().min(1).max(180).default(30),
 
