@@ -886,7 +886,7 @@ export class PerformanceService {
         const suyas = respuestas.filter((fila) => fila.competencyId === competencyId);
         const escala = (porId.get(competencyId)?.scale ?? 'ONE_TO_FIVE') as EscalaCompetencia;
         const media = (filas: typeof suyas) => promediarRespuestas(escala, filas);
-        const cortar = (campo: 'subjectArea' | 'subjectJobTitle') =>
+        const cortar = (campo: 'areaRaiz' | 'subjectJobTitle') =>
           [...new Set(suyas.map((fila) => evaluacionDe.get(fila.reviewId)?.[campo] ?? null))]
             .filter((nombre): nombre is string => Boolean(nombre))
             .map((nombre) => ({
@@ -908,14 +908,14 @@ export class PerformanceService {
           promedioAuto: media(suyas.filter((fila) => evaluacionDe.get(fila.reviewId)?.reviewerRole === 'SELF')),
           /** QUE FORMACION LA REFUERZA: es la costura hacia el plan del año siguiente. */
           formacion: porId.get(competencyId)?.suggestedActivity ?? null,
-          porArea: cortar('subjectArea'),
+          porArea: cortar('areaRaiz'),
           porCargo: cortar('subjectJobTitle'),
           displayOrder: porId.get(competencyId)?.displayOrder ?? 0,
         };
       })
       .sort(ordenarPorPromedio);
 
-    const agrupar = (campo: 'subjectArea' | 'subjectJobTitle') =>
+    const agrupar = (campo: 'areaRaiz' | 'subjectJobTitle') =>
       [...new Set(items.map((review) => review[campo] ?? null))]
         .filter((nombre): nombre is string => Boolean(nombre))
         .map((nombre) => ({
@@ -933,7 +933,7 @@ export class PerformanceService {
         ...resumirEvaluaciones(reviews.filter((review) => review.cycleFormId === cycleForm.id)),
       })),
       porCompetencia,
-      porArea: agrupar('subjectArea'),
+      porArea: agrupar('areaRaiz'),
       porCargo: agrupar('subjectJobTitle'),
       items,
     };
@@ -999,17 +999,39 @@ export class PerformanceService {
     const ids = [...new Set(reviews.flatMap((review) => [review.subjectUserId, review.evaluatorUserId]))];
     const gente = await this.prisma.scoped.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, fullName: true, jobTitle: { select: { name: true } }, area: { select: { name: true } } },
+      select: {
+        id: true,
+        fullName: true,
+        jobTitle: { select: { name: true } },
+        /*
+          EL AREA, Y TAMBIEN SU MADRE (2026-09-20).
+
+          Desde que hay SUB-AREAS, `area.name` es «Nomina», no «Gestion Humana». Sin la madre, el
+          corte «Por area» del consolidado pasaria a listar sub-areas sueltas y **desapareceria el
+          total del area grande** — que es justo la lectura que hace quien decide a donde llevar la
+          formacion del año.
+
+          Se traen las dos: cada fila nominal dice su SUB-AREA —es donde trabaja esa persona, y es
+          la evidencia— y el analisis agrupa por la MADRE. Ver `areaRaiz`.
+        */
+        area: { select: { name: true, parent: { select: { name: true } } } },
+      },
     });
     const porId = new Map(gente.map((persona) => [persona.id, persona]));
 
-    return reviews.map((review) => ({
-      ...review,
-      subjectName: porId.get(review.subjectUserId)?.fullName ?? null,
-      subjectJobTitle: porId.get(review.subjectUserId)?.jobTitle?.name ?? null,
-      subjectArea: porId.get(review.subjectUserId)?.area?.name ?? null,
-      evaluatorName: porId.get(review.evaluatorUserId)?.fullName ?? null,
-    }));
+    return reviews.map((review) => {
+      const persona = porId.get(review.subjectUserId);
+      return {
+        ...review,
+        subjectName: persona?.fullName ?? null,
+        subjectJobTitle: persona?.jobTitle?.name ?? null,
+        /** Donde trabaja: la SUB-AREA si la tiene. Va en la fila nominal. */
+        subjectArea: persona?.area?.name ?? null,
+        /** El area grande de la que cuelga; sin madre, ella misma. Por aqui AGRUPA el analisis. */
+        areaRaiz: persona?.area?.parent?.name ?? persona?.area?.name ?? null,
+        evaluatorName: porId.get(review.evaluatorUserId)?.fullName ?? null,
+      };
+    });
   }
 }
 

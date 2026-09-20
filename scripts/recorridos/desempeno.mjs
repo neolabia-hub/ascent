@@ -268,6 +268,32 @@ if (filaDeNomina && notaEntregada !== null) {
   );
 }
 
+/*
+  EL ANALISIS AGRUPA POR EL AREA MADRE, la fila nominal dice la SUB-AREA (2026-09-20).
+
+  Sin esto, al empezar a usar sub-areas el corte «Por area» pasaria a listar «Nomina» y «Seleccion»
+  sueltas y **desapareceria el total de Gestion Humana** — justo la lectura de quien decide a donde
+  llevar la formacion del año. Cada fila sigue diciendo donde trabaja la persona, que es la
+  evidencia; lo que se agrupa es otra cosa.
+*/
+const nombresPorArea = (consolidado?.porArea ?? []).map((g) => g.nombre);
+console.log(`   ... el corte «Por area» agrupa: ${nombresPorArea.slice(0, 6).join(' · ')}`);
+comprobar(
+  nombresPorArea.some((n) => n?.includes(`Gestion Humana ${SUFIJO}`)),
+  'el corte «Por area» agrupa por el AREA MADRE, no por cada sub-area suelta',
+  `no aparece el area madre; salieron: ${nombresPorArea.slice(0, 8).join(', ')}`,
+);
+comprobar(
+  !nombresPorArea.some((n) => n?.includes(`Nomina ${SUFIJO}`)),
+  'y no la parte en sub-areas, que perderia el total del area grande',
+  'el analisis se partio por sub-areas',
+);
+comprobar(
+  filaDeNomina?.subjectArea?.includes(`Nomina ${SUFIJO}`),
+  'pero la fila de la persona SI dice su sub-area: es donde trabaja',
+  `la fila dice "${filaDeNomina?.subjectArea}"`,
+);
+
 const xlsx = await admin.pedir(`/desempeno/ciclos/${creado.cicloId}/consolidado/xlsx`);
 comprobar(xlsx.estado === 200, `el consolidado se baja en xlsx (${xlsx.estado})`, `xlsx: ${xlsx.estado}`);
 
