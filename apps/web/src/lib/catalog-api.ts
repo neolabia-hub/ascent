@@ -60,6 +60,11 @@ export interface ActivityDetail extends Omit<ActivityListItem, 'versions'> {
   tracksExternalCertificate: boolean | null;
   /** Acepta certificacion previa de otra empresa. null = lo que diga su tipo (via C, 2.3). */
   admiteConvalidacion: boolean | null;
+  /**
+   * Horas que acredita su constancia. `null` = no declara horas, que es un estado normal.
+   * La versión la congela al publicar, y la constancia de un PROGRAMA suma las de sus módulos.
+   */
+  certificateHours: number | null;
   /** Portada subida. `null` = se pinta la generada, que es un estado normal (Decision #88). */
   coverKey: string | null;
   responsibleUserId: string | null;

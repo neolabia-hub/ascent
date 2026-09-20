@@ -41,6 +41,7 @@ export const CAMPOS_POR_DEFECTO: CertificateFields = {
   codigo: { visible: false, x: 6, y: 97, size: 1.6, align: 'left', bold: false, color: '#6b7280' },
   nota: { visible: false, x: 94, y: 94, size: 1.8, align: 'right', bold: false, color: '#6b7280' },
   qr: { visible: true, x: 92, y: 90, size: 10, align: 'center', bold: false, color: '#101418' },
+  modulos: { visible: false, x: 50, y: 84, size: 1.8, align: 'center', bold: false, color: '#4b5563' },
 };
 
 export interface CertificateRow {
@@ -52,6 +53,8 @@ export interface CertificateRow {
   revoked: boolean;
   activityName: string;
   hours: number | null;
+  /** "Programa" cuando es la constancia de un programa completo; si no, el tipo de la formacion. */
+  typeName: string | null;
 }
 
 export interface TemplateRow {
@@ -155,13 +158,28 @@ export async function descargarArchivo(
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Abre la vista previa en otra pestana. Misma razon que arriba: hace falta la cabecera. */
+/** Abre la vista previa de una PLANTILLA. Misma razon que arriba: hace falta la cabecera. */
 export async function abrirVistaPrevia(templateId: string): Promise<void> {
-  const respuesta = await fetch(`${API_URL}/v1/certificate-templates/${templateId}/preview`, {
+  return abrirPdfEnPestana(`/certificate-templates/${templateId}/preview`, 'No se pudo generar la vista previa');
+}
+
+/**
+ * ABRE UN PDF EN OTRA PESTAÑA, con la cabecera de autorizacion puesta.
+ *
+ * Es la excepcion razonable a la regla de "nada de ventanas nuevas": el visor de PDF del navegador
+ * ya hace esto mejor que cualquier cosa que dibujemos, y un papel se MIRA antes de decidir si se
+ * baja. Igual que `descargarPdf`, no sirve un `<a href>`: el token vive en MEMORIA —nunca en
+ * `localStorage`— y el navegador no lo adjunta al navegar, asi que se pide con `fetch` llevando la
+ * cabecera y se abre el objeto local.
+ *
+ * El `revokeObjectURL` va con un minuto de retraso: revocarlo antes deja la pestaña en blanco.
+ */
+export async function abrirPdfEnPestana(ruta: string, mensajeDeError = 'No se pudo abrir el PDF'): Promise<void> {
+  const respuesta = await fetch(`${API_URL}/v1${ruta}`, {
     credentials: 'include',
     headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
   });
-  if (!respuesta.ok) throw new Error('No se pudo generar la vista previa');
+  if (!respuesta.ok) throw new Error(mensajeDeError);
   const url = URL.createObjectURL(await respuesta.blob());
   window.open(url, '_blank', 'noopener');
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);

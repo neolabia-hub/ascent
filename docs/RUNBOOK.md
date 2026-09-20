@@ -344,6 +344,7 @@ un rojo que no era una regresion; el detalle, en Incidentes):
 | Cuando | Que hacer |
 |---|---|
 | **Siempre**, si la base lleva dias de corridas | `pnpm --filter @neo-pulse/api dev:limpiar-reglas`. Con mas de 30 reglas activas, crear una persona expira y fallan pruebas que no tocan asignaciones |
+| **Si ese limpiador desactiva CERO y el contador sigue alto** | La basura no es de la suite, sino de sesiones a mano: ninguno de los dos limpiadores la reconoce. Listar las reglas activas y retirarlas a mano (`active = false`) — la consulta y el criterio, en el incidente del 2026-08-31 |
 | **Despues de renombrar cualquier rotulo** | `node scripts/sincronizar-selectores.mjs` y luego `node scripts/selectores-huerfanos.mjs`. El primero arrastra el cambio a las pruebas; el segundo comprueba que ninguna quedo pidiendo un texto que la pantalla ya no dice |
 - CI (`.github/workflows/ci.yml`): job `calidad` (lint/typecheck/build/unit) + job `integracion`
   (Postgres de servicio, migrate, RLS via psql, seed, verify-rls, e2e con reporte adjunto si falla).
@@ -3801,6 +3802,32 @@ deja la suite acaba en un espacio y seis o mas digitos (`Induccion E2E 04084758`
 llamo su autor y sigue a salvo. **131 -> 29 reglas activas**, y el mensaje de lo respetado ahora
 dice por que se respeto.
 
+**Continuacion, 2026-09-16: el limpiador limpia lo de la SUITE, no lo de las manos.** Se volvio a
+llegar a **35 reglas activas** —por encima del umbral de 30— y `dev:limpiar-reglas` desactivaba
+**cero**, diciendo *"0 de 277 audiencias de prueba"*. No es un fallo suyo: filtra por AUDIENCIA de
+prueba (`Toda la empresa <marca>`), y `dev:limpiar-pruebas` filtra por la firma `E2E<digitos>`. Las
+35 eran de **sesiones a mano en dev** —`logistica`, `videos32`, `induccuin`, `informacion`,
+`Pildora S4 87496434`, once `Manejo de cargas ...`—, que no llevan ninguna de las dos marcas.
+
+El sintoma fue el de siempre y por eso costo reconocerlo: **una prueba distinta en cada corrida**
+—`asistencia-adjunto`, luego `asistencia-a-mano`—, siempre por tiempo de espera durante el montaje y
+nunca por una asercion. Se retiraron a mano con el mismo criterio del arreglo de arriba —nombre con
+espacio y seis o mas digitos, `active = false`, sin borrar nada—: **35 -> 17**, y la suite paso dos
+corridas seguidas en verde.
+
+Para la proxima: si `dev:limpiar-reglas` dice que desactivo cero y el contador sigue alto, **no es
+que no haya basura: es que no es de la suite**. Mirar la tabla entera antes de buscar el fallo en el
+codigo.
+
+```sql
+SELECT a.name, au.name AS audiencia,
+       (SELECT count(*) FROM assignments s WHERE s.rule_id = r.id) AS obligaciones
+FROM assignment_rules r
+JOIN audiences au ON au.id = r.audience_id
+LEFT JOIN activities a ON a.id = r.target_id
+WHERE r.active ORDER BY r.created_at;
+```
+
 **La leccion, y no es sobre reglas de asignacion:** una excepcion que se justifica con *"son unas
 pocas"* **caduca el dia que dejan de ser pocas**, y nadie vuelve a mirarla — porque el codigo sigue
 corriendo, sigue informando exito y el numero que la invalidaba no lo imprime nadie. Cuando se
@@ -3904,3 +3931,331 @@ es.
 **No llego a Git.** Se caza en `git status` antes de comitear, nunca despues: por eso la regla de este mismo documento de mirar `git status` antes de cualquier `git add -A` no es ceremonia, es la unica red. Se movio de vuelta a `C:UsersPruebaDocumentsASCENT - ENTREGA TRANSPRENSA` y no hizo falta rotar nada, porque nunca entro al historial.
 
 **Como paso.** Sin confirmar — alguna operacion de archivos la reubico dentro de `docs/entrega/` en vez de al lado. **Leccion:** si algun dia se ve esta carpeta dentro del repo otra vez, sacarla ANTES de comitear nada mas, no despues.
+
+## "Una fila por ronda, inmutable": el patron para cualquier cosa que se repite (2026-09-15)
+
+Ya aparecio dos veces por separado — `Assignment.cycleNumber` (la obligacion que se repite) y
+`CertificationGrant.cycleNumber` (una certificacion externa que se renueva) — y ahora una tercera,
+`PathEnrollment.cycleNumber` (un programa como Reinduccion, que agrupa modulos que se repiten). Las
+tres comparten la misma forma: `UNIQUE(id_del_padre, userId, cycleNumber)`, y cuando toca una ronda
+nueva **se crea una fila, nunca se pisa la anterior**. La alternativa obvia —un solo registro que se
+sobreescribe— pierde la evidencia de la ronda pasada (su fecha de cierre, su constancia) el mismo
+dia que se abre la siguiente, que es justo lo que un auditor pregunta. Si aparece una cuarta cosa que
+se repite por ronda, este es el molde: no inventar uno nuevo.
+
+## Instanciar servicios a mano con dependencias que el script no usa (2026-09-15)
+
+Siguiendo la trampa ya conocida de `tsx` sin `design:paramtypes` (ver mas abajo, "El `EPERM`..." y
+los scripts en `apps/api/scripts/verificar-*.ts`): cuando un servicio con muchas dependencias
+(`ProgramsService` con `prisma`, `certificates`, `assignments`, `audiences`) se instancia a mano solo
+para probar UN metodo que no usa todas ellas, no hace falta construir las que no se tocan — un
+`{} as AssignmentsService` como argumento basta, porque nunca se llama nada de ese objeto durante la
+prueba. Construir la dependencia entera (con SUS propias dependencias, y las de esas) para un script
+de un solo uso es trabajo que no paga nada.
+
+## "Arreglar de mas": el barrido que borraba anos de incumplimiento (2026-09-15)
+
+**Sintoma.** Ninguno. Todas las pruebas en verde, tsc y eslint limpios, y el fallo solo se ve
+leyendo lo que la politica del tipo promete en pantalla.
+
+**Que paso.** Un fallo real —una formacion exigida por DOS reglas nacia dos veces y completarla
+cerraba solo una— se arreglo cerrando **todas** las obligaciones vivas de esa persona para esa
+formacion. El arreglo era correcto para el caso que lo motivo y destruia otro: la politica
+`ACUMULA` (*"Nace la nueva y sigue debiendo la anterior"*) deja la ronda sin hacer VIVA a proposito
+mientras nace la siguiente. Una sola asistencia cerraba las tres rondas acumuladas y las dejaba
+`COMPLETED` — tres anos de incumplimiento convertidos en cumplimiento, sin dejar rastro distinto.
+
+**La forma del error, que es lo reutilizable.** El arreglo se escribio mirando UNA dimension
+(*"varias filas de la misma formacion para la misma persona"*) y esa dimension mezclaba dos cosas
+que significan lo contrario:
+
+```
+mismo usuario + misma formacion + varias filas vivas
+   ├─ ruleId DISTINTO          -> una cosa pedida por dos sitios   -> cerrar las dos
+   └─ mismo ruleId, ciclo dist -> PERIODOS distintos (ACUMULA)     -> cerrar la mas antigua
+```
+
+**La leccion.** Antes de sustituir un `findFirst` por un barrido, hay que preguntarse **por que
+habia varias filas**, no solo comprobar que sobraba una. Y el aviso de que la pregunta falta es
+concreto: si el comentario que justifica el cambio dice *"no hay ningun caso legitimo en el que..."*,
+ese es el momento de ir a buscar el caso legitimo, porque casi siempre existe y suele ser una
+politica configurable que alguien escribio hace meses.
+
+**Lo que lo habria cazado antes:** la regla vivia dentro de un servicio con base de datos, asi que
+no tenia pruebas propias. Salio a `learning/close-assignments.ts` como funcion pura —misma familia
+que `due-date.ts`, `next-cycle.ts`, `audience-rule.ts` y `program-completion.ts`— y las dos esquinas
+enfrentadas quedaron como dos pruebas que se contradicen si alguien vuelve a barrer.
+
+## tsc y lint no ven el DOM: la e2e se quedo roja tras tres reversiones de interfaz (2026-09-15)
+
+`programas.spec.ts` pedia la tarjeta del aprendiz como `article`; la tarjeta es un **enlace entero**
+a `/programa/[id]`. La sesion que hizo las reversiones de interfaz cerro declarando *"546/546
+unitarias, tsc y eslint limpios"* y **no volvio a correr e2e** — que es el unico sitio donde eso se
+ve. Mismo patron que el de `getByRole('tab')` de septiembre: **cambiar el elemento que envuelve una
+tarjeta no rompe ni el tipado ni el lint**, solo el selector.
+
+**Regla practica:** una sesion que toca marcado —aunque sea "solo" revertir a como estaba antes— no
+esta verificada hasta que corre e2e. `node scripts/selectores-huerfanos.mjs` ayuda con los textos,
+pero no con los ROLES ni con el elemento contenedor: eso solo lo dice la suite.
+
+## Cuando el codigo contradice a su propio comentario, el comentario suele tener razon (2026-09-15)
+
+`cicloDePrograma` explicaba con detalle que los modulos de un programa recurrente **van cayendo en
+pendientes de uno en uno**, segun se le abre la ventana a cada uno — *"no todos el mismo dia"*. Y
+`moduloAprobado`, doce lineas mas abajo, exigia `ronda.cycleNumber >= cicloPrograma`, que tumbaba
+todos a la vez en cuanto uno avanzaba.
+
+**Por que no lo cazo nada.** Las dos piezas se escribieron en la misma sesion y cada una estaba bien
+por separado: `cicloDePrograma` calculaba bien la ronda y `moduloAprobado` comparaba bien lo que le
+pedian comparar. El fallo vivia **entre las dos**, y el unico sitio donde se ve es una corrida con
+dos modulos en rondas distintas — que es justo lo que ninguna prueba montaba.
+
+**La regla practica:** cuando un comentario largo describe un comportamiento con ejemplos ("van
+cayendo uno por uno"), eso es una **especificacion**, y merece una prueba que la afirme. Un
+comentario que nadie ejecuta envejece igual que el codigo, con la diferencia de que no falla: se
+queda mintiendo.
+
+## Un programa sin modulos acreditaba la nada (2026-09-15)
+
+`evaluarPrograma([])` devuelve `completo: true`. Como funcion pura es la respuesta correcta —no
+queda ninguna condicion sin cumplir— y hasta tiene su prueba diciendolo. Pero tres capas mas abajo
+ese `true` **emite una constancia**.
+
+`publicar()` ya impedia publicar un programa sin modulos, asi que parecia cubierto. No lo estaba: se
+llega **quitandole los modulos a uno ya publicado**, que nada impide y es lo normal mientras se
+reorganiza un programa.
+
+**La leccion, que se repite:** una guarda en la puerta de entrada (`publicar`) no protege un estado
+al que tambien se llega **editando** despues. Si una condicion tiene consecuencias irreversibles
+—emitir un papel, cerrar una obligacion— la comprobacion va donde ocurre la consecuencia, no donde
+se creo el objeto. El "vacio trivialmente cierto" es el caso de siempre: `[].every(...)` es `true`,
+y casi nunca es lo que uno quiere que signifique.
+
+## Afirmar un fallo sin comprobar si algo ya lo impedia (2026-09-15)
+
+Leyendo `validarSecciones` (se queda con el PRIMER minimo de la seccion) y `recalcularProgreso` (se
+queda con el ULTIMO), la conclusion parecia evidente: un programa se puede publicar validado contra
+6 y completar con 5. Se conto como fallo confirmado.
+
+**Era falso.** `igualarMinimoDeSeccion` propaga el minimo a todos los items de la seccion, y la
+llaman **las dos** puertas de escritura (`agregarModulo` y `actualizarModulo`), asi que cuando esas
+dos funciones se ejecutan ya no hay nada que discrepar.
+
+**La forma del error:** se leyeron dos LECTORES y se dedujo una inconsistencia sin mirar a los
+ESCRITORES. Dos lecturas que interpretan un dato de forma distinta solo son un fallo si ese dato
+puede llegar en ese estado — y quien decide eso es quien lo escribe.
+
+**La comprobacion que faltaba, y cuesta un minuto:** antes de declarar una inconsistencia entre dos
+lecturas de un mismo campo, `grep` del nombre del campo en los metodos de escritura. Si aparece una
+normalizacion, el fallo no existe (o existe solo para filas anteriores a ella, que es otra
+conversacion).
+
+Lo que si quedaba era un problema de PANTALLA: el minimo se propaga a toda la seccion, pero el
+formulario no lo rellenaba ni lo advertia, asi que editar un modulo cambiaba el umbral de los otros
+seis en silencio. Un servidor que normaliza bien puede seguir siendo una interfaz que enganna.
+
+## `1fr` no encoge: la columna que empujaba el panel fuera de la pantalla (2026-09-15)
+
+**Sintoma.** En la ficha de un programa, el panel de "Asignar a una audiencia" se salia por la
+derecha y habia que mover la pantalla de lado para leerlo. Se culpo primero al popover del icono de
+informacion —se le cambio la apertura a la izquierda, que estaba bien hacerlo— y **el sintoma
+seguia**, porque la causa era otra.
+
+**Medido, no supuesto.** Un script en la pagina comparo cada elemento contra `clientWidth`:
+
+```js
+[...document.querySelectorAll('*')]
+  .filter(el => el.getBoundingClientRect().right > document.documentElement.clientWidth + 1)
+```
+
+Salio la seccion entera, no el popover. Y subiendo por los padres aparecio el numero que lo explica
+todo: la rejilla medía 1077 px y sus columnas sumaban **1139** (734 + 24 de hueco + 380).
+
+**La causa.** `lg:grid-cols-[1fr_380px]`. **`1fr` es `minmax(auto, 1fr)`**, y ese `auto` es el ancho
+MINIMO DEL CONTENIDO, no cero: dentro de la primera columna hay un `<select>` con nombres de
+formacion larguisimos, asi que la columna se negaba a bajar de su min-content y desbordaba a la
+hermana. Con `overflow` por medio no habia barra de desplazamiento: habia contenido **recortado**,
+que es peor porque no se ve que falta algo.
+
+**El arreglo:** `lg:grid-cols-[minmax(0,1fr)_380px]`. `minmax(0, 1fr)` deja que la columna baje
+hasta 0, asi que la rejilla nunca puede exceder a su contenedor — es una garantia estructural, no un
+ajuste que dependa del ancho.
+
+**Donde mas puede estar.** El patron se repite en el repo; estos son los candidatos, y **cada uno
+hay que mirarlo antes de tocarlo** (solo desborda si la columna flexible contiene algo que no
+encoge: un `select` con texto largo, una tabla, un `<pre>`, una URL sin espacios):
+
+```
+grep -rn "grid-cols-\[1fr_" apps/web/src --include=*.tsx
+```
+
+**La regla:** en una rejilla de "contenido + panel fijo", la columna flexible se escribe
+`minmax(0,1fr)`. Y cuando algo "se sale", medirlo con el filtro de arriba antes de culpar a lo
+ultimo que se toco — el elemento visible que molesta rara vez es el que desborda.
+
+## La tercera vez que preguntan lo mismo, el fallo es del producto (2026-09-15)
+
+El cliente pregunto cuatro veces por el cupo de un programa. Las cuatro se contesto con mas
+detalle, mejores ejemplos y mas texto en pantalla, y las cuatro se quedo igual. La quinta lo
+corrigio el:
+
+> *"¿A que te refieres con saltarse? Nadie se puede saltar nada. Debe ser que de esos 7, si pierde 1
+> no importa, pasa. ¿Por que no pide los minimos que puede perder?"*
+
+**Lo que estaba mal no era la explicacion, era la pregunta del formulario.** Pedia "minimo aprobado
+en la seccion" (6) cuando la regla se piensa como "cuantos puede perder" (1). Y de ahi salian dos
+problemas mas, los dos consecuencia del mismo error de encuadre:
+
+1. El numero dependia de un total que **todavia no existia** —una seccion se arma de uno en uno—
+   asi que la pantalla avisaba de una imposibilidad que era solo ir en orden.
+2. Habia que repetirlo en cada modulo, porque el dato es del GRUPO y se guarda por fila.
+
+Dado la vuelta ("puede perder 1") los tres desaparecen de golpe: es cierto desde el primer modulo,
+no cambia cuando el grupo crece, y se declara una sola vez.
+
+**La regla:** cuando alguien pregunta lo mismo por tercera vez, dejar de reescribir el parrafo. La
+repeticion no mide que la explicacion sea mala — mide que **lo que se explica no coincide con como
+la persona piensa el problema**. Y quien tiene el modelo correcto casi siempre es quien hace el
+trabajo, no quien escribe el formulario.
+
+**Corolario tecnico, que costo una corrida en rojo.** Si un valor no tiene columna y se DEDUCE de
+otros (`puedePerder = total - minimo`), hay que leerlo **antes** de la escritura que cambia esos
+otros. Deducirlo despues da un numero distinto y en silencio: aqui convertia "puede perder 1" en
+"hay que aprobarlos todos" cada vez que el grupo crecia.
+
+
+## El panel que se cerraba solo: `autoFocus` dentro de algo aparcado en -9999 (2026-09-15)
+
+**Sintoma.** `asistencia-a-mano` fallaba una de cada dos corridas, siempre en el mismo sitio —
+`getByRole('textbox', { name: 'Motivo de la falta' })` tras pulsar el disparador del Popover— y
+siempre por tiempo de espera agotado. Se dio por intermitencia del entorno. **No lo era.**
+
+**La causa, en orden.**
+
+1. El panel del `Popover` se pinta en un portal con `position: fixed` y, mientras `useLayoutEffect`
+   no le calcula el sitio, se aparcaba en `top/left: -9999` (para que no parpadeara en la esquina).
+2. Dentro de ese panel hay un `<Textarea autoFocus>` — el motivo de la falta.
+3. React aplica el `autoFocus` **con el panel todavia en -9999**.
+4. Enfocar algo fuera de la pantalla hace que el navegador **ruede la pagina para alcanzarlo**.
+5. El propio `Popover` escucha `scroll` en captura para cerrarse al rodar... **y se cierra solo.**
+
+El campo nunca llegaba a existir. Intermitente porque es una carrera entre el efecto que coloca el
+panel y el foco: gana uno u otro segun cuanto este cargada la maquina.
+
+**Y no era solo de la prueba.** A una persona le pasa igual; lo vive como *"abri el motivo y se me
+cerro solo"*, que es de esas cosas que nadie reporta porque parece que uno hizo algo mal.
+
+**El arreglo, por los dos lados.**
+
+- Mientras no tiene sitio, el panel se pinta en **0,0** y transparente en vez de en -9999. Siendo
+  `fixed`, 0,0 esta siempre dentro de la ventana, asi que enfocarlo no mueve nada. El parpadeo lo
+  evitaba ya el `opacity-0` que habia al lado; el -9999 no aportaba nada.
+- El cierre por desplazamiento **no se registra hasta que el panel tiene sitio**. Mientras se monta,
+  un scroll no significa que la persona se haya movido.
+
+Medido: **5 de 5 corridas en verde** donde antes eran 2 de 4.
+
+**La leccion.** Un componente que reacciona a eventos globales (`scroll`, `resize`, `mousedown`)
+**tiene que ignorarlos mientras se esta montando**, porque su propio montaje los provoca. Y aparcar
+algo fuera de la pantalla no es neutro: el navegador lo persigue en cuanto recibe el foco.
+
+**Y la del diagnostico, que es la que duele:** "falla una de cada dos" se archivo como intermitencia
+del entorno. Una intermitencia SIEMPRE tiene una causa; lo que varia es que lado de una carrera
+gana. Antes de escribir "es flaky", buscar **que dos cosas compiten**.
+
+## Un informe nuevo no esta terminado hasta verlo con datos SUCIOS (2026-09-16)
+
+El informe de Programas se escribio con su escenario de prueba —cuatro usuarios, obligaciones
+limpias— y las diez comprobaciones pasaron a la primera. Al abrirlo en el navegador contra el tenant
+de dev decia **"172 personas, 166 sin hacer"**. Una consulta a la base:
+
+```sql
+SELECT a.status, count(*) FROM assignments a
+  JOIN path_items pi ON pi.item_id = a.target_id
+  JOIN learning_paths lp ON lp.id = pi.path_id
+ WHERE lp.name LIKE '%Induccion General%' GROUP BY 1;
+```
+
+```
+ WITHDRAWN_LEFT_AUDIENCE | 170
+ PENDING                 | 128
+ COMPLETED               |   1
+```
+
+**170 de las 172 estaban RETIRADAS.** El informe contaba obligaciones de gente que ya habia salido
+de la audiencia —a la que el programa no le aplica— e inflaba justo las dos cifras que mandan a
+actuar. Mandaba a perseguir a 166 personas que no deben nada.
+
+**Por que las pruebas no lo vieron.** Porque las escribio la misma cabeza que escribio el calculo, y
+con los mismos estados en la cabeza: `PENDING`, `COMPLETED`, `WAIVED`. `WITHDRAWN_LEFT_AUDIENCE` es
+un estado que **el motor escribe solo**, sin que nadie lo pida, y por eso no aparece en un escenario
+que se monta a mano.
+
+**La regla practica, para cualquier informe nuevo:**
+
+1. Antes de darlo por bueno, **abrirlo contra el tenant de dev**, que lleva meses acumulando estados
+   raros. Es su mayor virtud, no su suciedad.
+2. Y si una cifra sorprende, **contar los estados en la base** antes de creerse el numero. El
+   `GROUP BY status` de arriba tarda dos segundos y contesta solo.
+3. En una consulta que filtra por estado, **enumerar los que SI cuentan** en vez de excluir los que
+   no: `status !== 'COMPLETED'` incluyo callado los cuatro estados terminales que nadie recordaba.
+
+---
+
+## Un agregado que avisa pero no senala: "(solo 2 de 5)" (2026-09-16)
+
+La ficha del programa decia a quien se le exigia colgando de cada audiencia un **"(solo 2 de 5)"**.
+Tecnicamente correcto y practicamente inutil: avisa de que faltan tres modulos y **no dice cuales**.
+Quien administra tenia que ir abriendo formaciones hasta dar con los que fallaban.
+
+El cliente lo dijo del derecho: *"lo importante es saber por modulo"*. Y tenia razon — la pregunta
+que se hace de verdad no es "¿a cuantos modulos llega esta audiencia?" sino, mirando una fila,
+**"¿y este, a quien?"**.
+
+**La leccion.** Un agregado con una cifra entre parentesis —"2 de 5", "3 fallos", "faltan 4"— es la
+senal de que la informacion se esta contando en el eje equivocado. **Avisar de que algo falta y no
+poder senalarlo es media informacion**, y la mitad que no sirve para actuar. Si el numero invita a
+preguntar "¿cuales?", la respuesta debe estar donde se pueda hacer algo con ella: en la fila.
+
+Dos cosas que hicieron barato invertirlo:
+
+1. **Los mismos datos, no una consulta nueva.** Las dos vistas —agrupada por audiencia y por
+   modulo— salen de una sola lectura de las reglas, invertida de dos maneras. Dos consultas
+   distintas para la misma verdad acaban discrepando; una sola no puede.
+2. **No repetir el aviso.** Cuando un modulo no alcanza a nadie, la linea de cobertura **no se
+   pinta**: eso ya lo dice la marca en rojo de la fila. Decir lo mismo en dos registros distintos es
+   justo lo que llevaba al cliente a decir *"todo es muy confuso"*.
+
+## Bloquear no es avisar: los dos candados que no se pusieron (2026-09-16)
+
+Preguntado si convenia **impedir** agregar a un programa una formacion sin publicar o sin
+obligaciones, la respuesta fue no en los dos casos, y conviene recordar por que.
+
+Un candado en el sitio equivocado **invierte el orden natural del trabajo**. Un programa se arma
+*antes* de decidir a quien se le exige —el boton de asignar el programa entero existe justo para
+eso— y mientras sus formaciones todavia se escriben. Exigir que cada pieza llegue ya publicada y ya
+exigida obligaria a recorrer formacion por formacion primero: exactamente lo que el programa venia a
+ahorrar.
+
+**La pregunta que decide.** ¿El bloqueo aporta informacion que el aviso no da? Si la situacion ya se
+ve —una marca en la fila, un `(sin publicar)` en el selector, un bloque que dice que falta— el
+candado no informa de nada: solo aplaza el problema a un momento mas incomodo y hace creer que no
+existe. Se bloquea lo que produce **evidencia falsa**; lo que solo esta a medias, se avisa.
+
+## Convertir una fila en boton le cambia el NOMBRE, y ahi dentro va texto que ya usaban otros (2026-09-16)
+
+Al hacer desplegable cada modulo de un programa, la fila entera paso a ser un `<button>`. El nombre
+accesible de un boton **se calcula con todo su texto**, y esa fila lleva dentro las marcas de estado
+— una de ellas, `· sin publicar`.
+
+Resultado: el nombre accesible de la fila contiene la palabra **"publicar"**, y en la misma pantalla
+hay un boton **Publicar** en la cabecera. `page.getByRole('button', { name: 'Publicar' })` busca por
+subcadena y sin distinguir mayusculas, asi que pasaba a encontrar **dos** elementos y moria por modo
+estricto. Un lector de pantalla tiene el mismo problema, solo que sin avisar.
+
+**No lo ve ni `tsc` ni `eslint`** —ninguno de los dos mira el arbol de accesibilidad— y la e2e que lo
+habria cazado tarda minutos. Se penso antes de correrla, mirando que texto quedaba dentro del boton.
+
+**La regla:** al envolver contenido existente en un control, ponerle `aria-label` propio en vez de
+dejar que el nombre se calcule solo. El texto de dentro esta ahi para leerse con los ojos, no para
+ser el identificador del control — y cambia cada vez que cambie un estado.

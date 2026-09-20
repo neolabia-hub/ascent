@@ -22,6 +22,7 @@ descoloca a quien lo abre.
 | [`guia-formaciones.html`](guia-formaciones.html) | Qué distingue cada tipo de formación y cuándo usar cada uno |
 | [`asistencia.html`](asistencia.html) | Los tres mecanismos de toma de lista —QR, instructor y firma— y cómo sale el acta |
 | [`guia-desempeno.html`](guia-desempeno.html) | El paso a paso de la evaluación de desempeño: qué significa firmar, cómo se calcula la nota y qué pasa después |
+| [`programas.html`](programas.html) | Varias formaciones con **una sola constancia**: cómo se arma, qué significa de verdad el cupo, y los dos errores que dejan gente sin papel |
 
 ## Qué significa cada cifra
 

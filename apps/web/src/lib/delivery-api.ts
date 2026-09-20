@@ -515,6 +515,21 @@ export interface AssignmentRow {
   targetType: string;
   targetId: string;
   targetName: string | null;
+  /**
+   * El nombre que el tenant le puso al TIPO de esa formación («Inducción general», «Reinducción»…).
+   * Permite mirar solo una familia en el expediente de una persona. Es el nombre tal cual, **no una
+   * familia deducida**: el modelo no marca «esto es una inducción», y adivinarlo por el nombre o por
+   * el código está descartado a propósito (`PENDIENTES` 11.7) — los dos son datos del tenant.
+   */
+  tipo: string | null;
+  /**
+   * Programas PUBLICADOS de los que esta formación es módulo. Vacío si es suelta.
+   *
+   * Importa en el expediente: un módulo **no emite constancia propia** mientras su programa esté
+   * publicado —el papel que vale es el del conjunto—, así que quien busca el papel y no lo
+   * encuentra necesita ver que pertenece a un programa.
+   */
+  programas: string[];
   source: 'MANUAL' | 'RULE' | 'PLAN' | 'STATIC_SNAPSHOT';
   cycleNumber: number;
   dueAt: string | null;

@@ -143,6 +143,10 @@ export class ActivitiesService {
             // crear una formacion diciendo que la acredita un tercero no guardaba nada.
             tracksExternalCertificate: input.tracksExternalCertificate,
             admiteConvalidacion: input.admiteConvalidacion,
+            // LAS HORAS QUE ACREDITA (2026-09-17). Mismo caso que el de arriba, y peor: la columna
+            // existia, la version la copiaba al publicar y la constancia la imprimia — pero nadie la
+            // escribia nunca, asi que TODA constancia salia sin horas. Ver `createActivitySchema`.
+            certificateHours: input.certificateHours ?? null,
             createdBy: actor.id,
             updatedBy: actor.id,
           },
@@ -216,6 +220,13 @@ export class ActivitiesService {
           */
           tracksExternalCertificate: input.tracksExternalCertificate,
           admiteConvalidacion: input.admiteConvalidacion,
+          /*
+            LAS HORAS SÍ SE CONGELAN, pero al PUBLICAR, no aquí. Aquí se guarda el valor vigente de
+            la ficha; `versioning.service.ts` lo copia a la versión el día que se publica, y desde
+            ahí la constancia lo repite intacto. Cambiarlo hoy no reescribe ningún papel ya emitido,
+            que es lo correcto: una constancia acredita lo que la formación era ese día.
+          */
+          certificateHours: input.certificateHours,
           // La PORTADA no se congela con la version (Decision #88): una foto no es evidencia, asi
           // que cambiarla no puede costar publicar la formacion de nuevo.
           coverKey: input.coverKey,

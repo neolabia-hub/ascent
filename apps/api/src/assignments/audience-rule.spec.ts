@@ -22,6 +22,7 @@ const conductor: PersonProfile = {
   jobTitleId: CARGO_CONDUCTOR,
   jobTitleTypeId: TIPO_OPERATIVO,
   areaId: AREA_LOGISTICA,
+  parentAreaId: null,
   regionalId: REGIONAL_NEIVA,
   serviceId: null,
   employmentType: 'DIRECTO',
@@ -32,6 +33,7 @@ const analista: PersonProfile = {
   jobTitleId: CARGO_ANALISTA,
   jobTitleTypeId: TIPO_ADMINISTRATIVO,
   areaId: AREA_GESTION_HUMANA,
+  parentAreaId: null,
   regionalId: null,
   serviceId: null,
   employmentType: 'CONTRATISTA',
@@ -124,5 +126,42 @@ describe('reconocer la misma audiencia', () => {
     const cruzando = rule({ match: 'ALL', jobTitleIds: [CARGO_CONDUCTOR], regionalIds: [REGIONAL_NEIVA] });
     const sumando = rule({ match: 'ANY', jobTitleIds: [CARGO_CONDUCTOR], regionalIds: [REGIONAL_NEIVA] });
     expect(sameAudienceRule(cruzando, sumando)).toBe(false);
+  });
+});
+
+/*
+  UN AREA INCLUYE SUS SUB-AREAS (2026-09-17).
+
+  Sin esto, mover a alguien de "Gestion Humana" a su sub-area "Nomina" lo sacaba de toda regla que
+  apuntara al area grande — y el motor le RETIRA las obligaciones vivas a quien sale de una
+  audiencia. Es decir: le desaparecian formaciones que debia, en silencio.
+*/
+describe('Un area alcanza tambien a sus sub-areas', () => {
+  const AREA_NOMINA = '99999999-9999-4999-8999-999999999999';
+  const deNomina: PersonProfile = {
+    jobTitleId: CARGO_ANALISTA,
+    jobTitleTypeId: TIPO_ADMINISTRATIVO,
+    areaId: AREA_NOMINA,
+    parentAreaId: AREA_GESTION_HUMANA,
+    regionalId: null,
+    serviceId: null,
+    employmentType: 'DIRECTO',
+    roadActor: null,
+  };
+
+  it('quien esta en la SUB-AREA entra en una regla que apunta al area padre', () => {
+    expect(personMatchesRule(deNomina, rule({ areaIds: [AREA_GESTION_HUMANA] }))).toBe(true);
+  });
+
+  it('y tambien entra si la regla apunta directamente a su sub-area', () => {
+    expect(personMatchesRule(deNomina, rule({ areaIds: [AREA_NOMINA] }))).toBe(true);
+  });
+
+  it('pero NO al reves: quien esta en el area padre no entra en una regla de la sub-area', () => {
+    expect(personMatchesRule(analista, rule({ areaIds: [AREA_NOMINA] }))).toBe(false);
+  });
+
+  it('ni cae en un area ajena por tener padre', () => {
+    expect(personMatchesRule(deNomina, rule({ areaIds: [AREA_LOGISTICA] }))).toBe(false);
   });
 });

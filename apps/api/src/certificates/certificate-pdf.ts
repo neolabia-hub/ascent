@@ -132,7 +132,23 @@ function valoresDe(datos: DatosParaDibujar): Record<string, string> {
     serial: datos.serialNumber,
     codigo: datos.verificationCode,
     nota: snapshot.resultado.scorePct === null ? '' : `Calificacion: ${snapshot.resultado.scorePct}%`,
+    /**
+     * QUE MODULOS COMPONEN EL PROGRAMA (2026-09-15). Solo tiene algo que decir en una constancia
+     * DE PROGRAMA: `emitirPorPrograma` guarda ahi la lista `[{name}, ...]` de los modulos
+     * aprobados. En una constancia de formacion suelta, `syllabus` es el temario publicado —otra
+     * forma— y este campo sale vacio, que es lo correcto: no hay "modulos" que listar.
+     */
+    modulos: modulosDe(snapshot.formacion.syllabus),
   };
+}
+
+/** Une los nombres de modulo en un texto de varias lineas, o vacio si el temario no tiene esa forma. */
+function modulosDe(syllabus: unknown): string {
+  if (!Array.isArray(syllabus)) return '';
+  const nombres = syllabus
+    .map((item) => (item && typeof item === 'object' && 'name' in item ? String((item as { name: unknown }).name) : null))
+    .filter((n): n is string => n !== null);
+  return nombres.join('\n');
 }
 
 function escribir(
@@ -143,16 +159,6 @@ function escribir(
 ): void {
   const fuente = campo.bold ? ctx.negrita : ctx.normal;
   const tamano = (campo.size / 100) * ctx.alto;
-  const anchoTexto = fuente.widthOfTextAtSize(texto, tamano);
-
-  // `center` es el caso util: un nombre largo y uno corto quedan igual de bien puestos bajo la
-  // linea del arte. Con `left` habria que recolocar el campo segun la longitud del nombre.
-  const x =
-    campo.align === 'center'
-      ? (campo.x / 100) * ctx.ancho - anchoTexto / 2
-      : campo.align === 'right'
-        ? (campo.x / 100) * ctx.ancho - anchoTexto
-        : (campo.x / 100) * ctx.ancho;
 
   /*
     LA Y SE INVIERTE AQUI, y solo aqui. La plantilla se guarda con origen ARRIBA-IZQUIERDA porque
@@ -163,9 +169,26 @@ function escribir(
     Se resta el tamaño de la letra porque la Y del campo es donde empieza el texto por ARRIBA, que
     es lo que se ve al colocarlo; pdf-lib dibuja desde la linea base.
   */
-  const y = ctx.alto - (campo.y / 100) * ctx.alto - tamano;
-
-  page.drawText(texto, { x, y, size: tamano, font: fuente, color: hexARgb(campo.color) });
+  const yInicial = ctx.alto - (campo.y / 100) * ctx.alto - tamano;
+  /*
+    VARIAS LINEAS, para el unico campo que las necesita ("modulos"): el resto siempre trae una
+    sola, y un salto de linea que no existe no mueve nada. 1.3 es el interlineado de siempre en
+    tipografia impresa — cabe respirar entre renglones sin que la lista de modulos ocupe el doble.
+  */
+  const lineas = texto.split('\n');
+  lineas.forEach((linea, indice) => {
+    const anchoTexto = fuente.widthOfTextAtSize(linea, tamano);
+    // `center` es el caso util: un nombre largo y uno corto quedan igual de bien puestos bajo la
+    // linea del arte. Con `left` habria que recolocar el campo segun la longitud del nombre.
+    const x =
+      campo.align === 'center'
+        ? (campo.x / 100) * ctx.ancho - anchoTexto / 2
+        : campo.align === 'right'
+          ? (campo.x / 100) * ctx.ancho - anchoTexto
+          : (campo.x / 100) * ctx.ancho;
+    const y = yInicial - indice * tamano * 1.3;
+    page.drawText(linea, { x, y, size: tamano, font: fuente, color: hexARgb(campo.color) });
+  });
 }
 
 async function dibujarFirma(

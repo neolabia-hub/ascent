@@ -28,6 +28,13 @@ const PERSON_SELECT = {
   employmentType: true,
   roadActor: true,
   jobTitle: { select: { jobTitleTypeId: true } },
+  /*
+    DE QUE AREA CUELGA LA SUYA (2026-09-17). Una regla que apunta a un area alcanza tambien a sus
+    SUB-AREAS — ver la faceta de area en `audience-rule.ts`—. Sin este dato, el predicado en memoria
+    y el filtro contra la base dirian cosas distintas sobre la misma persona, que es exactamente lo
+    que ese archivo existe para impedir.
+  */
+  area: { select: { parentId: true } },
 } satisfies Prisma.UserSelect;
 
 /**
@@ -299,6 +306,7 @@ export class AudiencesService {
       jobTitleId: user.jobTitleId,
       jobTitleTypeId: user.jobTitle.jobTitleTypeId,
       areaId: user.areaId,
+      parentAreaId: user.area.parentId,
       regionalId: user.regionalId,
       serviceId: user.serviceId,
       employmentType: user.employmentType,

@@ -3,6 +3,7 @@ import { progressSchema, saveAnswerSchema, selfEnrollSchema, submitAttemptSchema
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { EngagementService } from '../engagement/engagement.service.js';
+import { ProgramsService } from '../programs/programs.service.js';
 import { AttemptsService } from './attempts.service.js';
 import { LearnerService } from './learner.service.js';
 import { PlayerService } from './player.service.js';
@@ -19,6 +20,7 @@ export class LearningController {
     private readonly player: PlayerService,
     private readonly attempts: AttemptsService,
     private readonly engagement: EngagementService,
+    private readonly programs: ProgramsService,
   ) {}
 
   // ─────────────────────────── Mis pendientes e historial ───────────────────────────
@@ -27,6 +29,17 @@ export class LearningController {
   @RequirePermissions('enrollments:read_own')
   pending(@CurrentUser() actor: AuthUser) {
     return this.learner.pending(actor);
+  }
+
+  /**
+   * MIS PROGRAMAS (2026-09-14): un programa aparece con TODOS sus modulos y cual esta aprobado,
+   * no como formaciones sueltas — es justo lo que se pidio: "el usuario tambien lo debe ver asi,
+   * un solo programa con modulos".
+   */
+  @Get('programas')
+  @RequirePermissions('enrollments:read_own')
+  misProgramas(@CurrentUser() actor: AuthUser) {
+    return this.programs.misProgramas(actor.id);
   }
 
   @Get('history')

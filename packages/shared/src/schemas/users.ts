@@ -68,6 +68,8 @@ export const IMPORT_HEADERS = [
   'cargo',
   'tipo_cargo',
   'area',
+  // Detras de `area` a proposito: se lee «Gestion Humana › Nomina» en el mismo orden que el arbol.
+  'sub_area',
   'regional',
   'servicio',
   'fecha_ingreso',
@@ -92,6 +94,20 @@ export const importRowSchema = z.object({
    */
   tipo_cargo: z.string().max(40).optional().or(z.literal('')),
   area: z.string().min(2).max(40), // code o nombre del catalogo areas
+  /**
+   * LA SUB-AREA, si la empresa las usa (2026-09-17).
+   *
+   * Gestion Humana tiene Nomina, Contratacion y Seleccion. Cuando viene, **la persona queda en la
+   * SUB-AREA**, y esa sub-area se crea colgando del area de la columna anterior.
+   *
+   * Importa mas de lo que parece: el area de la persona decide **quien la evalua** —el evaluador es
+   * el responsable de esa area, ver `planificarEvaluaciones`—. Sin esta columna, evaluar por
+   * jefaturas obligaba a poner la sub-area en `area` y despues enlazarla a mano, dejando una
+   * ventana en la que esa gente colgaba de un area huerfana y se caia de las reglas por area.
+   *
+   * Vacia = la persona queda en el area, como siempre. Quien no maneje sub-areas no la nota.
+   */
+  sub_area: z.string().max(40).optional().or(z.literal('')),
   regional: z.string().max(40).optional().or(z.literal('')),
   // Opcionales las dos: un cliente que no las maneje deja la columna vacia y su carga entra igual.
   servicio: z.string().max(40).optional().or(z.literal('')),

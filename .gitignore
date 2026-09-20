@@ -19,3 +19,9 @@ playwright-report/
 
 storage-dev/
 .next-mirar
+
+# CERROJO TECNICO (2026-09-14): la ficha de acceso lleva una contraseña real el dia que se envia
+# al cliente, y por eso SIEMPRE vive fuera del repo — pero un `git add -A` distraido no lo sabe.
+# Si alguna vez la carpeta se cuela aqui dentro por error, esta regla la ignora de todas formas.
+"ASCENT - ENTREGA TRANSPRENSA/"
+docs/entrega/**/ficha-de-acceso.*

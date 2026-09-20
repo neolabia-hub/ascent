@@ -36,6 +36,27 @@ const SECTIONS: Section[] = [
         kind: 'user',
         hint: 'Quien evalúa el desempeño de su gente, responde la eficacia de sus formaciones y recibe el aviso cuando alguien reprueba. Es distinto del responsable de un PROCESO: aquel responde por un sistema de gestión, este por las personas.',
       },
+      /*
+        SUB-ÁREAS: EL ÁRBOL YA EXISTÍA, Y NINGUNA PANTALLA LO DEJABA USAR (2026-09-17).
+
+        `Area.parentId` está en el esquema desde el principio y la API lo acepta; aquí no se ofrecía,
+        así que no había forma de decir que **Nómina cuelga de Gestión Humana**.
+
+        Lo pidió el cliente por la evaluación de desempeño: *"se necesita saber por jefaturas, para
+        que cada jefe de sub-área sepa a quién evaluar, y no un área grande con muchas jefaturas"*.
+
+        **No hace falta ningún campo nuevo en la persona.** El evaluador sale del
+        `responsibleUserId` del área DE LA PERSONA (`planificarEvaluaciones`), así que basta con que
+        cada quien esté en su sub-área y que la sub-área tenga su responsable. El padre no decide
+        quién evalúa: sirve para agrupar —ver toda Gestión Humana junta— sin tocar esa regla.
+      */
+      {
+        key: 'parentId',
+        label: 'Área padre',
+        kind: 'select',
+        optionsFrom: 'areas',
+        hint: 'Solo si esta es una SUB-ÁREA: Nómina, Contratación y Selección cuelgan de Gestión Humana. Vacío = área de primer nivel. Quién evalúa no lo decide el padre, sino el responsable de esta misma área.',
+      },
     ],
   },
   {

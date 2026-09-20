@@ -15,6 +15,8 @@ export interface PersonProfile {
   jobTitleId: string;
   jobTitleTypeId: string;
   areaId: string;
+  /** De que area cuelga la suya, si esta en una SUB-AREA. Ver la faceta de area en `facetsOf`. */
+  parentAreaId: string | null;
   regionalId: string | null;
   serviceId: string | null;
   employmentType: string;
@@ -48,9 +50,29 @@ function facetsOf(rule: AudienceRule): Facet[] {
     });
   }
   if (rule.areaIds.length > 0) {
+    /*
+      UN AREA INCLUYE SUS SUB-AREAS (2026-09-17).
+
+      Antes era coincidencia exacta —`areaId in [...]`— y eso volvia PELIGROSO usar el arbol de
+      areas: el dia que alguien moviera a una persona de "Gestion Humana" a su sub-area "Nomina",
+      esa persona **se caia de toda regla que apuntara a Gestion Humana**. Y no solo dejaba de
+      recibir lo nuevo: el motor RETIRA las obligaciones vivas de quien sale de una audiencia
+      (`withdrawLeavers`), asi que le habrian desaparecido formaciones que debia.
+
+      Lo pidio el cliente al querer evaluar por jefaturas —cada jefe de sub-area evalua a los
+      suyos—, que obliga a que la gente cuelgue de su sub-area. Con esto, hacerlo ya no rompe nada:
+      "el area Gestion Humana" sigue significando *ella y todo lo que cuelga de ella*, que es lo que
+      cualquiera entiende al marcarla.
+
+      DOS NIVELES, no recursion: es la profundidad que el producto ofrece (la pantalla de areas
+      declara un unico "area padre") y se resuelve con un filtro de relacion, sin cargar el arbol
+      ni hacer una consulta recursiva. Si algun dia hubiera tres niveles, esto se queda corto **de
+      forma visible** —la sub-sub-area no entraria— y no en silencio.
+    */
     facets.push({
-      where: { areaId: { in: rule.areaIds } },
-      matches: (p) => rule.areaIds.includes(p.areaId),
+      where: { area: { OR: [{ id: { in: rule.areaIds } }, { parentId: { in: rule.areaIds } }] } },
+      matches: (p) =>
+        rule.areaIds.includes(p.areaId) || (p.parentAreaId !== null && rule.areaIds.includes(p.parentAreaId)),
     });
   }
   if (rule.regionalIds.length > 0) {

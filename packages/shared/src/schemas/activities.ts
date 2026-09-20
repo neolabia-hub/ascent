@@ -40,6 +40,20 @@ export const createActivitySchema = z.object({
   tracksExternalCertificate: z.boolean().nullable().optional(),
   /** ¿Acepta certificacion previa de otra empresa? Vacio = lo que diga su tipo (via C, 2.3). */
   admiteConvalidacion: z.boolean().nullable().optional(),
+  /**
+   * LAS HORAS QUE ACREDITA LA CONSTANCIA (2026-09-17).
+   *
+   * El campo existia en el esquema desde el principio —`Activity.certificateHours`, que la version
+   * copia al publicar y de donde la constancia saca su cifra— y **ningun endpoint ni ninguna
+   * pantalla lo escribia**. Es decir: la casilla "horas" de toda constancia salia vacia, y la del
+   * PROGRAMA —que SUMA las de sus modulos— daba siempre cero. Lo destapo el recorrido
+   * `scripts/recorridos/programa.mjs`, que es justo para lo que se escribio.
+   *
+   * Vive en la FICHA y no en la version porque es una propiedad de la formacion, no del contenido:
+   * cambiar el material no cambia cuantas horas acredita. La version se queda con la que hubiera el
+   * dia en que se publico, que es lo que una constancia tiene que poder repetir años despues.
+   */
+  certificateHours: z.number().int().min(1).max(2000).nullable().optional(),
 });
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 

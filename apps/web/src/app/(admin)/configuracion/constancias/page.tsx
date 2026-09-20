@@ -73,11 +73,17 @@ export default function ConstanciasPage() {
       showToast({ kind: 'danger', title: 'No se pudo abrir la plantilla', description: motivoDelError(fallo) });
       return;
     }
-    // Una plantilla creada antes de que existiera la colocacion trae `{}`: se rellena con la de
-    // por defecto para que la pantalla no salga sin nada que arrastrar.
+    /*
+      SE RELLENA CAMPO POR CAMPO, no solo cuando `fields` esta vacio del todo (2026-09-15).
+      Antes solo cubria una plantilla creada ANTES de que existiera la colocacion (`{}` a secas);
+      una plantilla que ya tenia datos colocados pero le faltaba UNO nuevo —como "Modulos", que
+      no existia cuando se creo esta plantilla— se quedaba sin la casilla para encenderlo, y no
+      habia forma de agregarlo desde la pantalla. El spread deja lo YA colocado tal cual (va
+      segundo, pisa el default) y solo aporta el default en lo que falta.
+    */
     setAbierta({
       ...detalle,
-      fields: detalle.fields && Object.keys(detalle.fields).length > 0 ? detalle.fields : CAMPOS_POR_DEFECTO,
+      fields: { ...CAMPOS_POR_DEFECTO, ...detalle.fields },
       signers: detalle.signers ?? [],
     });
   }
@@ -219,6 +225,7 @@ const CLAVES: CampoClave[] = [
   'codigo',
   'nota',
   'qr',
+  'modulos',
 ];
 
 /** Como se llama cada campo en la lista. La clave cruda ("qr", "vence") no se enseña. */
@@ -236,6 +243,8 @@ const NOMBRES: Record<CampoClave, string> = {
   codigo: 'Código de verificación',
   nota: 'Calificación',
   qr: 'Código QR',
+  /** Solo dice algo en una constancia DE PROGRAMA: en una formación suelta sale vacío. */
+  modulos: 'Módulos',
 };
 
 /** Lo que se escribe en cada campo mientras se coloca. Es texto de ejemplo, no datos reales. */
@@ -253,6 +262,10 @@ const ETIQUETAS: Record<CampoClave, string> = {
   codigo: 'K7M2P-9XQ4T-BC3JH',
   nota: 'Calificación: 95%',
   qr: 'QR',
+  // De muestra, con saltos de linea de verdad: es lo unico que se ve distinto entre esto y el
+  // resto de campos, y hay que verlo AQUI —no solo en la vista previa del PDF— o parece que el
+  // campo no acepta varias lineas.
+  modulos: 'Gestión Humana\nSeguridad y Salud en el Trabajo\nComercial',
 };
 
 function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: () => void }) {
@@ -547,7 +560,10 @@ function Editor({ plantilla, onCerrar }: { plantilla: TemplateDetail; onCerrar: 
                   onPointerDown={(evento) => iniciarArrastre(clave, evento)}
                   aria-label={`Colocar ${clave}`}
                   className={cn(
-                    'absolute cursor-grab whitespace-nowrap rounded px-1 leading-none active:cursor-grabbing',
+                    'absolute cursor-grab rounded px-1 leading-tight active:cursor-grabbing',
+                    // "Modulos" es el UNICO campo de varias lineas (ver certificate-pdf.ts): el
+                    // resto sigue de una sola linea porque asi es como se ven impresos.
+                    clave === 'modulos' ? 'whitespace-pre-line text-center' : 'whitespace-nowrap leading-none',
                     activo ? 'outline outline-2 outline-offset-2' : 'hover:bg-primary-soft/60',
                   )}
                   style={{

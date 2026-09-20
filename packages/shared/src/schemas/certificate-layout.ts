@@ -72,6 +72,12 @@ export const CAMPOS_CONSTANCIA = [
   'codigo',
   'nota',
   'qr',
+  /**
+   * QUE MODULOS COMPONEN EL PROGRAMA (2026-09-15). Solo imprime algo en una constancia DE
+   * PROGRAMA — en una de formacion suelta sale vacio, porque no hay modulos que listar. Es el
+   * unico campo que puede ocupar VARIAS LINEAS: quien lo coloque tiene que dejarle sitio debajo.
+   */
+  'modulos',
 ] as const;
 
 export type CampoClave = (typeof CAMPOS_CONSTANCIA)[number];
@@ -94,6 +100,7 @@ export const certificateFieldsSchema = z
     codigo: campoSchema.optional(),
     nota: campoSchema.optional(),
     qr: campoSchema.optional(),
+    modulos: campoSchema.optional(),
   })
   .strict();
 
@@ -152,4 +159,7 @@ export const CAMPOS_POR_DEFECTO: CertificateFields = {
   codigo: { visible: false, x: 6, y: 97, size: 1.6, align: 'left', bold: false, color: '#6b7280' },
   nota: { visible: false, x: 94, y: 94, size: 1.8, align: 'right', bold: false, color: '#6b7280' },
   qr: { visible: true, x: 92, y: 90, size: 10, align: 'center', bold: false, color: '#101418' },
+  // Apagado de entrada, como cargo/area/tipo/vence: solo dice algo en un programa, y quien no los
+  // usa no tiene por que verlo ocupando un hueco en su plantilla.
+  modulos: { visible: false, x: 50, y: 84, size: 1.8, align: 'center', bold: false, color: '#4b5563' },
 };

@@ -36,6 +36,22 @@ export interface CatalogRow {
   responsible?: { id: string; fullName: string } | null;
 }
 
+/**
+ * EL NOMBRE DE UN ÁREA CON SU RAMA: «Gestión Humana › Nómina» (2026-09-17).
+ *
+ * Desde que hay SUB-ÁREAS, un desplegable plano es inservible: «Nómina», «Contratación» y
+ * «Selección» salen al mismo nivel que «Gestión Humana» y nada dice cuál cuelga de cuál. Y aquí
+ * elegir mal tiene consecuencia real: **el área de la persona decide quién la evalúa**, porque el
+ * evaluador es el responsable de esa área (ver `planificarEvaluaciones` en el servidor).
+ *
+ * Se corta en dos niveles a propósito: con tres o más la etiqueta se vuelve una frase y deja de
+ * leerse de un vistazo, y el nivel que de verdad importa es el inmediato — de quién cuelgo.
+ */
+export function nombreConRama(area: CatalogRow, todas: readonly CatalogRow[]): string {
+  const padre = area.parentId ? todas.find((a) => a.id === area.parentId) : null;
+  return padre ? `${padre.name} › ${area.name}` : area.name;
+}
+
 export function listCatalog(key: CatalogKey): Promise<CatalogRow[]> {
   return apiFetch<CatalogRow[]>(`/catalogs/${key}`, { method: 'GET' });
 }

@@ -1,0 +1,261 @@
+<title>Programas, paso a paso</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* ── Sistema heredado de las otras guías: mismo azul, mismo naranja, mismas letras ──────────
+     Lo que se añade aquí es UNA cosa: cada tipo trae su propio color, el mismo con el que la
+     aplicación lo marca en las listas. Así la guía y la pantalla dicen lo mismo. */
+  :root {
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --ok-soft: #e9f5ee;
+    --warn: #b45309;
+    --warn-soft: #fdf3e6;
+    --danger: #b02a37;
+    --danger-soft: #fbeced;
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+      --paper: #0e1114; --surface: #171b20; --surface-2: #1e242b;
+      --line: #262c33; --line-strong: #333b44;
+      --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+      --ok: #3ba76f; --ok-soft: #12251b; --warn: #d98324; --warn-soft: #2a1f12;
+      --danger: #e2707c; --danger-soft: #2b1418;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+    --paper: #0e1114; --surface: #171b20; --surface-2: #1e242b;
+    --line: #262c33; --line-strong: #333b44;
+    --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+    --ok: #3ba76f; --ok-soft: #12251b; --warn: #d98324; --warn-soft: #2a1f12;
+    --danger: #e2707c; --danger-soft: #2b1418;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-700);
+    font-family: var(--body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .envoltorio { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── Cabecera ───────────────────────────────────────────────────────────────────────────── */
+  header.principal { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-family: var(--display); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(34px, 5.2vw, 52px); font-weight: 800;
+    line-height: 1.08; letter-spacing: -0.022em; color: var(--ink-900);
+    margin: 0 0 18px; text-wrap: balance; max-width: 18ch;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); max-width: 62ch; margin: 0; }
+
+  /* ── Índice de tipos ────────────────────────────────────────────────────────────────────── */
+  nav.tipos { position: sticky; top: 0; z-index: 20; background: var(--paper);
+    border-bottom: 1px solid var(--line); padding: 12px 0; margin-bottom: 44px; }
+  nav.tipos ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0;
+    counter-reset: none; }
+  nav.tipos a {
+    display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    font-size: 13px; font-weight: 600; color: var(--ink-700); text-decoration: none;
+    transition: border-color .15s, color .15s;
+  }
+  nav.tipos a:hover, nav.tipos a:focus-visible { border-color: var(--line-strong); color: var(--ink-900); }
+  nav.tipos a:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--tono); flex: none; }
+
+  /* ── Secciones ──────────────────────────────────────────────────────────────────────────── */
+  section.tipo { padding-top: 20px; margin-bottom: 72px; scroll-margin-top: 72px; }
+  .titulo-tipo { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
+  .barra { width: 5px; align-self: stretch; min-height: 42px; border-radius: 3px; background: var(--tono); flex: none; }
+  h2 {
+    font-family: var(--display); font-size: clamp(25px, 3.2vw, 33px); font-weight: 800;
+    letter-spacing: -0.018em; color: var(--ink-900); margin: 0; line-height: 1.15; text-wrap: balance;
+  }
+  .subtitulo { color: var(--ink-500); font-size: 16px; margin: 2px 0 26px 19px; max-width: 64ch; }
+
+  h3 {
+    font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--ink-500); margin: 34px 0 12px;
+  }
+  h3:first-of-type { margin-top: 0; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  a { color: var(--navy); }
+
+  /* ── Ficha técnica del tipo ─────────────────────────────────────────────────────────────── */
+  .ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 1px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .ficha div { background: var(--surface); padding: 13px 15px; }
+  .ficha dt { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-500); margin-bottom: 3px; }
+  .ficha dd { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink-900); }
+  .ficha dd.no { color: var(--ink-300); }
+
+  /* ── Pasos: numerados porque son una secuencia real ─────────────────────────────────────── */
+  ol.pasos { counter-reset: paso; list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 14px; }
+  ol.pasos > li { counter-increment: paso; position: relative; padding-left: 42px; max-width: 70ch; }
+  ol.pasos > li::before {
+    content: counter(paso); position: absolute; left: 0; top: 0;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--tono); color: #fff;
+    font-family: var(--display); font-size: 13px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  ol.pasos b { display: block; color: var(--ink-900); font-weight: 600; }
+
+  ul.limpia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  ul.limpia > li { position: relative; padding-left: 18px; max-width: 70ch; }
+  ul.limpia > li::before { content: ''; position: absolute; left: 2px; top: 10px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--ink-300); }
+
+  /* ── Avisos ─────────────────────────────────────────────────────────────────────────────── */
+  .aviso { border-left: 3px solid var(--warn); background: var(--warn-soft);
+    padding: 13px 16px; border-radius: 0 8px 8px 0; margin: 0 0 14px; max-width: 70ch; }
+  .aviso.bien { border-color: var(--ok); background: var(--ok-soft); }
+  .aviso.grave { border-color: var(--danger); background: var(--danger-soft); }
+  .aviso p:last-child { margin-bottom: 0; }
+  .aviso .etiqueta { font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 4px; }
+  .aviso.bien .etiqueta { color: var(--ok); }
+  .aviso.grave .etiqueta { color: var(--danger); }
+
+  /* ── Tablas ─────────────────────────────────────────────────────────────────────────────── */
+  .tabla-envuelve { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { background: var(--surface-2); font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink-900); }
+
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 56px 0; }
+  footer { border-top: 1px solid var(--line); padding-top: 22px; color: var(--ink-500); font-size: 14px; }
+
+  @media (max-width: 640px) {
+    .envoltorio { padding: 0 18px 64px; }
+    header.principal { padding: 44px 0 30px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<div class="envoltorio" style="--tono:#4338ca">
+<header class="principal">
+  <p class="kicker" style="color:#4338ca">NEO PULSE · Guía de uso · Programas</p>
+  <h1>Programas, paso a paso</h1>
+  <p class="entradilla">Varias formaciones bajo un solo paraguas, con <strong>una sola constancia</strong> para el
+    conjunto. Sirve cuando lo que hay que acreditar no es cada pieza por separado, sino haberlas hecho todas.</p>
+</header>
+
+<section class="tipo">
+  <h3>Antes de nada: las tres reglas que lo explican todo</h3>
+  <div class="aviso bien">
+    <span class="etiqueta">1 · Un programa = una constancia</span>
+    <p>Mientras el programa esté <strong>publicado</strong>, sus formaciones <strong>dejan de emitir su constancia
+      individual</strong>. El papel que vale es el del conjunto, y se emite al completarlo. Si el programa se
+      despublica, cada formación vuelve a certificar por su cuenta.</p>
+  </div>
+  <div class="aviso bien">
+    <span class="etiqueta">2 · Un programa = una audiencia</span>
+    <p>Sus módulos deben exigírsele <strong>a la misma gente</strong>. Es lo que hace que completarlo signifique lo
+      mismo para todos, y por tanto que la constancia diga la verdad con un solo nombre.</p>
+  </div>
+  <div class="aviso bien">
+    <span class="etiqueta">3 · Se completa haciéndolos todos</span>
+    <p>Ningún módulo se puede saltar. El cupo —si lo usas— perdona <em>reprobar</em>, nunca <em>no hacerlo</em>.</p>
+  </div>
+
+  <h3>Paso a paso</h3>
+  <ol class="pasos">
+    <li><b>Crea el programa</b> en <em>Programas → Nuevo programa</em>. Nace en borrador: todavía no lo ve nadie y
+      no le quita la constancia a nada.</li>
+    <li><b>Agrega los módulos.</b> Cada uno es una formación que ya existe. Agregarlo <strong>no toca sus
+      reglas</strong>: quien ya la tenía exigida la sigue teniendo igual.</li>
+    <li><b>Decide, por módulo, si hay que aprobarlo sí o sí.</b> Ver abajo: no es «obligatorio u opcional».</li>
+    <li><b>Ajusta la regla de aprobación</b> —el cupo— cuando estén todos puestos. Antes no se puede saber: al
+      agregar el primero nadie sabe si al final serán cinco o nueve.</li>
+    <li><b>Publica.</b> Aquí es donde se apagan las constancias individuales, así que la pantalla te avisa antes si
+      eso dejaría a alguien sin ningún papel.</li>
+    <li><b>Asígnalo</b> con <em>Asignar programa</em>: exige los módulos a la vez, todos a la misma audiencia. Es un
+      gesto en vez de uno por formación.</li>
+  </ol>
+
+  <h3>El cupo, dicho bien</h3>
+  <div class="aviso">
+    <span class="etiqueta">«Obligatorio» es de aprobar, no de cursar</span>
+    <p><strong>Todos los módulos se cursan.</strong> Lo que decides por módulo es qué pasa si lo <em>reprueba</em>:</p>
+    <p><b>Sí, obligatorio</b> → reprobarlo impide completar el programa.<br>
+       <b>No</b> → se cursa igual, pero reprobarlo lo perdona el cupo del grupo.</p>
+    <p>Ejemplo: un grupo de <b>6</b> con cupo de <b>5</b> significa <em>«hay que hacer los seis y aprobar al menos
+      cinco»</em>. Puede fallar cualquiera de ellos, pero <strong>no puede saltarse ninguno</strong>: mientras uno
+      siga pendiente, el programa no completa aunque los números del cupo ya den.</p>
+  </div>
+  <div class="aviso">
+    <span class="etiqueta">Quien no pudo presentarse</span>
+    <p>Existe una salida con nombre, fecha y motivo: <strong>eximir</strong>. Eximir resuelve el módulo pero
+      <em>no lo aprueba</em>, así que consume una de las que el cupo deja perder. Si lo que pasó es que la hizo por
+      fuera, la vía es <strong>convalidar</strong>, que sí cuenta como aprobada.</p>
+  </div>
+
+  <h3>Lo que hay que saber</h3>
+  <div class="aviso grave">
+    <span class="etiqueta">No mezcles tipos automáticos con audiencia marcada</span>
+    <p>Una <em>inducción general</em> o una <em>reinducción</em> nacen exigidas a <strong>toda la empresa</strong> al
+      publicar la formación, y eso no se puede quitar. Una píldora o una extraordinaria obligan a marcar cargo,
+      área, regional o servicio. Si mezclas las dos cosas en un programa, solo lo completará quien caiga en ambas.</p>
+    <p>Lo sano: los de toda la empresa en un programa, y los de audiencia marcada en otro.</p>
+  </div>
+  <div class="aviso grave">
+    <span class="etiqueta">Cuidado al meter una formación que ya se exigía a otro grupo</span>
+    <p>Su regla vieja <strong>sigue viva</strong>. Si a esa gente no se le exigen los demás módulos, nunca completará
+      el programa — y desde que el programa está publicado tampoco recibe la constancia individual de lo que sí
+      hace. La ficha te lo dice con el número exacto de personas afectadas, y te lo avisa antes de publicar.</p>
+  </div>
+  <div class="aviso bien">
+    <span class="etiqueta">Un módulo sin publicar bloquea el programa entero</span>
+    <p>Nadie puede cursarlo, así que el conjunto no se cierra para nadie. Sale marcado en la lista, y se arregla
+      publicando esa formación.</p>
+  </div>
+  <div class="aviso bien">
+    <span class="etiqueta">Editar el programa no reabre a quien ya lo completó</span>
+    <p>Su ronda queda cerrada y conserva su constancia. A quien va a medias sí le entra el módulo nuevo, que es lo
+      correcto: si la empresa decide que SST entra en la inducción, quien no ha terminado debería hacerla.</p>
+  </div>
+
+  <h3>Dónde se ve</h3>
+  <div class="ficha">
+    <div><dt>Ficha del programa</dt><dd>Qué falta para que funcione, y a quién alcanza cada módulo</dd></div>
+    <div><dt>Seguimiento → Programas</dt><dd>Cómo va cada uno y <b>lo que más frena</b></dd></div>
+    <div><dt>Expediente de la persona</dt><dd>Sus módulos, de qué programa son, y su constancia</dd></div>
+    <div><dt>Mi aprendizaje</dt><dd>Lo que ve el aprendiz, agrupado</dd></div>
+  </div>
+</section>
+<footer>
+  <p>NEO PULSE para TRANSPRENSA · Guía de uso, septiembre de 2026. Lo de aquí está medido contra el sistema, no supuesto.</p>
+</footer>
+</div>

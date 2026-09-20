@@ -93,6 +93,13 @@ export function ActivityInfoTab({
       activity.admiteConvalidacion === null || activity.admiteConvalidacion === undefined
         ? ''
         : String(activity.admiteConvalidacion),
+    /**
+     * LAS HORAS QUE ACREDITA SU CONSTANCIA (2026-09-17).
+     *
+     * Como texto, porque es lo que devuelve un campo numérico. Vacío = sin horas declaradas, que es
+     * un estado normal —no toda formación las tiene— y distinto de cero, que sería falso.
+     */
+    certificateHours: activity.certificateHours == null ? '' : String(activity.certificateHours),
   });
 
   useEffect(() => {
@@ -180,6 +187,7 @@ export function ActivityInfoTab({
         tracksExternalCertificate:
           form.tracksExternalCertificate === '' ? null : form.tracksExternalCertificate === 'true',
         admiteConvalidacion: form.admiteConvalidacion === '' ? null : form.admiteConvalidacion === 'true',
+        certificateHours: form.certificateHours.trim() === '' ? null : Number(form.certificateHours),
       });
       await onSaved();
       showToast({ kind: 'success', title: 'Ficha guardada' });
@@ -456,6 +464,34 @@ export function ActivityInfoTab({
                     </button>
                   ) : null}
                 </div>
+              </Field>
+
+              {/*
+                LAS HORAS QUE ACREDITA LA CONSTANCIA (2026-09-17).
+
+                El campo existía en la base desde el principio, la versión lo copiaba al publicar y la
+                constancia lo imprimía — y **ninguna pantalla lo escribía nunca**. Resultado: la casilla
+                «horas» salía vacía en todas las constancias, y la del PROGRAMA —que suma las de sus
+                módulos— daba siempre cero. Lo destapó el recorrido `programa.mjs`.
+
+                Va aquí, con lo demás de la constancia, porque es lo mismo: qué dice el papel.
+              */}
+              <Field
+                htmlFor="i-horas"
+                label="Horas que acredita"
+                ayuda="Las que imprime la constancia, y las que suma la constancia de un programa cuando esta formación es uno de sus módulos. Se congela al publicar: cambiarla después no reescribe ningún papel ya emitido."
+                hint="Vacío si esta formación no declara horas."
+              >
+                <Input
+                  id="i-horas"
+                  type="number"
+                  min={1}
+                  max={2000}
+                  className="w-32"
+                  disabled={!canEdit}
+                  value={form.certificateHours}
+                  onChange={(e) => setForm({ ...form, certificateHours: e.target.value })}
+                />
               </Field>
             </div>
 

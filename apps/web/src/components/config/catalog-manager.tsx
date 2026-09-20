@@ -28,7 +28,8 @@ import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /** Campo extra propio de un catalogo (ademas de code/name). */
 export interface ExtraField {
-  key: 'jobTitleTypeId' | 'annualHoursRequired' | 'colorHex' | 'areaId' | 'responsibleUserId';
+  /** `parentId` es el de las SUB-ÁREAS: de qué área cuelga esta (2026-09-17). */
+  key: 'jobTitleTypeId' | 'annualHoursRequired' | 'colorHex' | 'areaId' | 'responsibleUserId' | 'parentId';
   label: string;
   kind: 'select' | 'number' | 'color' | 'user';
   /** Para kind=select: catalogo del que salen las opciones. */

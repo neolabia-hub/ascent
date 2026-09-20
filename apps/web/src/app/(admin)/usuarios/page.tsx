@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Award,
   BadgeCheck,
   Copy,
   Download,
@@ -28,6 +27,7 @@ import {
   setAnalystScopes,
   listCatalog,
   listUsers,
+  nombreConRama,
   resetUserPassword,
   updateUser,
   type CatalogRow,
@@ -37,7 +37,6 @@ import {
   type UsersPage,
 } from '@/lib/admin-api';
 import { UserPermissionsDrawer } from '@/components/modules/admin/user-permissions-drawer';
-import { ConstanciasDePersona } from '@/components/modules/admin/constancias-de-persona';
 import { PapelesDePersona } from '@/components/modules/admin/papeles-de-persona';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
@@ -121,7 +120,6 @@ export default function UsuariosPage() {
     —"mandame el certificado de alturas de Juan"— y nunca con una formacion. Buscar a Juan es el
     primer gesto, asi que la descarga tiene que estar donde se acaba de encontrar a Juan.
   */
-  const [constanciasDe, setConstanciasDe] = useState<UserRow | null>(null);
   /*
     Y LOS PAPELES DE UN TERCERO, en la misma pantalla y por el mismo motivo que las constancias: la
     peticion llega con un NOMBRE delante —"acaba de llegar el certificado de alturas de Juan"— y
@@ -406,8 +404,9 @@ export default function UsuariosPage() {
         </div>
         <Select value={areaFilter} onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }} className="w-56">
           <option value="">Todas las areas</option>
+          {/* Con su rama: desde que hay sub-áreas, «Nómina» a secas no dice de dónde cuelga. */}
           {areas.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
+            <option key={a.id} value={a.id}>{nombreConRama(a, areas)}</option>
           ))}
         </Select>
       </div>
@@ -462,7 +461,6 @@ export default function UsuariosPage() {
                         user={user}
                         onPerfil={() => router.push(`/usuarios/${user.id}`)}
                         onEditar={() => openEdit(user)}
-                        onConstancias={() => setConstanciasDe(user)}
                         onPapeles={() => setPapelesDe(user)}
                         onPermisos={() => setPermissionsFor(user)}
                         onContrasena={() => setARestablecer(user)}
@@ -492,14 +490,6 @@ export default function UsuariosPage() {
         open={papelesDe !== null}
         onOpenChange={(abierto) => {
           if (!abierto) setPapelesDe(null);
-        }}
-      />
-      <ConstanciasDePersona
-        userId={constanciasDe?.id ?? null}
-        nombre={constanciasDe?.fullName ?? ''}
-        open={constanciasDe !== null}
-        onOpenChange={(abierto) => {
-          if (!abierto) setConstanciasDe(null);
         }}
       />
 
@@ -572,8 +562,16 @@ export default function UsuariosPage() {
                 }}
               >
                 <option value="">Seleccionar...</option>
+                {/*
+                  AQUÍ VA LA SUB-ÁREA, no el área grande (2026-09-17).
+
+                  El área de la persona es lo que decide **quién la evalúa**: el evaluador es el
+                  responsable de ESA área (`planificarEvaluaciones`). Dejarla en «Gestión Humana» la
+                  hace evaluar por el jefe de Gestión Humana; ponerla en «Nómina», por la jefatura de
+                  Nómina — que es lo que el cliente pidió. Por eso la etiqueta lleva la rama.
+                */}
                 {areas.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+                  <option key={a.id} value={a.id}>{nombreConRama(a, areas)}</option>
                 ))}
               </Select>
             </Field>
@@ -1021,7 +1019,6 @@ function AccionesDeFila({
   user,
   onPerfil,
   onEditar,
-  onConstancias,
   onPapeles,
   onPermisos,
   onContrasena,
@@ -1030,14 +1027,23 @@ function AccionesDeFila({
   user: UserRow;
   onPerfil: () => void;
   onEditar: () => void;
-  onConstancias: () => void;
   onPapeles: () => void;
   onPermisos: () => void;
   onContrasena: () => void;
   onActivar: () => void;
 }) {
+  /*
+    CONSTANCIAS SE FUE AL PERFIL (2026-09-17). El cliente: *"si ya está en perfil estaría más de una
+    vez"*. Y era cierto: el expediente ya las lista, y desde hoy además se abren y se descargan
+    desde ahí, que es para lo que se buscan.
+
+    **El papel de un tercero se queda en los dos sitios**, y a propósito: no es una lista repetida,
+    es una ACCIÓN —convalidar el papel de una ARL o del SENA contra una obligación viva—. Se llega a
+    ella desde la fila, cuando se está repasando gente, y desde el expediente, cuando se está
+    mirando a una persona. Quitarla de la fila no habría ahorrado una repetición: habría alargado el
+    camino de lo que más se hace.
+  */
   const flotantes = [
-    { icono: Award, texto: 'Constancias', accion: onConstancias },
     { icono: BadgeCheck, texto: 'Papel de un tercero', accion: onPapeles },
     { icono: ShieldCheck, texto: 'Permisos y excepciones', accion: onPermisos },
     { icono: KeyRound, texto: 'Generar contraseña nueva', accion: onContrasena },

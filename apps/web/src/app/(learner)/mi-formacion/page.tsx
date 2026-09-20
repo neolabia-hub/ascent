@@ -1,15 +1,17 @@
 'use client';
 
-import { GraduationCap } from 'lucide-react';
+import { CheckCircle2, Circle, GraduationCap, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatDate } from '@/lib/format';
 import { getHistory, getPending, toScore, type HistoryItem, type PendingItem } from '@/lib/learner-api';
+import { getMyPrograms, type MyProgram } from '@/lib/programs-api';
 import { ActivityCard } from '@/components/modules/learner/activity-card';
 import { ActivityCover } from '@/components/modules/activity-cover';
 import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ProgressRing } from '@/components/ui/progress-ring';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 
@@ -20,7 +22,7 @@ import { StatusPill } from '@/components/ui/status-pill';
  * la induccion, y lo que consulta antes de pedir un certificado. Por eso se ve igual de cuidado
  * que lo pendiente y no como una tabla de registros.
  */
-type Tab = 'pendiente' | 'historial';
+type Tab = 'pendiente' | 'historial' | 'programas';
 
 /**
  * `?actividad=<id>` llega desde un aviso ("se te asigno X"). Sin eso, pulsar el aviso dejaba a la
@@ -42,6 +44,7 @@ function MyLearning() {
   const [tab, setTab] = useState<Tab>('pendiente');
   const [pending, setPending] = useState<PendingItem[] | null>(null);
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  const [programs, setPrograms] = useState<MyProgram[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +65,14 @@ function MyLearning() {
         if (!cancelled) setHistory([]);
       });
 
+    void getMyPrograms()
+      .then((response) => {
+        if (!cancelled) setPrograms(response);
+      })
+      .catch(() => {
+        if (!cancelled) setPrograms([]);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -78,9 +89,25 @@ function MyLearning() {
         <TabButton active={tab === 'historial'} onClick={() => setTab('historial')}>
           Historial{history && history.length > 0 ? ` (${history.length})` : ''}
         </TabButton>
+        {/*
+          SOLO SI HAY ALGUNO. A diferencia de Pendiente e Historial, que siempre existen para
+          cualquier persona con una obligacion, "Programas" solo aplica a quien esta matriculado en
+          uno — mostrar la pestana vacia a todo el mundo seria prometer algo que casi nadie tiene.
+        */}
+        {programs === null || programs.length > 0 ? (
+          <TabButton active={tab === 'programas'} onClick={() => setTab('programas')}>
+            Programas{programs && programs.length > 0 ? ` (${programs.length})` : ''}
+          </TabButton>
+        ) : null}
       </div>
 
-      {tab === 'pendiente' ? <PendingList items={pending} highlight={destacada} /> : <HistoryList items={history} />}
+      {tab === 'pendiente' ? (
+        <PendingList items={pending} highlight={destacada} />
+      ) : tab === 'historial' ? (
+        <HistoryList items={history} />
+      ) : (
+        <ProgramsList items={programs} />
+      )}
     </div>
   );
 }
@@ -200,6 +227,66 @@ function HistoryList({ items }: { items: HistoryItem[] | null }) {
           </article>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * MIS PROGRAMAS (2026-09-14, PENDIENTES 11.4): un programa se ve como UN conjunto con sus
+ * módulos, cada uno con su check — no como formaciones sueltas que casualmente comparten nombre.
+ * Es justo lo que se pidió: "el usuario también lo debe ver así, un solo programa con módulos".
+ */
+function ProgramsList({ items }: { items: MyProgram[] | null }) {
+  if (items === null) return <CardsSkeleton />;
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={Layers}
+        title="No estás en ningún programa"
+        description="Un programa agrupa varias formaciones bajo un solo certificado. Si te asignan uno, aparecerá aquí."
+      />
+    );
+  }
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((program, index) => (
+        <Link
+          key={program.id}
+          href={`/programa/${program.id}`}
+          style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
+          className="focus-ring animate-card-in block rounded-xl border border-line bg-surface p-4 transition-shadow duration-150 ease-pulse hover:shadow-card-hover"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display text-base font-semibold leading-snug text-ink-900">{program.name}</h3>
+              <p className="mt-1 text-sm text-ink-500">
+                {program.description || `${program.modulos.filter((m) => m.aprobado).length} de ${program.modulos.length} módulos aprobados`}
+              </p>
+            </div>
+            <ProgressRing value={program.progressPct} size={44} />
+          </div>
+          {program.estado === 'COMPLETED' ? (
+            <div className="mt-2">
+              <StatusPill kind="ok" label={`COMPLETADO${program.completedAt ? ' · ' + formatDate(program.completedAt) : ''}`} />
+            </div>
+          ) : null}
+          <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
+            {program.modulos.map((modulo) => (
+              <li key={modulo.id} className="flex items-center gap-2 text-sm">
+                {modulo.aprobado ? (
+                  <CheckCircle2 size={15} className="shrink-0 text-ok" strokeWidth={2} />
+                ) : (
+                  <Circle size={15} className="shrink-0 text-ink-300" strokeWidth={2} />
+                )}
+                <span className={cn(modulo.aprobado ? 'text-ink-700' : 'text-ink-500')}>
+                  {modulo.actividad?.name ?? '(módulo eliminado)'}
+                  {!modulo.isRequired && modulo.sectionName ? ` · ${modulo.sectionName}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Link>
+      ))}
     </div>
   );
 }

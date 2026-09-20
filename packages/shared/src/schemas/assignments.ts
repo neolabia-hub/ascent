@@ -219,6 +219,36 @@ export const setActivityRequirementSchema = z
   });
 export type SetActivityRequirementInput = z.infer<typeof setActivityRequirementSchema>;
 
+/**
+ * EXIGIR UN PROGRAMA COMPLETO, en un solo boton (2026-09-14, PENDIENTES 11.3).
+ *
+ * Es EXACTAMENTE `setActivityRequirementSchema` sin `activityId`: el programa no es un target
+ * nuevo del motor de requisitos (`AssignmentTargetType.PATH` sigue sin usarse) — es azucar sobre
+ * el mismo `setActivityRequirement`, aplicado UNA VEZ POR MODULO con el mismo alcance. Quien
+ * asigna el programa no sabe que por debajo se crearon N requisitos, uno por formacion; ve una
+ * sola operacion, igual que con una formacion suelta.
+ */
+export const assignProgramSchema = z
+  .object({
+    scope: audienceRuleSchema,
+    trigger: z.enum(['ON_HIRE', 'ON_JOIN']),
+    dueDaysAfterTrigger: z.number().int().min(-365).max(3650).default(0),
+    everyMonths: z.number().int().min(1).max(120).nullable().default(null),
+    fixedDate: fixedDateSchema.nullable().default(null),
+    soloNuevos: z.boolean().default(false),
+    reason: z.string().min(10).max(500).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.trigger === 'ON_HIRE' && value.dueDaysAfterTrigger > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dueDaysAfterTrigger'],
+        message: 'La induccion de ingreso vence ANTES de la fecha de ingreso (usa 0 o negativo).',
+      });
+    }
+  });
+export type AssignProgramInput = z.infer<typeof assignProgramSchema>;
+
 /** Matriz cargo -> actividad: la forma corta de declarar las inducciones especificas. */
 export const toggleJobTitleMatrixSchema = z.object({
   jobTitleId: z.string().uuid(),

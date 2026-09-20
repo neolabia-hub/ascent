@@ -181,3 +181,54 @@ export function conteoPorEstado(resumen: ResumenEjecucion): Record<EstadoEjecuci
     EXIMIDA: resumen.eximidas,
   };
 }
+
+/**
+ * COMO VA CADA PROGRAMA (2026-09-16). Una fila por programa publicado, con lo unico accionable que
+ * un informe de conjunto puede dar: el modulo que frena a mas gente. Ver `ReportsService.programas`.
+ */
+export interface FilaPrograma {
+  id: string;
+  code: string;
+  name: string;
+  modulos: number;
+  /** A cuanta gente se le exige: tiene obligacion de algun modulo, haya empezado o no. */
+  alcanzados: number;
+  completos: number;
+  enCurso: number;
+  cumplimientoPct: number;
+  /** Les falta UN solo modulo: a quien mas rinde perseguir. */
+  aFaltaDeUno: number;
+  /** No han tocado nada del programa. */
+  sinEmpezar: number;
+  /**
+   * El modulo que mas gente tiene sin aprobar, entre quienes no han terminado. Partido en dos
+   * porque son problemas opuestos: `sinHacer` pide una convocatoria, `reprobados` pide revisar el
+   * contenido.
+   */
+  cuelloDeBotella: { activityId: string; name: string; personas: number; sinHacer: number; reprobados: number } | null;
+}
+
+export function getProgramas(): Promise<FilaPrograma[]> {
+  return apiFetch('/reportes/programas', { method: 'GET' });
+}
+
+/** Una persona dentro de un programa, con lo que le falta. Ver `ReportsService.programaDetalle`. */
+export interface PersonaDePrograma {
+  userId: string;
+  fullName: string;
+  documentNumber: string;
+  jobTitle: string | null;
+  exigidos: number;
+  aprobados: number;
+  completo: boolean;
+  /** Los modulos que le faltan. `intentado` distingue "lo reprobo" de "no lo ha hecho". */
+  faltan: Array<{ activityId: string; name: string; intentado: boolean }>;
+  /** Lo primero que se le vence de lo que le falta. */
+  venceEl: string | null;
+}
+
+export function getProgramaDetalle(
+  pathId: string,
+): Promise<{ programa: { id: string; name: string }; personas: PersonaDePrograma[] } | null> {
+  return apiFetch(`/reportes/programas/${pathId}`, { method: 'GET' });
+}

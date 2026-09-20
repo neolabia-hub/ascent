@@ -3,6 +3,8 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import { CertificatesService } from '../certificates/certificates.service.js';
 import { EngagementService } from '../engagement/engagement.service.js';
+import { ProgramsService } from '../programs/programs.service.js';
+import { obligacionesQueCierra } from './close-assignments.js';
 
 export interface CompletionOutcome {
   status: 'IN_PROGRESS' | 'COMPLETED' | 'PASSED' | 'FAILED';
@@ -30,6 +32,7 @@ export class CompletionService {
     private readonly prisma: PrismaService,
     private readonly engagement: EngagementService,
     private readonly certificates: CertificatesService,
+    private readonly programs: ProgramsService,
   ) {}
 
   /**
@@ -131,6 +134,19 @@ export class CompletionService {
     });
 
     /*
+      ¿ESTA FORMACION CERTIFICA SOLA? (2026-09-14). Si es modulo de un programa PUBLICADO, NO: la
+      evidencia que cuenta es la del programa completo, y emitir las dos confundiria al auditor con
+      dos papeles que dicen cosas parecidas. Ver el porque completo en
+      `ProgramsService.esModuloDeUnProgramaPublicado`.
+
+      Se pregunta ANTES de emitir, no despues de comparar: mas barato, y ademas evita el problema de
+      "ya emiti la individual y ahora tengo que revocarla" si algun dia se agrega un modulo a un
+      programa que ya publico gente completada — ese es un caso de migracion que queda pendiente,
+      declarado en el mismo sitio.
+    */
+    const esDeUnPrograma = await this.programs.esModuloDeUnProgramaPublicado(enrollment.activityVersion.activityId).catch(() => false);
+
+    /*
       LA CONSTANCIA NACE AQUI (Decision #110), no en un boton del panel.
 
       La alternativa era "generar constancia" a mano por cada persona que termina. Se descarta por
@@ -143,8 +159,21 @@ export class CompletionService {
       el papel se puede volver a emitir. Al reves seria perder lo importante por no poder imprimir
       lo secundario.
     */
-    await this.certificates.emitirPorEjecucion(tenantId, enrollmentId).catch((error: unknown) => {
-      this.logger.error(`No se pudo emitir la constancia de ${enrollmentId}`, error as Error);
+    if (!esDeUnPrograma) {
+      await this.certificates.emitirPorEjecucion(tenantId, enrollmentId).catch((error: unknown) => {
+        this.logger.error(`No se pudo emitir la constancia de ${enrollmentId}`, error as Error);
+      });
+    }
+
+    /*
+      SI ESTA FORMACION ES MODULO DE ALGUN PROGRAMA, se recalcula su avance (2026-09-14). Mismo
+      patron que la constancia: fuera de la transaccion del cierre, con `catch`, porque el
+      registro formativo YA es un hecho consumado y no puede depender de si el programa se
+      actualiza bien. La inmensa mayoria de las formaciones no son modulo de nada, asi que
+      `alCompletarActividad` sale de inmediato en ese caso.
+    */
+    await this.programs.alCompletarActividad(tenantId, enrollment.userId, enrollment.activityVersion.activityId).catch((error: unknown) => {
+      this.logger.error(`No se pudo actualizar el avance de programa de ${enrollment.userId}`, error as Error);
     });
 
     return { status: finalStatus, missing: [], assignmentClosed };
@@ -294,8 +323,17 @@ export class CompletionService {
       decidiendo `emitirPorEjecucion` leyendo la cascada, igual que al cerrar por contenido.
     */
     if (!yaCerrada) {
-      await this.certificates.emitirPorEjecucion(tenantId, enrollment.id).catch((error: unknown) => {
-        this.logger.error(`No se pudo emitir la constancia de ${enrollment.id}`, error as Error);
+      // Mismo criterio que al cerrar por contenido: si es modulo de un programa publicado, la
+      // individual NO se emite. Ver `ProgramsService.esModuloDeUnProgramaPublicado`.
+      const esDeUnPrograma = await this.programs.esModuloDeUnProgramaPublicado(enrollment.activityVersion.activityId).catch(() => false);
+      if (!esDeUnPrograma) {
+        await this.certificates.emitirPorEjecucion(tenantId, enrollment.id).catch((error: unknown) => {
+          this.logger.error(`No se pudo emitir la constancia de ${enrollment.id}`, error as Error);
+        });
+      }
+      // Mismo gancho que al cerrar por contenido: ver la nota completa en `evaluateWith`.
+      await this.programs.alCompletarActividad(tenantId, enrollment.userId, enrollment.activityVersion.activityId).catch((error: unknown) => {
+        this.logger.error(`No se pudo actualizar el avance de programa de ${enrollment.userId}`, error as Error);
       });
     }
 
@@ -306,6 +344,30 @@ export class CompletionService {
    * Cierra la obligacion que esta ejecucion satisface. Si la persona lo hizo por su cuenta (sin
    * venir de una asignacion), igual se busca una obligacion viva de esa misma actividad: haberlo
    * hecho por iniciativa propia tambien cumple.
+   *
+   * ─── UNA POR REGLA, LA MAS ANTIGUA (2026-09-15) ───
+   *
+   * Antes era `findFirst`, y se quedaba corto: si la MISMA persona queda obligada por DOS REGLAS
+   * distintas sobre la MISMA formacion —el caso real que lo destapo: una formacion asignada suelta
+   * desde su ficha Y ademas exigida por un programa del que es modulo, a audiencias que se cruzan—
+   * nacen dos filas (el indice unico es por REGLA, no por persona+formacion:
+   * `@@unique([ruleId, userId, cycleNumber])`). Completar la formacion UNA vez cerraba solo una; la
+   * otra se quedaba viva para siempre aunque la persona ya la hubiera hecho.
+   *
+   * Pero "cerrarlas todas" se pasa de largo, y se lleva por delante la politica **ACUMULA**
+   * (`next-cycle.ts`, y en pantalla "Nace la nueva y sigue debiendo la anterior"): ahi la ronda sin
+   * hacer sigue VIVA a proposito mientras nace la siguiente — *"a los tres años debe tres"*. Con un
+   * barrido, una sola asistencia cerraria las tres y borraria tres años de incumplimiento del
+   * expediente, que es justo lo que esa politica existe para conservar.
+   *
+   * Las dos situaciones se distinguen solas y el criterio sale de ahi:
+   *
+   *   reglas distintas   `ruleId` distinto → es UNA cosa exigida por dos sitios. Se cierran las dos.
+   *   rondas acumuladas  MISMO `ruleId`, `cycleNumber` distinto → son PERIODOS distintos. Se paga
+   *                      la mas antigua (`dueAt` asc), una por vez, como hacia el `findFirst`.
+   *
+   * Asi que: se agrupa por regla y se cierra la mas antigua de cada grupo. Las manuales (`ruleId`
+   * nulo) forman un grupo entre ellas, por lo mismo.
    */
   private async closeAssignment(
     db: TenantPrisma,
@@ -318,21 +380,31 @@ export class CompletionService {
      */
     validUntilOverride: Date | null = null,
   ): Promise<boolean> {
-    const assignment = enrollment.assignmentId
-      ? await db.assignment.findUnique({ where: { id: enrollment.assignmentId } })
-      : await db.assignment.findFirst({
-          where: {
-            userId: enrollment.userId,
-            targetType: 'ACTIVITY',
-            targetId: enrollment.activityVersion.activityId,
-            status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
-          },
-          orderBy: { dueAt: 'asc' },
-        });
-    if (!assignment || assignment.status === 'COMPLETED') return false;
+    const candidatas = await db.assignment.findMany({
+      where: {
+        userId: enrollment.userId,
+        targetType: 'ACTIVITY',
+        targetId: enrollment.activityVersion.activityId,
+        status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
+      },
+      // Sin vencimiento va al final: una obligacion sin fecha no es mas antigua que ninguna.
+      orderBy: [{ dueAt: 'asc' }, { cycleNumber: 'asc' }],
+      select: { id: true, ruleId: true },
+    });
 
-    await db.assignment.update({
-      where: { id: assignment.id },
+    const vivas = obligacionesQueCierra(candidatas);
+
+    // La que origino ESTA inscripcion, por si por lo que sea no calzo en el filtro de arriba (no
+    // deberia pasar — mismo usuario, misma actividad, y una obligacion viva no cambia de targetId
+    // ni de persona — pero es la unica que se conoce con certeza, y no cuesta nada cubrirla).
+    if (enrollment.assignmentId && !candidatas.some((a) => a.id === enrollment.assignmentId)) {
+      const propia = await db.assignment.findUnique({ where: { id: enrollment.assignmentId }, select: { id: true, status: true } });
+      if (propia && propia.status !== 'COMPLETED') vivas.push(propia.id);
+    }
+    if (vivas.length === 0) return false;
+
+    await db.assignment.updateMany({
+      where: { id: { in: vivas } },
       data: {
         status: 'COMPLETED',
         completedAt,
@@ -399,12 +471,22 @@ export class CompletionService {
     enrollment: { id: string; userId: string; assignmentId: string | null; activityVersion: { activityId: string } },
     validUntil: Date | null,
   ): Promise<void> {
-    const assignment =
-      (await db.assignment.findFirst({ where: { completedEnrollmentId: enrollment.id } })) ??
-      (enrollment.assignmentId ? await db.assignment.findUnique({ where: { id: enrollment.assignmentId } }) : null);
-    if (!assignment) return;
-    if (assignment.validUntilOverride?.getTime() === validUntil?.getTime()) return;
-    await db.assignment.update({ where: { id: assignment.id }, data: { validUntilOverride: validUntil } });
+    // TODAS las que cerro esta inscripcion, no solo la primera: desde que `closeAssignment` cierra
+    // cada obligacion viva de esa formacion (2026-09-15), puede haber mas de una con el mismo
+    // `completedEnrollmentId`, y el papel del tercero vale para todas por igual.
+    const asignaciones = await db.assignment.findMany({ where: { completedEnrollmentId: enrollment.id } });
+    const candidatos =
+      asignaciones.length > 0
+        ? asignaciones
+        : enrollment.assignmentId
+          ? await db.assignment.findMany({ where: { id: enrollment.assignmentId } })
+          : [];
+    const porActualizar = candidatos.filter((a) => a.validUntilOverride?.getTime() !== validUntil?.getTime());
+    if (porActualizar.length === 0) return;
+    await db.assignment.updateMany({
+      where: { id: { in: porActualizar.map((a) => a.id) } },
+      data: { validUntilOverride: validUntil },
+    });
   }
 
   private async markStatus(db: TenantPrisma, enrollmentId: string, status: 'IN_PROGRESS' | 'FAILED'): Promise<void> {

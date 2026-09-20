@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -9,6 +9,7 @@ import {
   CalendarRange,
   CalendarX2,
   CheckCircle2,
+  ChevronRight,
   ClipboardList,
   FileText,
   Layers,
@@ -1021,7 +1022,7 @@ export default function PlanDetallePage() {
       ) : view === 'ejecucion' ? (
         <EjecucionDelPlan planId={params.id} metrics={metrics} goalPct={plan.goalPct} />
       ) : (
-        <ProcessTable plan={plan} />
+        <ProcessTable plan={plan} canAdd={canAdd} onAddSession={openNew} />
       )}
 
       {/* Camino principal: la jornada se crea AQUI y entra al plan de una. */}
@@ -1881,7 +1882,60 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function ProcessTable({ plan }: { plan: PlanDetail }) {
+/**
+ * POR PROCESO, Y LO QUE HAY DEBAJO: proceso -> capacitaciones -> convocatorias (2026-09-15).
+ *
+ * ─── POR QUE DEJO DE SER UNA TABLA PLANA ───
+ *
+ * Antes eran cinco numeros por proceso y ningun sitio al que ir. Quien audita SST lee "33
+ * programadas, 28 ejecutadas" y su pregunta siguiente es SIEMPRE la misma —**¿cuales?**— y para
+ * contestarla habia que salir de aqui, entrar a "Por capacitacion" y filtrar por proceso a mano. El
+ * dato ya estaba a mano; lo que faltaba es que la fila fuera una PUERTA.
+ *
+ * ─── CADA NIVEL RESPONDE UNA PREGUNTA DISTINTA, y por eso las columnas no se repiten ───
+ *
+ *   proceso        "¿vamos bien en SST este ano?"      -> el compromiso del ano
+ *   capacitacion   "¿que se dicta, y como va cada tema?" -> cada tema y sus jornadas
+ *   convocatoria   "¿que paso con esta jornada?"        -> el hecho concreto
+ *
+ * Repetir cumplimiento y cobertura en los tres niveles es lo que hace que un informe se sienta
+ * redundante, y ademas MIENTE en los de abajo: el cumplimiento de una capacitacion con dos jornadas
+ * solo puede valer 0, 50 o 100, y la cobertura de UNA jornada no significa nada — se dicto o no se
+ * dicto. Los porcentajes son del conjunto, asi que se quedan arriba.
+ *
+ * ─── LAS DOS COLUMNAS NUEVAS DE ARRIBA ───
+ *
+ *   Capacitaciones   "33 jornadas" no distingue 33 temas distintos de 4 temas repetidos 8 veces, y
+ *                    son dos planes muy diferentes.
+ *   Por dictar       El cumplimiento dice como ha ido; lo accionable es cuanto queda.
+ *
+ * Todo sale de `plan.items`, que ya trae el proceso de cada renglon: no hace falta pedir nada mas
+ * al servidor.
+ */
+function ProcessTable({
+  plan,
+  canAdd,
+  onAddSession,
+}: {
+  plan: PlanDetail;
+  /** Si el plan admite jornadas nuevas. Mismo criterio que la vista Por capacitación. */
+  canAdd: boolean;
+  onAddSession: (group: ActivityGroup) => void;
+}) {
+  const [procesoAbierto, setProcesoAbierto] = useState<string | null>(null);
+  const [capacitacionAbierta, setCapacitacionAbierta] = useState<string | null>(null);
+
+  const itemsPorProceso = useMemo(() => {
+    const mapa = new Map<string, PlanItemRow[]>();
+    for (const item of plan.items) {
+      const procesoId = item.offering.activityVersion.activity.process.id;
+      const lista = mapa.get(procesoId);
+      if (lista) lista.push(item);
+      else mapa.set(procesoId, [item]);
+    }
+    return mapa;
+  }, [plan.items]);
+
   if (plan.byProcess.length === 0) {
     return (
       <div className="card">
@@ -1889,12 +1943,19 @@ function ProcessTable({ plan }: { plan: PlanDetail }) {
       </div>
     );
   }
+
+  const abrirProceso = (procesoId: string) => {
+    setProcesoAbierto((actual) => (actual === procesoId ? null : procesoId));
+    setCapacitacionAbierta(null);
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="px-5 py-4">
         <h2 className="font-display text-base font-semibold text-ink-900">Por proceso</h2>
         <p className="mt-1 text-sm text-ink-500">
-          El plan SST, el PESV y el BASC son vistas del mismo plan: cada auditor mira su parte.
+          El plan SST, el PESV y el BASC son vistas del mismo plan: cada auditor mira su parte. Abre un proceso para ver
+          sus capacitaciones, y una capacitación para ver sus convocatorias.
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -1902,25 +1963,176 @@ function ProcessTable({ plan }: { plan: PlanDetail }) {
           <THead>
             <Tr>
               <Th>Proceso</Th>
+              <Th className="text-right">Capacitaciones</Th>
               <Th className="text-right">Programadas</Th>
               <Th className="text-right">Ejecutadas</Th>
+              <Th className="text-right">Por dictar</Th>
               <Th className="text-right">Cumplimiento</Th>
               <Th className="text-right">Cobertura</Th>
             </Tr>
           </THead>
           <TBody>
-            {plan.byProcess.map((group) => (
-              <Tr key={group.process.id}>
-                <Td className="font-medium text-ink-900">{group.process.name}</Td>
-                <Td className="text-right tabular-nums text-ink-700">{group.metrics.programmed}</Td>
-                <Td className="text-right tabular-nums text-ink-700">{group.metrics.executed}</Td>
-                <Td className="text-right tabular-nums text-ink-700">{group.metrics.compliancePct}%</Td>
-                <Td className="text-right tabular-nums text-ink-700">{group.metrics.coveragePct}%</Td>
-              </Tr>
-            ))}
+            {plan.byProcess.map((grupo) => {
+              const items = itemsPorProceso.get(grupo.process.id) ?? [];
+              const capacitaciones = groupByActivity(items);
+              const porDictar = items.filter((item) => item.status === 'PLANNED' || item.status === 'RESCHEDULED').length;
+              const abierto = procesoAbierto === grupo.process.id;
+              return (
+                <Fragment key={grupo.process.id}>
+                  <Tr>
+                    <Td className="font-medium text-ink-900">
+                      <button
+                        type="button"
+                        onClick={() => abrirProceso(grupo.process.id)}
+                        aria-expanded={abierto}
+                        className="focus-ring inline-flex items-center gap-1.5 rounded text-left font-medium text-ink-900 hover:underline"
+                      >
+                        <ChevronRight
+                          size={15}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                          className={cn('shrink-0 text-ink-500 transition-transform duration-150', abierto && 'rotate-90')}
+                        />
+                        {grupo.process.name}
+                      </button>
+                    </Td>
+                    <Td className="text-right tabular-nums text-ink-700">{capacitaciones.length}</Td>
+                    <Td className="text-right tabular-nums text-ink-700">{grupo.metrics.programmed}</Td>
+                    <Td className="text-right tabular-nums text-ink-700">{grupo.metrics.executed}</Td>
+                    <Td className="text-right tabular-nums text-ink-700">{porDictar}</Td>
+                    <Td className="text-right tabular-nums text-ink-700">{grupo.metrics.compliancePct}%</Td>
+                    <Td className="text-right tabular-nums text-ink-700">{grupo.metrics.coveragePct}%</Td>
+                  </Tr>
+                  {abierto ? (
+                    <Tr>
+                      <Td colSpan={7} className="bg-paper p-0">
+                        <CapacitacionesDelProceso
+                          capacitaciones={capacitaciones}
+                          abierta={capacitacionAbierta}
+                          onAbrir={(activityId) => setCapacitacionAbierta((actual) => (actual === activityId ? null : activityId))}
+                          canAdd={canAdd}
+                          onAddSession={onAddSession}
+                        />
+                      </Td>
+                    </Tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </TBody>
         </Table>
       </div>
+    </div>
+  );
+}
+
+/** Nivel 2: los TEMAS de un proceso. El eje ya no es el ano, es cada capacitacion y sus jornadas. */
+function CapacitacionesDelProceso({
+  capacitaciones,
+  abierta,
+  onAbrir,
+  canAdd,
+  onAddSession,
+}: {
+  capacitaciones: ActivityGroup[];
+  abierta: string | null;
+  onAbrir: (activityId: string) => void;
+  canAdd: boolean;
+  onAddSession: (group: ActivityGroup) => void;
+}) {
+  if (capacitaciones.length === 0) {
+    return <p className="px-5 py-4 text-sm text-ink-500">Este proceso no tiene renglones en el plan.</p>;
+  }
+  return (
+    <div className="divide-y divide-line">
+      {capacitaciones.map((capacitacion) => {
+        const abiertaEsta = abierta === capacitacion.activityId;
+        return (
+          <div key={capacitacion.activityId}>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => onAbrir(capacitacion.activityId)}
+                aria-expanded={abiertaEsta}
+                className="focus-ring inline-flex min-w-0 items-center gap-1.5 rounded text-left"
+              >
+                <ChevronRight
+                  size={15}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                  className={cn('shrink-0 text-ink-500 transition-transform duration-150', abiertaEsta && 'rotate-90')}
+                />
+                <span className="truncate text-sm font-medium text-ink-900">{capacitacion.activityName}</span>
+              </button>
+              <div className="flex shrink-0 items-center gap-4 text-xs text-ink-500">
+                <span className="tabular-nums">
+                  {capacitacion.executed} de {capacitacion.items.length}{' '}
+                  {capacitacion.items.length === 1 ? 'jornada' : 'jornadas'}
+                </span>
+                {/*
+                  Sin los MESES: los dice cada convocatoria un nivel mas abajo, con su fecha al
+                  lado. Repetirlos aqui llenaba la fila de algo que ya esta dentro, y con muchas
+                  jornadas la linea se hacia larguisima.
+                */}
+                <span className="tabular-nums">
+                  {capacitacion.trained} de {capacitacion.projected} {capacitacion.projected === 1 ? 'persona' : 'personas'}
+                </span>
+                {/* Programar otra jornada SIN salir de aqui: es la accion que sigue a ver lo que
+                    falta, y buscarla en otra vista era el unico motivo para cambiar de pestaña. */}
+                {canAdd ? (
+                  <Button size="sm" variant="ghost" onClick={() => onAddSession(capacitacion)}>
+                    <Plus size={14} />
+                    Convocatoria
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {abiertaEsta ? <ConvocatoriasDeLaCapacitacion items={capacitacion.items} /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Nivel 3: la jornada concreta. Aqui no hay porcentajes: se dicto o no se dicto. */
+function ConvocatoriasDeLaCapacitacion({ items }: { items: PlanItemRow[] }) {
+  return (
+    // Sangrada a la izquierda: sin eso la tabla queda a ras del borde de la tarjeta y no se lee
+    // como algo que CUELGA de la capacitacion, sino como otra tabla mas.
+    <div className="overflow-x-auto border-t border-line bg-surface pl-6">
+      <Table>
+        <THead>
+          <Tr>
+            <Th>Convocatoria</Th>
+            <Th>Mes</Th>
+            <Th>Fecha</Th>
+            <Th>Regional</Th>
+            <Th className="text-right">Asistieron</Th>
+            <Th>Estado</Th>
+          </Tr>
+        </THead>
+        <TBody>
+          {items.map((item) => (
+            <Tr key={item.id}>
+              <Td>
+                <Link href={`/convocatorias/${item.offering.id}`} className="focus-ring font-mono text-xs text-ink-700 hover:underline">
+                  {item.offering.code}
+                </Link>
+              </Td>
+              <Td className="text-ink-700">{monthName(item.plannedMonth)}</Td>
+              <Td className="text-ink-700">{item.offering.scheduledDate ? formatDate(item.offering.scheduledDate) : '—'}</Td>
+              <Td className="text-ink-700">{item.offering.regional?.name ?? '—'}</Td>
+              <Td className="text-right tabular-nums text-ink-700">
+                {item.facts?.trained ?? 0} de {item.projectedSnapshot ?? item.offering.projectedCount ?? 0}
+              </Td>
+              <Td>
+                <StatusPill kind={ITEM_STATUS[item.status].kind} label={ITEM_STATUS[item.status].label} />
+              </Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
     </div>
   );
 }

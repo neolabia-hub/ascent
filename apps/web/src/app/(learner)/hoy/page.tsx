@@ -8,20 +8,28 @@ import {
   CircleCheck,
   Clock,
   Hourglass,
+  Layers,
   Play,
   Repeat2,
   Sparkles,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ApiError } from '@/lib/api';
 import { getPending, getTodayReview, selfEnroll, type PendingItem, type TodayReview } from '@/lib/learner-api';
+import { getMyPrograms, type MyProgram } from '@/lib/programs-api';
 import { ActivityCover } from '@/components/modules/activity-cover';
+import { ProgressRing } from '@/components/ui/progress-ring';
 import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { estadoVisual } from './estado-visual';
+
+/** Mismo color fijo que usa la ficha de un programa en administración: reconocible sin leer. */
+const COLOR_PROGRAMA = '#4338ca';
+const PROGRAMAS = '__programas__';
 
 /**
  * HOY: una BIBLIOTECA, no una lista de tareas (Decision #89).
@@ -54,6 +62,7 @@ const TODOS = '__todos__';
 export default function TodayPage() {
   const [pending, setPending] = useState<PendingItem[] | null>(null);
   const [review, setReview] = useState<TodayReview | null>(null);
+  const [programs, setPrograms] = useState<MyProgram[] | null>(null);
   const [tipo, setTipo] = useState<string>(TODOS);
 
   useEffect(() => {
@@ -72,10 +81,31 @@ export default function TodayPage() {
       .catch(() => {
         if (!cancelled) setReview(null);
       });
+    void getMyPrograms()
+      .then((response) => {
+        if (!cancelled) setPrograms(response);
+      })
+      .catch(() => {
+        if (!cancelled) setPrograms([]);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  /*
+    SOLO LOS QUE TODAVIA NO TERMINARON (2026-09-15): "Hoy" es lo que falta por hacer, no el
+    historial — un programa COMPLETED no tiene nada que "hoy" deba proponer. Lo empezado
+    (`progressPct > 0`) va primero dentro del propio grupo, misma regla que separa "Sigue donde
+    ibas" de "Cuando puedas" para las formaciones sueltas: terminar cuesta menos que arrancar.
+  */
+  const programasPendientes = useMemo(
+    () =>
+      (programs ?? [])
+        .filter((p) => p.estado !== 'COMPLETED')
+        .sort((a, b) => b.progressPct - a.progressPct),
+    [programs],
+  );
 
   /** Los tipos que esta persona TIENE, con su color. Nunca el catalogo entero de la empresa. */
   const tipos = useMemo(() => {
@@ -182,7 +212,7 @@ export default function TodayPage() {
 
   const hayRepaso = review !== null && review.total > 0;
 
-  if (pending.length === 0 && !hayRepaso) {
+  if (pending.length === 0 && !hayRepaso && programasPendientes.length === 0) {
     return (
       <EmptyState
         icon={CircleCheck}
@@ -202,14 +232,36 @@ export default function TodayPage() {
       {protagonistas.length > 0 ? <Protagonista items={protagonistas} /> : null}
 
       <div className="px-4 sm:px-6">
-        {tipos.length > 1 ? <FiltrosPorTipo tipos={tipos} activo={tipo} onChange={setTipo} total={pending.length} /> : null}
+        {tipos.length > 1 || programasPendientes.length > 0 ? (
+          <FiltrosPorTipo
+            tipos={tipos}
+            activo={tipo}
+            onChange={setTipo}
+            total={pending.length}
+            programas={programasPendientes.length > 0 ? programasPendientes.length : undefined}
+          />
+        ) : null}
 
         {hayRepaso ? <FilaRepaso review={review} /> : null}
 
-        {filas.length === 0 ? (
-          <p className="py-16 text-center text-sm text-ink-300">
-            Nada de ese tipo ahora mismo.
-          </p>
+        {/*
+          LOS PROGRAMAS VAN PRIMERO, no intercalados por fecha con las formaciones sueltas
+          (2026-09-15): un programa no tiene una unica fecha de vencimiento —la tienen sus
+          modulos, cada uno la suya— asi que no hay con que compararlo item a item contra
+          "Para esta semana". Se resuelve con la MISMA idea que ya separa "Sigue donde ibas" de
+          "Cuando puedas": lo empezado se nota antes que lo que no, y ESO es lo que ordena
+          `programasPendientes`.
+        */}
+        {(tipo === TODOS || tipo === PROGRAMAS) && programasPendientes.length > 0 ? (
+          <FilaProgramas items={programasPendientes} />
+        ) : null}
+
+        {tipo === PROGRAMAS ? null : filas.length === 0 ? (
+          programasPendientes.length === 0 ? (
+            <p className="py-16 text-center text-sm text-ink-300">
+              Nada de ese tipo ahora mismo.
+            </p>
+          ) : null
         ) : (
           filas.map((fila) => <Fila key={fila.clave} titulo={fila.titulo} nota={fila.nota} items={fila.items} />)
         )}
@@ -230,15 +282,31 @@ function FiltrosPorTipo({
   activo,
   onChange,
   total,
+  programas,
 }: {
   tipos: Array<{ nombre: string; color: string | null; cuantos: number }>;
   activo: string;
   onChange: (valor: string) => void;
   total: number;
+  /** Cuantos programas quedan sin terminar. `undefined` = no ofrecer la pastilla. */
+  programas?: number;
 }) {
   return (
     <div className="rail -mx-4 mt-7 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label="Filtrar por tipo">
-      <Chip label="Todo" cuantos={total} activo={activo === TODOS} onClick={() => onChange(TODOS)} />
+      <Chip label="Todo" cuantos={total + (programas ?? 0)} activo={activo === TODOS} onClick={() => onChange(TODOS)} />
+      {/*
+        LOS PROGRAMAS SON OTRO EJE, no un tipo mas: por eso llevan su propio color fijo —el mismo
+        de su ficha en administracion— y no el que le toque a un tipo de formacion cualquiera.
+      */}
+      {programas !== undefined ? (
+        <Chip
+          label="Programas"
+          color={COLOR_PROGRAMA}
+          cuantos={programas}
+          activo={activo === PROGRAMAS}
+          onClick={() => onChange(PROGRAMAS)}
+        />
+      ) : null}
       {tipos.map((tipo) => (
         <Chip
           key={tipo.nombre}
@@ -540,6 +608,96 @@ function Fila({ titulo, nota, items }: { titulo: string; nota?: string; items: P
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * LA FILA DE PROGRAMAS (2026-09-15). Misma forma que `Fila` —carril horizontal, mismo titulo,
+ * mismos botones de desplazar— porque es la misma idea de "biblioteca" aplicada a otra cosa: un
+ * programa tambien es algo que se recorre, solo que por debajo agrupa varias formaciones.
+ */
+function FilaProgramas({ items }: { items: MyProgram[] }) {
+  const rail = useRef<HTMLDivElement | null>(null);
+  const mover = (direccion: -1 | 1) => {
+    const nodo = rail.current;
+    if (!nodo) return;
+    nodo.scrollBy({ left: direccion * Math.max(280, nodo.clientWidth * 0.8), behavior: 'smooth' });
+  };
+
+  return (
+    <section className="group/fila mt-9">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Layers size={18} style={{ color: COLOR_PROGRAMA }} strokeWidth={1.75} aria-hidden="true" />
+          <h2 className="font-display text-lg font-semibold text-ink-900">Programas</h2>
+        </div>
+        <div className="hidden shrink-0 gap-1 opacity-0 transition-opacity group-hover/fila:opacity-100 md:flex">
+          {[-1, 1].map((direccion) => (
+            <button
+              key={direccion}
+              type="button"
+              onClick={() => mover(direccion as -1 | 1)}
+              aria-label={`Desplazar "Programas" hacia ${direccion === -1 ? 'atras' : 'adelante'}`}
+              className="focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-ink-700 transition-colors hover:border-line-strong hover:text-ink-900"
+            >
+              {direccion === -1 ? (
+                <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
+              ) : (
+                <ChevronRight className="h-5 w-5" strokeWidth={1.75} />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div ref={rail} className="rail -mx-4 flex gap-3.5 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        {items.map((item, indice) => (
+          <TarjetaPrograma key={item.id} item={item} indice={indice} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** La tarjeta de un programa: misma silueta que `Tarjeta`, con el avance en anillo en vez de barra. */
+function TarjetaPrograma({ item, indice }: { item: MyProgram; indice: number }) {
+  const aprobados = item.modulos.filter((m) => m.aprobado).length;
+  return (
+    <Link
+      href={`/programa/${item.id}`}
+      style={{ animationDelay: `${Math.min(indice, 5) * 60}ms` }}
+      className="poster stage-in group/t relative flex w-[260px] shrink-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface text-left shadow-card transition-shadow duration-200 hover:shadow-card-hover sm:w-[280px]"
+    >
+      <div className="relative overflow-hidden">
+        <ActivityCover seed={item.id} colorHex={COLOR_PROGRAMA} variant="tile" className="w-full rounded-none" />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
+        <span className="absolute bottom-2.5 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/30 px-2.5 py-1 text-[11px] font-semibold text-white shadow-btn-flat backdrop-blur-sm">
+          PROGRAMA
+        </span>
+        <span className="absolute right-2.5 top-2.5 rounded-full bg-black/35 p-1 backdrop-blur-sm">
+          <ProgressRing value={item.progressPct} size={28} showLabel={false} />
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: COLOR_PROGRAMA }}>
+          Programa
+        </p>
+        <h3 className="mt-1 line-clamp-2 min-h-[2.6em] text-[15px] font-semibold leading-snug text-ink-900">
+          {item.name}
+        </h3>
+        <p className="mt-2.5 text-xs text-ink-500">
+          {aprobados} de {item.modulos.length} módulos aprobados
+        </p>
+
+        <div className="mt-auto pt-3.5">
+          <span className="focus-ring inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-surface text-sm font-semibold text-ink-900 transition-colors duration-200 group-hover/t:border-transparent group-hover/t:bg-[var(--brand-primary)] group-hover/t:text-white">
+            {aprobados > 0 ? 'Continuar' : 'Ver módulos'}
+            <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 

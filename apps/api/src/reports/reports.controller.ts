@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Param, Post, Query, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, StreamableFile } from '@nestjs/common';
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { ReviewDigestService } from '../engagement/review-digest.service.js';
@@ -135,6 +135,23 @@ export class ReportsController {
     const pedidos = Number(meses);
     const horizonte = Number.isFinite(pedidos) ? Math.min(24, Math.max(1, Math.trunc(pedidos))) : 12;
     return this.reports.vencimientos(horizonte);
+  }
+
+  /**
+   * COMO VA CADA PROGRAMA. Mismo permiso que el resto de Seguimiento: es la misma pregunta de
+   * cumplimiento, hecha sobre el conjunto en vez de sobre cada formacion suelta.
+   */
+  @Get('programas')
+  @RequirePermissions('reports:read_scope')
+  programas() {
+    return this.reports.programas();
+  }
+
+  /** Abrir un programa: quienes son los que faltan y que les falta. */
+  @Get('programas/:pathId')
+  @RequirePermissions('reports:read_scope')
+  programaDetalle(@Param('pathId', ParseUUIDPipe) pathId: string) {
+    return this.reports.programaDetalle(pathId);
   }
 
   /**

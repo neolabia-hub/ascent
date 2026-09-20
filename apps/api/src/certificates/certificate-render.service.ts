@@ -93,7 +93,9 @@ export class CertificateRenderService {
         typeName: 'Capacitacion del plan',
         versionNumber: 3,
         hours: 8,
-        syllabus: {},
+        // De muestra en forma de PROGRAMA (lista de modulos), para que el campo "Modulos" tenga
+        // algo que enseñar al colocarlo: sin esto, quien lo enciende no ve nada que arrastrar.
+        syllabus: [{ name: 'Gestion Humana' }, { name: 'Seguridad y Salud en el Trabajo' }, { name: 'Comercial' }],
         responsibleName: null,
         responsibleJobTitle: null,
       },

@@ -50,7 +50,9 @@ describe('alcance de una asignacion manual', () => {
     expect(criterios({ jobTitleIds: [AUXILIAR], areaIds: [LOGISTICA], regionalIds: [ANTIOQUIA] })).toMatchObject({
       AND: [
         { jobTitleId: { in: [AUXILIAR] } },
-        { areaId: { in: [LOGISTICA] } },
+        // El area alcanza tambien a sus SUB-AREAS (2026-09-17): ya no es una igualdad sobre
+        // `areaId` sino un filtro de relacion. Ver la faceta de area en `audience-rule.ts`.
+        { area: { OR: [{ id: { in: [LOGISTICA] } }, { parentId: { in: [LOGISTICA] } }] } },
         { regionalId: { in: [ANTIOQUIA] } },
       ],
     });

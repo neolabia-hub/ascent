@@ -1,7 +1,7 @@
 'use client';
 
-import { Activity, ArrowLeft, Award, CalendarClock, Download, PieChart, Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, ArrowLeft, Award, CalendarClock, ChevronRight, Download, Layers, PieChart, Search } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ESTADOS,
@@ -9,6 +9,10 @@ import {
   descargarEjecucionGeneralXlsx,
   getEjecucionDeActividad,
   getEjecucionGeneral,
+  getProgramaDetalle,
+  getProgramas,
+  type FilaPrograma,
+  type PersonaDePrograma,
   type EstadoEjecucion,
   type FilaGeneral,
   type FilaPersona,
@@ -63,11 +67,16 @@ import { usePaginacion } from '@/components/ui/use-paginacion';
  *   EJECUCION     "¿como va esta formacion y quien la ha hecho?"  -> para ir detras de alguien.
  *   ANALITICA     "¿donde esta el problema?"                       -> para decidir donde mirar.
  *   VENCIMIENTOS  "¿que se me viene encima?"                       -> para programar el año.
+ *   PROGRAMAS     "¿cuanta gente tiene el conjunto completo?"      -> y que lo esta frenando.
  *
- * Son tres publicos y tres momentos distintos, y por eso son pestanas y no filtros de una misma
- * pantalla: quien entra a decidir no quiere pasar antes por una lista de doscientas formaciones.
+ * Son publicos y momentos distintos, y por eso son pestanas y no filtros de una misma pantalla:
+ * quien entra a decidir no quiere pasar antes por una lista de doscientas formaciones.
+ *
+ * PROGRAMAS entro el 2026-09-16 porque ninguna de las otras tres podia contestar su pregunta: todas
+ * hablan de formaciones sueltas, y un programa de 8 modulos exigido a 660 personas salia como 5.280
+ * renglones. El producto certifica el conjunto; el informe tenia que saberlo.
  */
-type Pestana = 'ejecucion' | 'analitica' | 'vencimientos';
+type Pestana = 'ejecucion' | 'analitica' | 'vencimientos' | 'programas';
 
 export default function ReportesPage() {
   /*
@@ -80,7 +89,7 @@ export default function ReportesPage() {
   const search = useSearchParams();
   const pedida = search.get('vista');
   const [pestana, setPestana] = useState<Pestana>(
-    pedida === 'vencimientos' || pedida === 'analitica' ? pedida : 'ejecucion',
+    pedida === 'vencimientos' || pedida === 'analitica' || pedida === 'programas' ? pedida : 'ejecucion',
   );
 
   return (
@@ -100,7 +109,10 @@ export default function ReportesPage() {
           icon={CalendarClock}
           label="Vencimientos"
         />
+        <TabSeguimiento id="programas" activa={pestana} onSelect={setPestana} icon={Layers} label="Programas" />
       </div>
+
+      {pestana === 'programas' ? <VistaProgramas /> : null}
 
       {pestana === 'ejecucion' ? <VistaEjecucion /> : null}
       {/*
@@ -154,6 +166,194 @@ function TabSeguimiento({
       <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
       {label}
     </button>
+  );
+}
+
+/**
+ * COMO VA CADA PROGRAMA (2026-09-16).
+ *
+ * La columna que justifica la pantalla es **"Lo que más frena"**, no el porcentaje: de la gente que
+ * no ha terminado, qué módulo es el que más personas tienen sin aprobar. Una sola convocatoria de
+ * esa formación cierra el programa de decenas a la vez — y sin esa columna hay que abrir persona
+ * por persona para descubrir que a casi todas les falta lo mismo.
+ */
+function VistaProgramas() {
+  const [filas, setFilas] = useState<FilaPrograma[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [abierto, setAbierto] = useState<string | null>(null);
+
+  useEffect(() => {
+    getProgramas()
+      .then(setFilas)
+      .catch((e: unknown) => setError(motivoDelError(e) ?? 'No se pudo cargar'));
+  }, []);
+
+  if (error) {
+    return <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>;
+  }
+  if (!filas) return <Skeleton className="h-64 w-full" />;
+  if (filas.length === 0) {
+    return (
+      <div className="card">
+        <EmptyState
+          icon={Layers}
+          title="Todavía no hay programas publicados"
+          description="Un programa agrupa varias formaciones y se certifica como un conjunto. Aparecen aquí al publicarlos."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-5 py-4">
+        <h2 className="font-display text-base font-semibold text-ink-900">Cómo va cada programa</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Cuenta a quien se le exige el programa, haya empezado o no. Un programa se da por completo cuando su regla de
+          aprobación se cumple y no le queda ningún módulo pendiente.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <THead>
+            <Tr>
+              {/* Los módulos van bajo el nombre y no en columna propia: con ocho columnas la tabla
+                  no cabía y el nombre del programa se partía en cinco líneas. */}
+              <Th className="min-w-[15rem]">Programa</Th>
+              <Th className="whitespace-nowrap text-right">Se le exige a</Th>
+              <Th className="whitespace-nowrap text-right">Completos</Th>
+              <Th className="whitespace-nowrap text-right">A falta de 1</Th>
+              <Th className="whitespace-nowrap text-right">Sin empezar</Th>
+              <Th className="whitespace-nowrap text-right">Cumplimiento</Th>
+              <Th className="whitespace-nowrap">Lo que más frena</Th>
+            </Tr>
+          </THead>
+          <TBody>
+            {filas.map((fila) => (
+              <Fragment key={fila.id}>
+                <Tr>
+                  <Td className="font-medium text-ink-900">
+                    <button
+                      type="button"
+                      onClick={() => setAbierto((actual) => (actual === fila.id ? null : fila.id))}
+                      aria-expanded={abierto === fila.id}
+                      className="focus-ring inline-flex items-center gap-1.5 rounded text-left font-medium text-ink-900 hover:underline"
+                    >
+                      <ChevronRight
+                        size={15}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                        className={cn('shrink-0 text-ink-500 transition-transform duration-150', abierto === fila.id && 'rotate-90')}
+                      />
+                      <span className="min-w-0">
+                        <span className="block">{fila.name}</span>
+                        <span className="block text-xs font-normal text-ink-500">
+                          {fila.modulos} {fila.modulos === 1 ? 'módulo' : 'módulos'}
+                        </span>
+                      </span>
+                    </button>
+                  </Td>
+                  <Td className="text-right tabular-nums text-ink-700">{fila.alcanzados}</Td>
+                  <Td className="text-right tabular-nums text-ink-700">{fila.completos}</Td>
+                  {/* Dos cifras que piden acciones distintas: a quien le falta uno se le programa una
+                      jornada; a quien no ha empezado hay que llamarlo. */}
+                  <Td className="text-right tabular-nums text-ink-700">{fila.aFaltaDeUno}</Td>
+                  <Td className="text-right tabular-nums text-ink-700">{fila.sinEmpezar}</Td>
+                  <Td className="text-right tabular-nums text-ink-700">{fila.cumplimientoPct}%</Td>
+                  <Td className="text-ink-700">
+                    {fila.cuelloDeBotella ? (
+                      <span>
+                        <span className="truncate">{fila.cuelloDeBotella.name}</span>
+                        <span className="ml-2 whitespace-nowrap text-xs text-ink-500">
+                          {fila.cuelloDeBotella.sinHacer > 0 ? `${fila.cuelloDeBotella.sinHacer} sin hacer` : null}
+                          {fila.cuelloDeBotella.sinHacer > 0 && fila.cuelloDeBotella.reprobados > 0 ? ' · ' : null}
+                          {fila.cuelloDeBotella.reprobados > 0 ? `${fila.cuelloDeBotella.reprobados} reprobados` : null}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-ink-500">—</span>
+                    )}
+                  </Td>
+                </Tr>
+                {abierto === fila.id ? (
+                  <Tr>
+                    <Td colSpan={7} className="bg-paper p-0">
+                      <PersonasDelPrograma pathId={fila.id} />
+                    </Td>
+                  </Tr>
+                ) : null}
+              </Fragment>
+            ))}
+          </TBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * QUIENES FALTAN EN UN PROGRAMA, ordenados por lo que les falta.
+ *
+ * Los completos van al final: la lista existe para perseguir, no para felicitar. Y entre los que
+ * faltan, primero los que estan mas cerca — a esos los cierra una sola convocatoria.
+ */
+function PersonasDelPrograma({ pathId }: { pathId: string }) {
+  const [personas, setPersonas] = useState<PersonaDePrograma[] | null>(null);
+
+  useEffect(() => {
+    getProgramaDetalle(pathId)
+      .then((r) => setPersonas(r?.personas ?? []))
+      .catch(() => setPersonas([]));
+  }, [pathId]);
+
+  if (!personas) return <Skeleton className="m-4 h-24" />;
+  if (personas.length === 0) {
+    return <p className="px-5 py-4 text-sm text-ink-500">Todavía no hay nadie con este programa exigido.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto border-t border-line bg-surface">
+      <Table>
+        <THead>
+          <Tr>
+            <Th>Persona</Th>
+            <Th>Cargo</Th>
+            <Th className="whitespace-nowrap text-right">Avance</Th>
+            <Th>Le falta</Th>
+          </Tr>
+        </THead>
+        <TBody>
+          {personas.map((persona) => (
+            <Tr key={persona.userId}>
+              <Td>
+                <span className="font-medium text-ink-900">{persona.fullName}</span>
+                <span className="ml-2 font-mono text-xs text-ink-500">{persona.documentNumber}</span>
+              </Td>
+              <Td className="text-ink-700">{persona.jobTitle ?? '—'}</Td>
+              <Td className="whitespace-nowrap text-right tabular-nums text-ink-700">
+                {persona.aprobados} de {persona.exigidos}
+              </Td>
+              <Td className="text-ink-700">
+                {persona.completo ? (
+                  <span className="text-xs text-ok">Completo</span>
+                ) : (
+                  <span className="flex flex-wrap gap-x-2 gap-y-1 text-xs">
+                    {persona.faltan.map((m) => (
+                      <span key={m.activityId} className="text-ink-700">
+                        {m.name}
+                        {/* "Lo intentó y lo perdió" pide revisar el contenido; "no lo ha hecho",
+                            programar una jornada. Sin distinguirlo, se actúa a ciegas. */}
+                        <span className="ml-1 text-ink-500">{m.intentado ? '(reprobado)' : '(sin hacer)'}</span>
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
+    </div>
   );
 }
 

@@ -748,6 +748,293 @@ export class ReportsService {
    * pantalla a proposito — un calculo paralelo "para el aviso" acabaria diciendo un numero distinto
    * del que se ve al entrar, y entonces no se creeria ninguno de los dos.
    */
+  /**
+   * COMO VA CADA PROGRAMA, Y QUE LO ESTA FRENANDO (2026-09-16).
+   *
+   * ─── EL HUECO QUE TAPA ───
+   *
+   * Ningun informe sabia que existen los programas. Un programa de 8 modulos exigido a 660 personas
+   * salia en Seguimiento como **5.280 renglones sueltos**, y la pregunta que el cliente hace de
+   * verdad —*"¿cuanta gente tiene la Induccion General completa?"*— no se podia contestar sin
+   * sumarlos a mano. El producto certifica el CONJUNTO y los informes solo hablaban de las partes.
+   *
+   * ─── Y LO QUE LO HACE UTIL, QUE NO ES EL PORCENTAJE ───
+   *
+   * El % de completos dice COMO VA; no dice QUE HACER. Lo accionable es el **cuello de botella**:
+   * de los que no han terminado, ¿que modulo es el que mas gente tiene sin aprobar? Con eso, una
+   * sola convocatoria de esa formacion cierra el programa de decenas de personas a la vez. Sin eso,
+   * el informe obliga a abrir persona por persona para descubrir que a casi todas les falta lo
+   * mismo.
+   *
+   * ─── EL DENOMINADOR ES A QUIEN SE LE EXIGE, no quien tiene inscripcion ───
+   *
+   * `PathEnrollment` solo nace cuando alguien cierra su primer modulo, asi que contar por ahi
+   * dejaria fuera justo a quien no ha empezado — que es la gente a la que hay que perseguir. Se
+   * cuenta por OBLIGACION: quien tiene una `Assignment` de cualquier modulo esta dentro del
+   * programa, haya hecho algo o no.
+   */
+  async programas() {
+    const programas = await this.prisma.scoped.learningPath.findMany({
+      where: { status: 'PUBLISHED', active: true },
+      include: { items: true },
+      orderBy: { name: 'asc' },
+    });
+    if (programas.length === 0) return [];
+
+    const idsDeActividad = [
+      ...new Set(programas.flatMap((p) => p.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId))),
+    ];
+    const [actividades, asignaciones, inscripciones, cursadas] = await Promise.all([
+      idsDeActividad.length
+        ? this.prisma.scoped.activity.findMany({ where: { id: { in: idsDeActividad } }, select: { id: true, name: true } })
+        : [],
+      idsDeActividad.length
+        ? this.prisma.scoped.assignment.findMany({
+            where: { targetType: 'ACTIVITY', targetId: { in: idsDeActividad } },
+            orderBy: { cycleNumber: 'desc' },
+            select: { userId: true, targetId: true, status: true },
+          })
+        : [],
+      this.prisma.scoped.pathEnrollment.findMany({
+        where: { pathId: { in: programas.map((p) => p.id) } },
+        orderBy: { cycleNumber: 'desc' },
+        select: { pathId: true, userId: true, status: true },
+      }),
+      // Quien INTENTO un modulo, aprobado o no: es lo que separa "no lo ha hecho" de "lo reprobo".
+      idsDeActividad.length
+        ? this.prisma.scoped.enrollment.findMany({
+            where: { activityVersion: { activityId: { in: idsDeActividad } } },
+            select: { userId: true, activityVersion: { select: { activityId: true } } },
+          })
+        : [],
+    ]);
+    const nombrePorActividad = new Map(actividades.map((a) => [a.id, a.name]));
+    const intentos = new Set(cursadas.map((e) => `${e.userId}:${e.activityVersion.activityId}`));
+
+    // Ordenadas por ciclo desc: la primera que se ve de cada par ES la vigente.
+    const vigente = new Map<string, string>();
+    for (const a of asignaciones) {
+      const clave = `${a.userId}:${a.targetId}`;
+      if (!vigente.has(clave)) vigente.set(clave, a.status);
+    }
+    const inscripcionVigente = new Map<string, string>();
+    for (const i of inscripciones) {
+      const clave = `${i.userId}:${i.pathId}`;
+      if (!inscripcionVigente.has(clave)) inscripcionVigente.set(clave, i.status);
+    }
+
+    return programas.map((programa) => {
+      const modulos = new Set(programa.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId));
+      /*
+        LAS RETIRADAS NO CUENTAN, NI ARRIBA NI ABAJO (2026-09-16).
+
+        `WITHDRAWN_LEFT_AUDIENCE` es quien salio de la audiencia: el programa **ya no le aplica**.
+        Contarlas inflaba las dos cifras que mas importan — en el tenant de dev, 170 de las 172
+        "alcanzadas" eran retiradas, y el cuello de botella decia "166 sin hacer" sobre gente a la
+        que nadie le exige nada. Un informe que cuenta obligaciones muertas manda a perseguir a
+        quien no debe nada.
+      */
+      const vigenteParaElPrograma = (userId: string, activityId: string) => {
+        const estado = vigente.get(`${userId}:${activityId}`);
+        return estado && !estado.startsWith('WITHDRAWN') ? estado : null;
+      };
+
+      const alcanzados = new Set<string>();
+      for (const a of asignaciones) {
+        if (modulos.has(a.targetId) && vigenteParaElPrograma(a.userId, a.targetId)) alcanzados.add(a.userId);
+      }
+
+      let completos = 0;
+      let aFaltaDeUno = 0;
+      let sinEmpezar = 0;
+      /*
+        EL CUELLO DE BOTELLA SE PARTE EN DOS, porque son dos problemas opuestos (2026-09-16).
+
+        Un modulo que mucha gente tiene atascado puede serlo por dos razones que piden acciones
+        contrarias: **no lo han hecho** (falta programar una convocatoria) o **lo intentaron y lo
+        reprobaron** (hay algo que revisar en el contenido o en la dificultad). Contados juntos, el
+        numero manda a hacer lo que no era la mitad de las veces.
+
+        Se distingue por el `Enrollment`: si existe uno de esa persona para ese modulo, lo intento.
+      */
+      const frenanPorModulo = new Map<string, { sinHacer: number; reprobados: number }>();
+      for (const userId of alcanzados) {
+        if (inscripcionVigente.get(`${userId}:${programa.id}`) === 'COMPLETED') {
+          completos += 1;
+          continue;
+        }
+        let leFaltan = 0;
+        let aprobadosDeLaPersona = 0;
+        let tocoAlgo = false;
+        // De los que NO han terminado: que modulos tienen sin aprobar. Un modulo que esa persona no
+        // tiene asignado no la frena — no se le debe.
+        for (const activityId of modulos) {
+          const estado = vigenteParaElPrograma(userId, activityId);
+          if (!estado) continue;
+          if (estado === 'COMPLETED') {
+            aprobadosDeLaPersona += 1;
+            tocoAlgo = true;
+            continue;
+          }
+          // EXIMIDA esta resuelta: el cupo la absorbe y no frena a nadie.
+          if (estado === 'WAIVED') continue;
+          leFaltan += 1;
+          const intentado = intentos.has(`${userId}:${activityId}`);
+          if (intentado) tocoAlgo = true;
+          const actual = frenanPorModulo.get(activityId) ?? { sinHacer: 0, reprobados: 0 };
+          if (intentado) actual.reprobados += 1;
+          else actual.sinHacer += 1;
+          frenanPorModulo.set(activityId, actual);
+        }
+        /*
+          "A FALTA DE UNO" EXIGE HABER APROBADO ALGO (2026-09-16).
+
+          Sin esa condicion, quien solo tiene UN modulo exigido y no lo ha hecho contaba a la vez
+          como "a falta de 1" y como "sin empezar" — las dos columnas se solapaban y sumaban mas que
+          el total. Y sobre todo decia lo contrario de lo que significa: la cifra existe para
+          senalar a quien esta A PUNTO, no a quien no ha empezado.
+        */
+        if (leFaltan === 1 && aprobadosDeLaPersona > 0) aFaltaDeUno += 1;
+        if (!tocoAlgo) sinEmpezar += 1;
+      }
+
+      const peor = [...frenanPorModulo.entries()].sort((a, b) => b[1].sinHacer + b[1].reprobados - (a[1].sinHacer + a[1].reprobados))[0];
+      return {
+        id: programa.id,
+        code: programa.code,
+        name: programa.name,
+        modulos: modulos.size,
+        alcanzados: alcanzados.size,
+        completos,
+        enCurso: alcanzados.size - completos,
+        cumplimientoPct: alcanzados.size === 0 ? 0 : Math.round((completos / alcanzados.size) * 100),
+        /** Les falta UN solo modulo. Es a quien mas rinde perseguir: una jornada y cierran. */
+        aFaltaDeUno,
+        /** No han tocado NADA del programa. Es un problema distinto: no han entrado. */
+        sinEmpezar,
+        cuelloDeBotella: peor
+          ? {
+              activityId: peor[0],
+              name: nombrePorActividad.get(peor[0]) ?? '',
+              personas: peor[1].sinHacer + peor[1].reprobados,
+              sinHacer: peor[1].sinHacer,
+              reprobados: peor[1].reprobados,
+            }
+          : null,
+      };
+    });
+  }
+
+  /**
+   * ABRIR UN PROGRAMA: ¿QUIENES SON LOS QUE FALTAN? (2026-09-16)
+   *
+   * Es el mismo hueco que este modulo existe para tapar, un nivel mas arriba: habia un porcentaje y
+   * ninguna forma de abrirlo. "0% de 172" no dice a quien llamar.
+   *
+   * **Ordenado por lo que les FALTA, de menos a mas**, y esa es la decision que hace util la lista:
+   * quien va a falta de un modulo se cierra con una convocatoria, y quien no ha empezado necesita
+   * otra conversacion. Puestos por nombre, los dos grupos quedan mezclados y hay que leerse los 172.
+   */
+  async programaDetalle(pathId: string) {
+    const programa = await this.prisma.scoped.learningPath.findUnique({ where: { id: pathId }, include: { items: true } });
+    if (!programa) return null;
+
+    const idsDeActividad = programa.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId);
+    if (idsDeActividad.length === 0) return { programa: { id: programa.id, name: programa.name }, personas: [] };
+
+    const [actividades, asignaciones, inscripciones, cursadas] = await Promise.all([
+      this.prisma.scoped.activity.findMany({ where: { id: { in: idsDeActividad } }, select: { id: true, name: true } }),
+      this.prisma.scoped.assignment.findMany({
+        where: { targetType: 'ACTIVITY', targetId: { in: idsDeActividad } },
+        orderBy: { cycleNumber: 'desc' },
+        select: {
+          userId: true,
+          targetId: true,
+          status: true,
+          dueAt: true,
+          user: { select: { id: true, fullName: true, documentNumber: true, jobTitle: { select: { name: true } } } },
+        },
+      }),
+      this.prisma.scoped.pathEnrollment.findMany({
+        where: { pathId },
+        orderBy: { cycleNumber: 'desc' },
+        select: { userId: true, status: true },
+      }),
+      this.prisma.scoped.enrollment.findMany({
+        where: { activityVersion: { activityId: { in: idsDeActividad } } },
+        select: { userId: true, activityVersion: { select: { activityId: true } } },
+      }),
+    ]);
+    const nombrePorActividad = new Map(actividades.map((a) => [a.id, a.name]));
+    const intentos = new Set(cursadas.map((e) => `${e.userId}:${e.activityVersion.activityId}`));
+
+    const completado = new Set(inscripciones.filter((i) => i.status === 'COMPLETED').map((i) => i.userId));
+
+    // Ordenadas por ciclo desc: la primera de cada par es la vigente.
+    const porPersona = new Map<
+      string,
+      {
+        user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string } | null };
+        modulos: Map<string, { status: string; dueAt: Date | null }>;
+      }
+    >();
+    for (const a of asignaciones) {
+      const entrada = porPersona.get(a.userId) ?? { user: a.user, modulos: new Map() };
+      if (!entrada.modulos.has(a.targetId)) entrada.modulos.set(a.targetId, { status: a.status, dueAt: a.dueAt });
+      porPersona.set(a.userId, entrada);
+    }
+
+    const personas = [...porPersona.entries()].map(([userId, entrada]) => {
+      const faltan: Array<{ activityId: string; name: string; intentado: boolean }> = [];
+      let aprobados = 0;
+      let exigidos = 0;
+      for (const [activityId, estado] of entrada.modulos) {
+        // RETIRADA: salio de la audiencia, el modulo ya no le aplica. No cuenta ni como exigido.
+        if (estado.status.startsWith('WITHDRAWN')) continue;
+        exigidos += 1;
+        if (estado.status === 'COMPLETED') {
+          aprobados += 1;
+          continue;
+        }
+        // EXIMIDA esta resuelta: sigue exigida pero no falta, y el cupo la absorbe.
+        if (estado.status === 'WAIVED') continue;
+        faltan.push({
+          activityId,
+          name: nombrePorActividad.get(activityId) ?? '',
+          intentado: intentos.has(`${userId}:${activityId}`),
+        });
+      }
+      const vence = [...entrada.modulos.values()]
+        .filter((m) => m.status !== 'COMPLETED' && m.dueAt)
+        .map((m) => m.dueAt as Date)
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      return {
+        userId,
+        fullName: entrada.user.fullName,
+        documentNumber: entrada.user.documentNumber,
+        jobTitle: entrada.user.jobTitle?.name ?? null,
+        exigidos,
+        aprobados,
+        completo: completado.has(userId),
+        faltan,
+        venceEl: vence ? vence.toISOString() : null,
+      };
+    });
+
+    // Quien tiene TODAS sus obligaciones retiradas ya no esta en el programa: no sale.
+    const activas = personas.filter((p) => p.exigidos > 0);
+
+    // Los completos al final: la lista existe para perseguir, no para felicitar. Y entre los que
+    // faltan, primero los que estan mas cerca — una convocatoria los cierra.
+    activas.sort((a, b) => {
+      if (a.completo !== b.completo) return a.completo ? 1 : -1;
+      if (a.faltan.length !== b.faltan.length) return a.faltan.length - b.faltan.length;
+      return a.fullName.localeCompare(b.fullName, 'es');
+    });
+
+    return { programa: { id: programa.id, name: programa.name }, personas: activas };
+  }
+
   async vencimientos(meses: number, hoy = new Date(), db?: TenantPrisma) {
     const cliente = db ?? this.prisma.scoped;
     const desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));

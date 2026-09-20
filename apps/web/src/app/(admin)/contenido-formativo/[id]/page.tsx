@@ -45,6 +45,7 @@ import { ActivityCover } from '@/components/modules/activity-cover';
 import { ActivityPlanCard } from '@/components/modules/delivery/activity-plan-card';
 import { ActivityAudienceTab } from '@/components/modules/authoring/activity-audience-tab';
 import { ActivityInfoTab } from '@/components/modules/authoring/activity-info-tab';
+import { ProgramasDeLaFormacion } from '@/components/modules/authoring/programas-de-la-formacion';
 import { ActivityScheduleTab } from '@/components/modules/authoring/activity-schedule-tab';
 import { AddContentDrawer } from '@/components/modules/authoring/add-content-drawer';
 import { EditContentDrawer } from '@/components/modules/authoring/edit-content-drawer';
@@ -568,7 +569,19 @@ export default function ActividadDetallePage() {
         <ViewTabs tabs={TABS} value={tab} onChange={setTab} />
       </div>
 
-      {tab === 'info' ? <ActivityInfoTab activity={activity} onSaved={loadActivity} canEdit /> : null}
+      {/*
+        A QUÉ PROGRAMA PERTENECE, en la pestaña Ficha (2026-09-16).
+
+        Va aquí y no en una pestaña propia porque no es un trabajo, es un DATO de la formación —y
+        uno que cambia lo que significa todo lo demás: si es módulo de un programa publicado, esta
+        formación deja de emitir constancia individual. Quien no lo sabe lo vive como un fallo.
+      */}
+      {tab === 'info' ? (
+        <div className="space-y-4">
+          <ProgramasDeLaFormacion activityId={activity.id} />
+          <ActivityInfoTab activity={activity} onSaved={loadActivity} canEdit />
+        </div>
+      ) : null}
 
       {tab === 'quienes' ? (
         <ActivityAudienceTab

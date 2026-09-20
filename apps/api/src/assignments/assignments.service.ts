@@ -64,7 +64,7 @@ export class AssignmentsService {
     }));
   }
 
-  async createRule(actor: AuthUser, input: CreateAssignmentRuleInput & { appliesFrom?: Date | null }) {
+  async createRule(actor: AuthUser, input: CreateAssignmentRuleInput & { appliesFrom?: Date | null; sourcePathId?: string | null }) {
     const tenantId = this.prisma.currentTenantId;
     await this.assertTargetExists(input.targetType, input.targetId);
 
@@ -110,6 +110,9 @@ export class AssignmentsService {
         // "Solo a quien entre desde ahora": se marca con el instante de creacion. Quien ya estaba
         // en la audiencia entro ANTES, asi que el motor no lo alcanza.
         appliesFrom: input.appliesFrom ?? null,
+        // De donde salio: el programa que la creo, o null si la declaro alguien sobre la formacion.
+        // No se lee todavia en ningun sitio; ver el porque en el esquema.
+        sourcePathId: input.sourcePathId ?? null,
         createdBy: actor.id,
       },
     });
@@ -403,7 +406,13 @@ export class AssignmentsService {
    * vuelve a la pantalla y cambia el plazo de 30 dias a 15 esta corrigiendo, no creando algo
    * nuevo, y un error de "ya existe" ahi es un callejon sin salida.
    */
-  async setActivityRequirement(actor: AuthUser, input: SetActivityRequirementInput) {
+  /*
+    `origen` NO viaja en el esquema publico, y es deliberado: si estuviera en
+    `setActivityRequirementSchema`, cualquier llamada a la API podria declarar que una regla la
+    creo un programa. Lo pone quien de verdad lo sabe —`ProgramsService.asignarAudiencia`— y por
+    eso es un parametro del servicio, no un campo del cuerpo.
+  */
+  async setActivityRequirement(actor: AuthUser, input: SetActivityRequirementInput, origen?: { pathId: string }) {
     await this.assertTargetExists('ACTIVITY', input.activityId);
 
     /*
@@ -433,10 +442,11 @@ export class AssignmentsService {
         let updated = false;
         let ultimo: Awaited<ReturnType<AssignmentsService['aplicarRequisito']>> | null = null;
         for (const jobTitleId of cargos) {
-          const uno = await this.aplicarRequisito(actor, {
-            ...input,
-            scope: audienceRuleSchema.parse({ ...input.scope, jobTitleIds: [jobTitleId] }),
-          });
+          const uno = await this.aplicarRequisito(
+            actor,
+            { ...input, scope: audienceRuleSchema.parse({ ...input.scope, jobTitleIds: [jobTitleId] }) },
+            origen,
+          );
           created += uno.created;
           updated = updated || uno.updated;
           ultimo = uno;
@@ -450,7 +460,7 @@ export class AssignmentsService {
         };
       }
     }
-    return this.aplicarRequisito(actor, input);
+    return this.aplicarRequisito(actor, input, origen);
   }
 
   /** La config del tipo de una formacion, que decide lo que el servidor fuerza. */
@@ -464,7 +474,7 @@ export class AssignmentsService {
   }
 
   /** Exigirla a UN alcance concreto. Lo que antes era el cuerpo entero de `setActivityRequirement`. */
-  private async aplicarRequisito(actor: AuthUser, input: SetActivityRequirementInput) {
+  private async aplicarRequisito(actor: AuthUser, input: SetActivityRequirementInput, origen?: { pathId: string }) {
     const tenantId = this.prisma.currentTenantId;
 
     /**
@@ -642,6 +652,9 @@ export class AssignmentsService {
       // "Solo a quien entre desde ahora" se traduce a la fecha de este momento: quien ya estaba
       // en la audiencia entro antes y no queda obligado.
       appliesFrom: input.soloNuevos ? new Date() : null,
+      // Solo al CREAR. Si la regla ya existia, mas arriba se actualiza sin tocar su origen: la
+      // declaro alguien sobre la formacion y que un programa la reutilice no cambia ese hecho.
+      sourcePathId: origen?.pathId ?? null,
     });
     return {
       ruleId: outcome.rule.id,
@@ -844,12 +857,25 @@ export class AssignmentsService {
       }),
     ]);
 
-    const titles = await this.resolveActivityTitles(items.map((i) => i.targetId));
+    const ids = items.map((i) => i.targetId);
+    const [titles, tipos, programas] = await Promise.all([
+      this.resolveActivityTitles(ids),
+      this.resolveActivityTypes(ids),
+      this.resolveProgramasDeActividad(ids),
+    ]);
     return {
       total,
       page: query.page,
       pageSize: query.pageSize,
-      items: items.map((item) => ({ ...item, targetName: titles.get(item.targetId) ?? null })),
+      items: items.map((item) => ({
+        ...item,
+        targetName: titles.get(item.targetId) ?? null,
+        // El tipo viaja para que el expediente pueda mirar solo una familia —sus inducciones— sin
+        // romper el orden cronologico. Ver `resolveActivityTypes`.
+        tipo: tipos.get(item.targetId) ?? null,
+        // Y de que programa es modulo, si lo es: explica por que esa formacion no tiene papel propio.
+        programas: programas.get(item.targetId) ?? [],
+      })),
     };
   }
 
@@ -901,6 +927,50 @@ export class AssignmentsService {
       select: { id: true, name: true },
     });
     return new Map(activities.map((a) => [a.id, a.name]));
+  }
+
+  /**
+   * EL TIPO DE CADA FORMACION, por su id (2026-09-17).
+   *
+   * Lo pide el expediente de una persona, para poder mirar **solo sus inducciones** sin perder el
+   * orden cronologico. Se devuelve el NOMBRE que el tenant le puso al tipo y no una familia
+   * deducida: el modelo no tiene ninguna marca de "esto es una induccion", y adivinarla por el
+   * nombre o por el codigo es justo lo que se decidio no hacer (ver `PENDIENTES` 11.7) — los dos
+   * son datos del tenant y mentirian en cuanto alguien renombrara algo.
+   */
+  private async resolveActivityTypes(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const activities = await this.prisma.scoped.activity.findMany({
+      where: { id: { in: [...new Set(ids)] } },
+      select: { id: true, activityType: { select: { name: true } } },
+    });
+    return new Map(activities.map((a) => [a.id, a.activityType.name]));
+  }
+
+  /**
+   * DE QUE PROGRAMAS ES MODULO CADA FORMACION (2026-09-17).
+   *
+   * Lo pide el expediente de una persona: al recorrer su trayectoria, una formacion suelta y un
+   * modulo de un programa se leen igual, y **no son lo mismo** — la del modulo no emite constancia
+   * propia mientras el programa este publicado, asi que quien busca su papel y no lo encuentra
+   * necesita ver que pertenece a un conjunto y que el papel es el del conjunto.
+   *
+   * Solo PUBLICADOS: un borrador no compromete a nadie y no suprime nada, asi que nombrarlo aqui
+   * seria contar algo que todavia no pasa. Mismo criterio que `esModuloDeUnProgramaPublicado`.
+   */
+  private async resolveProgramasDeActividad(ids: string[]): Promise<Map<string, string[]>> {
+    if (ids.length === 0) return new Map();
+    const items = await this.prisma.scoped.pathItem.findMany({
+      where: { itemType: 'ACTIVITY', itemId: { in: [...new Set(ids)] }, path: { status: 'PUBLISHED' } },
+      select: { itemId: true, path: { select: { name: true } } },
+    });
+    const porActividad = new Map<string, string[]>();
+    for (const item of items) {
+      const actual = porActividad.get(item.itemId) ?? [];
+      if (!actual.includes(item.path.name)) actual.push(item.path.name);
+      porActividad.set(item.itemId, actual);
+    }
+    return porActividad;
   }
 
   /** AAAA-MM-DD de la UI a fecha civil, sin pasar por instantes (evita correrla un dia). */

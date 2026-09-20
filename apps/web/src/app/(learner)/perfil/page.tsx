@@ -283,7 +283,18 @@ function MisConstancias() {
                 <Award className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink-900">{fila.activityName}</p>
+                <p className="flex items-center gap-1.5 truncate text-sm font-medium text-ink-900">
+                  {fila.activityName}
+                  {/*
+                    LA UNICA SEÑAL de que esto no es una formacion suelta: por debajo agrupa
+                    varios modulos, y sin esta pastilla se ve identica a cualquier otra.
+                  */}
+                  {fila.typeName === 'Programa' ? (
+                    <span className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                      Programa
+                    </span>
+                  ) : null}
+                </p>
                 <p className="text-xs text-ink-500">
                   {new Date(fila.issuedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
                   {fila.hours ? ` · ${fila.hours} horas` : ''}

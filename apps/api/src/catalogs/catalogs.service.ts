@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   activityTypeSchema,
@@ -105,6 +105,38 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
     },
     update: async (prisma, id, body) => {
       const data = areaUpdateSchema.parse(body);
+      /*
+        UN AREA NO PUEDE COLGAR DE SI MISMA NI DE SU PROPIA RAMA (2026-09-17).
+
+        El arbol (`parentId`) existia desde el principio sin ninguna pantalla que lo rellenara; al
+        abrirlo para declarar SUB-AREAS —Nomina bajo Gestion Humana— el desplegable lista todas las
+        areas, incluida la que se esta editando y sus hijas.
+
+        Un ciclo no da error al guardar: **cuelga la lectura** el dia que alguien recorra el arbol
+        para agrupar, y el sintoma aparece lejisimos de la causa. Se comprueba en el SERVIDOR y no
+        filtrando el desplegable, porque una lista filtrada no es un control: la API sigue
+        aceptando lo que le manden.
+      */
+      if (data.parentId) {
+        if (data.parentId === id) {
+          throw new BadRequestException({ code: 'AREA_PARENT_SELF', message: 'Un área no puede ser su propia área padre.' });
+        }
+        const todas = await prisma.area.findMany({ select: { id: true, parentId: true } });
+        const padreDe = new Map(todas.map((a) => [a.id, a.parentId]));
+        // Se sube desde el padre propuesto: si por el camino se llega a esta area, es un ciclo.
+        let subiendo: string | null | undefined = data.parentId;
+        const vistos = new Set<string>();
+        while (subiendo && !vistos.has(subiendo)) {
+          if (subiendo === id) {
+            throw new BadRequestException({
+              code: 'AREA_PARENT_CYCLE',
+              message: 'Esa área ya cuelga de esta, así que no puede ser además su padre.',
+            });
+          }
+          vistos.add(subiendo);
+          subiendo = padreDe.get(subiendo);
+        }
+      }
       return prisma.area.update({
         where: { id },
         data: {

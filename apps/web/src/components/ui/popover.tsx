@@ -78,7 +78,21 @@ export function Popover({
   }, [abierta, colocar]);
 
   useEffect(() => {
-    if (!abierta) return;
+    /*
+      HASTA QUE EL PANEL NO TIENE SITIO, NO SE ESCUCHA EL DESPLAZAMIENTO (2026-09-15).
+
+      El panel se cierra al rodar la pagina, y eso incluye el desplazamiento que provoca el
+      NAVEGADOR al enfocar algo: un panel con `autoFocus` dentro —el motivo de una falta, sin ir mas
+      lejos— pedia el foco en el mismo instante en que se montaba, y si el foco llegaba antes de que
+      `colocar()` lo pusiera en su sitio, el navegador rodaba para alcanzarlo y ese desplazamiento
+      **cerraba el panel recien abierto**. Quien lo vivia lo contaba como "lo abri y se cerro solo",
+      y en la suite salia como un tiempo de espera agotado esperando el campo.
+
+      Esperar a `sitio` corta la carrera de raiz: mientras el panel no esta colocado, un
+      desplazamiento no significa que la persona se haya movido — significa que todavia se esta
+      montando.
+    */
+    if (!abierta || !sitio) return;
     function fuera(evento: MouseEvent) {
       const destino = evento.target as Node;
       if (disparador.current?.contains(destino) || panel.current?.contains(destino)) return;
@@ -106,7 +120,7 @@ export function Popover({
       window.removeEventListener('scroll', cerrar, true);
       window.removeEventListener('resize', colocar);
     };
-  }, [abierta, colocar]);
+  }, [abierta, sitio, colocar]);
 
   return (
     <>
@@ -132,12 +146,20 @@ export function Popover({
               id={id}
               role="dialog"
               aria-label={etiqueta}
-              style={{ top: sitio?.top ?? -9999, left: sitio?.left ?? -9999 }}
+              /*
+                MIENTRAS NO TIENE SITIO SE PINTA EN 0,0 Y TRANSPARENTE, no en -9999 (2026-09-15).
+
+                Aparcarlo fuera de la pantalla parecia mas limpio y tenia un efecto que no se veia:
+                si algo de dentro pedia el foco antes de colocarlo —un `autoFocus`— el navegador
+                rodaba la pagina para alcanzar ese punto imposible. En 0,0 sigue estando dentro de
+                la ventana (es `fixed`), asi que enfocarlo no mueve nada. Lo que evita el parpadeo
+                es el `opacity-0` de abajo, que ya estaba: el -9999 no hacia falta para eso.
+              */
+              style={{ top: sitio?.top ?? 0, left: sitio?.left ?? 0 }}
               className={cn(
                 'fixed z-50 rounded-lg border border-line bg-surface p-3 shadow-card-hover',
-                // Hasta que se calcula el sitio se pinta invisible en vez de en la esquina: un
-                // salto de una posicion a otra se ve como un parpadeo.
-                sitio ? 'opacity-100' : 'opacity-0',
+                // Invisible hasta que se sabe donde va: un salto de una posicion a otra parpadea.
+                sitio ? 'opacity-100' : 'pointer-events-none opacity-0',
                 ancho,
                 className,
               )}

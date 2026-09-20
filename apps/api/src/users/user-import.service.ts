@@ -379,6 +379,42 @@ export class UserImportService {
       }
     }
 
+    /*
+      LA SUB-AREA, SI VIENE (2026-09-17).
+
+      Gestion Humana tiene Nomina, Contratacion y Seleccion. Cuando la fila la trae, **la persona
+      queda en la SUB-AREA**, y esa sub-area se crea colgando del area de la columna anterior.
+
+      Se enlaza AQUI y no a mano despues por un motivo concreto: el area de la persona decide quien
+      la evalua, y una sub-area sin padre deja a su gente fuera de las reglas que apuntan al area
+      grande — con el motor retirandoles las obligaciones vivas. Crearla ya enlazada cierra esa
+      ventana.
+
+      Si la sub-area YA existia, no se le toca el padre: puede estar colocada a proposito en otro
+      sitio, y un archivo de personas no es quien para reorganizar el organigrama.
+    */
+    let subAreaCreada = false;
+    if (row.sub_area) {
+      const yaExiste = ctx.areaByCode.get(clave(row.sub_area));
+      if (yaExiste) {
+        areaId = yaExiste;
+      } else {
+        try {
+          const codigo = codigoDesdeNombre(row.sub_area, ctx.codigosUsados.area);
+          const creada = await this.prisma.scoped.area.create({
+            select: { id: true },
+            data: { tenantId: ctx.tenantId, code: codigo, name: row.sub_area, active: true, parentId: areaId },
+          });
+          ctx.codigosUsados.area.add(codigo);
+          ctx.areaByCode.set(clave(row.sub_area), creada.id);
+          areaId = creada.id;
+          subAreaCreada = true;
+        } catch {
+          return fail(`No se pudo crear la sub-area "${row.sub_area}" (posible choque concurrente)`);
+        }
+      }
+    }
+
     let regionalId: string | null = row.regional ? (ctx.regionalByCode.get(clave(row.regional)) ?? null) : null;
     let regionalCreada = false;
     if (row.regional && !regionalId) {
@@ -418,6 +454,7 @@ export class UserImportService {
     const creados = [
       cargoCreado ? `cargo "${row.cargo}" (${row.tipo_cargo})` : null,
       areaCreada ? `area "${row.area}"` : null,
+      subAreaCreada ? `sub-area "${row.sub_area}" dentro de "${row.area}"` : null,
       regionalCreada ? `regional "${row.regional}"` : null,
       serviceCreado ? `servicio "${row.servicio}"` : null,
     ].filter((v): v is string => v !== null);

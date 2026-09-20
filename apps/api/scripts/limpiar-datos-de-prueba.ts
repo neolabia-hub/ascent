@@ -97,8 +97,19 @@ async function main() {
       await prisma.activity.findMany({ select: { id: true, code: true, name: true } })
     ).filter((a) => FIRMA.test(a.name) || FIRMA.test(a.code));
 
-    if (formaciones.length === 0) {
-      console.log('Nada que limpiar: no hay formaciones con firma de prueba.');
+    /*
+      PROGRAMAS DE PRUEBA (2026-09-14), la misma firma pero OTRA TABLA. `learning_paths` no es una
+      `activity`: los recorridos de Programas (crear, agregar modulos, publicar, asignar) quedaban
+      invisibles para este script aunque llevaran la firma en el nombre, y se acumulaban sin que
+      nada los recogiera — el mismo problema que este script ya resolvio una vez para formaciones,
+      en una tabla que entonces no existia.
+    */
+    const programas = (
+      await prisma.learningPath.findMany({ select: { id: true, code: true, name: true } })
+    ).filter((p) => FIRMA.test(p.name) || FIRMA.test(p.code));
+
+    if (formaciones.length === 0 && programas.length === 0) {
+      console.log('Nada que limpiar: no hay formaciones ni programas con firma de prueba.');
       return;
     }
 
@@ -114,6 +125,10 @@ async function main() {
     console.log('');
     for (const a of formaciones.slice(0, 8)) console.log(`    ${a.code} — ${a.name}`);
     if (formaciones.length > 8) console.log(`    ... y ${formaciones.length - 8} mas`);
+    console.log('');
+    console.log(`Programas con firma de prueba: ${programas.length}`);
+    for (const p of programas.slice(0, 8)) console.log(`    ${p.code} — ${p.name}`);
+    if (programas.length > 8) console.log(`    ... y ${programas.length - 8} mas`);
     console.log('');
 
     if (!enSerio) {
@@ -137,9 +152,32 @@ async function main() {
       ? await prisma.user.updateMany({ where: { id: { in: personas.map((u) => u.id) } }, data: { active: false } })
       : { count: 0 };
 
+    /*
+      LOS PROGRAMAS SI SE BORRAN, al reves que formaciones y personas. La diferencia no es un
+      descuido: un `LearningPath` de prueba es pura estructura —que modulos agrupa y con que
+      cupo— sin nada equivalente a una constancia o una inscripcion real. Lo que SI es evidencia
+      —los `enrollments` de cada modulo, y cualquier constancia ya emitida— cuelga de la ACTIVIDAD,
+      no del programa, y no se toca aqui: sigue viva y desactivada por el bloque de arriba.
+      Borrar el programa entero (con sus `path_items` y, si los hubiera, `path_enrollments`) no
+      deja un hueco que alguien tenga que explicar.
+    */
+    const programaIds = programas.map((p) => p.id);
+    const pathEnrollmentsBorrados = programaIds.length
+      ? await prisma.pathEnrollment.deleteMany({ where: { pathId: { in: programaIds } } })
+      : { count: 0 };
+    const pathItemsBorrados = programaIds.length
+      ? await prisma.pathItem.deleteMany({ where: { pathId: { in: programaIds } } })
+      : { count: 0 };
+    const programasBorrados = programaIds.length
+      ? await prisma.learningPath.deleteMany({ where: { id: { in: programaIds } } })
+      : { count: 0 };
+
     const quedan = await prisma.assignmentRule.count({ where: { active: true } });
     console.log(`Desactivadas ${reglas.count} regla(s) de formaciones de prueba.`);
     console.log(`Desactivadas ${bajas.count} persona(s) de prueba.`);
+    console.log(
+      `Borrados ${programasBorrados.count} programa(s) de prueba (${pathItemsBorrados.count} modulo(s), ${pathEnrollmentsBorrados.count} inscripcion(es)).`,
+    );
     console.log(`Quedan ${quedan} regla(s) activa(s) en la base.`);
   } finally {
     await prisma.$disconnect();

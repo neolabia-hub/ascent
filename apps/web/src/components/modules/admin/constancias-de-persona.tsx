@@ -119,7 +119,14 @@ export function ConstanciasDePersona({
               <li key={fila.id} className="rounded-xl border border-line p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-ink-900">{fila.activityName}</p>
+                    <p className="flex items-center gap-1.5 font-medium text-ink-900">
+                      {fila.activityName}
+                      {fila.typeName === 'Programa' ? (
+                        <span className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                          Programa
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="mt-0.5 text-xs tabular-nums text-ink-500">
                       Emitida el {new Date(fila.issuedAt).toLocaleDateString('es-CO')}
                       {fila.validUntil

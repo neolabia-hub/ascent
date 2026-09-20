@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   House,
+  Layers,
   Settings,
   Target,
   Users,
@@ -78,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
     titulo: 'Programar',
     items: [
       { href: '/contenido-formativo', label: 'Formaciones', icon: BookOpen },
+      { href: '/programas', label: 'Programas', icon: Layers },
       { href: '/convocatorias', label: 'Convocatorias', icon: CalendarDays },
       { href: '/asignaciones', label: 'Asignaciones', icon: Target },
     ],

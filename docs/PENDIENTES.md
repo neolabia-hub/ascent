@@ -139,6 +139,99 @@ que rodea a un sistema que ya tiene un cliente dentro. El detalle, en `HANDOFF` 
 | 10.8 | ~~El QR de la constancia no abre solo~~ **HECHO el 2026-09-11.** El margen del QR estaba en 1 modulo; la norma ISO/IEC 18004 pide 4. Sin esa "zona tranquila" el lector detecta el texto pero no lo trata como enlace fiable — exactamente el sintoma. Subido a produccion, pendiente de que el cliente confirme escaneando una constancia nueva | `certificate-render.service.ts` |
 | 10.9 | **El asistente automático 24/7 no existe todavía** y ya está prometido | El acta de entrega y la ficha técnica dicen que fuera del horario hay atención automática. Construirlo, cambiar la frase por lo que hoy es cierto, o ponerle fecha — **antes de firmar**. `docs/entrega/00-antes-de-enviar.md` §2 bis |
 
+## 11. Programas (agrupar formaciones, certificar por el conjunto) — abierto el 2026-09-14
+
+El cliente pidió que varias formaciones ("Gestión Humana", "Comercial"...) se vean y se certifiquen
+como **un solo programa** ("Programa de Inducción General"), no como formaciones sueltas, con reglas
+de aprobación parametrizables por tenant (ej. "7 de 9 módulos", con alguno obligatorio sí o sí). El
+detalle completo en `HANDOFF` 2026-09-14.
+
+| | Qué | Estado |
+|---|---|---|
+| 11.1 | **Fase 1 — el motor de la regla y el enganche al cierre.** Se reusó el esquema `LearningPath`/`PathItem`/`PathEnrollment`, que ya existía en Prisma sin construir. `program-completion.ts` (`evaluarPrograma()`) combina módulos obligatorios (`PathItem.isRequired`) con cupos opcionales por sección (`sectionName` + `minRequiredInSection`) — cubre el caso exacto del cliente. Wireado en `completion.service.ts`, en LOS DOS puntos de cierre (por contenido y por cualquier tipo de asistencia: QR, firma, instructor), para que **NO se emita constancia individual** si la formación es módulo de un programa publicado, y para recalcular el progreso del programa cada vez que se cierra una de sus formaciones. 8/8 pruebas de la regla + verificación manual (con transacción RLS correcta) de los tres escenarios de asistencia | **HECHO, verificado en dev, NO desplegado** |
+| 11.2 | **Fase 2 — emitir la constancia DEL PROGRAMA cuando se completa.** `Certificate.pathEnrollmentId` (migración `20260914200000_certificados_programa`, aplicada en dev) + `CertificatesService.emitirPorPrograma()` (snapshot con nombre del programa, "Programa" como tipo, horas = suma de las de los módulos aprobados, idempotente por el índice único parcial). Enganchado en `ProgramsService.recalcularProgreso`: dispara sola cuando `recienCompletado: true`, sin tumbar el recálculo si falla. Verificado con una prueba de punta a punta contra la base de dev (`scripts/verificar-constancia-programa.ts`, autocontenida y que limpia lo que crea): a medias no emite, al completar el segundo módulo emite una sola vez, y un segundo recálculo no duplica | **HECHO, verificado en dev con petición real (no aislada), NO desplegado** |
+| 11.3 | **Matricular gente a un programa.** No hay un requisito de tipo PATH nuevo en el motor: "Asignar a una audiencia" en la ficha del programa exige CADA módulo con `AssignmentsService.setActivityRequirement`, una vez por módulo, misma audiencia — reusa el motor entero, incluida la regla PLAN sin tocarla. `ProgramsService.asignarAudiencia` | **HECHO, verificado en dev con e2e (`e2e/programas.spec.ts`) y a mano** |
+| 11.4 | **Interfaz — admin y aprendiz.** Admin: `/programas` (listado con filtro por estado, tarjetas sin código visible) y `/programas/[id]` (módulos con reordenar arriba/abajo, formulario EN LÍNEA para agregar/editar módulo, panel de "Asignar a una audiencia" SIN `sticky` y con la explicación colapsada en un icono de información, descripción editable inline, publicar/"Volver a borrador"). Aprendiz: tab "Programas" en Mi aprendizaje, fila "Programas" en Hoy (con su propio filtro, mismo criterio de prioridad que el resto — empezado antes que sin empezar) y `/programa/[id]` con los módulos como contenido. `LearningPath.description` (migración `20260915090000_programa_descripcion`) | **HECHO, verificado en dev con e2e y a mano** |
+| 11.5 | **La constancia del programa AHORA PUEDE listar sus módulos.** Campo nuevo `modulos` en el diseñador de plantillas (`certificate-layout.ts`, `certificate-pdf.ts`): multilínea, apagado por defecto, solo imprime algo en una constancia DE PROGRAMA (usa `formacion.syllabus`, que ya se guardaba y no se usaba en ningún lado). Verificado en el editor; NO colocado en la plantilla real del cliente todavía —eso lo decide quien diseñe el arte— | **Campo construido y verificado, sin colocar en la plantilla en uso** |
+| 11.6 | **Reinducción como programa: la ronda se abre sin pisar la anterior.** `PathEnrollment.cycleNumber` (migración `20260915120000_programa_ciclo`, única ahora por `pathId+userId+cycleNumber` — "una fila por ronda, inmutable", mismo patrón que `CertificationGrant`). La ronda del programa sale de la más adelantada de las `Assignment.cycleNumber` de sus módulos (`cicloDePrograma()` en `program-completion.ts`); cada módulo se da por aprobado según su `Assignment` MÁS RECIENTE, no su historial de `Enrollment`. Al abrirse una ronda nueva se crea una fila aparte (nueva constancia), sin tocar la de la ronda anterior. Verificado de punta a punta contra la base de dev (script borrado tras usarlo) + 5 pruebas nuevas de `cicloDePrograma`. Detalle en `HANDOFF` 2026-09-15 (continuación 2) | **HECHO, verificado en dev, NO desplegado** |
+| 11.7 | ~~**Aviso de "asignación automática" para programas de Inducción General.**~~ **HECHO el 2026-09-15.** El panel de "Asignar" detecta los módulos cuyo TIPO ya se exige solo a toda la empresa al publicarse y lo dice. **No se deduce del nombre del programa ni del código del tipo** —los dos son datos del tenant, renombrables— sino de `activityType.config.defaultAssignmentMode === 'ON_HIRE'`, que es lo que lee `aplicarExigenciaAutomatica` de verdad; más `requiresBeforeHire`, que se dice aparte porque cambia A QUIÉN alcanza (con él la regla nace `soloNuevos` y **no toca a la plantilla actual**, que es justo lo que alguien daría por hecho al leer "se asigna sola a toda la empresa"). El aviso dice además cuántos tienen ya su regla activa, y que asignar igualmente no pisa esa regla —queda una segunda, y la obligación nace una sola vez (4.1)— pero con la misma audiencia no añade nada. Cubierto en `e2e/programas.spec.ts` | **HECHO, verificado en dev, NO desplegado** |
+| 11.8 | **Endurecido y explicado (2026-09-15/16).** Se cerró la regla de aprobación —**nada puede quedar sin hacer**: un módulo con obligación viva impide completar aunque el cupo dé—; el **cupo se configura desde el programa**, no desde cada módulo; un programa **vacío ya no acredita la nada**; una ronda **completa no se reabre**; un programa publicado **solo lo ve quien está obligado** (antes salía en Mi aprendizaje a toda la plantilla); el **informe de programas** en Seguimiento con su cuello de botella, que dejó de contar como activas las obligaciones retiradas. En la ficha: un **solo bloque** «Qué falta para que funcione» en vez de avisos sueltos, la cobertura leída **por módulo** —a quién alcanza cada uno, en vez de un «(solo 2 de 5)» que no señalaba— y desde la ficha de una formación se ve **de qué programa es módulo**, en una línea. Detalle en `docs/modulos/programas.md` y `HANDOFF` 2026-09-15/16 | **HECHO, verificado en dev (582 unitarias, 128 de la matriz, e2e), NO desplegado** |
+| 11.9 | **La ficha del programa, legible (2026-09-16).** El cliente leyó la pantalla del 11.8 y señaló tres cosas: (a) el aviso de *«Ninguna audiencia alcanza los N módulos»* **era correcto y aun así no se entendía** — describía la situación sin decir la regla que la convierte en problema (un programa se completa aprobándolos TODOS, `evaluarPrograma`), así que ahora la dice y nombra la salida: *si cada módulo va a propósito para un cargo distinto, no son un programa, son formaciones sueltas*; (b) el pie *«Se le exige a X · Y»* **repetía sumado** lo que ya dice cada módulo en su renglón — se quitó, junto con la segunda caja de «fechas distintas» que decía lo mismo que el bloque de estado tres centímetros más arriba; (c) el renglón de cada módulo volcaba la lista entera de audiencias y cinco botones, así que **cada módulo se abre**: el renglón deja lo que se compara entre módulos —orden, nombre, obligatorio/grupo, a quién alcanza resumido (dos nombres, y a partir de tres se cuenta) y lo que está mal— más reordenar; la ficha desplegada, DENTRO de la lista y no en una ventana, trae las audiencias con nombre completo, estado, campaña y exigencia automática. Las **acciones** van en un menú `⋯` —mismo patrón que la fila de *Usuarios*—, así que se alcanzan sin desplegar nada; y **cada clic tiene un solo destino**: el chevron despliega, el **nombre** abre la formación, el renglón en sí no hace nada. Además, un módulo de tipo automático **sin publicar** ahora dice que su regla de toda la empresa todavía no existe —nace al publicar la formación—, que era lo que hacía leer «se exige sola a toda la empresa» junto a un cargo concreto como un fallo. De paso, asignar un programa **recarga la lista**: antes se asignaba y la pantalla seguía diciendo «no se le exige a nadie» hasta recargar a mano. Cubierto en `e2e/programas.spec.ts` | **HECHO, verificado en dev (tsc, eslint, e2e, y a ojo en `mirar.ps1`), NO desplegado** |
+
+| 11.10 | **El aviso de la audiencia que no alcanza al resto del programa (2026-09-16).** Si un módulo tiene una audiencia que no llega a los demás módulos, se marca en ámbar en su ficha y se dice la consecuencia entera: esa gente no completará el programa **y tampoco recibirá la constancia individual de esa formación**. Nace de la pregunta del cliente *"¿qué pasa si se agrega una píldora que fue hecha para individual y tenía otra audiencia?"*. **No se bloquea agregar el módulo** —así es como se arma un programa, con formaciones que ya existen— y **no se arregló por debajo**: ver la decisión de abajo | **HECHO, verificado en dev, NO desplegado** |
+
+### La supresión de la constancia: por FORMACIÓN, no por persona (se probó lo contrario y se deshizo)
+
+Se construyó la versión **por persona** —emitir la individual a quien se le exigen *algunos* módulos
+del programa pero no *todos*, es decir, a quien el programa no le aplica— y se **deshizo el mismo
+día**, con su matriz y todo. Queda escrito porque la idea vuelve sola:
+
+- **Metía un modo de fallo nuevo.** Las reglas de un programa se crean módulo a módulo, así que
+  durante ese rato cualquiera cae en «algunos» y se lleva su individual; si después completa el
+  programa, acaba con **dos constancias del mismo esfuerzo**. Cambiar una pérdida de evidencia por
+  una duplicación, en el camino que emite los papeles y que se consulta en cada cierre de formación,
+  no es una mejora.
+- **El caso de partida requiere una mala configuración**, y el cliente la descartó: *"ese caso de que
+  una formación individual y por programa esté, no creo que pase"*. Su inducción general es **un**
+  programa para toda la empresa; las inducciones específicas se quedan como formaciones sueltas con
+  su constancia individual, que es justamente por lo que no serían un programa.
+- **La protección vive donde no cuesta nada**: el aviso en ámbar de 11.10.
+
+Si algún día el caso aparece de verdad en un tenant, el arreglo correcto **no es ese parche** sino
+que `AssignmentRule` sepa **de dónde** viene la obligación. Con ese dato, «los módulos que el PROGRAMA
+me exige» se pregunta sin adivinar, y entonces sí se puede suprimir por persona sin duplicar nada.
+
+| | Qué | Estado |
+|---|---|---|
+| 11.11 | **Una regla de asignación sabe de dónde salió (2026-09-16).** Columna `AssignmentRule.sourcePathId` (migración `20260916140000_regla_sabe_su_origen`): NULL = la declaró alguien sobre la FORMACIÓN (pestaña Quiénes, matriz por cargo, o el motor al publicar un tipo que se exige solo); con valor = la creó «Asignar programa» de ese programa. Se escribe **solo al crear** —si la regla ya existía a mano y un programa la reutiliza, no la creó el programa— y viaja como **parámetro interno del servicio**, no en el esquema público: si estuviera en el cuerpo de la petición, cualquiera podría declarar que su regla la puso un programa. `ON DELETE SET NULL`: borrar el programa no deja a nadie sin la formación que ya se le exigía. **Hoy no se lee en ningún sitio y no cambia ningún comportamiento.** Se añade ahora porque es el único dato de este asunto que **no se puede reconstruir mirando atrás**: sin él, una regla creada por un programa y una creada a mano son la misma fila para siempre, y cada día que pasa es un día de reglas a ciegas | **HECHO, migrado en dev, NO desplegado** |
+
+Lo que ese campo desbloquea el día que haga falta, sin arqueología: **compleción por persona**
+(tronco común + rama por cargo), **suprimir la constancia individual por persona** sin duplicar
+papeles, y que el **informe** sepa a quién le aplica de verdad un programa.
+
+### La regla de compleción de un programa: se queda en «todos los módulos», y por qué
+
+Decisión tomada el 2026-09-16, delegada expresamente por el cliente (*"lo que ejecutes debe ser lo
+que debe hacer el sistema LMS de un programa"*). **No se cambia**, y no por inercia:
+
+La alternativa —«cada persona completa con los módulos que a ella se le exigen»— **no se puede
+distinguir del abuso con el modelo de datos de hoy**. `AssignmentRule` no guarda de dónde viene una
+obligación: una regla creada por «Asignar programa» y una creada a mano sobre la formación suelta son
+idénticas. Así que «los módulos que a mí se me exigen» incluiría a quien solo debe UNA píldora por
+otro motivo — y esa persona **completaría el «Programa de Inducción General» haciendo una píldora**, y
+recibiría esa constancia. Eso es **evidencia falsa**, que es justo lo único que el proyecto sí
+bloquea (ver RUNBOOK, *«Bloquear no es avisar»*).
+
+| 11.12 | **Publicar avisa a quién deja sin papel, y la cobertura se cuenta POR PERSONA (2026-09-16).** Publicar apaga la constancia individual de todos los módulos, y lo hacía en silencio; ahora dice antes a cuánta gente deja sin ningún papel —`impactoDePublicar`—, sin bloquear. Y el aviso de la ficha, que comparaba **audiencias** («ninguna alcanza los N módulos»), pasa a contar **personas**: comparar audiencias daba **falsas alarmas** sobre programas sanos, porque dos audiencias distintas pueden alcanzar a la misma gente —una píldora marcada a todos los cargos llega a la plantilla entera, ya que `jobTitleId` y `areaId` son obligatorios—. La cuenta única es *gente con ALGUNO de los módulos exigido pero no TODOS*, y de ella salen las tres lecturas (aviso, línea verde y ventana de publicar), así que no pueden discrepar. Cubierto en la matriz (I39, I40, I41) | **HECHO, verificado en dev (131 de la matriz), NO desplegado** |
+
+**Lo de «tronco común + rama por cargo» NO está pendiente.** Se planteó como funcionalidad (un
+programa de inducción con los módulos generales para todos y la específica de cada cargo solo para
+ese cargo) y el cliente lo descartó al describir cómo lo usa: *"solo hay un programa de inducción
+general para todos, y las inducciones específicas no se usarían como programa porque la constancia
+sería individual"*. Es decir: **un programa = una audiencia para todos sus módulos**, que es
+exactamente lo que el sistema hace hoy.
+
+Y al pensarlo a fondo, el propio cliente lo descartó con el argumento que lo cierra: si las
+específicas van como módulos, **con 100 cargos son 100 módulos** en la lista, y separarlo en dos
+programas no arregla nada. Eso no es un problema de pantalla: **un programa es una lista FIJA de
+formaciones**, y meterle dentro una dimensión que varía por persona lo hace explotar. Los LMS que sí
+lo resuelven usan un **módulo dinámico** —una sola fila que se resuelve distinta para cada persona—,
+que es una pieza de modelo nueva y bastante más que «audiencia por módulo».
+
+**Y la necesidad real que había detrás no es estructura, es vista:** *«ver todo lo de inducción de
+una persona, sin importar si es general o específica»*. Eso es un informe —el perfil ya reúne lo que
+le falta, su trayectoria y sus constancias; solo falta agruparlo— y no toca el motor, ni las
+constancias, ni un número de auditoría. Si se pide, se hace por ahí, no cambiando el modelo.
+
+**Reglas ya decididas y aplicadas, para no volver a discutirlas:**
+- Si una formación es módulo de un programa publicado, su cierre —sea por contenido o por CUALQUIER
+  mecanismo de asistencia— nunca emite constancia individual; solo la emite la del programa completo
+  (Fase 2). Si el programa se despublica, la individual vuelve a emitirse normalmente.
+- Un programa **no tiene tipo** (`ActivityType`): certifica siempre al completarse, sin casilla que
+  lo decida. El tipo vive en cada módulo, no en el programa.
+- El color de un programa en la interfaz es **fijo** (`#4338ca`, `COLOR_PROGRAMA` en el frontend),
+  no el de la marca del tenant: es la señal de "esto es un programa" en cualquier empresa.
+
 ## Lo que NO está pendiente, para no volver a abrirlo
 
 Cosas que se decidieron y conviene no reabrir sin motivo nuevo:

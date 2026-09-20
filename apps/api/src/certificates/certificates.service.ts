@@ -209,6 +209,170 @@ export class CertificatesService {
   }
 
   /**
+   * Emite la constancia DE UN PROGRAMA completo (2026-09-14, PENDIENTES 11.2).
+   *
+   * ─── POR QUE ES UN METODO APARTE Y NO UNA VARIANTE DE `emitirPorEjecucion` ───
+   *
+   * No hay `Enrollment` que la origine: la evidencia de un programa es que TODOS sus modulos
+   * obligatorios (y el cupo de los que no lo son) estan aprobados, y eso vive repartido en varias
+   * filas de `enrollments`, una por modulo. El snapshot se arma agregando esas filas, no leyendo
+   * una sola.
+   *
+   * ─── EL RENDERIZADOR NO CAMBIA ───
+   *
+   * `CertificateSnapshot` es generico a proposito (ver el archivo): no sabe ni le importa si viene
+   * de una formacion o de un programa. Por eso esto reusa `plantillaActiva`, `SequenceService` y el
+   * mismo `CertificateRenderService` para el PDF — la unica diferencia es COMO se arma el snapshot.
+   *
+   * ─── IDEMPOTENTE, igual que `emitirPorEjecucion` y por la misma razon ───
+   *
+   * `recalcularProgreso` se llama cada vez que se cierra UN modulo del programa, y el ultimo modulo
+   * puede cerrarse por dos caminos a la vez (reintento del reproductor, dos pestañas). La segunda
+   * llamada choca con `UNIQUE(tenant_id, path_enrollment_id) WHERE path_enrollment_id IS NOT NULL`
+   * y aqui se traga el error, devolviendo la que ya existia.
+   *
+   * ─── SIN VIGENCIA, A PROPOSITO ───
+   *
+   * A diferencia de una formacion individual, un programa no cuelga de una `AssignmentRule` propia
+   * con su propia recurrencia — la tienen sus modulos, cada uno la suya, y no hay una unica
+   * respuesta a "cada cuanto vence el programa entero". `validUntil` queda `null`: el programa
+   * acredita que se completo, sin fecha de caducidad propia. Si algun dia un tenant pide programas
+   * que caduquen como conjunto, ese es el momento de decidir de donde sale esa fecha — no antes.
+   */
+  async emitirPorPrograma(tenantId: string, pathEnrollmentId: string): Promise<{ id: string } | null> {
+    const inscripcion = await this.prisma.forTenant(tenantId).pathEnrollment.findUnique({
+      where: { id: pathEnrollmentId },
+      include: {
+        path: { include: { items: true } },
+      },
+    });
+    if (!inscripcion) return null;
+    if (inscripcion.status !== 'COMPLETED') return null;
+
+    const usuario = await this.prisma.forTenant(tenantId).user.findUnique({
+      where: { id: inscripcion.userId },
+      include: { jobTitle: { select: { name: true } }, area: { select: { name: true } } },
+    });
+    if (!usuario) return null;
+
+    const plantilla = await this.plantillaActiva(tenantId);
+    if (!plantilla) {
+      this.logger.warn(`Tenant ${tenantId} sin plantilla de constancia activa; no se emite (programa)`);
+      return null;
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, branding: true },
+    });
+    const branding = (tenant?.branding ?? {}) as { companyDisplayName?: string; logoKey?: string | null };
+
+    const idsDeModulo = inscripcion.path.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId);
+
+    /*
+      LAS HORAS SON LA SUMA DE LOS MODULOS APROBADOS, no de todos los del programa: un modulo
+      optativo que la persona no curso (porque ya cumplia el cupo de su seccion con otros) no
+      aporta horas que nadie recibio. Se toma la MEJOR ejecucion por modulo, igual que
+      `emitirPorEjecucion` toma la mejor nota: si alguien repitio un modulo, cuenta una vez.
+    */
+    const ejecuciones = idsDeModulo.length
+      ? await this.prisma.forTenant(tenantId).enrollment.findMany({
+          where: {
+            userId: inscripcion.userId,
+            status: { in: ['COMPLETED', 'PASSED'] },
+            activityVersion: { activityId: { in: idsDeModulo } },
+          },
+          include: { activityVersion: { include: { activity: { select: { id: true, name: true } } } } },
+          orderBy: { completedAt: 'desc' },
+        })
+      : [];
+    const mejorPorModulo = new Map<string, (typeof ejecuciones)[number]>();
+    for (const ejecucion of ejecuciones) {
+      const activityId = ejecucion.activityVersion.activityId;
+      if (!mejorPorModulo.has(activityId)) mejorPorModulo.set(activityId, ejecucion);
+    }
+    const horasTotales = [...mejorPorModulo.values()].reduce(
+      (suma, e) => suma + (e.activityVersion.certificateHours ?? 0),
+      0,
+    );
+    const temario = [...mejorPorModulo.values()].map((e) => ({ name: e.activityVersion.activity.name }));
+
+    const completadoEn = inscripcion.completedAt ?? new Date();
+
+    const snapshot: CertificateSnapshot = {
+      schemaVersion: 1,
+      persona: {
+        fullName: usuario.fullName,
+        documentType: usuario.documentType,
+        documentNumber: usuario.documentNumber,
+        jobTitle: usuario.jobTitle?.name ?? null,
+        area: usuario.area?.name ?? null,
+      },
+      formacion: {
+        name: inscripcion.path.name,
+        code: inscripcion.path.code,
+        typeName: 'Programa',
+        versionNumber: 1,
+        hours: horasTotales > 0 ? horasTotales : null,
+        syllabus: temario,
+        responsibleName: null,
+        responsibleJobTitle: null,
+      },
+      resultado: {
+        status: 'COMPLETED',
+        scorePct: null,
+        completedAt: completadoEn.toISOString(),
+      },
+      empresa: {
+        name: tenant?.name ?? '',
+        displayName: branding.companyDisplayName || (tenant?.name ?? ''),
+        logoKey: branding.logoKey ?? null,
+      },
+    };
+
+    const year = new Date().getFullYear();
+
+    try {
+      const creada = await this.prisma.txForTenant(tenantId, async (tx) => {
+        const consecutivo = await this.sequence.next(tx, tenantId, 'CERTIFICATE', year);
+        return tx.certificate.create({
+          data: {
+            tenantId,
+            userId: inscripcion.userId,
+            pathEnrollmentId,
+            serialNumber: this.sequence.format('CERT', year, consecutivo),
+            verificationCode: nuevoCodigo(),
+            templateId: plantilla.id,
+            templateVersion: plantilla.versionNumber,
+            renderSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+            validUntil: null,
+          },
+          select: { id: true, serialNumber: true },
+        });
+      });
+
+      await this.audit.record({
+        tenantId,
+        userId: inscripcion.userId,
+        action: 'CERTIFICATE_ISSUED',
+        resourceType: 'certificates',
+        resourceId: creada.id,
+        newValues: { serialNumber: creada.serialNumber, pathEnrollmentId },
+      });
+
+      return { id: creada.id };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const previa = await this.prisma
+          .forTenant(tenantId)
+          .certificate.findFirst({ where: { pathEnrollmentId }, select: { id: true } });
+        return previa ?? null;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * La constancia que se puede ver, con lo que hace falta para pintarla.
    *
    * `verificationCode` es lo que llega de la pantalla publica: **sin sesion y sin tenant**, asi que
@@ -288,6 +452,13 @@ export class CertificatesService {
         revoked: fila.revokedAt !== null,
         activityName: snapshot.formacion.name,
         hours: snapshot.formacion.hours,
+        /**
+         * "Programa" o el nombre del tipo de la formacion (Induccion general, Pildora...). Sin
+         * esto, una constancia de programa y una de formacion suelta se veian identicas en el
+         * expediente: mismo nombre, mismas horas, ningun campo que dijera de cual de las dos
+         * viene. Lo pregunto el cliente mirando la lista y no la respuesta era clara.
+         */
+        typeName: snapshot.formacion.typeName,
       };
     });
   }

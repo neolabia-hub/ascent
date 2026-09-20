@@ -1246,6 +1246,24 @@ model AssignmentRule {
   /// salida. No es la GRACIA de `due-date.ts`: la gracia da PLAZO a quien ya estaba; esto decide
   /// si se le exige siquiera.
   appliesFrom         DateTime?            @map("applies_from")
+  /// DE DONDE SALIO ESTA REGLA (2026-09-16). NULL = alguien la declaro sobre la FORMACION —la
+  /// pestaña Quienes, la matriz por cargo, o el motor al publicar un tipo que se exige solo—.
+  /// Con valor = la creo el boton "Asignar programa" de ESE programa.
+  ///
+  /// Hoy **no se lee en ningun sitio y no cambia ningun comportamiento**. Existe porque es el
+  /// unico dato de todo esto que **no se puede reconstruir mirando atras**: sin el, una regla
+  /// creada por un programa y una creada a mano son la misma fila. Y es exactamente lo que hace
+  /// falta para poder preguntar "¿que modulos me exige EL PROGRAMA?", que hoy bloquea tres cosas
+  /// a la vez: compleccion por persona (tronco comun + rama por cargo), suprimir la constancia
+  /// individual por persona sin duplicar papeles, y que el informe sepa a quien le aplica de
+  /// verdad un programa. El porque entero, en `ProgramsService.esModuloDeUnProgramaPublicado`.
+  ///
+  /// Se escribe SOLO AL CREAR, nunca al actualizar: si la regla ya existia porque alguien la
+  /// declaro a mano y despues un programa la reutiliza, la verdad es que no la creo el programa.
+  /// `SetNull` al borrar el programa — perder el rastro del origen no es motivo para dejar a
+  /// nadie sin la formacion que ya se le exigia.
+  sourcePathId        String?              @map("source_path_id") @db.Uuid
+  sourcePath          LearningPath?        @relation(fields: [sourcePathId], references: [id], onDelete: SetNull)
   active              Boolean              @default(true)
   createdBy           String?              @map("created_by") @db.Uuid
   createdAt           DateTime             @default(now()) @map("created_at")
@@ -1253,6 +1271,7 @@ model AssignmentRule {
 
   assignments Assignment[]
 
+  @@index([sourcePathId])
   @@map("assignment_rules")
 }
 
@@ -1398,15 +1417,20 @@ model PlanItem {
 // ──────────────────── 6.8 Rutas de aprendizaje ────────────────────
 
 model LearningPath {
-  id       String        @id @default(uuid()) @db.Uuid
-  tenantId String        @map("tenant_id") @db.Uuid
-  code     String
-  name     String
-  status   VersionStatus @default(DRAFT)
-  active   Boolean       @default(true)
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  /// Lo que ve el aprendiz antes de saber que modulos trae (2026-09-15). Igual que
+  /// `Activity.description`: opcional, para no bloquear crear un programa en dos clics.
+  description String?
+  status      VersionStatus @default(DRAFT)
+  active      Boolean       @default(true)
 
   items       PathItem[]
   enrollments PathEnrollment[]
+  /// Las reglas que creo el boton "Asignar programa" de este programa. Ver `AssignmentRule.sourcePathId`.
+  sourcedRules AssignmentRule[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1432,18 +1456,24 @@ model PathItem {
   @@map("path_items")
 }
 
+// UNA FILA POR RONDA, inmutable una vez que la ronda queda atras — mismo patron que
+// `CertificationGrant` (Decision #13): reabrir un programa recurrente (p. ej. Reinduccion armada
+// como programa con varias formaciones que se repiten cada tanto) no pisa la fila de la ronda que
+// ya se completo, crea una nueva. Ver `cicloDePrograma` en `program-completion.ts`.
 model PathEnrollment {
   id          String           @id @default(uuid()) @db.Uuid
   tenantId    String           @map("tenant_id") @db.Uuid
   pathId      String           @map("path_id") @db.Uuid
   path        LearningPath     @relation(fields: [pathId], references: [id])
   userId      String           @map("user_id") @db.Uuid
+  cycleNumber Int              @default(1) @map("cycle_number")
   status      EnrollmentStatus @default(ENROLLED)
   progressPct Int              @default(0) @map("progress_pct")
   completedAt DateTime?        @map("completed_at")
   createdAt   DateTime         @default(now()) @map("created_at")
 
-  @@unique([pathId, userId])
+  @@unique([pathId, userId, cycleNumber])
+  @@index([tenantId, pathId, userId])
   @@map("path_enrollments")
 }
 
@@ -1788,6 +1818,10 @@ model Certificate {
   tenantId         String              @map("tenant_id") @db.Uuid
   userId           String              @map("user_id") @db.Uuid
   enrollmentId     String?             @map("enrollment_id") @db.Uuid
+  /// LA CONSTANCIA DE UN PROGRAMA (2026-09-14), espejo exacto de `enrollmentId` y por la misma
+  /// razon: UNA por `PathEnrollment`, garantizado por el mismo tipo de indice parcial (ver la
+  /// migracion). Sin relacion Prisma, igual que `enrollmentId`.
+  pathEnrollmentId String?             @map("path_enrollment_id") @db.Uuid
   grantId          String?             @map("grant_id") @db.Uuid
   grant            CertificationGrant? @relation(fields: [grantId], references: [id])
   serialNumber     String              @map("serial_number") // CERT-2026-000123 (serie tenant/ano)
@@ -1809,6 +1843,9 @@ model Certificate {
   /// indice PARCIAL —hay constancias sin inscripcion, las que nacen de una certificacion otorgada—
   /// y Prisma no sabe expresarlos, asi que vive en la migracion `20260901220000_certificados`.
   /// No quitarlo: sin el, dos evaluaciones de completado a la vez emiten dos constancias.
+  ///
+  /// MISMO PATRON para `path_enrollment_id` (2026-09-14): `UNIQUE(tenant_id, path_enrollment_id)
+  /// WHERE path_enrollment_id IS NOT NULL`, en la migracion `20260914200000_certificados_programa`.
   @@map("certificates")
 }
 
