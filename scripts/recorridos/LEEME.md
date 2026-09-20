@@ -32,6 +32,8 @@ node scripts/recorridos/acta-de-lista.mjs            # el acta de una jornada ma
 node scripts/recorridos/dos-puertas-del-papel.mjs    # el papel de un tercero: las dos puertas dicen lo mismo
 node scripts/recorridos/dos-reglas-una-obligacion.mjs # dos reglas vivas, una sola obligacion
 node scripts/recorridos/vencimientos.mjs             # el informe: tres fuentes, eje nuevo y el aviso a la bandeja
+node scripts/recorridos/programa.mjs                # un PROGRAMA entero: modulos, asistencia, constancia del conjunto y Seguimiento
+node scripts/recorridos/desempeno.mjs               # evaluacion por JEFATURAS de sub-area: calificar, firmar, consolidado
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```

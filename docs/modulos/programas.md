@@ -376,8 +376,13 @@ Es donde un informe miente sin querer, y una de ellas **se coló el primer día*
 | Qué | Dónde |
 |---|---|
 | Las reglas puras | `program-completion.spec.ts` — `evaluarPrograma`, `cicloDePrograma`, `moduloAprobado`, `moduloPendiente` |
-| Contra la base, de punta a punta | `pnpm --filter @neo-pulse/api dev:verificar-programas` — 128 comprobaciones en nueve bloques |
+| Contra la base, de punta a punta | `pnpm --filter @neo-pulse/api dev:verificar-programas` — 131 comprobaciones en nueve bloques |
 | La interfaz | `e2e/programas.spec.ts` |
+| **El camino entero, por HTTP y con sesión** | `node scripts/recorridos/programa.mjs` — 15 pasos: tres módulos con examen, asignación real, uno cerrado por **contenido** y otro por **asistencia**, el cupo que no perdona dejar uno sin hacer, la constancia del conjunto con la **suma de horas**, Seguimiento, y despublicar devolviendo la individual |
+
+La matriz prueba las REGLAS contra la base llamando a los servicios; el recorrido prueba que **las
+piezas encajan entre sí**. Son fallos distintos: el recorrido encontró que `certificateHours` no lo
+escribía ningún endpoint —toda constancia salía sin horas— y eso la matriz no podía verlo.
 
 La matriz cubre: supresión de la constancia individual (A), completar y certificar (B), obligatorio
 + cupo (C), rondas (D), esquinas (E), la vista del aprendiz (F), el cupo configurado desde el
