@@ -352,6 +352,24 @@ paso(9, 'CERRAR EL CICLO');
 const cerrar = await admin.post(`/desempeno/ciclos/${creado.cicloId}/cerrar`);
 comprobar(cerrar.ok, `ciclo cerrado (${cerrar.estado})`, `cerrar: ${cerrar.estado} ${JSON.stringify(cerrar.cuerpo).slice(0, 250)}`);
 
-console.log(`\nCREADO PARA LIMPIAR: ciclo=${creado.cicloId} areas=${[creado.areaMadre, ...creado.subAreas].join(',')} sufijo=${SUFIJO}`);
+// ───────────────────────────────────────────────────────────────────────────────
+paso(10, 'LIMPIEZA: las areas de prueba se desactivan solas');
+/*
+  SE DESACTIVAN, NO SE BORRAN. Las areas que crea este recorrido tienen personas colgando, asi que
+  borrarlas dejaria usuarios apuntando a nada. Desactivar las saca de los desplegables y del
+  catalogo, que es lo unico que estorba.
+
+  Y se hace AQUI y no "algun dia": sin esto, cada corrida dejaba tres areas nuevas en Configuracion
+  y al cabo de unos dias el catalogo del cliente estaba lleno de «Nomina E2E168229». Lo cazo el
+  propio cliente preguntando por que una sub-area salia como area general.
+*/
+let desactivadas = 0;
+for (const areaId of [...creado.subAreas, creado.areaMadre].filter(Boolean)) {
+  const r = await admin.patch(`/catalogs/areas/${areaId}`, { active: false });
+  if (r.ok) desactivadas += 1;
+}
+comprobar(desactivadas === 3, 'las tres areas de prueba quedan desactivadas', `solo se desactivaron ${desactivadas}`);
+
+console.log(`\nCREADO PARA LIMPIAR: ciclo=${creado.cicloId} sufijo=${SUFIJO}`);
 console.log('   (las personas las desactiva `pnpm --filter @neo-pulse/api dev:limpiar-pruebas`)');
 process.exit(resumen() === 0 ? 0 : 1);

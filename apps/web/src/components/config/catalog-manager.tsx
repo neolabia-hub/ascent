@@ -274,7 +274,30 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
             {filasVisibles.map((row) => (
               <Tr key={row.id}>
                 <Td className="font-mono text-xs text-ink-500">{row.code}</Td>
-                <Td className="font-medium">{row.name}</Td>
+                {/*
+                  UNA SUB-ÁREA TIENE QUE VERSE COMO TAL (2026-09-21).
+
+                  Se abrió el árbol de áreas y la lista seguía pintándolas planas: «Nómina» salía
+                  igual que «Gestión Humana» y no había forma de saber cuál colgaba de cuál. El
+                  cliente lo dijo así: *«¿por qué sale como área general si es una sub-área?»*.
+
+                  Se resuelve en el NOMBRE y no con una columna nueva, por dos razones: es el mismo
+                  «Gestión Humana › Nómina» que ya usan los desplegables de Usuarios —una sola forma
+                  de decirlo en todo el producto— y una columna más en una tabla de catálogo se
+                  gasta en algo que la mayoría de catálogos no tiene.
+                */}
+                <Td className="font-medium">
+                  {row.parentId ? (
+                    <>
+                      <span className="font-normal text-ink-500">
+                        {rows.find((otra) => otra.id === row.parentId)?.name ?? '?'} ›{' '}
+                      </span>
+                      {row.name}
+                    </>
+                  ) : (
+                    row.name
+                  )}
+                </Td>
                 {extraColumn ? (
                   <Td className="text-ink-500">
                     {extraColumn.key === 'jobTitleTypeId'
