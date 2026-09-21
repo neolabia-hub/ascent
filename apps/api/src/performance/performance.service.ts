@@ -886,7 +886,7 @@ export class PerformanceService {
         const suyas = respuestas.filter((fila) => fila.competencyId === competencyId);
         const escala = (porId.get(competencyId)?.scale ?? 'ONE_TO_FIVE') as EscalaCompetencia;
         const media = (filas: typeof suyas) => promediarRespuestas(escala, filas);
-        const cortar = (campo: 'areaRaiz' | 'subjectJobTitle') =>
+        const cortar = (campo: 'areaRaiz' | 'subjectArea' | 'subjectJobTitle') =>
           [...new Set(suyas.map((fila) => evaluacionDe.get(fila.reviewId)?.[campo] ?? null))]
             .filter((nombre): nombre is string => Boolean(nombre))
             .map((nombre) => ({
@@ -915,7 +915,7 @@ export class PerformanceService {
       })
       .sort(ordenarPorPromedio);
 
-    const agrupar = (campo: 'areaRaiz' | 'subjectJobTitle') =>
+    const agrupar = (campo: 'areaRaiz' | 'subjectArea' | 'subjectJobTitle') =>
       [...new Set(items.map((review) => review[campo] ?? null))]
         .filter((nombre): nombre is string => Boolean(nombre))
         .map((nombre) => ({
@@ -934,6 +934,12 @@ export class PerformanceService {
       })),
       porCompetencia,
       porArea: agrupar('areaRaiz'),
+      /*
+        Y EL CORTE FINO (2026-09-21). «Por area» contesta *"¿que area va peor?"*; esta contesta
+        *"¿a que jefatura hay que ir?"*, que en una empresa con sub-areas es otra pregunta y es la
+        accionable: "Gestion Humana 3.4" no dice con quien hablar, "Nomina 2.8" si.
+      */
+      porSubArea: agrupar('subjectArea'),
       porCargo: agrupar('subjectJobTitle'),
       items,
     };

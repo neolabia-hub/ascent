@@ -472,7 +472,9 @@ export class ReportsService {
         completedEnrollmentId: true,
         user: {
           select: {
-            area: { select: { id: true, name: true } },
+            // El area de la persona y, si es una SUB-AREA, la madre de la que cuelga: el informe
+            // agrupa 'area' por la grande y ofrece 'subarea' como corte fino. Ver `analytics.ts`.
+            area: { select: { id: true, name: true, parent: { select: { id: true, name: true } } } },
             jobTitle: { select: { id: true, name: true } },
             regional: { select: { id: true, name: true } },
             service: { select: { id: true, name: true } },
@@ -531,7 +533,8 @@ export class ReportsService {
           enrollmentStatus: porRonda.get(asignacion.id)?.status ?? null,
           puedeAutoinscribirse: conPuerta.has(asignacion.targetId),
         }),
-        area: asignacion.user.area ?? null,
+        area: asignacion.user.area?.parent ?? asignacion.user.area ?? null,
+        subarea: asignacion.user.area?.parent ? asignacion.user.area : null,
         cargo: asignacion.user.jobTitle ?? null,
         regional: asignacion.user.regional ?? null,
         servicio: asignacion.user.service ?? null,

@@ -5,6 +5,7 @@ function hecho(parcial: Partial<HechoAnalitica>): HechoAnalitica {
   return {
     estado: 'TERMINADA',
     area: null,
+    subarea: null,
     cargo: null,
     regional: null,
     servicio: null,
@@ -61,6 +62,41 @@ describe('agrupar', () => {
   it('sin solapamiento no se avisa de nada', () => {
     const resultado = agrupar([hecho({ area: CARIBE }), hecho({ area: ANDINA })], 'area');
     expect(resultado.sumaMasQueElTotal).toBe(false);
+  });
+
+  /*
+    SUB-AREAS: «Area» sigue siendo la grande, «Sub-area» es el corte fino (2026-09-21).
+
+    La trampa que esto vigila: si `area` pasara a agrupar por la sub-area, «Gestion Humana»
+    desapareceria de todos los informes sin que nadie lo pidiera, y el mismo rotulo diria otra cosa
+    de un dia para otro. Los hechos traen las dos etiquetas justamente para que no haya que elegir.
+  */
+  describe('un area con sub-areas', () => {
+    const GESTION = { id: 'g', name: 'Gestion Humana' };
+    const NOMINA = { id: 'n', name: 'Nomina' };
+    const SELECCION = { id: 's', name: 'Seleccion' };
+    const dos = [
+      hecho({ area: GESTION, subarea: NOMINA }),
+      hecho({ area: GESTION, subarea: SELECCION }),
+    ];
+
+    it('«Area» los junta a los dos bajo el area madre', () => {
+      const resultado = agrupar(dos, 'area');
+      expect(resultado.grupos).toHaveLength(1);
+      expect(resultado.grupos[0]?.label).toBe('Gestion Humana');
+      expect(resultado.grupos[0]?.resumen.total).toBe(2);
+    });
+
+    it('y «Sub-area» los separa, que es lo que dice a quien llamar', () => {
+      const resultado = agrupar(dos, 'subarea');
+      expect(resultado.grupos.map((g) => g.label).sort()).toEqual(['Nomina', 'Seleccion']);
+    });
+
+    it('quien trabaja directamente en el area sale como «Sin sub-area», no desaparece', () => {
+      const resultado = agrupar([...dos, hecho({ area: GESTION, subarea: null })], 'subarea');
+      expect(resultado.grupos.map((g) => g.label)).toContain('Sin sub-area');
+      expect(resultado.resumen.total).toBe(3);
+    });
   });
 });
 

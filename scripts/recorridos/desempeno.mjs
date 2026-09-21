@@ -294,6 +294,18 @@ comprobar(
   `la fila dice "${filaDeNomina?.subjectArea}"`,
 );
 
+/*
+  Y EL CORTE FINO, que es el accionable: «Gestion Humana 3,4» no dice con quien hablar; «Nomina
+  2,8» si. Las dos lecturas conviven —no se elige una— porque contestan preguntas distintas.
+*/
+const nombresPorSubArea = (consolidado?.porSubArea ?? []).map((g) => g.nombre);
+comprobar(
+  nombresPorSubArea.some((n) => n?.includes(`Nomina ${SUFIJO}`)) &&
+    nombresPorSubArea.some((n) => n?.includes(`Seleccion ${SUFIJO}`)),
+  'y existe ademas el corte «Por sub-area», con Nomina y Seleccion separadas',
+  `el corte fino no las trae: ${nombresPorSubArea.slice(0, 8).join(', ')}`,
+);
+
 const xlsx = await admin.pedir(`/desempeno/ciclos/${creado.cicloId}/consolidado/xlsx`);
 comprobar(xlsx.estado === 200, `el consolidado se baja en xlsx (${xlsx.estado})`, `xlsx: ${xlsx.estado}`);
 

@@ -214,7 +214,14 @@ export interface Consolidado extends CifrasDeCiclo {
   porFormulario: (CifrasDeCiclo & { cycleFormId: string; name: string })[];
   /** EL ANALISIS (2026-09-09): en que estamos flojos, donde y con quien. Ver `docs/modulos/desempeno.md`. */
   porCompetencia: ResultadoDeCompetencia[];
+  /** Agrupa por el ÁREA GRANDE: la madre, cuando la persona está en una sub-área. */
   porArea: GrupoDeCiclo[];
+  /**
+   * El corte fino, por la sub-área de cada quien. En una empresa sin sub-áreas sale idéntico a
+   * `porArea` y la pantalla no lo enseña. Cuando las hay, es el que dice **con qué jefatura
+   * hablar**: «Gestión Humana 3,4» no señala a nadie; «Nómina 2,8» sí.
+   */
+  porSubArea: GrupoDeCiclo[];
   porCargo: GrupoDeCiclo[];
   items: Evaluacion[];
 }

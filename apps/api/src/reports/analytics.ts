@@ -27,10 +27,23 @@ import { resumirEjecucion, type EstadoEjecucion, type ResumenEjecucion } from '.
  * haria que alguien intentara cuadrar los numeros y no pudiera.
  */
 
-export type Dimension = 'area' | 'cargo' | 'regional' | 'servicio' | 'proceso' | 'tipo' | 'norma';
+export type Dimension = 'area' | 'subarea' | 'cargo' | 'regional' | 'servicio' | 'proceso' | 'tipo' | 'norma';
 
 export const DIMENSIONES: Record<Dimension, { label: string; sinValor: string }> = {
   area: { label: 'Area', sinValor: 'Sin area' },
+  /*
+    SUB-AREA: UNA DIMENSION APARTE, y `area` sigue siendo la grande (2026-09-21).
+
+    Desde que existen sub-areas —Nomina y Seleccion bajo Gestion Humana— el area de la PERSONA es
+    la sub-area. Si `area` pasara a agrupar por ahi, "Gestion Humana" desapareceria de todos los
+    informes sin que nadie lo pidiera: el mismo rotulo diria otra cosa de un dia para otro, y quien
+    comparara con el mes pasado no cuadraria los numeros.
+
+    Asi que `area` agrupa por la MADRE —lo que siempre significo— y esta dimension nueva da el
+    corte fino. No es cosmetica: en cumplimiento, **quien persigue a la gente es la jefatura de
+    sub-area**. "Gestion Humana 78%" no dice a quien llamar; "Nomina 40%, Seleccion 95%" si.
+  */
+  subarea: { label: 'Sub-area', sinValor: 'Sin sub-area' },
   cargo: { label: 'Cargo', sinValor: 'Sin cargo' },
   regional: { label: 'Regional', sinValor: 'Sin regional' },
   servicio: { label: 'Servicio', sinValor: 'Sin servicio' },
@@ -52,7 +65,10 @@ export interface Etiqueta {
  */
 export interface HechoAnalitica {
   estado: EstadoEjecucion;
+  /** El area GRANDE: la madre si la persona esta en una sub-area, o la suya si no cuelga de nada. */
   area: Etiqueta | null;
+  /** La sub-area, solo si la persona esta en una. `null` = trabaja directamente en el area. */
+  subarea: Etiqueta | null;
   cargo: Etiqueta | null;
   regional: Etiqueta | null;
   servicio: Etiqueta | null;

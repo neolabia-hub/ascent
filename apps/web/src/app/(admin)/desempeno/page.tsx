@@ -785,6 +785,13 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
   const { showToast } = useToast();
   const [bajando, setBajando] = useState(false);
 
+  /*
+    ¿ESTA EMPRESA USA SUB-ÁREAS? Se deduce de los datos, no de una casilla: si el corte fino tiene
+    más grupos que el grueso, es que alguna área se abre en varias. Donde no las hay, los dos cortes
+    serían la misma lista y enseñar las dos es ruido.
+  */
+  const haySubAreas = (datos.porSubArea?.length ?? 0) > datos.porArea.length;
+
   const bajar = async () => {
     setBajando(true);
     try {
@@ -891,9 +898,18 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
         competencia falla» sino «que area o que cargo va peor en conjunto», que es lo que decide a
         quien se le lleva primero la formacion.
       */}
-      {datos.porArea.length > 1 || datos.porCargo.length > 1 ? (
+      {/*
+        «POR SUB-ÁREA» SOLO SI LAS HAY (2026-09-21).
+
+        En una empresa sin sub-áreas ese corte sería IDÉNTICO al de «Por área» —cada quien cuelga
+        directamente de la suya— y dos columnas iguales lado a lado se leen como un error. Cuando sí
+        las hay es la que dice **con qué jefatura hablar**: «Gestión Humana 3,4» no señala a nadie;
+        «Nómina 2,8» sí. Por eso la condición compara los dos tamaños en vez de mirar una bandera.
+      */}
+      {datos.porArea.length > 1 || datos.porCargo.length > 1 || haySubAreas ? (
         <section className="mt-6 grid gap-4 sm:grid-cols-2">
           {datos.porArea.length > 1 ? <Corte titulo="Por área" grupos={datos.porArea} /> : null}
+          {haySubAreas ? <Corte titulo="Por sub-área" grupos={datos.porSubArea ?? []} /> : null}
           {datos.porCargo.length > 1 ? <Corte titulo="Por cargo" grupos={datos.porCargo} /> : null}
         </section>
       ) : null}
