@@ -161,8 +161,8 @@ En `.env.prod` se ponen esas dos etiquetas en `IMAGE_API` e `IMAGE_WEB`, y la m�
 ## 4. Levantar (primera vez)
 
 ```bash
-sudo mkdir -p /opt/neo-pulse && sudo chown $USER /opt/neo-pulse
-cd /opt/neo-pulse
+sudo mkdir -p /opt/ascent && sudo chown $USER /opt/ascent
+cd /opt/ascent
 git clone <repo> .            # o subirlo con rsync
 
 cp .env.prod.example .env.prod
@@ -206,8 +206,14 @@ reinició.
 
 ## 5. Actualizar
 
+> **La carpeta es `/opt/ascent`, no `/opt/neo-pulse`** (corregido el 2026-09-21). El documento decia
+> lo segundo desde el primer dia y la maquina siempre tuvo lo primero — el producto se llama Ascent
+> desde el despliegue del 09. Se descubrio desplegando: `cd: /opt/neo-pulse: No such file or
+> directory`, con la copia de seguridad ya hecha y el despliegue a medias. Una ruta equivocada en el
+> documento que se sigue a ciegas es una parada en seco en el peor momento.
+
 ```bash
-cd /opt/neo-pulse && git pull
+cd /opt/ascent && git pull
 docker compose -f docker/docker-compose.prod.yml --env-file .env.prod pull
 docker compose -f docker/docker-compose.prod.yml --env-file .env.prod up -d
 ```
@@ -223,7 +229,7 @@ la vez sobre la misma base.
 ```bash
 crontab -e
 # Diario a las 3:00
-0 3 * * * /opt/neo-pulse/scripts/backup.sh >> /var/log/neo-pulse-backup.log 2>&1
+0 3 * * * /opt/ascent/scripts/backup.sh >> /var/log/neo-pulse-backup.log 2>&1
 ```
 
 `backup.sh` vuelca Postgres, se niega a dejar un archivo vacío, borra lo de más de 14 días y —si hay
@@ -233,7 +239,7 @@ R2— sube la copia **fuera de la máquina**. Una copia en el mismo disco que la
 **Y antes de dar la salida por buena, se restaura:**
 
 ```bash
-./scripts/restaurar-prueba.sh /opt/neo-pulse/backups/neopulse-<fecha>.dump
+./scripts/restaurar-prueba.sh /opt/ascent/backups/neopulse-<fecha>.dump
 ```
 
 Restaura en una base de usar y tirar —producción no se toca— y cuenta personas, formaciones,
