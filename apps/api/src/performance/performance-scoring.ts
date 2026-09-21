@@ -245,3 +245,66 @@ export function planificarEvaluaciones(
 
   return { evaluaciones, sinEvaluador };
 }
+
+/** Una evaluacion vista desde la brecha: de quien es, quien la puso y que nota saco. */
+export interface EvaluacionComparable {
+  subjectUserId: string;
+  subjectName: string | null;
+  reviewerRole: string;
+  status: string;
+  score: unknown;
+}
+
+/** Lo que separa como se ve una persona de como la ve su jefe. */
+export interface BrechaDeUnaPersona {
+  subjectUserId: string;
+  subjectName: string | null;
+  auto: number;
+  jefe: number;
+  /** Positiva = se puso MAS nota de la que le puso su jefe. */
+  diferencia: number;
+}
+
+/**
+ * LA BRECHA ENTRE LA AUTOEVALUACION Y LA DEL JEFE (2026-09-21).
+ *
+ * Es la lectura mas usada de una campaña de desempeño, y no por curiosidad: senala las dos
+ * conversaciones que hay que tener.
+ *
+ *   · Diferencia grande y POSITIVA -> alguien que se ve mucho mejor de lo que lo ven. Esa
+ *     conversacion es la dificil, y llega mejor con el numero delante que sin el.
+ *   · Diferencia grande y NEGATIVA -> alguien que se infravalora, que suele ser quien se quema.
+ *   · Y mirando la columna entera: un jefe cuyas diferencias son todas enormes en el mismo
+ *     sentido probablemente no esta calificando, esta poniendo la misma nota a todos.
+ *
+ * SOLO CUENTA A QUIEN TIENE LAS DOS ENTREGADAS. Con una sola, la diferencia no existe — y
+ * rellenarla con un cero diria que coinciden, que es lo contrario de lo que pasa.
+ *
+ * Se ordena por diferencia ABSOLUTA: lo que se quiere mirar primero es lo que mas se separa, en
+ * cualquiera de los dos sentidos.
+ */
+export function brechaDeAutoevaluacion(evaluaciones: EvaluacionComparable[]): BrechaDeUnaPersona[] {
+  const porPersona = new Map<string, { nombre: string | null; auto: number | null; jefe: number | null }>();
+
+  for (const evaluacion of evaluaciones) {
+    if (evaluacion.status !== 'SUBMITTED' || evaluacion.score === null || evaluacion.score === undefined) continue;
+    const nota = Number(evaluacion.score);
+    if (Number.isNaN(nota)) continue;
+
+    const actual = porPersona.get(evaluacion.subjectUserId) ?? { nombre: evaluacion.subjectName, auto: null, jefe: null };
+    if (evaluacion.reviewerRole === 'SELF') actual.auto = nota;
+    else actual.jefe = nota;
+    porPersona.set(evaluacion.subjectUserId, actual);
+  }
+
+  return [...porPersona.entries()]
+    .filter(([, datos]) => datos.auto !== null && datos.jefe !== null)
+    .map(([subjectUserId, datos]) => ({
+      subjectUserId,
+      subjectName: datos.nombre,
+      auto: datos.auto as number,
+      jefe: datos.jefe as number,
+      diferencia: Math.round(((datos.auto as number) - (datos.jefe as number)) * 10) / 10,
+    }))
+    .sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia));
+}

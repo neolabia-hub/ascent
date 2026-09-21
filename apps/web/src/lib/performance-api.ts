@@ -223,6 +223,25 @@ export interface Consolidado extends CifrasDeCiclo {
    */
   porSubArea: GrupoDeCiclo[];
   porCargo: GrupoDeCiclo[];
+  /**
+   * La campaña CERRADA anterior a esta. `null` en la primera, que es un estado normal.
+   *
+   * Existe porque una nota sola no significa nada: «3,8» no dice si lo que se hizo funcionó;
+   * «3,8, y la anterior 3,2» sí.
+   */
+  anterior: (CifrasDeCiclo & { id: string; name: string; startsAt: string }) | null;
+  /**
+   * Cuánto se separa cómo se ve cada persona de cómo la ve su jefe, de mayor a menor diferencia.
+   * Solo aparece quien tiene las DOS evaluaciones entregadas.
+   */
+  brecha: {
+    subjectUserId: string;
+    subjectName: string | null;
+    auto: number;
+    jefe: number;
+    /** Positiva = se puso más nota de la que le puso su jefe. */
+    diferencia: number;
+  }[];
   items: Evaluacion[];
 }
 

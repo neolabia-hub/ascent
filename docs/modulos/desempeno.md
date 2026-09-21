@@ -527,3 +527,90 @@ plan del año siguiente, que era la razón de haber añadido esa columna.
   El Excel lleva el detalle si alguien lo necesita.
 - **Comparar contra el ciclo anterior.** Es el análisis que sigue —«¿mejoramos en seguridad vial tras
   la formación?»— y necesita dos ciclos cerrados. Cuando exista el segundo.
+
+---
+
+## 9. Sub-áreas, y las dos lecturas nuevas (2026-09-21)
+
+### Evaluar por JEFATURAS
+
+Lo pidió el cliente así: *«se necesita saber por jefaturas, con sub-áreas, para que cada jefe de
+sub-área sepa a quién evaluar, y no un área grande que tiene muchas jefaturas»*.
+
+**No hizo falta ningún campo nuevo en la persona.** La regla que ya existía lo resuelve entero:
+
+```
+persona.areaId  →  area.responsibleUserId  =  quien la evalúa
+```
+
+Basta con que cada quien esté en su sub-área y que la sub-área tenga su responsable. Lo que faltaba
+era poder declarar la jerarquía: `Area.parentId` existía desde el primer día y ninguna pantalla lo
+dejaba usar. Ahora se declara en *Configuración → Áreas* con el campo **«Área padre»**.
+
+**El organigrama admite DOS niveles y el servidor rechaza el tercero** (`AREA_DEPTH`). No es un
+capricho: la faceta de área de una audiencia resuelve «el área y sus hijas» con un filtro de relación
+de un solo salto, así que una sub-sub-área se caería de las reglas del área grande **en silencio**, y
+el motor le retiraría las obligaciones vivas. Se podría hacer recursivo —`withDescendants` ya lo es
+para el alcance del analista— y se eligió lo contrario: una regla que el sistema impide romper vale
+más que una que aguanta más casos y hay que recordar.
+
+### «Área» sigue siendo la grande; «Sub-área» es un corte nuevo
+
+El riesgo que esto tenía era silencioso: la dimensión `area` de los informes sale del área de la
+persona, que ahora es la sub-área. Sin tocar nada, «Gestión Humana» habría **desaparecido de todos
+los informes** —Seguimiento, Inicio y el consolidado de desempeño— sin que nadie lo pidiera, y quien
+comparara con el mes anterior no cuadraría los números.
+
+| | Qué agrupa |
+|---|---|
+| **Área** | Siempre la grande: la madre, o ella misma si no cuelga de nada |
+| **Sub-área** | El corte fino, y el accionable |
+
+Se **añade** información en vez de cambiarle el significado a la que ya existía. Y el corte fino no
+es detalle por detalle: en cumplimiento **quien persigue a la gente es la jefatura de sub-área** —
+«Gestión Humana 78 %» no dice a quién llamar, «Nómina 40 %» sí. Mismo razonamiento que la columna
+«Lo que más frena» del informe de programas.
+
+En desempeño, «Por sub-área» solo aparece cuando la empresa de verdad las usa: donde no las hay sería
+una copia de «Por área», y dos listas idénticas lado a lado se leen como un error.
+
+### Lo que NO cambia: en qué se evalúa
+
+Los formularios se reparten **por cargo**, no por área, y así se queda. Un analista de Nómina y uno
+de Selección hacen el mismo trabajo: se les evalúan las mismas competencias. Lo que cambia entre
+ellos no es *qué* se les pregunta, sino *quién* se lo pregunta. Atar las competencias a la sub-área
+obligaría a mantener decenas de formularios casi idénticos que se desincronizan solos; si alguna
+necesita algo propio, la vía correcta ya existe: un formulario con su cargo declarado, heredando las
+comunes de un formulario base (Decisión #141).
+
+### Contra la campaña anterior
+
+Una nota de 3,8 no significa nada sola. «3,8, y la anterior 3,2» ya es una decisión: lo que se hizo
+funcionó. Va pegado a las cifras de cabecera y no en una sección aparte, porque no es otro dato — es
+lo que hace que el promedio signifique algo.
+
+Se compara con el ciclo **CERRADO inmediatamente anterior**, no con «el del año pasado» por fecha: una
+empresa puede hacer dos campañas en un año o saltarse uno, y anclar en el calendario mentiría en los
+dos casos. En la primera campaña no se enseña nada: decir «sin cambio» inventaría una comparación.
+
+### La brecha entre la autoevaluación y la del jefe
+
+Los datos ya estaban —cada persona tiene dos filas, la suya y la de su jefe— y nadie los cruzaba. Es
+la lectura más usada de una campaña, y señala las conversaciones que hay que tener:
+
+- diferencia grande y **positiva** → alguien que se ve mucho mejor de lo que lo ven;
+- grande y **negativa** → alguien que se infravalora, que suele ser quien se quema;
+- y leyendo la columna entera: un jefe cuyas diferencias son todas enormes en el mismo sentido
+  probablemente no está calificando, está poniendo la misma nota a todos.
+
+**Solo cuenta quien tiene las DOS entregadas.** Con una sola la diferencia no existe, y rellenarla
+con un cero diría que coinciden — que es lo contrario de lo que pasa. Se enseñan las seis más
+separadas: es un diagnóstico, no un listado.
+
+### Cómo se prueba
+
+| Qué | Dónde |
+|---|---|
+| La brecha, como función pura | `performance-scoring.spec.ts` — 5 casos, incluido «con una sola no aparece» |
+| «Área» frente a «Sub-área» en informes | `analytics.spec.ts` — 3 casos, incluido «Sin sub-área» no desaparece |
+| **El camino entero, por HTTP** | `node scripts/recorridos/desempeno.mjs` — 9 pasos: dos jefaturas de sub-área que reciben **exactamente a los suyos**, las guardas del árbol, el formulario congelado, calificar, firmar, el consolidado con la misma nota, y el xlsx |

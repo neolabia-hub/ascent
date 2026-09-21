@@ -12,6 +12,7 @@ import {
   planificarEvaluaciones,
   problemasDeReparto,
   repartirFormularios,
+  brechaDeAutoevaluacion,
   type EscalaCompetencia,
   type FormularioDelCiclo,
 } from './performance-scoring.js';
@@ -941,8 +942,49 @@ export class PerformanceService {
       */
       porSubArea: agrupar('subjectArea'),
       porCargo: agrupar('subjectJobTitle'),
+      /*
+        CONTRA LA CAMPAÑA ANTERIOR (2026-09-21).
+
+        Una nota de 3,8 no significa nada sola. «3,8, y el año pasado 3,2» ya es una decision: lo
+        que se hizo funciono. Sin esta comparacion el consolidado describe un año y no dice si la
+        formacion del anterior sirvio para algo, que es la pregunta que justifica el modulo.
+
+        Se compara con el ciclo CERRADO inmediatamente anterior, no con "el del año pasado" por
+        fecha: una empresa puede hacer dos campañas en un año o saltarse uno, y anclar en el
+        calendario mentiria en los dos casos. `null` = es la primera, que es un estado normal.
+      */
+      anterior: await this.comparacionConElAnterior(cycle),
+      /*
+        LA BRECHA ENTRE COMO SE VE UNO Y COMO LO VE SU JEFE.
+
+        Los datos ya estaban: cada persona tiene DOS filas —la suya y la de su jefe— y por eso se
+        pueden comparar lado a lado. Es la señal mas usada en desempeño, y sirve en los dos
+        sentidos: quien se sobrevalora mucho, y el jefe que califica a todos igual.
+      */
+      brecha: brechaDeAutoevaluacion(items),
       items,
     };
+  }
+
+  /**
+   * El ciclo CERRADO anterior a este, con sus cifras, para poder decir «y el anterior fue X».
+   *
+   * `null` cuando no hay ninguno: es la primera campaña, y decir «0» o «sin cambio» seria
+   * inventarse una comparacion que no existe.
+   */
+  private async comparacionConElAnterior(cycle: { id: string; startsAt: Date }) {
+    const anterior = await this.prisma.scoped.performanceCycle.findFirst({
+      where: { status: 'CLOSED', startsAt: { lt: cycle.startsAt } },
+      orderBy: { startsAt: 'desc' },
+      select: { id: true, name: true, startsAt: true },
+    });
+    if (!anterior) return null;
+
+    const reviews = await this.prisma.scoped.performanceReview.findMany({
+      where: { cycleId: anterior.id },
+      select: { status: true, score: true, signedAt: true },
+    });
+    return { id: anterior.id, name: anterior.name, startsAt: anterior.startsAt, ...resumirEvaluaciones(reviews) };
   }
 
   /**

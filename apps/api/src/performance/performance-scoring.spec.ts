@@ -1,4 +1,5 @@
 import {
+  brechaDeAutoevaluacion,
   calcularNota,
   planificarEvaluaciones,
   problemasDeReparto,
@@ -247,5 +248,61 @@ describe('el recordatorio del ciclo', () => {
     expect(cuandoCierra(0)).toBe('cierra hoy');
     expect(cuandoCierra(1)).toBe('cierra mañana');
     expect(cuandoCierra(3)).toBe('cierra en 3 dias');
+  });
+});
+
+/*
+  LA BRECHA AUTOEVALUACION / JEFE (2026-09-21). Los datos ya existian —dos filas por persona— y
+  nadie los cruzaba. Lo que se vigila aqui es que no se invente una diferencia donde falta una de
+  las dos notas: rellenar con cero diria que coinciden, que es lo contrario de lo que pasa.
+*/
+describe('brecha entre la autoevaluacion y la del jefe', () => {
+  const fila = (parcial: Partial<Parameters<typeof brechaDeAutoevaluacion>[0][number]>) => ({
+    subjectUserId: 'u1',
+    subjectName: 'Persona',
+    reviewerRole: 'MANAGER',
+    status: 'SUBMITTED',
+    score: 80,
+    ...parcial,
+  });
+
+  it('cruza las dos notas de la misma persona', () => {
+    const resultado = brechaDeAutoevaluacion([
+      fila({ reviewerRole: 'SELF', score: 90 }),
+      fila({ reviewerRole: 'MANAGER', score: 70 }),
+    ]);
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0]).toMatchObject({ auto: 90, jefe: 70, diferencia: 20 });
+  });
+
+  it('la diferencia es negativa cuando la persona se infravalora', () => {
+    const resultado = brechaDeAutoevaluacion([
+      fila({ reviewerRole: 'SELF', score: 60 }),
+      fila({ reviewerRole: 'MANAGER', score: 85 }),
+    ]);
+    expect(resultado[0]?.diferencia).toBe(-25);
+  });
+
+  it('con una sola de las dos NO aparece: la diferencia no existe', () => {
+    expect(brechaDeAutoevaluacion([fila({ reviewerRole: 'SELF', score: 90 })])).toEqual([]);
+    expect(brechaDeAutoevaluacion([fila({ reviewerRole: 'MANAGER', score: 90 })])).toEqual([]);
+  });
+
+  it('una sin entregar tampoco cuenta, aunque traiga nota', () => {
+    const resultado = brechaDeAutoevaluacion([
+      fila({ reviewerRole: 'SELF', score: 90 }),
+      fila({ reviewerRole: 'MANAGER', score: 70, status: 'PENDING' }),
+    ]);
+    expect(resultado).toEqual([]);
+  });
+
+  it('ordena por la diferencia mas grande, en cualquiera de los dos sentidos', () => {
+    const resultado = brechaDeAutoevaluacion([
+      fila({ subjectUserId: 'a', reviewerRole: 'SELF', score: 82 }),
+      fila({ subjectUserId: 'a', reviewerRole: 'MANAGER', score: 80 }),
+      fila({ subjectUserId: 'b', reviewerRole: 'SELF', score: 50 }),
+      fila({ subjectUserId: 'b', reviewerRole: 'MANAGER', score: 90 }),
+    ]);
+    expect(resultado.map((f) => f.subjectUserId)).toEqual(['b', 'a']);
   });
 });

@@ -842,6 +842,35 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
       </div>
 
       {/*
+        CONTRA LA CAMPAÑA ANTERIOR (2026-09-21).
+
+        Va pegado a las cifras y no en una sección aparte, porque no es otro dato: es lo que hace
+        que el promedio de arriba signifique algo. «3,8» no dice si lo que se hizo funcionó; «3,8, y
+        la anterior 3,2» sí — y eso es lo que decide la formación del año que viene.
+
+        En la PRIMERA campaña no se enseña nada. Decir «sin cambio» o «0» inventaría una comparación
+        que no existe, y quien la lea creerá que se quedó igual.
+      */}
+      {datos.anterior && datos.anterior.promedio !== null && datos.promedio !== null ? (
+        <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-md bg-paper px-3.5 py-2.5 text-sm text-ink-700">
+          <span>
+            La campaña anterior —{datos.anterior.name}— cerró con{' '}
+            <strong className="font-medium text-ink-900">{datos.anterior.promedio}%</strong>.
+          </span>
+          {(() => {
+            const delta = Math.round((datos.promedio - datos.anterior.promedio) * 10) / 10;
+            if (delta === 0) return <span className="text-ink-500">Esta va igual.</span>;
+            return (
+              <span className={cn('font-medium', delta > 0 ? 'text-ok' : 'text-warn')}>
+                Esta va {delta > 0 ? '+' : ''}
+                {delta} puntos {delta > 0 ? 'arriba' : 'abajo'}.
+              </span>
+            );
+          })()}
+        </p>
+      ) : null}
+
+      {/*
         Y LO MISMO, FORMULARIO A FORMULARIO (Decision #139).
 
         Es para lo que sirve tener varios en una campaña: el promedio de conductores y el de
@@ -911,6 +940,52 @@ function VerConsolidado({ datos, onCerrar }: { datos: Consolidado; onCerrar: () 
           {datos.porArea.length > 1 ? <Corte titulo="Por área" grupos={datos.porArea} /> : null}
           {haySubAreas ? <Corte titulo="Por sub-área" grupos={datos.porSubArea ?? []} /> : null}
           {datos.porCargo.length > 1 ? <Corte titulo="Por cargo" grupos={datos.porCargo} /> : null}
+        </section>
+      ) : null}
+
+      {/*
+        CÓMO SE VE CADA UNO FRENTE A CÓMO LO VE SU JEFE (2026-09-21).
+
+        Los datos ya estaban —dos filas por persona— y nadie los cruzaba. Señala las dos
+        conversaciones que hay que tener: quien se ve mucho mejor de lo que lo ven, y quien se
+        infravalora. Y leyendo la columna entera aparece una tercera señal: un jefe cuyas
+        diferencias son todas enormes en el mismo sentido no está calificando.
+
+        Se enseñan las SEIS más separadas, no las 900: es un diagnóstico, no un listado.
+      */}
+      {datos.brecha?.length > 0 ? (
+        <section className="mt-6">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500">
+            Dónde más se separan la autoevaluación y la del jefe
+          </h3>
+          <p className="mt-1 text-xs text-ink-500">
+            Solo quien tiene las dos entregadas. En positivo, se puso más nota de la que le pusieron.
+          </p>
+          <ul className="mt-3 overflow-hidden rounded-xl bg-paper">
+            {datos.brecha.slice(0, 6).map((fila) => (
+              <li
+                key={fila.subjectUserId}
+                className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2.5 last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-sm text-ink-900">{fila.subjectName ?? 'Sin nombre'}</span>
+                <span className="flex shrink-0 items-center gap-3 text-xs tabular-nums text-ink-500">
+                  <span>
+                    se puso <strong className="font-medium text-ink-900">{fila.auto}</strong> · le pusieron{' '}
+                    <strong className="font-medium text-ink-900">{fila.jefe}</strong>
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 font-semibold',
+                      fila.diferencia > 0 ? 'bg-warn-soft text-warn' : 'bg-info-soft text-info',
+                    )}
+                  >
+                    {fila.diferencia > 0 ? '+' : ''}
+                    {fila.diferencia}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

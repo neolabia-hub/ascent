@@ -121,6 +121,36 @@ const CATALOG_DESCRIPTORS: Record<CatalogKey, CatalogDescriptor> = {
         if (data.parentId === id) {
           throw new BadRequestException({ code: 'AREA_PARENT_SELF', message: 'Un área no puede ser su propia área padre.' });
         }
+        /*
+          DOS NIVELES Y NO MAS: AREA -> SUB-AREA (2026-09-21).
+
+          No es una limitacion por gusto, es que **el resto del sistema asume dos**. La faceta de
+          area de una audiencia resuelve "el area y sus hijas" con un filtro de relacion de un solo
+          salto (`audience-rule.ts`); con una sub-sub-area, esa gente se caeria de las reglas del
+          area grande y el motor les retiraria las obligaciones vivas — en silencio.
+
+          Se podria hacer recursivo, como ya lo es `withDescendants` para el alcance del analista.
+          Se elige lo contrario: **prohibir el tercer nivel**, porque un organigrama de dos alturas
+          es lo que el negocio necesita —Gestion Humana / Nomina— y porque una regla que el sistema
+          IMPIDE romper vale mas que una que aguanta mas casos y hay que recordar.
+
+          Si algun dia hacen falta tres, este error es el sitio donde se descubre: dice que hay que
+          hacer recursivo lo de arriba antes de permitirlo.
+        */
+        const padre = await prisma.area.findUnique({ where: { id: data.parentId }, select: { parentId: true } });
+        if (padre?.parentId) {
+          throw new BadRequestException({
+            code: 'AREA_DEPTH',
+            message: 'Esa área ya es una sub-área. El organigrama admite dos niveles: área y sub-área.',
+          });
+        }
+        const hijas = await prisma.area.count({ where: { parentId: id } });
+        if (hijas > 0) {
+          throw new BadRequestException({
+            code: 'AREA_DEPTH',
+            message: 'Esta área ya tiene sub-áreas, así que no puede colgar de otra. El organigrama admite dos niveles.',
+          });
+        }
         const todas = await prisma.area.findMany({ select: { id: true, parentId: true } });
         const padreDe = new Map(todas.map((a) => [a.id, a.parentId]));
         // Se sube desde el padre propuesto: si por el camino se llega a esta area, es un ciclo.

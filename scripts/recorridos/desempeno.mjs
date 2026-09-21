@@ -63,11 +63,23 @@ comprobar(
   `un area no puede ser su propia madre (${ciclo.estado} ${ciclo.cuerpo?.code ?? ''})`,
   `lo acepto (${ciclo.estado}), y eso cuelga la lectura del arbol el dia que alguien lo recorra`,
 );
+/*
+  Y EL ORGANIGRAMA ADMITE DOS NIVELES. Colgar Gestion Humana de su propia hija lo rechaza la guarda
+  de PROFUNDIDAD antes que la de ciclo —Gestion Humana ya tiene sub-areas, asi que no puede colgar
+  de nadie—, y esta bien que sea asi: con dos niveles un ciclo largo ya no se puede ni formar. La
+  guarda de ciclo se queda como segunda linea, no como la unica.
+*/
 const cicloLargo = await admin.patch(`/catalogs/areas/${creado.areaMadre}`, { parentId: areaNomina });
 comprobar(
-  cicloLargo.estado === 400 && cicloLargo.cuerpo?.code === 'AREA_PARENT_CYCLE',
+  cicloLargo.estado === 400 && ['AREA_DEPTH', 'AREA_PARENT_CYCLE'].includes(cicloLargo.cuerpo?.code),
   `ni colgar de su propia rama (${cicloLargo.estado} ${cicloLargo.cuerpo?.code ?? ''})`,
   `lo acepto (${cicloLargo.estado}): Gestion Humana quedaria colgando de su propia hija`,
+);
+const tercerNivel = await admin.patch(`/catalogs/areas/${areaSeleccion}`, { parentId: areaNomina });
+comprobar(
+  tercerNivel.estado === 400 && tercerNivel.cuerpo?.code === 'AREA_DEPTH',
+  `y no deja un TERCER nivel (${tercerNivel.estado} ${tercerNivel.cuerpo?.code ?? ''})`,
+  `lo acepto (${tercerNivel.estado}), y una sub-sub-area se cae de las reglas del area grande en silencio`,
 );
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -304,6 +316,32 @@ comprobar(
     nombresPorSubArea.some((n) => n?.includes(`Seleccion ${SUFIJO}`)),
   'y existe ademas el corte «Por sub-area», con Nomina y Seleccion separadas',
   `el corte fino no las trae: ${nombresPorSubArea.slice(0, 8).join(', ')}`,
+);
+
+/*
+  LAS DOS LECTURAS QUE CONVIERTEN EL INFORME EN UNA DECISION (2026-09-21).
+
+  `anterior` es `null` aqui o no segun lo que haya en la base —esto no monta una campaña cerrada
+  solo para comprobarlo—, asi que se comprueba la FORMA: si viene, trae nombre y cifras; si no,
+  viene nulo. Lo que NO puede pasar es que venga un cero disfrazado de comparacion.
+*/
+comprobar(
+  consolidado?.anterior === null || typeof consolidado?.anterior?.name === 'string',
+  `la comparacion con la campaña anterior llega bien (${consolidado?.anterior?.name ?? 'no hay anterior'})`,
+  `llego algo raro: ${JSON.stringify(consolidado?.anterior).slice(0, 120)}`,
+);
+
+/*
+  LA BRECHA solo cuenta a quien tiene LAS DOS entregadas. En este recorrido la persona tiene la del
+  jefe entregada y la autoevaluacion sin responder, asi que **no debe aparecer**: si apareciera,
+  seria una diferencia inventada contra una nota que nadie puso.
+*/
+const enLaBrecha = (consolidado?.brecha ?? []).map((f) => f.subjectUserId);
+console.log(`   ... la brecha trae ${enLaBrecha.length} persona(s)`);
+comprobar(
+  !enLaBrecha.includes(deNomina.id),
+  'y quien tiene solo una de las dos evaluaciones NO sale en la brecha',
+  'salio en la brecha con una sola nota: la diferencia estaria inventada',
 );
 
 const xlsx = await admin.pedir(`/desempeno/ciclos/${creado.cicloId}/consolidado/xlsx`);
