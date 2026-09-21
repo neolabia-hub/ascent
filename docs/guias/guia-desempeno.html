@@ -647,6 +647,113 @@
   </section>
 
   <section>
+    <h2>Cuando el área es grande: evaluar por jefaturas</h2>
+    <p>
+      Gestión Humana no tiene un jefe: tiene el de Nómina, el de Contratación y el de Selección. Si
+      la empresa está así, poner a todo el mundo en «Gestión Humana» deja
+      <strong>a una sola persona evaluando a treinta</strong>, y ninguna de las tres jefaturas
+      califica a su gente.
+    </p>
+    <p>La solución no es un campo nuevo ni una pantalla nueva. Son dos pasos:</p>
+    <ol>
+      <li>
+        En <strong>Configuración → Áreas</strong>, se crea Nómina como un área normal y se le pone
+        <strong>«Área padre» = Gestión Humana</strong>. Eso la convierte en sub-área.
+      </li>
+      <li>
+        A cada sub-área se le pone <strong>su responsable</strong>, y la gente se mueve
+        <strong>a la sub-área</strong> (en la ficha, o con la columna <code>sub_area</code> del
+        archivo de carga).
+      </li>
+    </ol>
+    <p>
+      Con eso, al planificar el ciclo <strong>cada jefe recibe exactamente a los suyos</strong>. No
+      hay nada más que configurar.
+    </p>
+    <div class="clave">
+      <p>
+        <strong>Lo que NO cambia.</strong> El formulario sigue repartiéndose <strong>por
+        cargo</strong>. Un analista de Nómina y uno de Selección hacen el mismo trabajo: se les
+        evalúan las mismas competencias. Lo que cambia entre ellos no es <em>qué</em> se les
+        pregunta, sino <em>quién</em> se lo pregunta.
+      </p>
+      <p>
+        <strong>Y «Área» sigue queriendo decir el área grande.</strong> En los informes, Gestión
+        Humana sigue dando su número con toda su gente dentro; «Sub-área» es un corte
+        <em>añadido</em>, no un reemplazo. Nada de lo que ya se venía mirando cambia de significado
+        ni deja de cuadrar con los meses anteriores.
+      </p>
+      <p>
+        <strong>Dos niveles, no tres.</strong> Una sub-área no puede colgar de otra sub-área; el
+        sistema lo impide al guardar.
+      </p>
+    </div>
+    <p>
+      Si la empresa no tiene sub-áreas, no hay nada que hacer y no se nota: el corte «Por sub-área»
+      <strong>ni siquiera aparece</strong> donde no las hay, para no enseñar dos listas idénticas
+      una al lado de la otra.
+    </p>
+  </section>
+
+  <section>
+    <h2>Cómo se lee el consolidado del ciclo</h2>
+    <p>
+      Al cerrar —y mientras va— el ciclo enseña su análisis. Estas son las lecturas, y lo que
+      contesta cada una:
+    </p>
+    <div class="tabla-envoltura">
+      <table>
+        <thead><tr><th>Lectura</th><th>La pregunta que contesta</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>La nota, y la del ciclo anterior</strong></td>
+            <td>¿Mejoramos? Un 3,8 solo no dice nada; «3,8, y la anterior 3,2» ya es una conclusión</td>
+          </tr>
+          <tr>
+            <td><strong>Por área</strong></td>
+            <td>Dónde está el problema, en grande</td>
+          </tr>
+          <tr>
+            <td><strong>Por sub-área</strong></td>
+            <td>A quién llamar. «Gestión Humana 78 %» no dice a quién; «Nómina 40 %» sí</td>
+          </tr>
+          <tr>
+            <td><strong>Las competencias más bajas</strong></td>
+            <td>Qué formación pedir para el plan del año siguiente</td>
+          </tr>
+          <tr>
+            <td><strong>Autoevaluación contra la del jefe</strong></td>
+            <td>Qué conversaciones hay que tener</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>La comparación con el ciclo anterior</h3>
+    <p>
+      Se compara con el <strong>ciclo cerrado inmediatamente anterior</strong>, no con «el del año
+      pasado» por fecha: una empresa puede hacer dos campañas en un año o saltarse uno, y anclarlo
+      al calendario mentiría en los dos casos. <strong>En la primera campaña no se enseña
+      nada</strong> — decir «sin cambio» sería inventarse una comparación que no existe.
+    </p>
+    <h3>La brecha entre la autoevaluación y la del jefe</h3>
+    <p>
+      Cada persona deja dos notas: la que se puso y la que le puso su jefe. La diferencia entre las
+      dos es la lectura más útil de toda la campaña, y se enseñan las <strong>seis más
+      separadas</strong> — es un diagnóstico, no un listado.
+    </p>
+    <ul>
+      <li>Diferencia grande y <strong>positiva</strong> → alguien que se ve mucho mejor de lo que lo ven. Ahí hay una conversación pendiente.</li>
+      <li>Grande y <strong>negativa</strong> → alguien que se infravalora. Suele ser quien se quema.</li>
+      <li>Y leyendo la columna entera: <strong>un jefe cuyas diferencias son todas enormes en el mismo sentido</strong> probablemente no está calificando — está poniendo la misma nota a todos.</li>
+    </ul>
+    <p>
+      <strong>Solo aparece quien tiene las dos entregadas.</strong> Con una sola la diferencia no
+      existe, y contarla como cero diría que coinciden, que es justo lo contrario de lo que pasa.
+      Esta lectura solo tiene sentido si el ciclo lleva activada la autoevaluación.
+    </p>
+  </section>
+
+  <section>
     <h2>Cómo se calcula la nota</h2>
     <p>
       Es un <strong>promedio ponderado, llevado a porcentaje</strong>. Cada respuesta se convierte

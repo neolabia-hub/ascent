@@ -554,6 +554,33 @@ el motor le retiraría las obligaciones vivas. Se podría hacer recursivo —`wi
 para el alcance del analista— y se eligió lo contrario: una regla que el sistema impide romper vale
 más que una que aguanta más casos y hay que recordar.
 
+### La decisión de fondo: UN árbol, no un campo aparte (2026-09-21)
+
+La pregunta que hizo el cliente al cerrar, y que merece quedar escrita porque es la que se vuelve a
+hacer dentro de seis meses: *«¿es mejor así, o que área y sub-área estén todo combinado en el mismo
+lugar?»*.
+
+**Ya están en el mismo lugar, y eso es exactamente lo que lo hace barato.** «Sub-área» no es una
+tabla nueva, ni un catálogo paralelo, ni un campo nuevo en la persona: es **una fila más de
+`areas`** que tiene `parentId`. La persona sigue teniendo **un solo `areaId`**, y apunta al nodo más
+hondo donde esté.
+
+Las tres formas que había, y por qué esta:
+
+| Forma | Qué costaba |
+|---|---|
+| **Plano** — subir «Nómina» como área general, que es lo que el cliente iba a hacer | La jefatura de Gestión Humana deja de ver a su gente; una regla que apunte al área grande **no alcanza** a los de Nómina y el motor les retira obligaciones vivas; los informes se parten en cuarenta filas sin total |
+| **Campo aparte** — `areaId` **y** `subAreaId` en la persona | Cada sitio que hoy lee `areaId` —audiencias, planificación de evaluaciones, alcance del analista, informes, importación, encuestas de eficacia, seis pantallas— tendría que **decidir cuál de los dos usa**, y cada decisión es un fallo silencioso esperando. Dos desplegables en cada formulario. Y el archivo del cliente, que ya trae la sub-área, seguiría sin encajar |
+| **Un árbol (lo que se hizo)** | Un campo, un catálogo, un desplegable. Todo lo que leía `areaId` **sigue leyéndolo sin enterarse**. El precio es la profundidad máxima de dos, y es un precio que el servidor cobra en la cara (`AREA_DEPTH`) en vez de dejarlo fallar callado |
+
+Lo único que hubo que tocar fue **donde el significado se habría desplazado solo**: la faceta de
+audiencia (que ahora alcanza «el área y sus hijas») y la dimensión `area` de los informes (que sube
+a la madre). Dos sitios, no veinte, y los dos porque no tocarlos habría **cambiado el resultado de
+algo que ya funcionaba**.
+
+Para quien administra, el resumen cabe en una línea: *una sub-área es un área a la que se le puso
+«Área padre»*. No hay concepto nuevo que aprender, y quien no las use no se entera de que existen.
+
 ### «Área» sigue siendo la grande; «Sub-área» es un corte nuevo
 
 El riesgo que esto tenía era silencioso: la dimensión `area` de los informes sale del área de la

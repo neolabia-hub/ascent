@@ -7,7 +7,9 @@ Existe porque los pendientes estaban repartidos entre siete documentos —el HAN
 `00-el-motor.md` §9, `08-evidencia.md` §10, `seguimiento.md` §11, `05-cumplimiento.md`— y para saber
 qué falta había que leerlos todos. Cada punto dice **dónde está el detalle**, para no repetirlo.
 
-Al 2026-09-09 (noche), con Ascent ya en producción.
+Al **2026-09-21**, con Programas (§11) y Sub-áreas (§12) cerrados y desplegados. Lo que de verdad
+queda abierto está en **§10 (Producción)**, y no es código: vigilancia/Sentry —lo de más valor—,
+rotar las credenciales de R2, el correo de soporte y la promesa de asistencia 24/7 del acta.
 
 ---
 
@@ -139,7 +141,18 @@ que rodea a un sistema que ya tiene un cliente dentro. El detalle, en `HANDOFF` 
 | 10.8 | ~~El QR de la constancia no abre solo~~ **HECHO el 2026-09-11.** El margen del QR estaba en 1 modulo; la norma ISO/IEC 18004 pide 4. Sin esa "zona tranquila" el lector detecta el texto pero no lo trata como enlace fiable — exactamente el sintoma. Subido a produccion, pendiente de que el cliente confirme escaneando una constancia nueva | `certificate-render.service.ts` |
 | 10.9 | **El asistente automático 24/7 no existe todavía** y ya está prometido | El acta de entrega y la ficha técnica dicen que fuera del horario hay atención automática. Construirlo, cambiar la frase por lo que hoy es cierto, o ponerle fecha — **antes de firmar**. `docs/entrega/00-antes-de-enviar.md` §2 bis |
 
-## 11. Programas (agrupar formaciones, certificar por el conjunto) — abierto el 2026-09-14
+## 11. Programas (agrupar formaciones, certificar por el conjunto) — ~~abierto el 2026-09-14~~ **CERRADO Y DESPLEGADO el 2026-09-21**
+
+> **Todo lo de esta sección está en producción desde el 2026-09-21** (42 migraciones). Donde una fila
+> diga «NO desplegado» es historia de cuando se escribió, no el estado de hoy. Lo único que sigue en
+> manos del cliente es **11.5**: el campo `modulos` de la constancia existe y está apagado; colocarlo
+> en la plantilla real es una decisión de quien diseña el arte.
+>
+> Se cerró con: la guía de usuario `docs/guias/programas.html`, la documentación técnica en
+> `docs/modulos/programas.md`, y un recorrido de punta a punta (`scripts/recorridos/programa.mjs`,
+> 15 pasos con asignaciones reales, los tres tipos de asistencia, certificados y llegada a
+> Seguimiento) que **destapó un fallo de producto real**: `certificateHours` no lo escribía nadie y
+> las constancias salían sin horas.
 
 El cliente pidió que varias formaciones ("Gestión Humana", "Comercial"...) se vean y se certifiquen
 como **un solo programa** ("Programa de Inducción General"), no como formaciones sueltas, con reglas
@@ -156,7 +169,7 @@ detalle completo en `HANDOFF` 2026-09-14.
 | 11.6 | **Reinducción como programa: la ronda se abre sin pisar la anterior.** `PathEnrollment.cycleNumber` (migración `20260915120000_programa_ciclo`, única ahora por `pathId+userId+cycleNumber` — "una fila por ronda, inmutable", mismo patrón que `CertificationGrant`). La ronda del programa sale de la más adelantada de las `Assignment.cycleNumber` de sus módulos (`cicloDePrograma()` en `program-completion.ts`); cada módulo se da por aprobado según su `Assignment` MÁS RECIENTE, no su historial de `Enrollment`. Al abrirse una ronda nueva se crea una fila aparte (nueva constancia), sin tocar la de la ronda anterior. Verificado de punta a punta contra la base de dev (script borrado tras usarlo) + 5 pruebas nuevas de `cicloDePrograma`. Detalle en `HANDOFF` 2026-09-15 (continuación 2) | **HECHO, verificado en dev, NO desplegado** |
 | 11.7 | ~~**Aviso de "asignación automática" para programas de Inducción General.**~~ **HECHO el 2026-09-15.** El panel de "Asignar" detecta los módulos cuyo TIPO ya se exige solo a toda la empresa al publicarse y lo dice. **No se deduce del nombre del programa ni del código del tipo** —los dos son datos del tenant, renombrables— sino de `activityType.config.defaultAssignmentMode === 'ON_HIRE'`, que es lo que lee `aplicarExigenciaAutomatica` de verdad; más `requiresBeforeHire`, que se dice aparte porque cambia A QUIÉN alcanza (con él la regla nace `soloNuevos` y **no toca a la plantilla actual**, que es justo lo que alguien daría por hecho al leer "se asigna sola a toda la empresa"). El aviso dice además cuántos tienen ya su regla activa, y que asignar igualmente no pisa esa regla —queda una segunda, y la obligación nace una sola vez (4.1)— pero con la misma audiencia no añade nada. Cubierto en `e2e/programas.spec.ts` | **HECHO, verificado en dev, NO desplegado** |
 | 11.8 | **Endurecido y explicado (2026-09-15/16).** Se cerró la regla de aprobación —**nada puede quedar sin hacer**: un módulo con obligación viva impide completar aunque el cupo dé—; el **cupo se configura desde el programa**, no desde cada módulo; un programa **vacío ya no acredita la nada**; una ronda **completa no se reabre**; un programa publicado **solo lo ve quien está obligado** (antes salía en Mi aprendizaje a toda la plantilla); el **informe de programas** en Seguimiento con su cuello de botella, que dejó de contar como activas las obligaciones retiradas. En la ficha: un **solo bloque** «Qué falta para que funcione» en vez de avisos sueltos, la cobertura leída **por módulo** —a quién alcanza cada uno, en vez de un «(solo 2 de 5)» que no señalaba— y desde la ficha de una formación se ve **de qué programa es módulo**, en una línea. Detalle en `docs/modulos/programas.md` y `HANDOFF` 2026-09-15/16 | **HECHO, verificado en dev (582 unitarias, 128 de la matriz, e2e), NO desplegado** |
-| 11.9 | **La ficha del programa, legible (2026-09-16).** El cliente leyó la pantalla del 11.8 y señaló tres cosas: (a) el aviso de *«Ninguna audiencia alcanza los N módulos»* **era correcto y aun así no se entendía** — describía la situación sin decir la regla que la convierte en problema (un programa se completa aprobándolos TODOS, `evaluarPrograma`), así que ahora la dice y nombra la salida: *si cada módulo va a propósito para un cargo distinto, no son un programa, son formaciones sueltas*; (b) el pie *«Se le exige a X · Y»* **repetía sumado** lo que ya dice cada módulo en su renglón — se quitó, junto con la segunda caja de «fechas distintas» que decía lo mismo que el bloque de estado tres centímetros más arriba; (c) el renglón de cada módulo volcaba la lista entera de audiencias y cinco botones, así que **cada módulo se abre**: el renglón deja lo que se compara entre módulos —orden, nombre, obligatorio/grupo, a quién alcanza resumido (dos nombres, y a partir de tres se cuenta) y lo que está mal— más reordenar; la ficha desplegada, DENTRO de la lista y no en una ventana, trae las audiencias con nombre completo, estado, campaña y exigencia automática. Las **acciones** van en un menú `⋯` —mismo patrón que la fila de *Usuarios*—, así que se alcanzan sin desplegar nada; y **cada clic tiene un solo destino**: el chevron despliega, el **nombre** abre la formación, el renglón en sí no hace nada. Además, un módulo de tipo automático **sin publicar** ahora dice que su regla de toda la empresa todavía no existe —nace al publicar la formación—, que era lo que hacía leer «se exige sola a toda la empresa» junto a un cargo concreto como un fallo. De paso, asignar un programa **recarga la lista**: antes se asignaba y la pantalla seguía diciendo «no se le exige a nadie» hasta recargar a mano. Cubierto en `e2e/programas.spec.ts` | **HECHO, verificado en dev (tsc, eslint, e2e, y a ojo en `mirar.ps1`), NO desplegado** |
+| 11.9 | **La ficha del programa, legible (2026-09-16).** El cliente leyó la pantalla del 11.8 y señaló tres cosas: (a) el aviso de *«Ninguna audiencia alcanza los N módulos»* **era correcto y aun así no se entendía** — describía la situación sin decir la regla que la convierte en problema (un programa se completa aprobándolos TODOS, `evaluarPrograma`), así que ahora la dice y nombra la salida: *si cada módulo va a propósito para un cargo distinto, no son un programa, son formaciones sueltas*; (b) el pie *«Se le exige a X · Y»* **repetía sumado** lo que ya dice cada módulo en su renglón — se quitó, junto con la segunda caja de «fechas distintas» que decía lo mismo que el bloque de estado tres centímetros más arriba; (c) el renglón de cada módulo volcaba la lista entera de audiencias y cinco botones, así que **cada módulo se abre**: el renglón deja lo que se compara entre módulos —orden, nombre, obligatorio/grupo, a quién alcanza resumido (dos nombres, y a partir de tres se cuenta) y lo que está mal— más reordenar; la ficha desplegada, DENTRO de la lista y no en una ventana, trae las audiencias con nombre completo, estado, campaña y exigencia automática. Las acciones se probaron en un menú `⋯` y **se volvió a dejarlas visibles** (↑ ↓ ✏️ 🗑) el 2026-09-20: con un admin ordenando diez módulos, un menú son dos clics por cada movimiento. Y **cada clic tiene un solo destino**: el chevron despliega, el **nombre** abre la formación —sin subrayado, que en una fila desplegable se lee como «esto despliega»—, el renglón en sí no hace nada. Además, un módulo de tipo automático **sin publicar** ahora dice que su regla de toda la empresa todavía no existe —nace al publicar la formación—, que era lo que hacía leer «se exige sola a toda la empresa» junto a un cargo concreto como un fallo. De paso, asignar un programa **recarga la lista**: antes se asignaba y la pantalla seguía diciendo «no se le exige a nadie» hasta recargar a mano. Cubierto en `e2e/programas.spec.ts` | **HECHO, verificado en dev (tsc, eslint, e2e, y a ojo en `mirar.ps1`), NO desplegado** |
 
 | 11.10 | **El aviso de la audiencia que no alcanza al resto del programa (2026-09-16).** Si un módulo tiene una audiencia que no llega a los demás módulos, se marca en ámbar en su ficha y se dice la consecuencia entera: esa gente no completará el programa **y tampoco recibirá la constancia individual de esa formación**. Nace de la pregunta del cliente *"¿qué pasa si se agrega una píldora que fue hecha para individual y tenía otra audiencia?"*. **No se bloquea agregar el módulo** —así es como se arma un programa, con formaciones que ya existen— y **no se arregló por debajo**: ver la decisión de abajo | **HECHO, verificado en dev, NO desplegado** |
 
@@ -231,6 +244,34 @@ constancias, ni un número de auditoría. Si se pide, se hace por ahí, no cambi
   lo decida. El tipo vive en cada módulo, no en el programa.
 - El color de un programa en la interfaz es **fijo** (`#4338ca`, `COLOR_PROGRAMA` en el frontend),
   no el de la marca del tenant: es la señal de "esto es un programa" en cualquier empresa.
+
+## 12. Sub-áreas y jefaturas — **HECHO Y DESPLEGADO el 2026-09-21**
+
+Se abre y se cierra el mismo día porque el cliente lo necesitaba antes de subir a su gente. Queda
+aquí para que conste qué se tocó y qué NO, que es la parte que se olvida.
+
+| | Qué | Estado |
+|---|---|---|
+| 12.1 | **El árbol de áreas, usable.** `Area.parentId` existía desde el primer día sin pantalla que lo dejara declarar. Ahora se pone en *Configuración → Áreas* («Área padre»), con tres guardas del servidor: `AREA_PARENT_SELF`, `AREA_PARENT_CYCLE` y **`AREA_DEPTH` (dos niveles, no tres)** | **HECHO, desplegado** |
+| 12.2 | **La faceta de audiencia alcanza el área Y SUS HIJAS** (`audience-rule.ts`, en sus dos derivaciones). Sin esto, mover a alguien a una sub-área le habría sacado de toda regla del área grande y el motor le habría retirado las obligaciones vivas **en silencio** | **HECHO, desplegado** |
+| 12.3 | **«Área» sigue siendo la grande; «Sub-área» es una dimensión NUEVA** en informes (`analytics.ts`). Se añade un corte; no se le cambia el significado a ninguno | **HECHO, desplegado** |
+| 12.4 | **Columna `sub_area` en el archivo de personas**, que crea la sub-área colgando del área de la columna anterior. Si ya existía, **no se le toca el padre**: un archivo de personas no reorganiza el organigrama | **HECHO, desplegado** |
+| 12.5 | **Las tres lecturas del ciclo**: contra la campaña anterior (el ciclo cerrado inmediatamente anterior, no por fecha), la brecha autoevaluación/jefe (solo con las dos entregadas) y «Por sub-área» (solo donde las hay) | **HECHO, desplegado** |
+
+**Verificado que NO se rompe nada que dependa del área:** el alcance del analista ya recorría el
+árbol (`withDescendants`, sin tocar), quién evalúa el desempeño, la encuesta de eficacia y las
+pantallas leen `areaId` sin enterarse. **En qué se evalúa NO cambia**: el formulario va por CARGO.
+
+Cubierto por `scripts/recorridos/desempeno.mjs` (10 pasos, con dos jefaturas de sub-área recibiendo
+exactamente a los suyos y limpieza propia al terminar), `performance-scoring.spec.ts` y
+`analytics.spec.ts`. Detalle en `docs/arquitectura.md` §4.55 y `docs/modulos/desempeno.md` §9.
+
+**Lo único que queda abierto de aquí**, y es opcional, no un fallo:
+
+- **El consolidado de desempeño a pantalla completa.** Con área + sub-área + competencias + brecha,
+  la vista actual empieza a quedarse estrecha. Se aplaza a propósito hasta ver una campaña real con
+  datos del cliente: rediseñar una pantalla contra datos imaginados es como se llega a la tercera
+  versión. Cuando se haga, va como **capa de la aplicación**, no como ventana nueva del navegador.
 
 ## Lo que NO está pendiente, para no volver a abrirlo
 

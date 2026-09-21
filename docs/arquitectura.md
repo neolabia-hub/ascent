@@ -598,6 +598,44 @@ le exige y por debajo busca o crea la audiencia y su requisito
 fila, no dos gemelas. Ahi mismo se pueden crear obligaciones `MANUAL` sueltas, en segundo plano:
 no alcanzan a quien entre despues.
 
+### El arbol de areas, y que alcanza la faceta de area (2026-09-21)
+
+`areas.parent_id` existe desde el primer dia. Desde el 2026-09-21 se declara desde la interfaz
+(*Configuracion → Areas*, campo **Area padre**) y el organigrama admite **DOS niveles**: area
+grande y sub-area. Una persona tiene **un solo `area_id`** y apunta al nodo mas hondo donde este —
+no hay un campo `sub_area_id` ni un catalogo aparte. Una sub-area **es** un area con padre.
+
+**La faceta de area de una audiencia alcanza el area Y SUS HIJAS** (`audience-rule.ts`), en las dos
+derivaciones que tiene toda regla: el filtro que va a la base y el predicado en memoria.
+
+```ts
+where:   { area: { OR: [{ id: { in: rule.areaIds } }, { parentId: { in: rule.areaIds } }] } }
+matches: (p) => rule.areaIds.includes(p.areaId)
+              || (p.parentAreaId !== null && rule.areaIds.includes(p.parentAreaId))
+```
+
+Sin eso, mover a la gente de Gestion Humana a la sub-area Nomina les habria sacado de toda regla que
+apunte a Gestion Humana, y el motor les habria retirado las obligaciones vivas como
+`WITHDRAWN_LEFT_AUDIENCE` — en silencio, y sin que nadie lo hubiera pedido.
+
+**Por que dos niveles y no N.** Ese filtro es de UN SALTO. Una sub-sub-area se caeria de las reglas
+del area grande sin avisar. Se podria hacer recursivo (`withDescendants` ya lo es para el alcance
+del analista) y se eligio lo contrario: el servidor **rechaza** el tercer nivel al guardar
+(`AREA_DEPTH`, junto a `AREA_PARENT_SELF` y `AREA_PARENT_CYCLE`, en `catalogs.service.ts`). Una
+regla que el sistema impide romper vale mas que una que aguanta mas casos y hay que recordar.
+
+**En los informes, «Area» sigue siendo la GRANDE.** La dimension `area` sube a la madre
+(`asignacion.user.area?.parent ?? asignacion.user.area`) y **`subarea` es una dimension nueva**
+(`analytics.ts`). Se AÑADE un corte; no se le cambia el significado al que ya existia. Lo contrario
+habria hecho desaparecer «Gestion Humana» de Seguimiento, de Inicio y del consolidado de desempeño
+sin que nadie lo pidiera, y los numeros habrian dejado de cuadrar con los meses anteriores.
+
+**Y todo lo demas lee `area_id` sin enterarse**: quien evalua el desempeño
+(`area.responsibleUserId`), quien responde la encuesta de eficacia, la importacion de personas y las
+pantallas. Ese es el motivo de que sea un arbol y no un campo aparte: un campo aparte habria
+obligado a cada uno de esos sitios a decidir cual de los dos usa, y cada decision es un fallo
+silencioso esperando.
+
 **Y la convocatoria (`offerings`) es otra cosa**: la JORNADA —cuando, donde, quien dicta,
 modalidad, intensidad horaria, proyectados—. La inscripcion (`enrollments`) cuelga de ella.
 

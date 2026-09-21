@@ -17,11 +17,11 @@ descoloca a quien lo abre.
 
 | Guía | Responde |
 |---|---|
-| [`guia-usuarios.html`](guia-usuarios.html) | El alta una a una y la carga masiva, qué pasa cuando alguien entra o sale, y cómo se recupera un acceso perdido |
+| [`guia-usuarios.html`](guia-usuarios.html) | El alta una a una y la carga masiva, qué pasa cuando alguien entra o sale, cómo se recupera un acceso perdido, y cuándo hacen falta **sub-áreas** |
 | [`guia-montar-formaciones.html`](guia-montar-formaciones.html) | De la carpeta de PDF a la lección publicada: tarjetas, vídeo, examen y constancia |
 | [`guia-formaciones.html`](guia-formaciones.html) | Qué distingue cada tipo de formación y cuándo usar cada uno |
 | [`asistencia.html`](asistencia.html) | Los tres mecanismos de toma de lista —QR, instructor y firma— y cómo sale el acta |
-| [`guia-desempeno.html`](guia-desempeno.html) | El paso a paso de la evaluación de desempeño: qué significa firmar, cómo se calcula la nota y qué pasa después |
+| [`guia-desempeno.html`](guia-desempeno.html) | El paso a paso de la evaluación de desempeño: qué significa firmar, cómo se calcula la nota, cómo evaluar **por jefaturas de sub-área** y cómo se lee el consolidado |
 | [`programas.html`](programas.html) | Varias formaciones con **una sola constancia**: cómo se arma, qué significa de verdad el cupo, y los dos errores que dejan gente sin papel |
 
 ## Qué significa cada cifra

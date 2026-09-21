@@ -4259,3 +4259,64 @@ habria cazado tarda minutos. Se penso antes de correrla, mirando que texto queda
 **La regla:** al envolver contenido existente en un control, ponerle `aria-label` propio en vez de
 dejar que el nombre se calcule solo. El texto de dentro esta ahi para leerse con los ojos, no para
 ser el identificador del control — y cambia cada vez que cambie un estado.
+
+
+## Mover gente a una sub-area puede RETIRARLE obligaciones sin que nadie lo pida (2026-09-21)
+
+Al habilitar el arbol de areas, el cambio peligroso no era ninguno de los que se escribieron: era el
+que **no** se escribia. Si la gente de Gestion Humana se mueve a la sub-area Nomina y la faceta de
+area de las audiencias sigue comparando por igualdad, esa gente **sale de toda regla que apunte a
+Gestion Humana**, y el motor de obligaciones hace su trabajo: las marca
+`WITHDRAWN_LEFT_AUDIENCE`. Sin error, sin aviso, y visible solo cuando alguien pregunte por que ya
+no le sale un curso.
+
+Lo mismo por el otro lado: la dimension `area` de los informes sale del area de la persona, asi que
+«Gestion Humana» **habria desaparecido** de Seguimiento, de Inicio y del consolidado, y los numeros
+habrian dejado de cuadrar con los meses anteriores.
+
+**La forma del fallo, que es lo que vale:** *cambiar donde apunta un dato no cambia el codigo que lo
+lee, le cambia el SIGNIFICADO.* Antes de mover un dato a un sitio mas hondo hay que listar quien lo
+lee —aqui: audiencias, informes, quien evalua el desempeño, la encuesta de eficacia, el alcance del
+analista, la importacion— y decidir uno por uno si sigue queriendo decir lo mismo.
+
+El criterio con el que se cerro: **se AÑADE un corte nuevo, nunca se le cambia el significado al que
+ya existia.** «Area» siguio siendo la grande y «Sub-area» nacio como dimension aparte.
+
+**Y una regla de un salto se protege prohibiendo el tercer nivel, no documentandolo.** La faceta
+resuelve las hijas con `parentId in (...)`: un solo salto. Una sub-sub-area se caeria en silencio,
+asi que el servidor **rechaza** crearla (`AREA_DEPTH`). Se podria haber hecho recursivo
+—`withDescendants` ya lo es— y se prefirio el limite: una regla que el sistema impide romper vale
+mas que una que aguanta mas casos y hay que recordar.
+
+
+## Un recorrido de punta a punta encuentra el hueco ENTRE dos piezas correctas (2026-09-21)
+
+`scripts/recorridos/programa.mjs` (15 pasos, con asignaciones reales, los tres tipos de asistencia,
+certificados y llegada a Seguimiento) destapo que **`certificateHours` no lo escribia nadie**.
+Existia en el esquema, en la pantalla y en el PDF; ningun camino lo guardaba, y las constancias
+salian sin horas.
+
+Ninguna prueba unitaria podia verlo: cada pieza, por separado, estaba bien. El hueco estaba en el
+camino que nadie recorria entero. Cuando se cierre un modulo, el recorrido completo no es un extra —
+es lo unico que mira el producto como lo mira un usuario.
+
+De la misma tanda: la convocatoria necesitaba `publish` + `enroll` o el roster nacia vacio, y cada
+recorrido debe **limpiar lo suyo al terminar** (lo hace `desempeno.mjs`) o el siguiente arranca sobre
+la basura del anterior.
+
+
+## La base de desarrollo en rojo no siempre es una regresion — segunda vez (2026-09-21)
+
+Dos e2e de asistencia fallando, y ningun cambio cerca de asistencia. La causa: **35 reglas de
+asignacion activas** en la base de desarrollo, hechas a mano en sesiones anteriores. Este RUNBOOK ya
+avisa de que por encima de 30 la creacion de una persona expira.
+
+Lo que hay que recordar de verdad: **`dev:limpiar-reglas` limpia lo que dejaron las PRUEBAS**, que se
+reconoce por sus marcas. Lo hecho a mano durante una sesion de desarrollo no lo reconoce nadie y se
+queda ahi para siempre. Se retiraron 18 a mano (35 → 17) y dos pasadas seguidas quedaron en 26/26.
+
+Antes de buscar el fallo en el codigo, mirar el contador:
+
+```
+pnpm --filter @neo-pulse/api dev:limpiar-reglas        # dice cuantas hay
+```

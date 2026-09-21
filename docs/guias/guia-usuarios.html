@@ -170,7 +170,7 @@
           </tr>
           <tr>
             <td><strong>Área</strong></td>
-            <td>Hace <strong>cuatro cosas</strong>, no una: entra en las reglas de quién debe qué («todo Operaciones hace esta capacitación»), decide <strong>quién lo evalúa</strong> —el responsable del área—, decide <strong>quién responde si la formación sirvió</strong>, y es por donde se cortan los informes</td>
+            <td>Hace <strong>cuatro cosas</strong>, no una: entra en las reglas de quién debe qué («todo Operaciones hace esta capacitación»), decide <strong>quién lo evalúa</strong> —el responsable del área—, decide <strong>quién responde si la formación sirvió</strong>, y es por donde se cortan los informes.<br>Si la empresa usa <strong>sub-áreas</strong>, la persona va en la suya, y una regla que apunte al área grande <strong>la sigue alcanzando</strong></td>
           </tr>
           <tr>
             <td>Regional y servicio</td>
@@ -243,15 +243,41 @@
   <section>
     <h2>Antes de cargar a nadie: los catálogos</h2>
     <p>
-      El archivo de personas <strong>no crea cargos ni áreas</strong>: los busca. Si una fila dice
-      «Conductor» y ese cargo no existe en el catálogo, esa fila falla — las demás entran igual.
+      El archivo <strong>crea lo que le falte</strong> —área, sub-área, regional y servicio— y avisa
+      en el resultado de cada fila qué creó, para que nadie se lleve una sorpresa al abrir
+      Configuración después. El <strong>cargo</strong> es la excepción: para crearlo hace falta saber
+      si es Administrativo, Operativo o Comercial, y eso no se adivina. Si el cargo no existe y la
+      fila no trae la columna <code>tipo_cargo</code>, <strong>esa fila falla</strong> y lo dice —
+      las demás entran igual.
     </p>
-    <p>Así que primero, en <strong>Configuración</strong>, tienen que existir:</p>
+    <p>
+      Que pueda crearlos no quiere decir que convenga dejárselo al archivo. Lo creado desde el
+      archivo nace <strong>sin responsable</strong>, y un área sin responsable no tiene quién evalúe
+      a su gente. Así que, en <strong>Configuración</strong>, lo sano es tener antes:
+    </p>
     <ul>
       <li><strong>Cargos</strong> — todos los de la empresa, no solo los del primer grupo que se cargue.</li>
       <li><strong>Áreas</strong> — y a cada una, <strong>su responsable</strong> (ver más abajo: es el paso que todo el mundo olvida).</li>
+      <li><strong>Sub-áreas</strong>, si la empresa las tiene — ver el recuadro de abajo.</li>
       <li><strong>Regionales</strong> y <strong>servicios</strong>, si se van a usar.</li>
     </ul>
+    <div class="clave">
+      <p>
+        <strong>Sub-áreas: cuándo hacen falta.</strong> Si Gestión Humana tiene Nómina, Contratación
+        y Selección, y cada una tiene su propio jefe, entonces hacen falta. La sub-área es
+        <strong>un área normal a la que se le pone un «Área padre»</strong> —no hay un catálogo
+        aparte ni un campo nuevo en la persona—, y la gente queda <strong>en la sub-área</strong>.
+      </p>
+      <p>
+        Con eso, cada jefe de sub-área evalúa exactamente a los suyos, y los informes siguen dando
+        el número de <strong>Gestión Humana entera</strong> además del de cada sub-área. Si la
+        empresa no las usa, no hay nada que hacer: todo sigue igual que siempre.
+      </p>
+      <p>
+        <strong>Dos niveles, no tres.</strong> El sistema no deja colgar una sub-área de otra
+        sub-área, y lo dice al guardar.
+      </p>
+    </div>
     <div class="clave">
       <p>
         <strong>El archivo acepta el código o el nombre</strong>, y no distingue tildes ni
@@ -306,7 +332,9 @@
           <tr><td>nombre_completo</td><td><strong>Sí</strong></td><td>Como se va a ver en las constancias</td></tr>
           <tr><td>correo</td><td><strong>Sí</strong></td><td>A dónde llegan los avisos</td></tr>
           <tr><td>cargo</td><td><strong>Sí</strong></td><td>Código o nombre del catálogo</td></tr>
-          <tr><td>area</td><td><strong>Sí</strong></td><td>Código o nombre del catálogo</td></tr>
+          <tr><td>area</td><td><strong>Sí</strong></td><td>Código o nombre. El área <strong>grande</strong>. Si no existe, se crea</td></tr>
+          <tr><td>sub_area</td><td>No</td><td>Solo si la empresa las usa. La persona queda <strong>aquí</strong>, y la sub-área se crea colgando del área de la columna anterior</td></tr>
+          <tr><td>tipo_cargo</td><td>No</td><td>Administrativo, Operativo o Comercial. <strong>Solo hace falta si el cargo todavía no existe</strong>: sirve para crearlo</td></tr>
           <tr><td>telefono</td><td>No</td><td></td></tr>
           <tr><td>regional</td><td>No</td><td>Código o nombre</td></tr>
           <tr><td>servicio</td><td>No</td><td>Código o nombre</td></tr>
@@ -412,6 +440,11 @@
             <strong>Es el paso que todo el mundo olvida.</strong> Sin él, esa área no tiene quién
             evalúe el desempeño de su gente ni quién responda si la formación sirvió. Se puede poner
             después, pero entonces hay que volver atrás.
+          </p>
+          <p>
+            Y si hay <strong>sub-áreas</strong>, el responsable que cuenta es el de la
+            <strong>sub-área</strong>: es donde está la persona, y es de ahí de donde sale su
+            evaluador. Poner solo el de Gestión Humana deja a la gente de Nómina sin evaluador.
           </p>
         </div>
       </li>

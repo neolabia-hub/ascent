@@ -24,6 +24,133 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-21 — PROGRAMAS CERRADO, y las SUB-AREAS: el cambio que no podia cambiarle el significado a nada
+
+Sesion larga y con dos mitades. La primera termino de cerrar **Programas** (11.5, 11.9–11.12). La
+segunda llego con prisa del cliente —*"el cliente esta esperando para subir los usuarios"*— y era la
+de fondo: **evaluar el desempeño por jefaturas**, con sub-areas. Todo desplegado a produccion al
+final del dia.
+
+### 1. LA FICHA DEL PROGRAMA, EN LA FORMA QUE PEDIA QUIEN LA USA
+
+Cinco vueltas sobre la misma fila de modulo, todas del cliente mirando la pantalla:
+
+- El aviso *"Ninguna audiencia alcanza los 2 modulos"* era correcto y **no se entendia**. Se cambio
+  por contar **por PERSONA** (`contarPorPersona()`): la pregunta de verdad no es si una audiencia
+  cubre el programa, es si **alguien** lo cubre. La comparacion de audiencias se retiro.
+- El pie *"Se le exige a X · Y"* estaba diciendo lo mismo que la fila de arriba. Fuera.
+- La lista de audiencias por modulo iba a crecer sin limite: `resumenDeAudiencias()` corta en dos
+  nombres y el resto es «y N mas».
+- **Los botones.** Primero se probo un menu de opciones; se volvio a los visibles (↑ ↓ ✏️ 🗑). Con un
+  admin que ordena diez modulos, un menu son dos clics por cada movimiento.
+- **El nombre del modulo abre la formacion**, el chevron solo despliega. Sin subrayado, porque
+  subrayado en una fila desplegable se lee como «esto despliega».
+
+Y un cambio de fondo en las palabras: **el cupo es de APROBAR, no de cursar**. Se cursa todo; el
+minimo dice cuantos hay que aprobar. La explicacion que se habia dado en conversacion estaba mal
+—el motor siempre estuvo bien—, y la pantalla ahora lo dice con esas palabras
+(`significadoDelCupo()`).
+
+**Lo que se construyo y se DESHIZO**: suprimir la constancia por PERSONA en vez de por formacion.
+Funcionaba. Se retiro entero a peticion del cliente —*"lo que no quiero son errores por
+complejidad... ese caso no creo que pase"*— y queda el porque escrito en el docblock de
+`esModuloDeUnProgramaPublicado()`, para que nadie lo reabra sin saber que ya se hizo.
+
+### 2. EL RECORRIDO DE PROGRAMA DESTAPO UN FALLO DE PRODUCTO DE VERDAD
+
+`scripts/recorridos/programa.mjs`, 15 pasos con asignaciones reales, asistencia de los tres tipos,
+certificados y llegada a Seguimiento. Dos cosas que ninguna prueba anterior tocaba:
+
+- **Las horas de la constancia no las escribia nadie.** `certificateHours` existia en el esquema,
+  en la pantalla y en el PDF, y **ningun camino lo guardaba**. Las constancias salian sin horas.
+- La convocatoria necesitaba `publish` + `enroll` para que el roster no naciera vacio.
+
+Un recorrido de punta a punta encuentra lo que una prueba unitaria no puede: el hueco **entre** dos
+piezas que por separado estan bien.
+
+### 3. LAS SUB-AREAS. Y NO HIZO FALTA NINGUN CAMPO NUEVO
+
+La peticion: *"cada jefe de sub-area debe saber a quien evaluar, no un area grande con muchas
+jefaturas"*. La regla que ya existia lo resuelve entero:
+
+```
+persona.areaId  →  area.responsibleUserId  =  quien la evalua
+```
+
+`Area.parentId` estaba en el esquema **desde el primer dia** y ninguna pantalla lo dejaba usar.
+Ahora se declara en *Configuracion → Areas*. **Dos niveles, y el servidor rechaza el tercero**
+(`AREA_DEPTH`) porque la faceta de audiencia resuelve las hijas con un filtro de UN salto.
+
+**El riesgo era silencioso, y es lo unico que de verdad importa de esta sesion.** Si la gente se
+mueve a la sub-area sin tocar nada mas:
+
+1. Toda regla que apunte a «Gestion Humana» **deja de alcanzarles**, y el motor les retira las
+   obligaciones vivas como `WITHDRAWN_LEFT_AUDIENCE`. Nadie lo pidio y nadie se entera.
+2. «Gestion Humana» **desaparece de todos los informes** —Seguimiento, Inicio, el consolidado— y
+   quien compare con el mes pasado no cuadra los numeros.
+
+Los dos se cerraron, y con el mismo criterio: **se AÑADE informacion, no se le cambia el significado
+a la que ya existia**. «Area» sigue siendo la grande; «Sub-area» es un corte nuevo. El detalle
+tecnico, en `docs/arquitectura.md` §4.55.
+
+### 4. LA PREGUNTA QUE HIZO EL CLIENTE AL CERRAR, Y LA RESPUESTA
+
+*"¿Es mejor esta opcion, o que area y sub-area esten todo combinado en el mismo lugar?"*
+
+**Ya estan en el mismo lugar, y por eso salio barato.** Una sub-area no es una tabla nueva ni un
+campo nuevo en la persona: es una fila mas de `areas` con `parentId`. Todo lo que leia `area_id`
+—audiencias, evaluaciones, alcance del analista, informes, importacion, seis pantallas— **sigue
+leyendolo sin enterarse**. Un campo `subAreaId` aparte habria obligado a cada uno de esos sitios a
+decidir cual de los dos usa. Escrito entero en `docs/modulos/desempeno.md` §9.
+
+### 5. LAS TRES LECTURAS NUEVAS DEL CICLO
+
+- **Contra la campaña anterior.** Un 3,8 solo no dice nada. Se compara con el ciclo **cerrado
+  inmediatamente anterior**, no por fecha: una empresa hace dos campañas en un año o se salta uno.
+  En la primera no se enseña nada.
+- **La brecha autoevaluacion / jefe.** Los datos estaban desde siempre y nadie los cruzaba. Solo
+  cuenta quien tiene **las dos entregadas**.
+- **Por sub-area**, que solo aparece donde las hay.
+
+### 6. LO QUE SE VERIFICO QUE NO SE ROMPIA
+
+El cliente pregunto por ello y era la pregunta correcta: `area_id` lo usa medio sistema.
+
+| Que | Como quedo |
+|---|---|
+| Alcance del analista | `withDescendants` **ya** recorria el arbol. Asignar el proceso PESV enseña PESV; asignar el area enseña todos sus procesos y los de sus sub-areas. Sin tocar |
+| Audiencias | Arreglado: la faceta alcanza el area y sus hijas |
+| Informes | Arreglado: `area` sube a la madre, `subarea` es dimension nueva |
+| En que se evalua | **No cambia.** El formulario va por CARGO, y asi se queda |
+
+### 7. UNA TARDE ENTERA QUE NO ERA UN FALLO DEL CODIGO
+
+Dos e2e de asistencia en rojo. No era una regresion: la base de desarrollo tenia **35 reglas de
+asignacion activas** hechas a mano, y el RUNBOOK ya avisa de que por encima de 30 se rompe la
+creacion de personas. Los limpiadores automaticos no reconocen la basura hecha a mano. Se retiraron
+18 reglas (35 → 17) y dos pasadas seguidas quedaron en 26/26.
+
+### Verificacion
+
+lint 0 · typecheck 0 · **594/594 unitarias** · matriz **131/131** · verify-rls correcto · build 0 ·
+e2e **27/27** · `programa.mjs` y `desempeno.mjs` en `=== TODO BIEN ===`.
+
+### Produccion
+
+Desplegado el mismo dia. Respaldo previo (`~/respaldo-antes-programas-2026-09-21-1901.sql`, 327K),
+**42 migraciones** aplicadas, datos intactos (3 usuarios, 4 formaciones, 2 constancias), los cinco
+contenedores sanos y `/login`, `/v1/health` y `/programas` en 200.
+
+Y se descubrio desplegando que el documento de despliegue decia `/opt/neo-pulse` desde el primer dia
+cuando la carpeta real siempre fue **`/opt/ascent`**. Corregido.
+
+> **Sobre las areas de prueba en la lista.** El cliente vio «Gestion Humana E2E302358» y pregunto.
+> Eso es **solo la base de desarrollo**: produccion tiene 10 areas limpias, todas generales, ninguna
+> de prueba. Los desplegables ya filtran por `active`; la lista de *Configuracion → Areas* enseña
+> tambien las inactivas a proposito, que es donde se estaban viendo.
+
+---
+
 ## 2026-09-16 — LA FICHA DEL PROGRAMA, LEIDA POR EL CLIENTE (11.9), y una pregunta de fondo que queda ABIERTA
 
 Sesion de correccion pura sobre la pantalla que dejo el 11.8. El cliente la abrio, la leyo entera y
