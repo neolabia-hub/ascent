@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { esJornada, type ActivityTypeConfig } from '@/lib/activity-type';
-import type { CatalogRow, PickableUser } from '@/lib/admin-api';
+import { nombreConRama, type CatalogRow, type PickableUser } from '@/lib/admin-api';
 import type { Modality } from '@/lib/catalog-api';
 import {
   EMPTY_RULE,
   previewProjected,
   type AudienceRule,
+  type CompletionRequirement,
   type ExecutedBy,
   type FacetCount,
   type OfferingBody,
@@ -45,11 +46,16 @@ export interface OfferingFormValue {
   kind: OfferingKind;
   modality: Modality;
   /**
-   * Como se cierra la jornada: '' = lo que diga su modalidad (el caso normal), 'true' por lista,
-   * 'false' por la plataforma. Texto porque es lo que devuelve un `<select>`; se convierte al
+   * Que se exige para darla por cumplida: '' = lo que diga su modalidad (el caso normal),
+   * 'ATTENDANCE', 'CONTENT' o 'BOTH'. Texto porque es lo que devuelve un `<select>`; se convierte al
    * guardar, en un solo sitio.
    */
-  closesByAttendance: string;
+  completionRequirement: string;
+  /**
+   * ¿Se toma lista? Solo se pregunta cuando lo que acredita es el CONTENIDO: en los otros dos casos
+   * la lista es lo que cierra y por tanto se toma siempre. Ver `cierre-de-la-jornada.ts`.
+   */
+  takesAttendance: boolean;
   scheduledDate: string;
   startTime: string;
   endTime: string;
@@ -124,7 +130,8 @@ export function nuevaConvocatoria(
   return {
     kind: config.defaultOfferingKind,
     modality,
-    closesByAttendance: '',
+    completionRequirement: '',
+    takesAttendance: false,
     scheduledDate: '',
     startTime: conFecha ? '08:00' : '',
     endTime: conFecha ? '12:00' : '',
@@ -151,10 +158,8 @@ export function convocatoriaExistente(offering: OfferingDetail): OfferingFormVal
   return {
     kind: offering.kind,
     modality: offering.modality,
-    closesByAttendance:
-      offering.closesByAttendance === null || offering.closesByAttendance === undefined
-        ? ''
-        : String(offering.closesByAttendance),
+    completionRequirement: offering.completionRequirement ?? '',
+    takesAttendance: offering.takesAttendance === true,
     scheduledDate: fecha(offering.scheduledDate),
     startTime: offering.startTime ?? '',
     endTime: offering.endTime ?? '',
@@ -174,6 +179,22 @@ export function convocatoriaExistente(offering: OfferingDetail): OfferingFormVal
   };
 }
 
+/**
+ * ¿LO QUE ACREDITA ES SOLO EL CONTENIDO? Es lo unico que decide si la casilla de la lista se
+ * pregunta o no.
+ *
+ * Resuelve el defecto de la modalidad aqui porque la pantalla tiene que saberlo ANTES de guardar, y
+ * el `exigencia` del servidor solo existe para una convocatoria que ya se guardo. Es la misma
+ * duplicacion que ya tenia el rotulo de la opcion heredada («lo que sugiere su modalidad: ...»), y
+ * se queda en una sola linea a proposito: **la regla de verdad vive en `cierre-de-la-jornada.ts`** y
+ * es la que aplica el servidor. Si algun dia divergen, manda aquel.
+ */
+function soloContenido(value: OfferingFormValue): boolean {
+  if (value.kind === 'PERMANENT') return true;
+  if (value.completionRequirement !== '') return value.completionRequirement === 'CONTENT';
+  return value.modality === 'VIRTUAL';
+}
+
 /** Lo que se manda al servidor. Lo que no aplica a la forma elegida viaja como null, no vacio. */
 export function cuerpoDeConvocatoria(value: OfferingFormValue, activityVersionId?: string): OfferingBody {
   const conFecha = value.kind !== 'PERMANENT';
@@ -184,7 +205,13 @@ export function cuerpoDeConvocatoria(value: OfferingFormValue, activityVersionId
     ...(activityVersionId ? { activityVersionId } : {}),
     kind: value.kind,
     modality: value.modality,
-    closesByAttendance: value.closesByAttendance === '' ? null : value.closesByAttendance === 'true',
+    completionRequirement: value.completionRequirement === '' ? null : (value.completionRequirement as CompletionRequirement),
+    /*
+      SOLO VIAJA CUANDO ES UNA ELECCION. Si la lista acredita, se toma por definicion y mandar un
+      `false` desde aqui seria mandar un dato que el servidor tiene que ignorar — y un dato que se
+      ignora acaba leyendose algun dia. `null` = que lo deduzca quien sabe la regla.
+    */
+    takesAttendance: soloContenido(value) ? value.takesAttendance : null,
     scheduledDate: conFecha && value.scheduledDate ? value.scheduledDate : null,
     startTime: conFecha && value.startTime ? value.startTime : null,
     endTime: conFecha && value.endTime ? value.endTime : null,
@@ -321,14 +348,19 @@ export function OfferingForm({
    * entero: acotar antes de que nazcan las obligaciones es legitimo, y una lista vacia seria un
    * callejon sin salida.
    */
-  const opcionesDe = (filas: CatalogRow[], presentes: FacetCount[] | undefined) => {
+  const opcionesDe = (filas: CatalogRow[], presentes: FacetCount[] | undefined, arbol?: CatalogRow[]) => {
+    // `arbol` solo lo usan las AREAS: la etiqueta lleva la rama («Gestión Humana › Nómina») porque
+    // la lista mezcla areas y sub-areas, y «Nómina» a secas no dice de donde cuelga. Se pasa el
+    // catalogo COMPLETO y no `filas`, que aqui viene filtrado a lo que hay entre los obligados: si
+    // la madre no tuviera gente propia, la rama de su hija se quedaria sin nombre.
+    const rotulo = (fila: CatalogRow) => (arbol ? nombreConRama(fila, arbol) : fila.name);
     if (!presentes || presentes.length === 0) {
-      return filas.map((fila) => ({ id: fila.id, label: fila.name }));
+      return filas.map((fila) => ({ id: fila.id, label: rotulo(fila) }));
     }
     const cuantos = new Map(presentes.map((faceta) => [faceta.id, faceta.count]));
     return filas
       .filter((fila) => cuantos.has(fila.id))
-      .map((fila) => ({ id: fila.id, label: fila.name, hint: `${cuantos.get(fila.id)} obligados` }));
+      .map((fila) => ({ id: fila.id, label: rotulo(fila), hint: `${cuantos.get(fila.id)} obligados` }));
   };
   const set = (parcial: Partial<OfferingFormValue>) => onChange({ ...value, ...parcial });
   const conFecha = value.kind !== 'PERMANENT';
@@ -407,27 +439,68 @@ export function OfferingForm({
         Se dice "al completar el contenido" y no "automatico" a secas por lo mismo: "automatico" no
         dice QUE lo dispara, y lo que la gente necesita saber es que se cierra sola al terminar.
       */}
+      {/*
+        ─── Y DESDE EL 2026-09-21 SON DOS PREGUNTAS, NO UNA (`PENDIENTES` 2.7) ───
+
+        Este desplegable respondia a la vez QUE ACREDITA y SI SE TOMA LISTA, y el cliente dio con el
+        hueco: *"si la formacion tiene evaluacion se cierra por contenido, pero se quiere el QR, la
+        firma o el acta como constancia de que estuvo presente"*. Al elegir «al completar el
+        contenido» desaparecia la lista entera, y con ella los tres mecanismos.
+
+        Ahora la evidencia documental tiene su propia casilla y deja de ser una compuerta. Y aparece
+        «las dos cosas», que es lo que un auditor pide en una presencial con examen y no se podia
+        pedir: hasta hoy, o acreditaba la lista y el examen no obligaba, o al reves.
+      */}
       {value.kind !== 'PERMANENT' ? (
-        <Field
-          htmlFor="o-cierre"
-          label="Como se registra"
-          ayuda="Que queda escrito de que la persona la hizo. Con LISTA, alguien la toma en la sesión y esa marca es la que cierra la formación. AL COMPLETAR EL CONTENIDO no hay nada que marcar: la plataforma la cierra sola cuando la persona termina el temario y, si su tipo los pide, la evaluación y la encuesta. Lo sugiere la modalidad, pero manda lo que se elija aquí."
-        >
-          <Select
-            id="o-cierre"
-            disabled={soloLogistica}
-            value={value.closesByAttendance}
-            onChange={(event) => set({ closesByAttendance: event.target.value })}
+        <>
+          <Field
+            htmlFor="o-cierre"
+            label="Qué se exige para darla por cumplida"
+            ayuda="Con LISTA, alguien la toma en la sesión y esa marca cierra la formación. AL COMPLETAR EL CONTENIDO no hay nada que marcar: la plataforma la cierra sola cuando la persona termina el temario y, si su tipo los pide, la evaluación y la encuesta. LAS DOS COSAS exige venir Y aprobar: quien asiste pero reprueba sigue debiéndola. Lo sugiere la modalidad, pero manda lo que se elija aquí."
           >
-            <option value="">
-              {value.modality === 'VIRTUAL'
-                ? 'Lo que sugiere su modalidad: al completar el contenido'
-                : 'Lo que sugiere su modalidad: con lista de asistencia'}
-            </option>
-            <option value="true">Con lista de asistencia</option>
-            <option value="false">Al completar el contenido</option>
-          </Select>
-        </Field>
+            <Select
+              id="o-cierre"
+              disabled={soloLogistica}
+              value={value.completionRequirement}
+              onChange={(event) => set({ completionRequirement: event.target.value })}
+            >
+              <option value="">
+                {value.modality === 'VIRTUAL'
+                  ? 'Lo que sugiere su modalidad: al completar el contenido'
+                  : 'Lo que sugiere su modalidad: con lista de asistencia'}
+              </option>
+              <option value="ATTENDANCE">Con lista de asistencia</option>
+              <option value="CONTENT">Al completar el contenido</option>
+              <option value="BOTH">Las dos cosas: asiste y aprueba</option>
+            </Select>
+          </Field>
+
+          {/*
+            SOLO SE PREGUNTA CUANDO ES UNA PREGUNTA. Si la lista acredita —«con lista» o «las dos
+            cosas»— la lista se toma por definicion, y ofrecer un si/no ahi seria ofrecer apagar lo
+            unico que puede cerrar la jornada. El servidor aplica la misma regla (`seTomaLista`).
+          */}
+          {soloContenido(value) ? (
+            <Field
+              htmlFor="o-lista"
+              label="Lista de asistencia"
+              ayuda="Márcalo si hubo una sesión a la que la gente fue. Habilita el QR, la firma y el acta, y todo queda en el expediente — pero no cierra la formación: la cierra el contenido."
+            >
+              <label className="flex items-center gap-2 text-sm text-ink-700">
+                <input
+                  id="o-lista"
+                  type="checkbox"
+                  className="focus-ring rounded"
+                  disabled={soloLogistica}
+                  checked={value.takesAttendance}
+                  onChange={(event) => set({ takesAttendance: event.target.checked })}
+                />
+                {/* Corto y en el mismo idioma que «Las dos cosas: asiste y aprueba». */}
+                <span>Se toma, como evidencia</span>
+              </label>
+            </Field>
+          ) : null}
+        </>
       ) : null}
 
       {conFecha ? (
@@ -647,12 +720,12 @@ export function OfferingForm({
               onChange={(jobTitleIds) => set({ scope: { ...value.scope, jobTitleIds } })}
             />
           </Field>
-          <Field htmlFor="o-scope-areas" label="Areas">
+          <Field htmlFor="o-scope-areas" label="Áreas" hint="Un área incluye también a sus sub-áreas.">
             <MultiSelect
               id="o-scope-areas"
               placeholder="Todas"
               disabled={soloLogistica}
-              options={opcionesDe(catalogs.areas, proyectados?.facets.areas)}
+              options={opcionesDe(catalogs.areas, proyectados?.facets.areas, catalogs.areas)}
               value={value.scope.areaIds}
               onChange={(areaIds) => set({ scope: { ...value.scope, areaIds } })}
             />
@@ -721,9 +794,15 @@ function loQueProyecta(preview: ProjectedPreview): string {
 function resumenDeTajada(scope: AudienceRule, catalogs: OfferingFormCatalogs): string {
   const nombres = (ids: string[], filas: CatalogRow[]): string[] =>
     ids.map((id) => filas.find((fila) => fila.id === id)?.name ?? '?');
+  // Las areas, con su rama: en una linea de resumen «Nómina» sola no distingue una sub-area de un
+  // area de primer nivel, que es justo lo que hay que poder leer de un vistazo.
+  const areasConRama = scope.areaIds.map((id) => {
+    const fila = catalogs.areas.find((area) => area.id === id);
+    return fila ? nombreConRama(fila, catalogs.areas) : '?';
+  });
   const partes = [
     ...nombres(scope.jobTitleIds, catalogs.jobTitles),
-    ...nombres(scope.areaIds, catalogs.areas),
+    ...areasConRama,
     ...nombres(scope.regionalIds, catalogs.regionals),
     ...nombres(scope.serviceIds, catalogs.services),
   ];

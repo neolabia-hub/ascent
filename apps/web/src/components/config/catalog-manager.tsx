@@ -15,6 +15,7 @@ import {
   type PickableUser,
 } from '@/lib/admin-api';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/components/ui/cn';
 import { Drawer } from '@/components/ui/drawer';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -318,14 +319,39 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
                           ))
                         : extraColumn.key === 'responsibleUserId'
                           ? (row.responsible?.fullName ?? (
-                              // Un hueco que se puede llenar de un clic no es una advertencia: es
-                              // una tarea. Se ofrece hacerla en vez de pintar el problema de ambar.
+                              /*
+                                Un hueco que se puede llenar de un clic no es una advertencia: es
+                                una tarea. Se ofrece hacerla en vez de pintar el problema de ambar.
+
+                                SALVO EN UNA SUB-ÁREA, QUE SÍ VA EN ÁMBAR (2026-09-21).
+
+                                El evaluador sale del responsable del area DE LA PERSONA y **no se
+                                hereda del padre** (`planificarEvaluaciones`). Quien acaba de crear
+                                «Nómina» dentro de «Gestión Humana» da por hecho lo contrario —es
+                                lo que significa colgar una cosa de otra en cualquier organigrama—
+                                y no se entera hasta que abre el ciclo y su gente sale entera en
+                                «sin evaluador».
+
+                                No heredar es lo correcto: haria evaluar a un jefe gente que no
+                                sabe que tiene. Lo que faltaba era decirlo aqui, que es donde se
+                                toma la decision.
+                              */
                               <button
                                 type="button"
                                 onClick={() => openEdit(row)}
-                                className="focus-ring rounded text-ink-500 underline decoration-dotted underline-offset-4 hover:text-ink-900"
+                                title={
+                                  row.parentId
+                                    ? 'Una sub-área no hereda el responsable de su área padre: sin él, su gente sale sin evaluador al abrir un ciclo de desempeño'
+                                    : undefined
+                                }
+                                className={cn(
+                                  'focus-ring rounded underline decoration-dotted underline-offset-4',
+                                  row.parentId
+                                    ? 'bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn'
+                                    : 'text-ink-500 hover:text-ink-900',
+                                )}
                               >
-                                Asignar
+                                {row.parentId ? 'Sin responsable' : 'Asignar'}
                               </button>
                             ))
                           : (row.annualHoursRequired ?? '—')}

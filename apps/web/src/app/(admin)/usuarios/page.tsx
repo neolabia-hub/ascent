@@ -140,6 +140,8 @@ export default function UsuariosPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  /** El archivo ya simulado, esperando el «Aplicar». `null` = no hay nada pendiente de confirmar. */
+  const [pendiente, setPendiente] = useState<File | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -330,15 +332,47 @@ export default function UsuariosPage() {
     }
   };
 
+  /*
+    SUBIR NO APLICA: PRIMERO SE VE QUE PASARIA (`PENDIENTES` 5.4, 2026-09-21).
+
+    Desde que una recarga ACTUALIZA a quien ya esta, el archivo equivocado puede pisar correcciones
+    hechas a mano. Lo cazo el cliente preguntando justo por ese cruce, y no hay regla que lo resuelva
+    —los dos datos los escribio una persona de la empresa—, asi que la defensa es enseñar la lista
+    antes: «a 12 personas les cambia el area, a esta le reemplaza el correo». Se aplica en un segundo
+    clic, con lo que va a pasar delante.
+  */
   const onImportFile = async (file: File) => {
     setImporting(true);
     setImportResult(null);
+    setPendiente(null);
     try {
-      const result = await importUsers(file);
+      const previa = await importUsers(file, true);
+      setImportResult(previa);
+      // Solo se guarda el archivo si hay algo que aplicar: con todo en rojo no hay segundo paso.
+      if (previa.ok > 0) setPendiente(file);
+      showToast({
+        kind: previa.failed === 0 ? 'info' : 'warning',
+        title: `Vista previa: ${previa.creadas} se crearían, ${previa.actualizadas} cambiarían, ${previa.failed} con error`,
+        description: previa.ok > 0 ? 'Revisa la lista y pulsa «Aplicar» para guardarlo.' : undefined,
+      });
+    } catch (error) {
+      showToast({ kind: 'danger', title: error instanceof Error ? error.message : 'Error al leer el archivo' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  /** El segundo clic: el mismo archivo, ahora sí escribiendo. */
+  const aplicarImport = async () => {
+    if (!pendiente) return;
+    setImporting(true);
+    try {
+      const result = await importUsers(pendiente, false);
       setImportResult(result);
+      setPendiente(null);
       showToast({
         kind: result.failed === 0 ? 'success' : 'warning',
-        title: `Importacion terminada: ${result.ok} creadas, ${result.failed} con error`,
+        title: `Listo: ${result.creadas} creadas, ${result.actualizadas} actualizadas, ${result.failed} con error`,
       });
       await load();
     } catch (error) {
@@ -360,7 +394,13 @@ export default function UsuariosPage() {
   const formValid = useMemo(
     () =>
       form.fullName.trim().length >= 3 &&
-      form.email.includes('@') &&
+      /*
+        EL CORREO YA NO ES OBLIGATORIO (2026-09-21): hay gente que no tiene, y exigirlo empujaba a
+        inventar direcciones. En blanco se guarda como «sin correo» y esa persona entra con su
+        cedula. Lo que si se sigue exigiendo es que, SI se escribe algo, tenga forma de correo — un
+        campo a medio escribir es un error de captura, no una decision.
+      */
+      ((form.email ?? '').trim() === '' || (form.email ?? '').includes('@')) &&
       form.jobTitleId !== '' &&
       form.areaId !== '' &&
       (editing !== null || form.documentNumber.trim().length >= 5) &&
@@ -447,7 +487,13 @@ export default function UsuariosPage() {
                   <Tr key={user.id}>
                     <Td>
                       <div className="font-medium text-ink-900">{user.fullName}</div>
-                      <div className="text-xs text-ink-500">{user.email}</div>
+                      {/*
+                        QUIEN NO TIENE CORREO SE VE (2026-09-21). Dejar el hueco vacio se lee como
+                        «no cargo la pantalla»; y quien administra necesita poder mirar la lista y
+                        saber a quien NO le van a llegar los avisos por correo. No va en ambar: no
+                        es un error, es un hecho de esa persona.
+                      */}
+                      <div className="text-xs text-ink-500">{user.email ?? 'Sin correo · entra con su cédula'}</div>
                     </Td>
                     <Td className="font-mono text-xs">{user.documentNumber}</Td>
                     <Td className="text-ink-700">{user.jobTitle.name}</Td>
@@ -518,8 +564,18 @@ export default function UsuariosPage() {
             <Input id="u-name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} maxLength={160} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field htmlFor="u-email" label="Correo" required hint="Personal o corporativo.">
-              <Input id="u-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={120} />
+            <Field
+              htmlFor="u-email"
+              label="Correo"
+              hint="Personal o corporativo. Si no tiene, déjalo vacío: entrará con su cédula."
+            >
+              <Input
+                id="u-email"
+                type="email"
+                value={form.email ?? ''}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                maxLength={120}
+              />
             </Field>
             <Field htmlFor="u-emailkind" label="Tipo de correo">
               <Select id="u-emailkind" value={form.emailKind} onChange={(e) => setForm({ ...form, emailKind: e.target.value as 'PERSONAL' | 'CORPORATE' })}>
@@ -540,7 +596,12 @@ export default function UsuariosPage() {
                 ))}
               </Select>
             </Field>
-            <Field htmlFor="u-area" label="Area donde trabaja" required>
+            <Field
+              htmlFor="u-area"
+              label="Área donde trabaja"
+              required
+              hint="Si tiene sub-área, se elige la sub-área: de ahí sale quién lo evalúa."
+            >
               <Select
                 id="u-area"
                 value={form.areaId}
@@ -873,11 +934,59 @@ export default function UsuariosPage() {
 
           {importResult ? (
             <div className="space-y-3">
-              <div className="flex gap-2">
-                <StatusPill kind="ok" label={`${importResult.ok} CREADAS`} />
+              {/*
+                EL DESGLOSE, NO UN SOLO NUMERO (2026-09-21).
+
+                Decia «N CREADAS» para todo lo que salio bien, y desde que una recarga ACTUALIZA en
+                vez de rechazar eso seria mentira: el archivo mensual de una empresa son casi todo
+                filas que ya estaban. Quien lo sube necesita ver de un vistazo cuanta gente entro de
+                verdad y a cuanta se le cambio algo — lo segundo es lo que mueve obligaciones.
+
+                «Sin cambios» va en gris y solo si las hay: es la mayoria, y no es una noticia.
+              */}
+              <div className="flex flex-wrap gap-2">
+                <StatusPill kind="ok" label={`${importResult.creadas} ${importResult.simulacion ? 'SE CREARÍAN' : 'CREADAS'}`} />
+                {importResult.actualizadas > 0 ? (
+                  <StatusPill
+                    kind="info"
+                    label={`${importResult.actualizadas} ${importResult.simulacion ? 'CAMBIARÍAN' : 'ACTUALIZADAS'}`}
+                  />
+                ) : null}
+                {importResult.sinCambios > 0 ? (
+                  <StatusPill kind="neutral" label={`${importResult.sinCambios} SIN CAMBIOS`} />
+                ) : null}
                 <StatusPill kind={importResult.failed > 0 ? 'danger' : 'neutral'} label={`${importResult.failed} CON ERROR`} />
               </div>
-              {importResult.ok > 0 ? (
+
+              {/*
+                EL SEGUNDO CLIC (`PENDIENTES` 5.4). Hasta aquí no se ha escrito nada: la lista de
+                abajo dice lo que PASARÍA. El botón no se llama «Confirmar» sino «Aplicar» y dice
+                cuántas filas mueve, porque lo que hay que leer antes de pulsarlo es el número.
+              */}
+              {importResult.simulacion && pendiente ? (
+                <div className="rounded-lg border border-info/40 bg-info-soft p-3">
+                  <p className="text-sm text-ink-700">
+                    <strong>Todavía no se ha guardado nada.</strong> Revisa la lista —sobre todo lo que
+                    dice «Cambiaría»— y aplica cuando esté bien.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" onClick={aplicarImport} loading={importing}>
+                      Aplicar ({importResult.creadas + importResult.actualizadas} filas)
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setPendiente(null); setImportResult(null); }}
+                      disabled={importing}
+                    >
+                      Descartar
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Solo hay contrasenas que copiar de las filas NUEVAS, y solo una vez aplicado. */}
+              {!importResult.simulacion && importResult.creadas > 0 ? (
                 <Button variant="outline" size="sm" onClick={copyImportPasswords}>
                   <Copy size={14} />
                   Copiar contrasenas generadas
@@ -886,9 +995,20 @@ export default function UsuariosPage() {
               <div className="max-h-64 overflow-y-auto rounded-md border border-line">
                 <Table>
                   <THead>
+                    {/*
+                      CON EL NOMBRE, NO SOLO LA CEDULA (2026-09-21).
+
+                      Lo reporto el cliente con 1.089 filas en rojo: la tabla enseñaba el numero de
+                      fila y el documento, asi que para saber DE QUIEN era cada error habia que
+                      abrir el archivo y buscar la cedula una por una.
+
+                      El nombre va debajo del documento y no en columna propia: este cajon es
+                      estrecho y la tercera columna —el motivo— es la que hay que poder leer
+                      entera, que es a lo que se vino.
+                    */}
                     <Tr>
                       <Th>Fila</Th>
-                      <Th>Documento</Th>
+                      <Th>Persona</Th>
                       <Th>Resultado</Th>
                     </Tr>
                   </THead>
@@ -896,11 +1016,37 @@ export default function UsuariosPage() {
                     {importResult.rows.map((row) => (
                       <Tr key={row.rowNumber}>
                         <Td className="text-ink-500">{row.rowNumber}</Td>
-                        <Td className="font-mono text-xs">{row.documento}</Td>
+                        <Td>
+                          <span className="font-mono text-xs">{row.documento}</span>
+                          {row.nombre ? <span className="block text-xs text-ink-700">{row.nombre}</span> : null}
+                        </Td>
                         <Td>
                           {row.status === 'OK' ? (
-                            <span className="text-sm text-ok">
-                              OK{row.generatedPassword ? ` — clave: ${row.generatedPassword}` : ''}
+                            /*
+                              «OK» ya no basta: hay tres cosas buenas que pueden pasarle a una fila y
+                              significan trabajo distinto. «Actualizada» va en azul y no en verde
+                              porque es lo que hay que MIRAR —ahi es donde alguien cambio de area— y
+                              la nota de al lado dice exactamente que campos se tocaron.
+                            */
+                            <span
+                              className={
+                                row.accion === 'SIN_CAMBIOS'
+                                  ? 'text-sm text-ink-500'
+                                  : row.accion === 'ACTUALIZADA'
+                                    ? 'text-sm text-info'
+                                    : 'text-sm text-ok'
+                              }
+                            >
+                              {row.accion === 'ACTUALIZADA'
+                                ? importResult.simulacion
+                                  ? 'Cambiaría'
+                                  : 'Actualizada'
+                                : row.accion === 'SIN_CAMBIOS'
+                                  ? 'Ya estaba, sin cambios'
+                                  : importResult.simulacion
+                                    ? 'Se crearía'
+                                    : 'Creada'}
+                              {row.generatedPassword ? ` — clave: ${row.generatedPassword}` : ''}
                               {row.note ? <span className="block text-xs text-ink-500">{row.note}</span> : null}
                             </span>
                           ) : (

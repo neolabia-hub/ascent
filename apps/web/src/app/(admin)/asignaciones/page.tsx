@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardCheck, Grid3x3, Plus, ShieldOff, ShieldX, Target, Users } from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
-import { listCatalog, type CatalogRow } from '@/lib/admin-api';
+import { listCatalog, nombreConRama, type CatalogRow } from '@/lib/admin-api';
 import { listActivities, type ActivityListItem } from '@/lib/catalog-api';
 import {
   createAssignmentRule,
@@ -776,7 +776,7 @@ export default function AsignacionesPage() {
               ))}
             </Select>
           </Field>
-          <Field htmlFor="a-area" label="Area">
+          <Field htmlFor="a-area" label="Área" hint="Un área incluye también a sus sub-áreas. Para acotar, elige la sub-área.">
             <Select
               id="a-area"
               value={audienceForm.areaIds[0] ?? ''}
@@ -785,7 +785,7 @@ export default function AsignacionesPage() {
               <option value="">Cualquiera</option>
               {areas.map((area) => (
                 <option key={area.id} value={area.id}>
-                  {area.name}
+                  {nombreConRama(area, areas)}
                 </option>
               ))}
             </Select>
@@ -869,12 +869,17 @@ export default function AsignacionesPage() {
               ))}
             </Select>
           </Field>
-          <Field htmlFor="m-area" label="A toda el area">
+          {/*
+            La asignación manual alcanza el área Y SUS SUB-ÁREAS, igual que una regla
+            (`buildAudienceWhere`, con su prueba en `manual-reach.spec.ts`). Se dice aquí porque
+            esta pantalla crea obligaciones de una vez, sin previsualización que lo delate.
+          */}
+          <Field htmlFor="m-area" label="A toda el área" hint="Incluye también a sus sub-áreas. Para acotar, elige la sub-área.">
             <Select id="m-area" value={assignForm.areaId} onChange={(event) => setAssignForm({ ...assignForm, areaId: event.target.value })}>
               <option value="">Ninguna</option>
               {areas.map((area) => (
                 <option key={area.id} value={area.id}>
-                  {area.name}
+                  {nombreConRama(area, areas)}
                 </option>
               ))}
             </Select>

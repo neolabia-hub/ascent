@@ -19,7 +19,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import { listActivities, type ActivityListItem } from '@/lib/catalog-api';
-import { listCatalog, type CatalogRow } from '@/lib/admin-api';
+import { listCatalog, nombreConRama, type CatalogRow } from '@/lib/admin-api';
 import { EMPTY_RULE, previewAudience, type AudienceRule } from '@/lib/delivery-api';
 import {
   addModule,
@@ -1606,11 +1606,16 @@ export default function ProgramaDetailPage() {
                   onChange={(jobTitleIds) => setScope({ ...scope, jobTitleIds })}
                 />
               </Field>
-              <Field htmlFor="a-areas" label="A toda un área">
+              {/* Con la rama y diciendo que el área arrastra a sus hijas, igual que en Quiénes. */}
+              <Field
+                htmlFor="a-areas"
+                label="A toda un área"
+                hint="Marcar un área incluye también a sus sub-áreas. Para acotar, marca la sub-área."
+              >
                 <MultiSelect
                   id="a-areas"
                   placeholder="Ninguna área"
-                  options={catalogs.areas.map((row) => ({ id: row.id, label: row.name }))}
+                  options={catalogs.areas.map((row) => ({ id: row.id, label: nombreConRama(row, catalogs.areas) }))}
                   value={scope.areaIds}
                   onChange={(areaIds) => setScope({ ...scope, areaIds })}
                 />

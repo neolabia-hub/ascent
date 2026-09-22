@@ -3,7 +3,7 @@
 import { Info, ShieldCheck, ShieldOff, ShieldX, SlidersHorizontal, UserPlus, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { quienDecide, type ActivityTypeConfig } from '@/lib/activity-type';
-import { listCatalog, listPickableUsers, type CatalogRow, type PickableUser } from '@/lib/admin-api';
+import { listCatalog, listPickableUsers, nombreConRama, type CatalogRow, type PickableUser } from '@/lib/admin-api';
 import {
   createAssignments,
   EMPTY_RULE,
@@ -518,11 +518,30 @@ export function ActivityAudienceTab({
                       onChange={(jobTitleIds) => setScope({ ...scope, jobTitleIds })}
                     />
                   </Field>
-                  <Field htmlFor="q-areas" label="A toda un area">
+                  {/*
+                    CON LA RAMA, Y DICIENDO QUE EL ÁREA ARRASTRA A SUS HIJAS (2026-09-21).
+
+                    Las opciones se pintaban con el nombre pelado, así que desde que hay sub-áreas
+                    la lista enseñaba «Gestión Humana», «Nómina» y «Selección» como tres áreas
+                    hermanas. Quien marca «Gestión Humana» no tenía forma de saber si Nómina entra
+                    —entra, `audience-rule.ts`— y quien quería acotar a Nómina no sabía si estaba
+                    marcando algo dentro de otra cosa.
+
+                    Los dos datos son necesarios y ninguno sustituye al otro: la rama dice DÓNDE
+                    está cada área, y la ayuda dice QUÉ hace marcarla. Con la rama sola, alguien
+                    marcaría la madre y las dos hijas «por si acaso» —que es inofensivo pero
+                    delata que no se entiende—; con la ayuda sola, «Nómina» sigue sin decir de
+                    quién cuelga.
+                  */}
+                  <Field
+                    htmlFor="q-areas"
+                    label="A toda un área"
+                    hint="Marcar un área incluye también a sus sub-áreas. Para acotar, marca la sub-área."
+                  >
                     <MultiSelect
                       id="q-areas"
-                      placeholder="Ninguna area"
-                      options={catalogs.areas.map((row) => ({ id: row.id, label: row.name }))}
+                      placeholder="Ninguna área"
+                      options={catalogs.areas.map((row) => ({ id: row.id, label: nombreConRama(row, catalogs.areas) }))}
                       value={scope.areaIds}
                       onChange={(areaIds) => setScope({ ...scope, areaIds })}
                     />
