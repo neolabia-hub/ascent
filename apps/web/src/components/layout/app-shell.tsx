@@ -2,7 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { getPublicTenant, me, refresh, setAccessToken, type MeResponse, onSessionLost } from '@/lib/api';
+import {
+  getPublicTenant,
+  iniciarRenovacionAutomatica,
+  me,
+  refresh,
+  setAccessToken,
+  type MeResponse,
+  onSessionLost,
+} from '@/lib/api';
 import { LEARNER_HOME, isLearnerOnly } from '@/lib/landing';
 import { resolveTenantSlug } from '@/lib/tenant';
 import { SessionProvider } from '@/components/providers/session-provider';
@@ -70,6 +78,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => onSessionLost(null);
   }, [router]);
 
+  /*
+    Y LA SESION SE RENUEVA ANTES DE CADUCAR (2026-09-21): temporizador al 80% de la vida del token y
+    puesta al dia al volver a la pestaña, con un solo refresco entre todas. El detalle y el porque
+    del cerrojo, en `lib/api.ts`. Sin esto el primer clic tras un rato quieto pagaba un 401.
+  */
+  useEffect(() => iniciarRenovacionAutomatica(), []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -79,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       } catch {
         try {
           const refreshed = await refresh();
-          setAccessToken(refreshed.accessToken);
+          setAccessToken(refreshed.accessToken, refreshed.expiresIn);
           return await me();
         } catch {
           return null;

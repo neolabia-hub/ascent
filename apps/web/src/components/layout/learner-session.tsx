@@ -2,7 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { getPublicTenant, me, refresh, setAccessToken, type MeResponse, onSessionLost } from '@/lib/api';
+import {
+  getPublicTenant,
+  iniciarRenovacionAutomatica,
+  me,
+  refresh,
+  setAccessToken,
+  type MeResponse,
+  onSessionLost,
+} from '@/lib/api';
 import { resolveTenantSlug } from '@/lib/tenant';
 import { ServiceWorkerBridge } from '@/components/providers/service-worker-bridge';
 import { TenantProvider, applyTenantBranding, type TenantContextValue } from '@/components/providers/tenant-provider';
@@ -63,6 +71,13 @@ export function LearnerSession({ children }: { children: ReactNode }) {
     return () => onSessionLost(null);
   }, [router]);
 
+  /*
+    Y LA SESION SE RENUEVA ANTES DE CADUCAR (2026-09-21). Aqui importa mas que en el panel: el
+    aprendiz deja la leccion abierta, se va a hacer otra cosa y vuelve — y el envio de su avance no
+    puede ser lo que descubra que el token murio. El detalle, en `lib/api.ts`.
+  */
+  useEffect(() => iniciarRenovacionAutomatica(), []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -72,7 +87,7 @@ export function LearnerSession({ children }: { children: ReactNode }) {
       } catch {
         try {
           const refreshed = await refresh();
-          setAccessToken(refreshed.accessToken);
+          setAccessToken(refreshed.accessToken, refreshed.expiresIn);
           return await me();
         } catch {
           return null;

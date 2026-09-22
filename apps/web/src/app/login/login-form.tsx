@@ -90,7 +90,8 @@ export function LoginForm() {
 
     try {
       const response = await login(brandingState.tenantSlug, identifier, password);
-      setAccessToken(response.accessToken);
+      // Con el TTL, para que la renovacion anticipada empiece a contar desde el primer momento.
+      setAccessToken(response.accessToken, response.expiresIn);
 
       if (response.user.mustChangePassword) {
         router.push('/cambiar-contrasena');
