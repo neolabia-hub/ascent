@@ -155,6 +155,15 @@ export interface EnrollmentAttempt {
 }
 
 export interface OpenEnrollment {
+  /**
+   * Que exige esta jornada. Con 'BOTH' el temario puede estar completo y la formacion seguir
+   * pendiente, porque ademas hay que haber asistido a la sesion (`PENDIENTES` 2.7).
+   */
+  exigencia: 'ATTENDANCE' | 'CONTENT' | 'BOTH';
+  /** Si ya consta que asistio. Solo se consulta cuando la asistencia pinta algo. */
+  asistenciaRegistrada: boolean;
+  /** Atajo de los dos anteriores: exige las dos cosas y todavia no consta que viniera. */
+  faltaAsistencia: boolean;
   enrollment: {
     id: string;
     status: EnrollmentStatus;

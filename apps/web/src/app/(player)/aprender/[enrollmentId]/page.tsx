@@ -131,7 +131,7 @@ export default function EnrollmentPage() {
     );
   }
 
-  const { enrollment, contents, attempts } = data;
+  const { enrollment, contents, attempts, faltaAsistencia } = data;
   const done = contents.filter((content) => content.status === 'COMPLETED').length;
   const pct = contents.length === 0 ? 0 : Math.round((done / contents.length) * 100);
   const blocked = enrollment.blockedAt !== null;
@@ -262,6 +262,25 @@ export default function EnrollmentPage() {
               >
                 {done === 0 ? 'Empezar' : 'Continuar'}
               </Button>
+            ) : faltaAsistencia ? (
+              /*
+                TERMINAR EL TEMARIO NO ES TERMINAR LA FORMACION (2026-09-21, `PENDIENTES` 2.7).
+
+                Con una jornada que exige las dos cosas, aqui se enseñaba «Formacion terminada» en
+                verde a alguien que todavia no cumplia porque no consta que asistiera. La pantalla
+                decia lo contrario que el expediente, y la persona se enteraba —si se enteraba— al
+                ver su formacion en rojo semanas despues.
+
+                No es un aviso de error: la persona no hizo nada mal y no tiene nada que arreglar
+                desde aqui. Por eso va en ambar y no en rojo, y dice QUIEN lo resuelve.
+              */
+              <section className="mt-4 rounded-xl border border-warn/40 bg-warn-soft p-5">
+                <h2 className="font-display text-base font-semibold text-warn">Te falta la asistencia</h2>
+                <p className="mt-1 text-sm text-ink-700">
+                  Terminaste todo el contenido. Esta formación además exige haber estado en la sesión, y todavía no
+                  consta tu asistencia. La registra quien dicta la jornada: si ya fuiste, avísale.
+                </p>
+              </section>
             ) : (
               <section className="mt-4 rounded-xl border border-ok/40 bg-ok-soft p-5 text-center">
                 <Check className="mx-auto h-8 w-8 text-ok" strokeWidth={2} aria-hidden="true" />

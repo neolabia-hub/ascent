@@ -388,13 +388,25 @@ comprobar(
   `una falta justificada le quito la obligacion (${trasJustificar.length} vivas)`,
 );
 
-paso(13, 'DOS REGLAS SOBRE LA MISMA PERSONA: la asistencia cierra UNA obligacion');
+paso(13, 'DOS REGLAS SOBRE LA MISMA PERSONA: UNA sola obligacion, y la asistencia la cierra');
 /*
   El caso que aparece en cuanto una formacion se exige por dos caminos que alcanzan a la misma
-  gente —por cargo Y por area—. Hoy le nacen DOS obligaciones, porque la deduplicacion del motor es
-  POR REGLA, y asistir a UNA jornada cierra UNA. Se mide en vez de suponerlo, porque de aqui sale
-  el numero del auditor: si asistir cerrara las dos, una jornada cubriria dos requisitos distintos;
-  si no cerrara ninguna, quien fue seguiria en rojo.
+  gente —por cargo Y por area—. Se mide en vez de suponerlo, porque de aqui sale el numero del
+  auditor.
+
+  ─── CORREGIDO EL 2026-09-21: ESTE PASO AFIRMABA LO CONTRARIO DE LO QUE EL SISTEMA HACE ───
+
+  Decia *"hoy le nacen DOS obligaciones, porque la deduplicacion del motor es POR REGLA"*, y eso
+  dejo de ser cierto el **2026-09-08** con el pendiente 4.1: el motor mira si esa persona **ya debe
+  esa misma formacion** antes de abrirle la ronda 1, asi que con dos reglas vivas le nace UNA. El
+  recorrido se quedo atras y llevaba en rojo desde entonces sin que nadie lo volviera a correr — que
+  es el riesgo de un recorrido que no entra en ninguna tanda automatica.
+
+  Lo destapo la regresion del 2026-09-21, al tocar el cierre de la jornada. **No lo rompio ese
+  cambio**: la causa de los otros 17 fallos era `tracksExternalCertificate` apagado en el tenant, y
+  al encenderlo estos dos siguieron ahi solos.
+
+  El comportamiento de hoy tiene ademas su propio recorrido dedicado: `dos-reglas-una-obligacion.mjs`.
 */
 const reglaPorArea = await admin.post(`/activities/${creado.activityId}/requirements`, {
   scope: { match: 'ALL', areaIds: [area.id] },
@@ -409,9 +421,9 @@ creado.personas.push(doblePersona.id);
 const dobles = await suyas(doblePersona.id);
 console.log(`   ... a quien cumple las dos reglas le nacen ${dobles.length}: ${dobles.map((a) => a.status).join(', ')}`);
 comprobar(
-  dobles.length === 2,
-  'a quien cumple las dos le nacen DOS obligaciones — la deduplicacion del motor es por REGLA',
-  `le nacieron ${dobles.length}, y con dos reglas que la alcanzan deberian ser 2`,
+  dobles.length === 1,
+  'a quien cumple las dos le nace UNA sola obligacion (pendiente 4.1): no se debe dos veces lo mismo',
+  `le nacieron ${dobles.length}, y con dos reglas sobre la MISMA formacion deberia ser 1`,
 );
 
 const jornada3 = await admin.post('/offerings', {
@@ -435,8 +447,8 @@ const trasLaJornada = await suyas(doblePersona.id);
 const vivasDoble = trasLaJornada.filter((a) => ['PENDING', 'IN_PROGRESS', 'OVERDUE'].includes(a.status));
 console.log(`   ... ahora tiene ${trasLaJornada.length}: ${trasLaJornada.map((a) => a.status).join(', ')}`);
 comprobar(
-  trasLaJornada.filter((a) => a.status === 'COMPLETED').length === 1 && vivasDoble.length === 1,
-  'una queda CUMPLIDA y la otra sigue viva: una jornada no cierra dos requisitos distintos',
+  trasLaJornada.filter((a) => a.status === 'COMPLETED').length === 1 && vivasDoble.length === 0,
+  'su unica obligacion queda CUMPLIDA y no le queda ninguna viva: no debe dos veces la misma formacion',
   `cumplidas=${trasLaJornada.filter((a) => a.status === 'COMPLETED').length} vivas=${vivasDoble.length}`,
 );
 
@@ -639,14 +651,14 @@ comprobar(
 // (c) El caso que rompio la regla de la modalidad: la ARL por videollamada en vivo.
 const porVideollamada = await admin.post('/offerings', {
   activityVersionId: creado.versionId, kind: 'EVENT', modality: 'VIRTUAL',
-  closesByAttendance: true,
+  completionRequirement: 'ATTENDANCE',
   scheduledDate: fecha, startTime: '06:30', endTime: '07:30',
   executedBy: 'ARL', executedByOther: 'ARL Sura', capacity: 5,
 });
 comprobar(
   porVideollamada.ok && (await cierreDe(porVideollamada.cuerpo?.id)) === true,
   'y una VIRTUAL marcada a mano SI se cierra por lista: es la videollamada en vivo de la ARL',
-  `admiteAsistencia=${await cierreDe(porVideollamada.cuerpo?.id)} con closesByAttendance en true`,
+  `admiteAsistencia=${await cierreDe(porVideollamada.cuerpo?.id)} con completionRequirement en ATTENDANCE`,
 );
 await admin.post(`/offerings/${porVideollamada.cuerpo?.id}/publish`, { confirm: true });
 const cuartaPersona = await alta(5);
@@ -665,7 +677,7 @@ comprobar(
 // (d) Y una PERMANENTE no se cierra por lista aunque se marque: no hay sesion a la que asistir.
 const permanenteMarcada = await admin.post('/offerings', {
   activityVersionId: creado.versionId, kind: 'PERMANENT', modality: 'VIRTUAL',
-  closesByAttendance: true,
+  completionRequirement: 'ATTENDANCE',
 });
 comprobar(
   permanenteMarcada.ok && (await cierreDe(permanenteMarcada.cuerpo?.id)) === false,

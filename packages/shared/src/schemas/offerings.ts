@@ -19,6 +19,8 @@ import { audienceRuleSchema } from './assignments.js';
 export const offeringKindSchema = z.enum(['EVENT', 'PERMANENT', 'HYBRID']);
 export const offeringStatusSchema = z.enum(['DRAFT', 'PUBLISHED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']);
 export const executedBySchema = z.enum(['PROPIOS', 'TEMPORALES', 'ARL', 'EPS', 'OTROS']);
+/** Que se exige para dar por cumplida una jornada. Ver `cierre-de-la-jornada.ts`. */
+export const completionRequirementSchema = z.enum(['ATTENDANCE', 'CONTENT', 'BOTH']);
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD');
 const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Hora HH:mm');
@@ -29,17 +31,27 @@ const offeringBaseSchema = z.object({
   modality: modalitySchema,
 
   /**
-   * ¿ESTA JORNADA SE CIERRA CON LISTA DE ASISTENCIA? `null` = lo que diga su modalidad.
+   * ¿QUE SE EXIGE PARA DARLA POR CUMPLIDA? `null` = lo que diga su modalidad.
    *
    * Se pregunta en vez de deducirse porque la regla derivada cambio dos veces en dos dias, las dos
    * por un caso real: una capacitacion del plan con fecha pero virtual y con contenido (no lleva
    * lista) y una que dicta la ARL por videollamada en vivo (si la lleva, y es virtual). La respuesta
    * depende de como se dicto ESA sesion, y eso solo lo sabe quien la programa.
    *
-   * El defecto acierta casi siempre —presencial e hibrida si, virtual no— y esto es para lo que no
-   * encaja. Ver `cierre-de-la-jornada.ts`.
+   * El defecto acierta casi siempre —presencial e hibrida `ATTENDANCE`, virtual `CONTENT`— y esto es
+   * para lo que no encaja. `BOTH` nunca es defecto: exigir dos cosas se decide, no se deduce.
+   * Ver `cierre-de-la-jornada.ts`.
    */
-  closesByAttendance: z.boolean().nullable().optional(),
+  completionRequirement: completionRequirementSchema.nullable().optional(),
+
+  /**
+   * ¿SE TOMA LISTA? `null` = lo que se deduzca: se toma si la lista acredita.
+   *
+   * Independiente de lo anterior a proposito. Es lo que permite el caso que faltaba: acredita el
+   * contenido —el examen obliga— y **aun asi** hay QR, firma y acta, como constancia de que la
+   * persona estuvo. Esa evidencia va al expediente y no cierra nada.
+   */
+  takesAttendance: z.boolean().nullable().optional(),
 
   scheduledDate: dateOnly.nullable().optional(),
   startTime: timeOfDay.nullable().optional(),

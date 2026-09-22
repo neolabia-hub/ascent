@@ -142,6 +142,21 @@ enum AttendanceStatus {
   JUSTIFIED
 }
 
+/// QUE SE EXIGE PARA DAR POR CUMPLIDA UNA JORNADA (2026-09-21, `PENDIENTES` 2.7).
+///
+/// Antes era un booleano (`closes_by_attendance`) que respondia DOS preguntas a la vez: que acredita
+/// y si se toma lista. Por eso no cabia el caso que pidio el cliente —cerrar por contenido y aun asi
+/// tomar lista como constancia de que estuvo presente— ni el que pide un auditor: asistio Y aprobo.
+///
+///   ATTENDANCE  la lista acredita. El contenido queda disponible y no obliga.
+///   CONTENT     acredita lo que cada quien haga en la plataforma. Puede haber lista, como EVIDENCIA.
+///   BOTH        las dos cosas: no basta con venir, ni con aprobar desde casa.
+enum CompletionRequirement {
+  ATTENDANCE
+  CONTENT
+  BOTH
+}
+
 enum AttendanceMethod {
   INSTRUCTOR
   QR
@@ -513,7 +528,20 @@ model User {
   documentNumber String       @map("document_number")
   fullName       String       @map("full_name")
   phone          String?
-  email          String
+  /// NULO = ESTA PERSONA NO TIENE CORREO, y es un caso real (2026-09-21).
+  ///
+  /// Lo trajo el cliente cargando su plantilla: *"eso pasa a veces, no tiene correo"*. Antes la
+  /// columna era obligatoria y la fila se rechazaba, asi que la salida practica era **inventar una
+  /// direccion** —`1116267708@empresa.com`— y eso es peor que no tener ninguna: parece un correo,
+  /// nadie lo lee, y despues no hay forma de saber quien tiene uno de verdad.
+  ///
+  /// Nulo NO deja a nadie fuera del sistema: **se entra con la cedula O con el correo** (Decision
+  /// #10), asi que quien no tiene correo entra con su cedula, como siempre. Lo unico que pierde es
+  /// lo que se manda por correo — y por eso tiene que constar, para no contarlo como entregado.
+  ///
+  /// El indice `@@unique([tenantId, email])` sigue valiendo: en Postgres los nulos no chocan entre
+  /// si, asi que puede haber mil personas sin correo y ningun correo repetido.
+  email          String?
   emailKind      EmailKind    @default(PERSONAL) @map("email_kind")
   /// Foto de perfil, subida por la propia persona. Nulable siempre: sin ella van las iniciales.
   avatarKey      String?      @map("avatar_key")
@@ -1019,7 +1047,24 @@ model Offering {
   ///
   /// El defecto —presencial e hibrida si, virtual no— acierta casi siempre; esto se pone explicito
   /// para lo que no encaja. Mismo idioma que `activities.tracksExternalCertificate`.
-  closesByAttendance      Boolean?   @map("closes_by_attendance")
+  ///
+  /// ─── DESDOBLADO EN DOS PREGUNTAS (2026-09-21, `PENDIENTES` 2.7) ───
+  ///
+  /// Este booleano respondia a la vez QUE ACREDITA y SI SE TOMA LISTA, y por eso no habia forma de
+  /// pedir lo que el cliente describio: *"la formacion tiene evaluacion y se cierra por contenido,
+  /// pero quiero el QR, la firma o el acta como constancia de que estuvo presente"*. Al cerrar por
+  /// contenido la lista desaparecia entera.
+  ///
+  /// Ahora son dos columnas: `completionRequirement` (que se exige) y `takesAttendance` (si se toma
+  /// lista, independiente). La evidencia documental deja de ser una compuerta y pasa a ser lo que
+  /// es: material del expediente.
+  completionRequirement   CompletionRequirement? @map("completion_requirement")
+  /// ¿SE TOMA LISTA? `null` = lo que se deduzca de `completionRequirement` (se toma si acredita).
+  ///
+  /// Se pone explicito para el caso que abrio el 2.7: acredita el contenido y AUN ASI hay QR, firma
+  /// y acta. Tambien admite lo contrario —acredita la lista y no se toma con estos mecanismos— pero
+  /// eso no tiene uso hoy y la pantalla no lo ofrece.
+  takesAttendance         Boolean?   @map("takes_attendance")
   /// EL ACTA ESCANEADA de la jornada: UN documento para todos los que asistieron, no uno por
   /// persona. Es como se hace de verdad —una hoja que circula y se firma— y pedirla por cabeza
   /// obligaria a subir veinte veces el mismo escaneo.

@@ -6,7 +6,7 @@ import type { AuthUser } from '../common/types.js';
 import { CompletionService } from '../learning/completion.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { caducaEn, generarCodigo, normalizar, segundosRestantes, vigente } from './codigo-de-sesion.js';
-import { cierraPorLista } from './cierre-de-la-jornada.js';
+import { queSeExige, seTomaLista } from './cierre-de-la-jornada.js';
 
 /**
  * LOS MECANISMOS 2 Y 3 DE LA ASISTENCIA (`PENDIENTES` 2.4, CLAUDE.md §3.7).
@@ -256,17 +256,34 @@ export class AsistenciaEnSalaService {
     });
 
     /*
-      Y SE CIERRA POR EL MISMO SITIO QUE LA LISTA DEL INSTRUCTOR.
+      Y SE CIERRA POR EL MISMO SITIO QUE LA LISTA DEL INSTRUCTOR — cuando la lista es lo que cierra.
 
       Aqui no se pasa certificado: el papel de un tercero lo registra quien toma la lista o quien
       abre la ficha de la persona (2.1 y 2.2). Escaneando un QR nadie teclea el numero de su
       certificado de alturas.
+
+      Desde el 2026-09-21 la marca puede NO cerrar nada —jornada que acredita por contenido— o
+      cerrar solo si ademas ya aprobo —`BOTH`—. La firma y el QR siguen exactamente el mismo
+      criterio que la lista del instructor: si divergieran, el mismo hecho tendria dos resultados
+      segun por donde entro.
     */
-    const resultado = await this.completion.cerrarPorAsistencia(this.prisma.scoped, tenantId, {
-      enrollmentId: inscripcion.id,
-      attendedAt: ahora,
-      certificado: null,
+    const jornada = await this.prisma.scoped.offering.findUniqueOrThrow({
+      where: { id: offeringId },
+      select: { kind: true, modality: true, completionRequirement: true, takesAttendance: true },
     });
+    const exigencia = queSeExige(jornada);
+    const resultado =
+      exigencia === 'ATTENDANCE'
+        ? await this.completion.cerrarPorAsistencia(this.prisma.scoped, tenantId, {
+            enrollmentId: inscripcion.id,
+            attendedAt: ahora,
+            certificado: null,
+          })
+        : exigencia === 'BOTH'
+          ? await this.completion
+              .evaluateWith(this.prisma.scoped, tenantId, inscripcion.id)
+              .then((outcome) => ({ closed: outcome.assignmentClosed }))
+          : { closed: false };
 
     await this.audit.record({
       tenantId,
@@ -303,7 +320,8 @@ export class AsistenciaEnSalaService {
         status: true,
         kind: true,
         modality: true,
-        closesByAttendance: true,
+        completionRequirement: true,
+        takesAttendance: true,
         scheduledDate: true,
         location: true,
         sessionCodeExpiresAt: true,
@@ -334,7 +352,8 @@ export class AsistenciaEnSalaService {
         status: true,
         kind: true,
         modality: true,
-        closesByAttendance: true,
+        completionRequirement: true,
+        takesAttendance: true,
         sessionCode: true,
         sessionCodeExpiresAt: true,
       },
@@ -343,11 +362,19 @@ export class AsistenciaEnSalaService {
     if (offering.status === 'DRAFT' || offering.status === 'CANCELLED') {
       throw new ConflictException({ code: 'OFFERING_NOT_ATTENDABLE', status: offering.status });
     }
-    if (!cierraPorLista(offering)) {
+    /*
+      MISMA PUERTA QUE LA LISTA DEL INSTRUCTOR: «¿se toma lista?», no «¿la lista cierra?» (2026-09-21).
+
+      El QR y la firma son mecanismos de la MISMA lista (#158), asi que tienen que admitir lo mismo.
+      Si aqui se hubiera quedado `cierraPorLista`, una jornada que acredita por contenido tendria
+      lista a mano y acta pero no QR ni firma — tres mecanismos del mismo hecho comportandose
+      distinto, que es como nacen los fallos que nadie sabe explicar.
+    */
+    if (!seTomaLista(offering)) {
       throw new ConflictException({
         code: 'OFFERING_NOT_ATTENDABLE',
         message:
-          'Esta jornada no se cierra con lista: se acredita con lo que cada persona complete en la plataforma.',
+          'Esta jornada no toma lista: se acredita con lo que cada persona complete en la plataforma.',
       });
     }
     return offering;

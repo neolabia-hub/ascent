@@ -5,6 +5,7 @@ import { CertificatesService } from '../certificates/certificates.service.js';
 import { EngagementService } from '../engagement/engagement.service.js';
 import { ProgramsService } from '../programs/programs.service.js';
 import { obligacionesQueCierra } from './close-assignments.js';
+import { queSeExige } from '../offerings/cierre-de-la-jornada.js';
 
 export interface CompletionOutcome {
   status: 'IN_PROGRESS' | 'COMPLETED' | 'PASSED' | 'FAILED';
@@ -57,6 +58,9 @@ export class CompletionService {
         assignmentId: true,
         activityVersionId: true,
         blockedAt: true,
+        offeringId: true,
+        // La jornada, para saber QUE exige. Con `BOTH` no basta con aprobar: hay que haber venido.
+        offering: { select: { kind: true, modality: true, completionRequirement: true, takesAttendance: true } },
         activityVersion: {
           select: {
             activityId: true,
@@ -86,6 +90,26 @@ export class CompletionService {
           : !doneContents.has(content.id),
       )
       .map((content) => content.title);
+
+    /*
+      «LAS DOS COSAS»: NO BASTA CON APROBAR (2026-09-21, `PENDIENTES` 2.7).
+
+      Si la jornada exige `BOTH`, haber hecho el temario entero **no** la cierra mientras no conste
+      que la persona asistio. La asistencia entra como un requisito mas de `missing`, y no como una
+      rama aparte, por un motivo concreto: asi la pantalla del aprendiz y la del administrador dicen
+      QUE FALTA con el mismo mecanismo de siempre, en vez de quedarse en «en curso» sin explicar por
+      que. Era lo que hacia la version anterior de esto y es exactamente el fallo que se evita.
+
+      Solo cuenta `PRESENT`. Una falta JUSTIFICADA explica por que no vino, no que ya no haga falta
+      venir — la misma regla que aplica la lista al marcarla (ver `marcarAsistencia`).
+    */
+    if (enrollment.offering && queSeExige(enrollment.offering) === 'BOTH') {
+      const asistio = await db.attendanceRecord.findUnique({
+        where: { offeringId_userId: { offeringId: enrollment.offeringId, userId: enrollment.userId } },
+        select: { status: true },
+      });
+      if (asistio?.status !== 'PRESENT') missing.push('Asistencia a la sesión');
+    }
 
     if (missing.length > 0) {
       // Bloqueada por intentos agotados: la ejecucion queda REPROBADA, no eternamente en curso.
@@ -458,6 +482,56 @@ export class CompletionService {
    * vez de copiarse: la primera version de esto se olvido de propagar la vigencia y el papel se
    * guardaba sin mover nada. Escrito dos veces, la segunda repite el olvido.
    */
+  /**
+   * EL PAPEL DE UN TERCERO, SIN CERRAR NADA (2026-09-21).
+   *
+   * Para las jornadas que **toman lista pero no acreditan con ella** —la que exige el contenido y
+   * ademas pasa lista, y la que exige las dos cosas—. Antes esas listas RECHAZABAN el certificado
+   * (`CERT_NOT_ON_THIS_LIST`) y mandaban a registrarlo desde la ficha de la persona.
+   *
+   * Se deshizo esa regla porque confundia dos cosas: **el papel es EVIDENCIA, no una acreditacion**.
+   * Quien decide si la formacion queda cumplida es `queSeExige`, siempre — nunca el papel. Prohibir
+   * registrarlo donde se recoge de verdad (el instructor lo tiene en la mano al terminar la sesion)
+   * obligaba a apuntarlo en un papel aparte y volver a teclearlo persona por persona en Usuarios.
+   * Eso no protege nada: solo garantiza que la evidencia se pierda.
+   *
+   * Asi que hace exactamente dos cosas, las dos sin tocar el estado:
+   *   1. guarda el papel en la inscripcion, y
+   *   2. propaga su vigencia a la obligacion (Decision #157, EL PAPEL MANDA) — que es correcto
+   *      aunque la formacion todavia no este cumplida: cuando se cumpla, ya sabe cuando caduca.
+   */
+  async registrarPapelSinCerrar(
+    db: TenantPrisma,
+    input: {
+      enrollmentId: string;
+      certificado: { issuer: string; number: string; issuedAt?: Date | null; validUntil?: Date | null; fileKey?: string | null };
+    },
+  ): Promise<void> {
+    const enrollment = await db.enrollment.findUnique({
+      where: { id: input.enrollmentId },
+      select: {
+        id: true,
+        userId: true,
+        assignmentId: true,
+        activityVersion: { select: { activityId: true } },
+      },
+    });
+    if (!enrollment) return;
+
+    const cert = input.certificado;
+    await db.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        extCertIssuer: cert.issuer,
+        extCertNumber: cert.number,
+        extCertIssuedAt: cert.issuedAt ?? null,
+        extCertValidUntil: cert.validUntil ?? null,
+        extCertFileKey: cert.fileKey ?? null,
+      },
+    });
+    await this.actualizarVigenciaPorPapel(db, enrollment, cert.validUntil ?? null);
+  }
+
   async registrarVigenciaDePapel(
     db: TenantPrisma,
     enrollment: { id: string; userId: string; assignmentId: string | null; activityVersion: { activityId: string } },

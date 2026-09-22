@@ -10,6 +10,8 @@ import type { Modality } from './catalog-api';
 // ─────────────────────────── Convocatorias ───────────────────────────
 
 export type OfferingKind = 'EVENT' | 'PERMANENT' | 'HYBRID';
+/** Que se exige para dar por cumplida una jornada (`PENDIENTES` 2.7). */
+export type CompletionRequirement = 'ATTENDANCE' | 'CONTENT' | 'BOTH';
 export type OfferingStatus = 'DRAFT' | 'PUBLISHED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type ExecutedBy = 'PROPIOS' | 'TEMPORALES' | 'ARL' | 'EPS' | 'OTROS';
 
@@ -114,12 +116,17 @@ export interface OfferingDetail extends Omit<OfferingListItem, '_count'> {
   /** Quien dicta la jornada ("ARL Sura", "PROPIOS"): es el emisor por defecto del certificado. */
   quienLaDicto: string;
   /**
-   * ¿Se cierra con lista de asistencia? Viene RESUELTO del servidor —presencial o hibrida, y que no
-   * sea de autoservicio—. La pantalla no repite la condicion: ya cambio una vez.
+   * ¿SE TOMA LISTA? Viene RESUELTO del servidor. La pantalla no repite la condicion: ya cambio dos
+   * veces. Desde el 2026-09-21 significa «hay lista», no «la lista cierra» — una jornada que se
+   * acredita por contenido tambien puede tomarla, como evidencia.
    */
   admiteAsistencia: boolean;
-  /** 'Como se acredita' puesto a mano en esta jornada. `null` = lo que diga su modalidad. */
-  closesByAttendance: boolean | null;
+  /** Y QUE ACREDITA esa jornada, tambien resuelto. Es lo que decide si marcar cierra algo. */
+  exigencia: CompletionRequirement;
+  /** Lo que se eligio a mano en esta jornada. `null` = lo que diga su modalidad. */
+  completionRequirement: CompletionRequirement | null;
+  /** Si se eligio a mano tomar lista sin que acredite. `null` = lo que se deduzca. */
+  takesAttendance: boolean | null;
   planItems: Array<{ id: string; plannedMonth: number; status: string; plan: { id: string; name: string; year: number; status: string } }>;
   /** La TAJADA: a que parte de los obligados atiende esta jornada (Decision #68). */
   audience: { id: string; name: string; rule: AudienceRule } | null;
@@ -131,8 +138,10 @@ export interface OfferingBody {
   activityVersionId?: string;
   kind: OfferingKind;
   modality: Modality;
-  /** Como se acredita esta jornada. `null` = lo que diga su modalidad, que es el caso normal. */
-  closesByAttendance?: boolean | null;
+  /** Que se exige para darla por cumplida. `null` = lo que diga su modalidad, el caso normal. */
+  completionRequirement?: CompletionRequirement | null;
+  /** ¿Se toma lista? `null` = que lo deduzca el servidor (se toma si la lista acredita). */
+  takesAttendance?: boolean | null;
   scheduledDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;

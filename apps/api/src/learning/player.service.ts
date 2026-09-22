@@ -6,6 +6,7 @@ import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CompletionService } from './completion.service.js';
 import { meetsCompletion, mergeProgressData, readLastCard, resolveMinWatchPct } from './progress-rules.js';
+import { queSeExige } from '../offerings/cierre-de-la-jornada.js';
 
 /**
  * EL REPRODUCTOR: lo que ve y hace la persona mientras cursa.
@@ -65,7 +66,40 @@ export class PlayerService {
     const progressByContent = new Map(progress.map((row) => [row.activityContentId, row]));
     const passed = new Set(attempts.filter((attempt) => attempt.passed).map((attempt) => attempt.assessmentId));
 
+    /*
+      LO QUE FALTA QUE NO ESTA EN EL TEMARIO (2026-09-21, `PENDIENTES` 2.7).
+
+      Con una jornada que exige `BOTH`, alguien puede terminar el temario entero, aprobar el examen y
+      **seguir sin cumplir**, porque le falta haber asistido. El motor ya lo sabia —lo pone en
+      `missing`— pero esta pantalla no tenia por donde enterarse: devolvia los contenidos y nada mas,
+      asi que el aprendiz veia todo en verde y su formacion en curso, sin una sola palabra que lo
+      explicara. Lo encontro `scripts/recorridos/exigencia-y-lista.mjs`, paso 10.
+
+      Se resuelve con DOS DATOS y no llamando a `CompletionService.evaluate`: esa funcion ESCRIBE
+      —cambia el estado, cierra obligaciones, emite constancias— y abrir una pantalla no puede tener
+      efectos. Aqui solo se lee.
+    */
+    const jornada = await this.prisma.scoped.offering.findUnique({
+      where: { id: enrollment.offeringId },
+      select: { kind: true, modality: true, completionRequirement: true, takesAttendance: true },
+    });
+    const exigencia = jornada ? queSeExige(jornada) : 'CONTENT';
+    const asistencia =
+      exigencia === 'CONTENT'
+        ? null
+        : await this.prisma.scoped.attendanceRecord.findUnique({
+            where: { offeringId_userId: { offeringId: enrollment.offeringId, userId: actor.id } },
+            select: { status: true },
+          });
+
     return {
+      /**
+       * Que exige esta jornada y si ya consta la asistencia. Con `BOTH` y sin asistencia, el temario
+       * puede estar completo y la formacion seguir pendiente: es lo unico que puede explicarlo.
+       */
+      exigencia,
+      asistenciaRegistrada: asistencia?.status === 'PRESENT',
+      faltaAsistencia: exigencia === 'BOTH' && asistencia?.status !== 'PRESENT',
       enrollment: {
         id: enrollment.id,
         status: enrollment.status,
@@ -300,6 +334,8 @@ export class PlayerService {
         blockedAt: true,
         blockedReason: true,
         activityVersionId: true,
+        // La jornada, para saber si ademas de cursar hay que haber asistido (ver `openEnrollment`).
+        offeringId: true,
         activityVersion: {
           select: {
             versionNumber: true,

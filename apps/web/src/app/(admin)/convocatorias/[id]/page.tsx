@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowUpCircle, CheckCircle2, Search, Send, SlidersHorizontal, UserPlus, XCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUpCircle,
+  CheckCircle2,
+  ExternalLink,
+  Search,
+  Send,
+  SlidersHorizontal,
+  UserPlus,
+  XCircle,
+} from 'lucide-react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import {
   adjustProjected,
@@ -373,7 +383,29 @@ export default function ConvocatoriaDetallePage() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-[28px] font-semibold text-ink-900">{activity.name}</h1>
+            {/*
+              EL TITULO ABRE LA FORMACION (2026-09-21).
+
+              Desde una convocatoria no habia forma de llegar a su formacion salvo ir al catalogo y
+              buscarla por el nombre — y desde aqui se necesita a cada rato: para mirar el temario,
+              la pestaña de «Quienes» o publicar una version. La flecha de arriba solo vuelve alla
+              cuando se vino de alli; llegando desde el listado de convocatorias, no lleva a ninguna.
+
+              Va en el TITULO y no en un boton mas porque el nombre de la formacion ya estaba ahi
+              siendo lo que uno intenta pulsar. El subrayado aparece al pasar por encima: en una
+              cabecera no hace falta anunciarlo, y permanente ensuciaria la unica linea grande de la
+              pantalla.
+            */}
+            <Link
+              href={`/contenido-formativo/${activity.id}`}
+              title="Abrir la formación"
+              className="focus-ring group inline-flex items-center gap-2 rounded"
+            >
+              <h1 className="font-display text-[28px] font-semibold text-ink-900 group-hover:underline">
+                {activity.name}
+              </h1>
+              <ExternalLink size={16} className="text-ink-500 group-hover:text-ink-900" aria-hidden="true" />
+            </Link>
             {/*
               QUE TIPO DE FORMACION ES, aqui y con su color.
               La cabecera decia el nombre, el codigo, la version y el proceso, pero no el TIPO — y
@@ -683,19 +715,46 @@ export default function ConvocatoriaDetallePage() {
                 </span>
               </dd>
             </div>
+            {/*
+              DOS RENGLONES DESDE EL 2026-09-21, porque son dos hechos (`PENDIENTES` 2.7): lo que
+              ACREDITA y si ademas SE TOMA LISTA. Con uno solo, una jornada que se cierra por
+              contenido y aun asi pasa lista no tenia forma de decirlo, y quien leia la ficha daba
+              por hecho que no habia lista.
+            */}
             <div>
-              <dt className="text-xs text-ink-500">Como se registra</dt>
+              <dt className="text-xs text-ink-500">Qué se exige</dt>
               <dd className="text-sm text-ink-900">
-                {offering.admiteAsistencia ? 'Con la lista de asistencia de la sesión' : 'Automático, al completar el contenido'}
+                {offering.exigencia === 'ATTENDANCE'
+                  ? 'La lista de asistencia de la sesión'
+                  : offering.exigencia === 'BOTH'
+                    ? 'Las dos cosas: asistir y aprobar'
+                    : 'Completar el contenido en la plataforma'}
                 {/*
                   Y DE DONDE SALIO ESA RESPUESTA, que es la mitad que faltaba: no es lo mismo que
                   alguien lo eligiera para esta jornada que que lo sugiriera su modalidad. Sin esto,
                   quien mira no sabe si puede cambiarlo ni por que dice lo que dice.
                 */}
                 <span className="ml-1.5 text-xs text-ink-500">
-                  {offering.closesByAttendance !== null
+                  {offering.completionRequirement !== null
                     ? '(elegido para esta jornada)'
                     : '(lo sugirio la modalidad)'}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-500">Lista de asistencia</dt>
+              <dd className="text-sm text-ink-900">
+                {!offering.admiteAsistencia
+                  ? 'No se toma'
+                  : offering.exigencia === 'CONTENT'
+                    ? 'Sí se toma, como evidencia'
+                    : 'Sí se toma'}
+                <span className="ml-1.5 text-xs text-ink-500">
+                  {!offering.admiteAsistencia
+                    ? '(no hay sesión que registrar)'
+                    : offering.exigencia === 'CONTENT'
+                      ? '(queda en el expediente, pero no cierra la formación)'
+                      : '(QR, firma o a mano)'}
                 </span>
               </dd>
             </div>
@@ -719,13 +778,19 @@ export default function ConvocatoriaDetallePage() {
                   pantalla para el ahora —esa es la segunda puerta, `PENDIENTES` 2.2 y 2.3— pero
                   prometer una lista que no va a aparecer es peor que no decir nada: quien lo lee
                   cierra la jornada esperando que le pregunten, y no le preguntan.
+
+                  Desde el 2026-09-21 la condicion es «¿HAY lista?» y no «¿la lista acredita?». Una
+                  jornada que se cierra por contenido y aun asi pasa lista **si** pide el papel: el
+                  papel es EVIDENCIA, no una acreditacion, y el instructor lo tiene en la mano al
+                  terminar la sesion. Que la formacion quede cumplida lo decide la exigencia de la
+                  jornada, nunca el certificado. Sin lista, sigue siendo la ficha de la persona.
                 */}
                 <span className="ml-1.5 text-xs text-ink-500">
                   {!offering.registraCertificadoExterno
                     ? '(solo queda la constancia de la empresa)'
                     : offering.admiteAsistencia
                       ? '(la lista pedira su número y su vencimiento)'
-                      : '(esta jornada no lo pide: se cierra al completar el contenido)'}
+                      : '(se registra desde la ficha de la persona, en Usuarios)'}
                 </span>
               </dd>
             </div>

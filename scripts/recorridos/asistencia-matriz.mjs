@@ -139,7 +139,7 @@ async function montarFormacion(tipo, indice, modality) {
   (`cierre-de-la-jornada.ts`). La regla derivada cambio dos veces en dos dias, las dos por un caso
   real, y por eso dejo de haber regla.
 
-  Aqui se rota la modalidad para ejercer las tres, y en la VIRTUAL se marca `closesByAttendance` —
+  Aqui se rota la modalidad para ejercer las tres, y en la VIRTUAL se marca `completionRequirement` —
   que es exactamente el caso de la capacitacion que dicta la ARL por videollamada en vivo: es
   virtual y SI tiene lista de quien se conecto. Si eso dejara de funcionar, ese cliente se queda sin
   poder cerrar nada y nadie se entera hasta que lo reporta.
@@ -166,7 +166,7 @@ for (const tipo of tipos) {
     kind: 'EVENT',
     modality,
     // La virtual necesita decirlo: es el caso de la videollamada en vivo con lista.
-    ...(modality === 'VIRTUAL' ? { closesByAttendance: true } : {}),
+    ...(modality === 'VIRTUAL' ? { completionRequirement: 'ATTENDANCE' } : {}),
     scheduledDate: fecha,
     startTime: '08:00',
     endTime: '10:00',

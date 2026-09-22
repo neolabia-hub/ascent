@@ -23,7 +23,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { ruleReachesEveryone } from '../assignments/audience-rule.js';
 import { AudiencesService } from '../assignments/audiences.service.js';
 import { decidirCertificadoExterno, laDictaUnTercero } from '../certificates/certificate-policy.js';
-import { cierraPorLista } from './cierre-de-la-jornada.js';
+import { queSeExige, seTomaLista } from './cierre-de-la-jornada.js';
 import { CompletionService } from '../learning/completion.service.js';
 import { ProjectedAudienceService } from './projected-audience.service.js';
 import { planVersionMigration, type MigrationPolicy } from './version-migration.js';
@@ -139,11 +139,22 @@ export class OfferingsService {
           'Esta convocatoria es de autoservicio: se acredita completando el contenido, no con una lista de asistencia.',
       });
     }
-    if (!cierraPorLista(offering)) {
+    /*
+      LA PUERTA ES «¿SE TOMA LISTA?», NO «¿LA LISTA CIERRA?» (2026-09-21).
+
+      Antes era `cierraPorLista`, y por eso una jornada que se acredita con el contenido no podia
+      registrar ninguna asistencia: ni lista, ni QR, ni firma, ni acta. Eso confundia dos cosas —lo
+      que ACREDITA y lo que se DOCUMENTA— y dejaba fuera el caso real que pidio el cliente: el curso
+      con evaluacion donde ademas hay que dejar constancia de que la persona estuvo.
+
+      Con `seTomaLista` la evidencia se puede tomar siempre que la jornada diga que hay lista. Que
+      esa marca cierre algo o no lo decide despues `queSeExige`, en un sitio distinto y a proposito.
+    */
+    if (!seTomaLista(offering)) {
       throw new ConflictException({
         code: 'OFFERING_NOT_ATTENDABLE',
         message:
-          'Esta jornada no se cierra con lista: se acredita con lo que cada persona complete en la plataforma. Si hubo una sesión con lista —una videollamada en vivo, por ejemplo— márcalo en la convocatoria.',
+          'Esta jornada no toma lista: se acredita con lo que cada persona complete en la plataforma. Si además hubo una sesión, marca «Se toma lista de asistencia» en la convocatoria.',
       });
     }
     if (offering.status === 'DRAFT' || offering.status === 'CANCELLED') {
@@ -151,6 +162,7 @@ export class OfferingsService {
     }
 
     const tenantId = this.prisma.currentTenantId;
+    const exigencia = queSeExige(offering);
     const conCertificado = input.items.filter((fila) => fila.certificate);
     const { quienLaDicto } = await this.contextoDeLaJornada(offeringId);
     /*
@@ -276,6 +288,50 @@ export class OfferingsService {
         // jornada, no que ya no tenga que formarse: ira a la siguiente.
         ausentes += 1;
         if (fila.estado === 'JUSTIFIED') justificados += 1;
+        continue;
+      }
+
+      /*
+        Y AQUI SE SEPARA LO QUE DOCUMENTA DE LO QUE ACREDITA (2026-09-21).
+
+        La marca ya esta guardada arriba: eso pasa siempre, sea cual sea la exigencia, y es lo que
+        pedia el 2.7 — el QR, la firma y el acta valen como constancia de que la persona estuvo
+        aunque no sean lo que cierra.
+
+        Lo que cambia es que pasa DESPUES:
+
+          ATTENDANCE  la marca cierra, como siempre.
+          BOTH        no cierra sola: se vuelve a evaluar, y cerrara solo si ademas ya aprobo.
+          CONTENT     no cierra nada. La marca es evidencia y se acabo.
+      */
+      if (exigencia !== 'ATTENDANCE') {
+        /*
+          EL PAPEL SE GUARDA IGUAL, aunque esta lista no acredite (2026-09-21).
+
+          El certificado de un tercero es EVIDENCIA, no una acreditacion: quien decide si la
+          formacion queda cumplida es `queSeExige`, siempre. El instructor lo tiene en la mano al
+          terminar la sesion, asi que este es el sitio donde se recoge de verdad — mandarlo a
+          teclearlo persona por persona en Usuarios solo garantiza que se pierda.
+        */
+        if (fila.certificate) {
+          await this.completion.registrarPapelSinCerrar(this.prisma.scoped, {
+            enrollmentId: fila.enrollmentId,
+            certificado: {
+              issuer: fila.certificate.issuer ?? quienLaDicto,
+              number: fila.certificate.number,
+              issuedAt: fila.certificate.issuedAt ? new Date(`${fila.certificate.issuedAt}T12:00:00-05:00`) : null,
+              validUntil: fila.certificate.validUntil
+                ? new Date(`${fila.certificate.validUntil}T23:59:59-05:00`)
+                : null,
+              fileKey: fila.certificate.fileKey ?? null,
+            },
+          });
+        }
+        if (exigencia === 'BOTH') {
+          // Puede que ya tuviera el contenido aprobado y solo faltara venir: entonces cierra aqui.
+          const outcome = await this.completion.evaluateWith(this.prisma.scoped, tenantId, fila.enrollmentId);
+          if (outcome.assignmentClosed) cerradas += 1;
+        }
         continue;
       }
 
@@ -526,11 +582,15 @@ export class OfferingsService {
       registraCertificadoExterno: contexto.registraCertificado,
       quienLaDicto: contexto.quienLaDicto,
       /*
-        ¿SE CIERRA POR LISTA? La regla vive en el servidor y viaja resuelta, para que la pantalla no
-        la reimplemente: dos implementaciones de la misma condicion acaban discrepando, y esta ya
-        cambio una vez —era el `kind` y es la MODALIDAD—. Ver `marcarAsistencia`.
+        LAS DOS RESPUESTAS VIAJAN RESUELTAS DEL SERVIDOR, para que la pantalla no las reimplemente:
+        dos implementaciones de la misma condicion acaban discrepando, y esta ya cambio dos veces
+        —era el `kind`, luego la MODALIDAD, y ahora son dos preguntas—. Ver `marcarAsistencia`.
+
+        `admiteAsistencia` conserva el nombre y pasa a significar «¿hay lista?», que es lo que la
+        pantalla necesita para enseñar la pestaña. Lo que esa lista ACREDITA lo dice `exigencia`.
       */
-      admiteAsistencia: cierraPorLista(offering),
+      admiteAsistencia: seTomaLista(offering),
+      exigencia: queSeExige(offering),
       versionUpgrade: await this.versionUpgrade(offering.id),
     };
   }
@@ -1698,7 +1758,8 @@ export class OfferingsService {
       modality: input.modality,
       // `undefined` = no vino y la columna no se toca; `null` = "lo que diga su modalidad", que es
       // un valor con significado y hay que poder volver a el (ver `cierre-de-la-jornada.ts`).
-      closesByAttendance: input.closesByAttendance,
+      completionRequirement: input.completionRequirement,
+      takesAttendance: input.takesAttendance,
       scheduledDate: this.toDate(input.scheduledDate),
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
