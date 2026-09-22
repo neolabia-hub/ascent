@@ -1,14 +1,17 @@
 'use client';
 
-import { Check, Lock, Plus, Save, ShieldCheck } from 'lucide-react';
+import { Check, Layers, Lock, Plus, Save, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import {
   createRole,
+  listCatalog,
   listPermissions,
   listRoles,
+  setRoleActivityTypes,
   updateRole,
+  type CatalogRow,
   type PermissionRow,
   type RoleRow,
 } from '@/lib/admin-api';
@@ -61,16 +64,37 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<RoleRow[] | null>(null);
   const [permissions, setPermissions] = useState<PermissionRow[]>([]);
   const [draft, setDraft] = useState<Record<string, Set<string>>>({});
+  /*
+    EL SEGUNDO BORRADOR: QUE TIPOS PUEDE TOCAR CADA ROL (2026-09-22).
+
+    Va en la MISMA matriz y no en una pantalla aparte porque es la misma pregunta —«que puede
+    hacer este rol»— y porque separarlo obligaria a guardar en dos sitios para configurar una
+    cosa. Se lleva en su propio estado porque se guarda por otra ruta: los permisos van en
+    `updateRole` y los tipos en `setRoleActivityTypes`.
+
+    **Conjunto vacio = SIN ACOTAR**, que es como nacen todos los roles: ninguna casilla marcada
+    quiere decir «puede con todos», no «no puede con ninguno». La pantalla lo dice en voz alta
+    debajo de la tabla, porque es lo contrario de lo que sugiere una fila de casillas vacias.
+  */
+  const [tipoDraft, setTipoDraft] = useState<Record<string, Set<string>>>({});
+  const [tipos, setTipos] = useState<CatalogRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [newRole, setNewRole] = useState({ code: '', name: '' });
 
   const load = useCallback(async () => {
     try {
-      const [roleRows, permissionRows] = await Promise.all([listRoles(), listPermissions()]);
+      const [roleRows, permissionRows, tipoRows] = await Promise.all([
+        listRoles(),
+        listPermissions(),
+        // Los tipos los crea el propio tenant, asi que la matriz se dibuja con los que HAYA.
+        listCatalog('activity-types'),
+      ]);
       setRoles(roleRows);
       setPermissions(permissionRows);
+      setTipos(tipoRows.filter((tipo) => tipo.active));
       setDraft(Object.fromEntries(roleRows.map((role) => [role.id, new Set(role.permissionCodes)])));
+      setTipoDraft(Object.fromEntries(roleRows.map((role) => [role.id, new Set(role.activityTypeIds)])));
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudieron cargar los roles', description: motivoDelError(error) });
       setRoles([]);
@@ -93,11 +117,28 @@ export default function RolesPage() {
     if (!roles) return false;
     return roles.some((role) => {
       const current = draft[role.id];
-      if (!current) return false;
-      if (current.size !== role.permissionCodes.length) return true;
-      return role.permissionCodes.some((code) => !current.has(code));
+      const tiposActuales = tipoDraft[role.id];
+      if (current) {
+        if (current.size !== role.permissionCodes.length) return true;
+        if (role.permissionCodes.some((code) => !current.has(code))) return true;
+      }
+      // Los tipos cuentan como cambio igual que los permisos: es el MISMO boton de guardar.
+      if (tiposActuales) {
+        if (tiposActuales.size !== role.activityTypeIds.length) return true;
+        if (role.activityTypeIds.some((id) => !tiposActuales.has(id))) return true;
+      }
+      return false;
     });
-  }, [draft, roles]);
+  }, [draft, tipoDraft, roles]);
+
+  const toggleTipo = (roleId: string, tipoId: string) => {
+    setTipoDraft((previous) => {
+      const next = new Set(previous[roleId] ?? []);
+      if (next.has(tipoId)) next.delete(tipoId);
+      else next.add(tipoId);
+      return { ...previous, [roleId]: next };
+    });
+  };
 
   const toggle = (roleId: string, code: string) => {
     setDraft((previous) => {
@@ -114,10 +155,23 @@ export default function RolesPage() {
     try {
       for (const role of roles) {
         const current = draft[role.id];
-        if (!current) continue;
-        const changed =
-          current.size !== role.permissionCodes.length || role.permissionCodes.some((code) => !current.has(code));
-        if (changed) await updateRole(role.id, { permissionCodes: [...current] });
+        if (current) {
+          const changed =
+            current.size !== role.permissionCodes.length || role.permissionCodes.some((code) => !current.has(code));
+          if (changed) await updateRole(role.id, { permissionCodes: [...current] });
+        }
+        /*
+          Los tipos van por su propia ruta y solo si cambiaron: mandar el conjunto entero en cada
+          guardado reescribiria las filas de todos los roles —y su `set_by`/`set_at`— cada vez que
+          alguien toca una casilla de permisos en otra columna.
+        */
+        const tiposActuales = tipoDraft[role.id];
+        if (tiposActuales) {
+          const cambiaron =
+            tiposActuales.size !== role.activityTypeIds.length ||
+            role.activityTypeIds.some((id) => !tiposActuales.has(id));
+          if (cambiaron) await setRoleActivityTypes(role.id, [...tiposActuales]);
+        }
       }
       await load();
       showToast({
@@ -240,9 +294,81 @@ export default function RolesPage() {
                 ))}
               </Fragment>
             ))}
+
+            {/*
+              ─── QUE TIPOS DE FORMACION PUEDE TOCAR CADA ROL (2026-09-22) ───
+
+              Va en esta misma matriz y no en otra pantalla porque es la misma pregunta: «que puede
+              hacer este rol». Separarlo obligaria a ir a dos sitios y guardar dos veces para
+              configurar una cosa.
+
+              No son permisos y por eso el grupo lo dice: un permiso es una CAPACIDAD («puede
+              publicar») y esto es un AMBITO («sobre que puede»). La diferencia se nota en la regla
+              de abajo, que es la contraria a la de un permiso: sin marcar nada, puede con todos.
+            */}
+            {tipos.length > 0 ? (
+              <Fragment key="tipos-de-formacion">
+                <tr className="bg-paper">
+                  <td
+                    colSpan={roles.length + 1}
+                    className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.04em] text-ink-500"
+                  >
+                    Tipos de formación que puede tocar
+                  </td>
+                </tr>
+                {tipos.map((tipo) => (
+                  <tr key={tipo.id} className="border-b border-line last:border-0 hover:bg-paper/60">
+                    <td className="sticky left-0 z-10 bg-surface px-4 py-2.5">
+                      <span className="block text-ink-900">{tipo.name}</span>
+                      <span className="block font-mono text-[11px] text-ink-300">{tipo.code}</span>
+                    </td>
+                    {roles.map((role) => {
+                      const marcado = tipoDraft[role.id]?.has(tipo.id) ?? false;
+                      const sinAcotar = (tipoDraft[role.id]?.size ?? 0) === 0;
+                      return (
+                        <td key={role.id} className="px-4 py-2.5 text-center">
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={marcado}
+                            aria-label={`${role.name}: puede crear ${tipo.name}`}
+                            title={sinAcotar ? 'Sin acotar: hoy puede con todos los tipos' : undefined}
+                            onClick={() => toggleTipo(role.id, tipo.id)}
+                            className={cn(
+                              'focus-ring inline-flex h-6 w-6 items-center justify-center rounded border transition-colors duration-150',
+                              marcado
+                                ? 'border-primary bg-primary text-white'
+                                : sinAcotar
+                                  ? // Sin acotar, las casillas vacias no significan «no puede»: se
+                                    // dibujan mas tenues para que no se lean como una prohibicion.
+                                    'border-dashed border-line-strong bg-surface hover:border-ink-300'
+                                  : 'border-line-strong bg-surface hover:border-ink-300',
+                            )}
+                          >
+                            {marcado ? <Check size={13} strokeWidth={3} /> : null}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </Fragment>
+            ) : null}
           </tbody>
         </table>
       </div>
+
+      {tipos.length > 0 ? (
+        <div className="mt-4 flex items-start gap-2 rounded-lg bg-paper px-4 py-3 text-sm text-ink-700">
+          <Layers size={16} className="mt-0.5 shrink-0 text-ink-500" strokeWidth={1.75} />
+          <p>
+            <strong>Sin ninguna casilla marcada, ese rol puede con TODOS los tipos.</strong> Marcar es acotar: en cuanto
+            se marca uno, solo podrá crear y ver ese. Para devolverle el acceso a todo, se desmarcan todos.
+            {' '}Y si a una persona concreta se le marcan tipos en su ficha, <strong>los suyos mandan sobre los de su
+            rol</strong> — igual que con los permisos.
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex items-start gap-2 rounded-lg bg-info-soft px-4 py-3 text-sm text-info">
         <ShieldCheck size={16} className="mt-0.5 shrink-0" strokeWidth={1.75} />

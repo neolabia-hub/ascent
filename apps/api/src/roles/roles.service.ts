@@ -41,6 +41,8 @@ interface RoleView {
   isSystem: boolean;
   active: boolean;
   permissionCodes: string[];
+  /** Tipos de formacion que puede tocar. **Vacio = sin acotar**, puede con todos (2026-09-22). */
+  activityTypeIds: string[];
   userCount: number;
 }
 
@@ -62,6 +64,10 @@ export class RolesService {
       orderBy: { name: 'asc' },
       include: {
         permissions: { select: { permission: { select: { code: true } } } },
+        // Los tipos que puede tocar viajan en la MISMA llamada (2026-09-22): la pantalla de
+        // Permisos los pinta como unas filas mas de la matriz, y pedirlos rol por rol seria una
+        // peticion por columna para dibujar una tabla que ya se esta dibujando.
+        activityTypeScopes: { select: { activityTypeId: true } },
         _count: { select: { users: true } },
       },
     });
@@ -72,6 +78,8 @@ export class RolesService {
       isSystem: role.isSystem,
       active: role.active,
       permissionCodes: role.permissions.map((rp) => rp.permission.code),
+      /** Vacio = **sin acotar**: ese rol puede con todos los tipos. */
+      activityTypeIds: role.activityTypeScopes.map((scope) => scope.activityTypeId),
       userCount: role._count.users,
     }));
   }
@@ -118,6 +126,8 @@ export class RolesService {
         isSystem: role.isSystem,
         active: role.active,
         permissionCodes: permissions.map((permission) => permission.code),
+        // Un rol nace SIN ACOTAR: puede con todos los tipos hasta que alguien lo limite.
+        activityTypeIds: [],
         userCount: 0,
       };
     } catch (error) {
@@ -134,6 +144,10 @@ export class RolesService {
       where: { id },
       include: {
         permissions: { select: { permission: { select: { code: true } } } },
+        // Se traen para devolverlos tal cual: renombrar o cambiar permisos NO toca el alcance por
+        // tipo, que se fija en su propia ruta. Sin esto, la respuesta diria «sin acotar» y la
+        // pantalla borraria las casillas al refrescar.
+        activityTypeScopes: { select: { activityTypeId: true } },
         _count: { select: { users: true } },
       },
     });
@@ -195,6 +209,8 @@ export class RolesService {
       isSystem: updated.isSystem,
       active: updated.active,
       permissionCodes: newValues.permissionCodes,
+      // Renombrar o cambiar permisos NO toca el alcance por tipo: se fija en su propia ruta.
+      activityTypeIds: existing.activityTypeScopes.map((scope) => scope.activityTypeId),
       userCount: existing._count.users,
     };
   }

@@ -77,7 +77,17 @@ export interface RoleRow {
   isSystem: boolean;
   active: boolean;
   permissionCodes: string[];
+  /**
+   * Tipos de formacion que este rol puede tocar (2026-09-22).
+   * **Vacio = sin acotar**: puede con todos. Acotar es un acto deliberado.
+   */
+  activityTypeIds: string[];
   userCount: number;
+}
+
+/** Fija el conjunto ENTERO de tipos de un rol. Lista vacia = desacotarlo. */
+export function setRoleActivityTypes(roleId: string, activityTypeIds: string[]): Promise<{ activityTypeIds: string[] }> {
+  return apiFetch(`/roles/${roleId}/tipos`, { method: 'PUT', body: { activityTypeIds } });
 }
 
 export function listRoles(): Promise<RoleRow[]> {
