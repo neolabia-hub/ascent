@@ -1,0 +1,380 @@
+<title>Qué acredita cada jornada · NEO PULSE</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* ── Sistema heredado de las otras guías: mismo azul, mismo naranja, mismas letras ──────────
+     Lo que se añade aquí es UNA cosa: cada tipo trae su propio color, el mismo con el que la
+     aplicación lo marca en las listas. Así la guía y la pantalla dicen lo mismo. */
+  :root {
+    --ink-900: #101418;
+    --ink-700: #2a3138;
+    --ink-500: #5b6572;
+    --ink-300: #aab3bd;
+    --paper: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --line: #e5e8ec;
+    --line-strong: #cdd3da;
+    --navy: #1f3a5f;
+    --navy-soft: #eaeef3;
+    --accent: #e8734a;
+    --ok: #1a7f4e;
+    --ok-soft: #e9f5ee;
+    --warn: #b45309;
+    --warn-soft: #fdf3e6;
+    --danger: #b02a37;
+    --danger-soft: #fbeced;
+    --display: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+      --paper: #0e1114; --surface: #171b20; --surface-2: #1e242b;
+      --line: #262c33; --line-strong: #333b44;
+      --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+      --ok: #3ba76f; --ok-soft: #12251b; --warn: #d98324; --warn-soft: #2a1f12;
+      --danger: #e2707c; --danger-soft: #2b1418;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink-900: #e8ebee; --ink-700: #c9d0d6; --ink-500: #8b96a1; --ink-300: #6a747e;
+    --paper: #0e1114; --surface: #171b20; --surface-2: #1e242b;
+    --line: #262c33; --line-strong: #333b44;
+    --navy: #7ea6d8; --navy-soft: #182231; --accent: #ef8a55;
+    --ok: #3ba76f; --ok-soft: #12251b; --warn: #d98324; --warn-soft: #2a1f12;
+    --danger: #e2707c; --danger-soft: #2b1418;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-700);
+    font-family: var(--body); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .envoltorio { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── Cabecera ───────────────────────────────────────────────────────────────────────────── */
+  header.principal { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-family: var(--display); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(34px, 5.2vw, 52px); font-weight: 800;
+    line-height: 1.08; letter-spacing: -0.022em; color: var(--ink-900);
+    margin: 0 0 18px; text-wrap: balance; max-width: 18ch;
+  }
+  .entradilla { font-size: 18px; line-height: 1.6; color: var(--ink-500); max-width: 62ch; margin: 0; }
+
+  /* ── Índice de tipos ────────────────────────────────────────────────────────────────────── */
+  nav.tipos { position: sticky; top: 0; z-index: 20; background: var(--paper);
+    border-bottom: 1px solid var(--line); padding: 12px 0; margin-bottom: 44px; }
+  nav.tipos ol { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0;
+    counter-reset: none; }
+  nav.tipos a {
+    display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 9px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    font-size: 13px; font-weight: 600; color: var(--ink-700); text-decoration: none;
+    transition: border-color .15s, color .15s;
+  }
+  nav.tipos a:hover, nav.tipos a:focus-visible { border-color: var(--line-strong); color: var(--ink-900); }
+  nav.tipos a:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--tono); flex: none; }
+
+  /* ── Secciones ──────────────────────────────────────────────────────────────────────────── */
+  section.tipo { padding-top: 20px; margin-bottom: 72px; scroll-margin-top: 72px; }
+  .titulo-tipo { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
+  .barra { width: 5px; align-self: stretch; min-height: 42px; border-radius: 3px; background: var(--tono); flex: none; }
+  h2 {
+    font-family: var(--display); font-size: clamp(25px, 3.2vw, 33px); font-weight: 800;
+    letter-spacing: -0.018em; color: var(--ink-900); margin: 0; line-height: 1.15; text-wrap: balance;
+  }
+  .menor { display: block; color: var(--ink-500); font-size: 13.5px; font-weight: 400; line-height: 1.45; margin-top: 2px; }
+  .subtitulo { color: var(--ink-500); font-size: 16px; margin: 2px 0 26px 19px; max-width: 64ch; }
+
+  h3 {
+    font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--ink-500); margin: 34px 0 12px;
+  }
+  h3:first-of-type { margin-top: 0; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  strong { color: var(--ink-900); font-weight: 600; }
+  a { color: var(--navy); }
+
+  /* ── Ficha técnica del tipo ─────────────────────────────────────────────────────────────── */
+  .ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 1px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .ficha div { background: var(--surface); padding: 13px 15px; }
+  .ficha dt { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-500); margin-bottom: 3px; }
+  .ficha dd { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink-900); }
+  .ficha dd.no { color: var(--ink-300); }
+
+  /* ── Pasos: numerados porque son una secuencia real ─────────────────────────────────────── */
+  ol.pasos { counter-reset: paso; list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 14px; }
+  ol.pasos > li { counter-increment: paso; position: relative; padding-left: 42px; max-width: 70ch; }
+  ol.pasos > li::before {
+    content: counter(paso); position: absolute; left: 0; top: 0;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: var(--tono); color: #fff;
+    font-family: var(--display); font-size: 13px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  ol.pasos b { display: block; color: var(--ink-900); font-weight: 600; }
+
+  ul.limpia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  ul.limpia > li { position: relative; padding-left: 18px; max-width: 70ch; }
+  ul.limpia > li::before { content: ''; position: absolute; left: 2px; top: 10px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--ink-300); }
+
+  /* ── Avisos ─────────────────────────────────────────────────────────────────────────────── */
+  .aviso { border-left: 3px solid var(--warn); background: var(--warn-soft);
+    padding: 13px 16px; border-radius: 0 8px 8px 0; margin: 0 0 14px; max-width: 70ch; }
+  .aviso.bien { border-color: var(--ok); background: var(--ok-soft); }
+  .aviso.grave { border-color: var(--danger); background: var(--danger-soft); }
+  .aviso p:last-child { margin-bottom: 0; }
+  .aviso .etiqueta { font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 4px; }
+  .aviso.bien .etiqueta { color: var(--ok); }
+  .aviso.grave .etiqueta { color: var(--danger); }
+
+  /* ── Tablas ─────────────────────────────────────────────────────────────────────────────── */
+  /* Un caso practico: caja de prosa, no rejilla. */
+  .caso { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--tono);
+    border-radius: 0 12px 12px 0; padding: 18px 22px; margin: 0 0 30px; }
+  .caso p { margin: 0 0 12px; }
+  .caso p:last-child { margin-bottom: 0; }
+  .caso .tabla-envuelve { margin: 14px 0 4px; }
+  /* La linea que resume de que va el caso, antes de la caja. */
+  .resumen-caso { color: var(--ink-500); font-style: italic; margin: 0 0 10px; max-width: 70ch; }
+
+  .tabla-envuelve { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { background: var(--surface-2); font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; }
+  td:first-child { color: var(--ink-900); font-weight: 500; }
+
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink-900); }
+
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 56px 0; }
+  footer { border-top: 1px solid var(--line); padding-top: 22px; color: var(--ink-500); font-size: 14px; }
+
+</style>
+<div class="envoltorio" style="--tono:#0f766e">
+<header class="principal">
+  <p class="kicker" style="color:#0f766e">NEO PULSE · Guía de uso · Común a todos los tipos</p>
+  <h1>Qué acredita cada jornada</h1>
+  <p class="entradilla">Todas las combinaciones de formación y convocatoria, con el caso real de cada una. Para consultar cuando hay que programar algo y no está claro qué elegir.</p>
+</header>
+
+<section class="tipo">
+  <h3>Las tres decisiones, y quién las toma</h3>
+  <p>Lo que le pasa a una persona al final depende de tres cosas que se deciden en <strong>sitios distintos y por personas distintas</strong>. Casi todas las dudas vienen de mezclarlas.</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Decisión</th><th>Dónde se toma</th><th>Qué controla</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>1. El tipo de formación</strong></td>
+        <td>Configuración → Tipos de formación<br><span class="menor">Una vez, para toda su clase</span></td>
+        <td>Si lleva evaluación, si lleva encuesta, si emite constancia, si entra al plan anual, si se repite, y si admite el papel de un tercero</td>
+      </tr>
+      <tr>
+        <td><strong>2. La modalidad</strong></td>
+        <td>La ficha de la formación<br><span class="menor">Presencial · Virtual · Híbrida</span></td>
+        <td><strong>Dónde va la gente.</strong> Es logística: no decide nada por sí sola, solo <em>sugiere</em> lo de la casilla 3</td>
+      </tr>
+      <tr>
+        <td><strong>3. Qué se exige y si hay lista</strong></td>
+        <td>La convocatoria<br><span class="menor">Jornada por jornada</span></td>
+        <td><strong>Qué acredita</strong> que esa persona la cumplió, y qué queda documentado</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <div class="aviso">
+    <p><strong>La misma formación puede acreditarse distinto en dos jornadas.</strong> La inducción de marzo se dictó en el salón y se cerró con la lista; la de septiembre se puso en línea y se cierra con el contenido. Es la misma formación y el mismo tipo: cambia cómo se dictó, y eso se dice en la convocatoria.</p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section class="tipo">
+  <h3>La tabla completa</h3>
+  <p>Las cuatro formas que puede tomar una jornada. La columna de la izquierda es lo que se elige en <em>«Qué se exige para darla por cumplida»</em>; la casilla de la lista solo aparece en la tercera fila.</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Qué se exige</th><th>¿Hay lista?</th><th>Qué cierra la formación</th><th>La evaluación</th><th>Cuándo sale la constancia</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Con la lista</strong><br><span class="menor">defecto en presencial e híbrida</span></td>
+        <td>Sí, siempre</td>
+        <td>Marcar a la persona como presente</td>
+        <td>Queda disponible, <strong>no obliga</strong></td>
+        <td>Al marcar la asistencia</td>
+      </tr>
+      <tr>
+        <td><strong>Al completar el contenido</strong><br><span class="menor">defecto en virtual</span></td>
+        <td>No</td>
+        <td>Terminar el temario y aprobar</td>
+        <td><strong>Obliga</strong></td>
+        <td>Al aprobar</td>
+      </tr>
+      <tr>
+        <td><strong>Al completar el contenido</strong><br><span class="menor">+ lista como evidencia</span></td>
+        <td>Sí, y <strong>no cierra nada</strong></td>
+        <td>Terminar el temario y aprobar</td>
+        <td><strong>Obliga</strong></td>
+        <td>Al aprobar</td>
+      </tr>
+      <tr>
+        <td><strong>Las dos cosas</strong><br><span class="menor">nunca es defecto</span></td>
+        <td>Sí, y es media exigencia</td>
+        <td>Haber venido <em>y</em> haber aprobado</td>
+        <td><strong>Obliga</strong></td>
+        <td>Cuando se cumplen las dos</td>
+      </tr>
+      <tr>
+        <td><strong>Autoservicio</strong><br><span class="menor">convocatoria permanente</span></td>
+        <td>No, nunca</td>
+        <td>Terminar el temario y aprobar</td>
+        <td><strong>Obliga</strong></td>
+        <td>Al aprobar</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="sep">
+
+<section class="tipo">
+  <h2 class="titulo-tipo">Los casos, uno por uno</h2>
+  <p>Cada uno es una situación real de TRANSPRENSA. Si la que tienes delante no está aquí, busca la que más se le parezca: lo que decide es cómo se dictó, no cómo se llama.</p>
+
+  <h3>1 · La charla en el salón</h3>
+  <p class="resumen-caso">Manejo defensivo. Dos horas, presencial, el instructor de la ARL, sin examen.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> modalidad <em>Presencial</em>. No se toca nada más — el defecto ya es «Con la lista».</p>
+    <p><strong>Qué pasa:</strong> el día de la jornada se pasa lista, o la gente escanea el QR, o firma en pantalla. Cada persona marcada <strong>queda cumplida en ese momento</strong>.</p>
+    <p><strong>Quien no vino</strong> la sigue debiendo y entra en la siguiente jornada. Marcarla como falta justificada explica por qué no vino; <em>no</em> la exime.</p>
+  </div>
+
+  <h3>2 · El curso en línea</h3>
+  <p class="resumen-caso">Inducción en SG-SST. Cada quien la hace desde su puesto cuando puede, con evaluación al final.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> modalidad <em>Virtual</em>. Defecto: «Al completar el contenido».</p>
+    <p><strong>Qué pasa:</strong> no hay nada que marcar. La plataforma la cierra sola cuando la persona termina el temario y aprueba. <strong>Si se intenta pasar lista, el sistema la rechaza</strong> — no hubo sesión que registrar.</p>
+  </div>
+
+  <h3>3 · La videollamada en vivo</h3>
+  <p class="resumen-caso">Capacitación de la ARL por Teams, con fecha y hora, y alguien apuntando quién se conectó.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> modalidad <em>Virtual</em>, y se cambia a mano a <em>«Con la lista de asistencia»</em>.</p>
+    <p><strong>Por qué hay que cambiarlo:</strong> es el caso que rompe el defecto. Virtual sugiere «al completar el contenido», pero aquí sí hubo sesión y sí hay lista. Es virtual por dónde se conectó la gente, no por cómo se acredita.</p>
+  </div>
+
+  <h3>4 · El taller presencial que se acredita después</h3>
+  <p class="resumen-caso">Se hace una demostración en el patio y después cada quien responde el examen en la plataforma.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> modalidad <em>Presencial</em>, y se cambia a mano a <em>«Al completar el contenido»</em>. Si además quieres constancia de quién estuvo, marca <strong>«Lista de asistencia → Se toma, como evidencia»</strong>.</p>
+    <p><strong>Qué pasa con la lista:</strong> aparecen el QR, la firma y el acta; todo queda en el expediente de cada persona <strong>y no cierra nada</strong>. La formación la cierra el examen.</p>
+    <p><strong>Cuidado con esto:</strong> alguien que asistió y no ha hecho el examen <em>sigue pendiente</em>. La lista marcada no lo adelanta. Es lo correcto —lo que se exige es el examen— pero hay que saberlo antes de mirar el informe.</p>
+  </div>
+
+  <h3>5 · La presencial con examen obligatorio</h3>
+  <p class="resumen-caso">Trabajo en alturas. La norma exige que la persona asista <em>y</em> que demuestre que aprendió.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> modalidad <em>Presencial</em>, y se elige <em>«Las dos cosas: asiste y aprueba»</em>.</p>
+    <p><strong>Qué pasa, en los cuatro escenarios:</strong></p>
+    <div class="tabla-envuelve"><table>
+      <thead><tr><th>La persona…</th><th>Resultado</th></tr></thead>
+      <tbody>
+        <tr><td>Asiste el martes y aprueba el jueves</td><td>Al asistir no cumple. <strong>Al aprobar, cierra</strong> y sale su constancia</td></tr>
+        <tr><td>Aprueba desde casa y asiste después</td><td>Al aprobar no cumple —ve en su pantalla que le falta la asistencia—. <strong>Al marcarla presente, cierra</strong></td></tr>
+        <tr><td>Asiste pero <strong>reprueba</strong></td><td><strong>No cumple.</strong> Su asistencia queda registrada, no hay constancia, y puede repetir el examen</td></tr>
+        <tr><td>Aprueba todo pero <strong>no fue</strong></td><td><strong>No cumple.</strong> No ve «Formación terminada»: ve que le falta la asistencia y quién la registra</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>El orden da igual.</strong> Cierra cuando se completa la segunda mitad, venga por donde venga.</p>
+  </div>
+
+  <h3>6 · La píldora de autoservicio</h3>
+  <p class="resumen-caso">Un vídeo de cinco minutos que está siempre disponible y cada quien ve cuando quiere.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> convocatoria <em>Permanente</em>. Es la que se abre sola al publicar, si el tipo lo dice.</p>
+    <p><strong>Qué pasa:</strong> no hay fecha, no hay sesión y <strong>nunca hay lista</strong>, aunque alguien intente activarla. No hay a qué asistir.</p>
+  </div>
+
+  <h3>7 · El curso externo que emite certificado</h3>
+  <p class="resumen-caso">Recertificación de montacargas. La dicta un centro acreditado y entrega su propio papel.</p>
+  <div class="caso">
+    <p><strong>Se programa así:</strong> como corresponda a cómo se dictó —normalmente presencial, con la lista—. Lo que habilita el papel es el <strong>tipo de formación</strong>, en Configuración.</p>
+    <p><strong>Dónde se registra el papel:</strong> en la misma lista de asistencia, con su número, su emisor y su vencimiento. Es donde se recoge de verdad: el instructor lo tiene en la mano al terminar.</p>
+    <p><strong>El papel es evidencia, no acreditación.</strong> Quien decide si la formación queda cumplida es lo que la jornada exige — nunca el certificado. Lo que sí hace el papel es fijar <strong>hasta cuándo vale</strong>: su fecha manda sobre la recurrencia, así que la próxima ronda se programa según el papel y no según el calendario.</p>
+    <p><strong>Si la jornada no toma lista</strong> —un curso en línea de la ARL que emite certificado—, el papel se registra desde la <strong>ficha de la persona</strong>, en Usuarios.</p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section class="tipo">
+  <h3>Lo que el sistema impide, para que no haya que recordarlo</h3>
+  <p>Tres cosas no se pueden configurar mal porque el sistema no deja. No son avisos: son imposibles.</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Regla</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Si la lista acredita, la lista se toma</strong></td>
+        <td>No se puede apagar. Sin lista no habría forma de cerrar esa jornada nunca</td>
+      </tr>
+      <tr>
+        <td><strong>Una convocatoria permanente nunca lleva lista</strong></td>
+        <td>Es autoservicio: no hay sesión a la que asistir. Aunque alguien marque la casilla, no aparece. Dejarlo pasar convertiría un error de captura en asistencias inventadas</td>
+      </tr>
+      <tr>
+        <td><strong>«Las dos cosas» nunca se aplica sola</strong></td>
+        <td>La modalidad sugiere «con la lista» o «al completar el contenido», nunca las dos. Exigir dos cosas es una decisión, y deducirla dejaría gente sin cumplir sin que nadie lo hubiera pedido</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="tipo">
+  <h3>Cómo se lee la ficha de una convocatoria</h3>
+  <p>En la ficha hay dos renglones que responden a estas dos preguntas, y conviene leerlos juntos:</p>
+  <div class="caso">
+    <p><span class="menor">QUÉ SE EXIGE</span><br>
+      <strong>La lista de asistencia de la sesión</strong> · <em>(elegido para esta jornada)</em></p>
+    <p><span class="menor">LISTA DE ASISTENCIA</span><br>
+      <strong>Sí se toma</strong> · <em>(QR, firma o a mano)</em></p>
+  </div>
+  <p>El texto entre paréntesis del primer renglón dice de dónde salió la respuesta: <em>«elegido para esta jornada»</em> si alguien lo decidió a mano, <em>«lo sugirió la modalidad»</em> si es el defecto. Sirve para saber si se puede cambiar sin romper nada.</p>
+  <p>Y en el segundo, <em>«queda en el expediente, pero no cierra la formación»</em> es la señal de que estás en el caso 4: hay lista y acredita el contenido.</p>
+</section>
+
+<section class="tipo">
+  <h3>Si tienes que elegir y no lo tienes claro</h3>
+  <p>Tres preguntas, en este orden. La primera que dé «sí» decide:</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Pregunta</th><th>Si la respuesta es sí</th></tr></thead>
+    <tbody>
+      <tr><td>¿La norma exige que la persona <strong>asista y además demuestre</strong> que aprendió?</td><td><strong>Las dos cosas</strong></td></tr>
+      <tr><td>¿Lo que de verdad acredita es lo que cada quien hace en la plataforma?</td><td><strong>Al completar el contenido</strong> — y marca la lista si además hubo sesión que documentar</td></tr>
+      <tr><td>¿Hubo una sesión y estar ahí <em>es</em> el cumplimiento?</td><td><strong>Con la lista</strong></td></tr>
+    </tbody>
+  </table></div>
+  <div class="aviso">
+    <p><strong>Ante la duda, deja el defecto.</strong> Lo que sugiere la modalidad acierta en la inmensa mayoría de las jornadas, y siempre se puede cambiar después: la convocatoria se corrige mientras no esté cerrada.</p>
+  </div>
+</section>
+
+<footer>
+  <p>NEO PULSE para TRANSPRENSA · Guía de uso, septiembre de 2026. Lo de aquí está medido contra el sistema, no supuesto: cada regla tiene detrás una prueba que falla si deja de ser cierta.</p>
+</footer>
+</div>

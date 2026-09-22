@@ -21,6 +21,7 @@ descoloca a quien lo abre.
 | [`guia-montar-formaciones.html`](guia-montar-formaciones.html) | De la carpeta de PDF a la lección publicada: tarjetas, vídeo, examen y constancia |
 | [`guia-formaciones.html`](guia-formaciones.html) | Qué distingue cada tipo de formación y cuándo usar cada uno |
 | [`asistencia.html`](asistencia.html) | Los tres mecanismos de toma de lista —QR, instructor y firma— y cómo sale el acta |
+| [`asistencia-combinaciones.html`](asistencia-combinaciones.html) | **Qué acredita cada jornada**: las cuatro formas que puede tomar una convocatoria, siete casos reales de principio a fin, y las tres reglas que el sistema impide romper |
 | [`guia-desempeno.html`](guia-desempeno.html) | El paso a paso de la evaluación de desempeño: qué significa firmar, cómo se calcula la nota, cómo evaluar **por jefaturas de sub-área** y cómo se lee el consolidado |
 | [`programas.html`](programas.html) | Varias formaciones con **una sola constancia**: cómo se arma, qué significa de verdad el cupo, y los dos errores que dejan gente sin papel |
 
