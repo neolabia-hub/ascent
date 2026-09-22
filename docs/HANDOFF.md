@@ -24,6 +24,33 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-22 — DESPLEGADO A PRODUCCION: todo lo de la sesion del 21
+
+Commit `2d36e23`. Los cinco pasos de `05-reglas-de-despliegue.md` §3, en orden:
+
+| Paso | Resultado |
+|---|---|
+| 1. Copia ANTES de tocar nada | `neopulse-20260922-142045.dump`, 388 KB, subida a R2. **No vacia** |
+| 2. `git pull` | 51 archivos, las dos migraciones incluidas |
+| 3. Reconstruir imagenes | `neo-pulse-web:local` y `neo-pulse-api:local` |
+| 4. `up -d` + **`restart caddy`** | `migrate` Exited(0) tras aplicar las migraciones y reaplicar RLS |
+| 5. Comprobar que RESPONDE | `/v1/health` ok · login de transprensa 200 · tenant publico 200 |
+
+Verificado ademas en la base de produccion: `completion_requirement` y `takes_attendance`
+existen, `closes_by_attendance` **ya no**, y `users.email` admite nulo. Cero errores en la API
+en los tres minutos siguientes.
+
+**Se desplego en horario laboral (9:00) a peticion expresa**, en contra de la costumbre del
+RUNBOOK. El hueco de 503 se queda en ~3 s por el `restart caddy` del paso 4 — que es
+exactamente para lo que se añadio. Sin incidencias.
+
+**Lo que queda del lado del cliente:** no ha visto ninguno de los cambios de pantalla (regla
+§3 bis). Se subio igual, con el compromiso de enseñarselos despues. Los visibles son: las dos
+preguntas de la convocatoria, el aviso ambar del aprendiz cuando le falta la asistencia, la
+vista previa de la carga masiva y los selectores de area con la rama.
+
+---
+
 ## 2026-09-21 (continuacion) — LAS SUB-AREAS, VISTAS DESDE LA PANTALLA: el motor estaba bien y la interfaz no lo contaba
 
 Sesion corta y de repaso, disparada por las preguntas del cliente sobre lo que se habia desplegado
