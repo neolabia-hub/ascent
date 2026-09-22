@@ -72,6 +72,7 @@ export {
   importRowSchema,
   setOverridesSchema,
   setAnalystScopesSchema,
+  alcancePorTipoSchema,
   documentTypeSchema,
   employmentTypeSchema,
   roadActorSchema,

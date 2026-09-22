@@ -23,4 +23,12 @@ export interface AuthUser {
   hasPermission: (code: PermissionCode) => boolean;
   /** Procesos que puede ver. `null` = todos (ver common/analyst-scope.ts). */
   scopeProcessIds: AnalystScope;
+  /**
+   * Tipos de formacion que puede tocar. `null` = todos (2026-09-22).
+   *
+   * Tercera dimension del mismo alcance, con el mismo convenio: **sin filas no se acota**. Lo
+   * resuelve `PermissionService.getActivityTypeScope`, donde esta escrita la precedencia entre lo
+   * de la persona y lo de su rol.
+   */
+  scopeActivityTypeIds: string[] | null;
 }

@@ -169,9 +169,27 @@ export const setAnalystScopesSchema = z.object({
         .object({
           processId: z.string().uuid().nullable().optional(),
           areaId: z.string().uuid().nullable().optional(),
+          /** Tercera dimension del alcance: que TIPOS de formacion puede tocar (2026-09-22). */
+          activityTypeId: z.string().uuid().nullable().optional(),
         })
-        .refine((s) => s.processId || s.areaId, 'Cada ambito debe tener proceso o area'),
+        .refine(
+          (s) => s.processId || s.areaId || s.activityTypeId,
+          'Cada ambito debe tener proceso, area o tipo de formacion',
+        ),
     )
     .max(50),
 });
 export type SetAnalystScopesInput = z.infer<typeof setAnalystScopesSchema>;
+
+/**
+ * QUE TIPOS DE FORMACION PUEDE TOCAR UN ROL (2026-09-22).
+ *
+ * Se manda el conjunto ENTERO y no altas y bajas sueltas: la pantalla marca casillas y guarda. Con
+ * operaciones por tipo, dos pestañas abiertas se pisan y gana la ultima en llegar.
+ *
+ * **Lista vacia = sin acotar**, que es como nacen todos los roles. Acotar es un acto deliberado.
+ */
+export const alcancePorTipoSchema = z.object({
+  activityTypeIds: z.array(z.string().uuid()).max(50),
+});
+export type AlcancePorTipoInput = z.infer<typeof alcancePorTipoSchema>;

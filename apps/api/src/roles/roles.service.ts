@@ -221,6 +221,64 @@ export class RolesService {
     return { ok: true };
   }
 
+  /** QUE TIPOS DE FORMACION PUEDE TOCAR ESTE ROL (2026-09-22). Lista vacia = sin acotar. */
+  async tiposDelRol(roleId: string) {
+    const filas = await this.prisma.scoped.roleActivityTypeScope.findMany({
+      where: { roleId },
+      select: { activityType: { select: { id: true, code: true, name: true } } },
+    });
+    return {
+      activityTypeIds: filas.map((fila) => fila.activityType.id),
+      tipos: filas.map((fila) => fila.activityType),
+    };
+  }
+
+  /**
+   * Fija el conjunto ENTERO. Se borra y se reescribe dentro de una transaccion: con altas y bajas
+   * sueltas, dos pestañas abiertas dejan un estado que no eligio nadie.
+   *
+   * **Guardar la lista vacia DESACOTA el rol**, y tiene que ser asi: es la unica forma de devolverle
+   * el acceso a todo a un rol que se acoto por error. Si «vacio» significara «ninguno», no habria
+   * manera de deshacerlo desde la pantalla.
+   */
+  async fijarTiposDelRol(roleId: string, activityTypeIds: string[], actor: AuthUser) {
+    const tenantId = this.prisma.currentTenantId;
+    const role = await this.prisma.scoped.role.findUnique({ where: { id: roleId }, select: { id: true, code: true } });
+    if (!role) throw new NotFoundException({ code: 'ROLE_NOT_FOUND' });
+
+    const unicos = [...new Set(activityTypeIds)];
+    if (unicos.length > 0) {
+      // Que existan y sean de este tenant: el id viaja desde la pantalla y no se da por bueno.
+      const existentes = await this.prisma.scoped.activityType.findMany({
+        where: { id: { in: unicos } },
+        select: { id: true },
+      });
+      if (existentes.length !== unicos.length) {
+        throw new BadRequestException({ code: 'INVALID_ACTIVITY_TYPE_IDS' });
+      }
+    }
+
+    await this.prisma.tx(async (tx) => {
+      await tx.roleActivityTypeScope.deleteMany({ where: { roleId } });
+      if (unicos.length > 0) {
+        await tx.roleActivityTypeScope.createMany({
+          data: unicos.map((activityTypeId) => ({ tenantId, roleId, activityTypeId, setBy: actor.id })),
+        });
+      }
+    });
+
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'ROLE_ACTIVITY_TYPES_SET',
+      resourceType: 'roles',
+      resourceId: roleId,
+      newValues: { roleCode: role.code, activityTypeIds: unicos, acotado: unicos.length > 0 },
+    });
+
+    return { activityTypeIds: unicos };
+  }
+
   /** Resuelve codigos de permiso contra el catalogo global; rechaza codigos inexistentes. */
   private async resolvePermissions(codes: string[]): Promise<Array<{ id: string; code: string }>> {
     const unique = [...new Set(codes)];

@@ -77,3 +77,51 @@ export function assertScopeAllows(scope: AnalystScope, processId: string): void 
     message: 'Ese proceso no esta en tu alcance. Pidele al administrador que lo agregue.',
   });
 }
+
+/**
+ * EL ALCANCE POR TIPO DE FORMACION (2026-09-22). Mismo convenio que el de procesos: `null` = sin
+ * restriccion, y tener filas es lo que acota.
+ *
+ * Lo pidio el cliente —*"el analista solo debe poder crear tipo plan"*— pero no se cablea «PLAN»
+ * en ningun sitio: que tipos puede tocar cada rol y cada persona se configura desde Permisos,
+ * porque los tipos los crea el propio tenant y la siguiente empresa querra otra cosa.
+ *
+ * El mensaje NO enumera lo que si puede, a proposito: quien lo lee no puede arreglarlo solo, y la
+ * lista de lo que no le toca no le sirve. Dice a quien pedirselo, que es lo unico accionable.
+ */
+export function tipoPermitido(scope: string[] | null, activityTypeId: string): boolean {
+  return scope === null || scope.includes(activityTypeId);
+}
+
+export function assertTipoPermitido(scope: string[] | null, activityTypeId: string): void {
+  if (tipoPermitido(scope, activityTypeId)) return;
+  throw new ForbiddenException({
+    code: 'ACTIVITY_TYPE_OUT_OF_SCOPE',
+    message: 'No puedes crear formaciones de ese tipo. Pidele al administrador que te lo habilite.',
+  });
+}
+
+/**
+ * El filtro para las CONSULTAS: que tipos entran en lo que esta persona ve.
+ *
+ * ─── SE CRUZA CON LO QUE PIDE LA PANTALLA, NO SE PONE AL LADO ───
+ *
+ * Recibe el tipo pedido y devuelve UNA sola clave `activityTypeId`. Escribir el alcance y el filtro
+ * como dos claves del mismo objeto no las suma: **la segunda pisa a la primera en silencio**, y el
+ * alcance se pierde. Es exactamente el fallo que ya costo una tarde en la tajada de las
+ * convocatorias (`projected-audience.service.ts`, 2026-09-04), asi que aqui no puede repetirse.
+ *
+ * Si alguien pide un tipo que no es suyo, la respuesta es una lista VACIA: devolverle lo suyo
+ * mientras la pantalla dice otra cosa seria mentirle, y un 403 le confirma que ese tipo existe.
+ *
+ * Devuelve `{}` cuando no hay restriccion ni filtro —y no un `in` con todos los tipos— porque
+ * enumerar todo obligaria a cargar el catalogo en cada consulta solo para decir «no filtres».
+ */
+export function tipoScopeWhere(
+  scope: string[] | null,
+  pedido?: string,
+): { activityTypeId?: string | { in: string[] } } {
+  if (scope === null) return pedido ? { activityTypeId: pedido } : {};
+  if (!pedido) return { activityTypeId: { in: scope } };
+  return { activityTypeId: { in: scope.includes(pedido) ? [pedido] : [] } };
+}

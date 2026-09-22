@@ -18,9 +18,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: JwtPayload): Promise<AuthUser> {
     if (!payload?.sub || !payload?.tenantId) throw new UnauthorizedException();
-    const [perms, scopeProcessIds] = await Promise.all([
+    const [perms, scopeProcessIds, scopeActivityTypeIds] = await Promise.all([
       this.permissions.getEffectivePermissions(payload.sub, payload.tenantId),
       this.permissions.getAnalystScope(payload.sub, payload.tenantId),
+      // El tercer alcance, en el mismo viaje: que TIPOS de formacion puede tocar (2026-09-22).
+      this.permissions.getActivityTypeScope(payload.sub, payload.tenantId, payload.roleId),
     ]);
     return {
       id: payload.sub,
@@ -30,6 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       permissions: perms,
       hasPermission: (code) => perms.has(code),
       scopeProcessIds,
+      scopeActivityTypeIds,
     };
   }
 }

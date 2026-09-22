@@ -60,10 +60,64 @@ export class PermissionService {
    * El arbol de areas se recorre en memoria y no con SQL recursivo a proposito: son una decena de
    * filas por tenant, y el SQL crudo no pasa por el cliente atado al tenant (RLS).
    */
+  /**
+   * QUE TIPOS DE FORMACION PUEDE TOCAR ESTA PERSONA (2026-09-22). `null` = todos.
+   *
+   * ─── LA PRECEDENCIA, Y POR QUE ES ESTA ───
+   *
+   * **Lo de la persona manda sobre lo del rol.** Si tiene tipos marcados valen los suyos —aunque
+   * sean mas que los de su rol—; si no tiene ninguno, hereda los del rol; si el rol tampoco tiene,
+   * puede con todos.
+   *
+   * Es exactamente la precedencia de los permisos sueltos (`UserPermissionOverride`): lo individual
+   * pisa lo del rol. Tener dos reglas distintas en el mismo producto seria la forma mas corta de
+   * que alguien configure una creyendo la otra.
+   *
+   * ─── Y POR QUE «SIN FILAS» ES «TODOS» Y NO «NINGUNO» ───
+   *
+   * Mismo convenio que el alcance por proceso, y por el mismo motivo: **acotar es un acto
+   * deliberado**. Si la ausencia de filas significara «ninguno», el dia que esto se desplegara
+   * todo el mundo se quedaria sin poder crear nada sin que nadie lo hubiera pedido.
+   */
+  async getActivityTypeScope(userId: string, tenantId: string, roleId: string): Promise<string[] | null> {
+    const prisma = this.prisma.forTenant(tenantId);
+
+    const suyos = await prisma.analystScope.findMany({
+      where: { userId, activityTypeId: { not: null } },
+      select: { activityTypeId: true },
+    });
+    if (suyos.length > 0) {
+      return suyos.map((row) => row.activityTypeId).filter((id): id is string => id !== null);
+    }
+
+    const delRol = await prisma.roleActivityTypeScope.findMany({
+      where: { roleId },
+      select: { activityTypeId: true },
+    });
+    if (delRol.length > 0) return delRol.map((row) => row.activityTypeId);
+
+    return null;
+  }
+
   async getAnalystScope(userId: string, tenantId: string): Promise<AnalystScope> {
     const prisma = this.prisma.forTenant(tenantId);
+    /*
+      SOLO LAS FILAS QUE HABLAN DE PROCESOS O AREAS (corregido el 2026-09-22).
+
+      Aqui se leian TODAS las filas de la persona, y con dos dimensiones eso funcionaba porque toda
+      fila traia proceso o area. Al añadir la tercera —el tipo de formacion, que vive en esta misma
+      tabla— marcarle un tipo a alguien le dejaba el alcance de procesos en CERO: la consulta veia
+      filas, deducia «esta acotado», y no encontraba ni un proceso en ellas.
+
+      El sintoma es de los peores: la persona conserva sus permisos y de repente no ve ni una
+      formacion, sin ningun error. Lo cazo `alcance-por-tipo.mjs` en el paso 5, que es justo el que
+      mezcla las dos dimensiones.
+
+      La leccion, que es la de siempre en esta tabla: **«tener filas» acota POR DIMENSION, no en
+      general.** Cada dimension mira solo las suyas.
+    */
     const rows = await prisma.analystScope.findMany({
-      where: { userId },
+      where: { userId, OR: [{ processId: { not: null } }, { areaId: { not: null } }] },
       select: { processId: true, areaId: true },
     });
     if (rows.length === 0) return null;

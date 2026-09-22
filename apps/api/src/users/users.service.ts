@@ -106,6 +106,8 @@ export class UsersService {
             id: true,
             process: { select: { id: true, code: true, name: true } },
             area: { select: { id: true, code: true, name: true } },
+            // La tercera dimension (2026-09-22): que tipos de formacion puede tocar esta persona.
+            activityType: { select: { id: true, code: true, name: true } },
           },
         },
       },
@@ -344,6 +346,8 @@ export class UsersService {
             userId: id,
             processId: s.processId ?? null,
             areaId: s.areaId ?? null,
+            // Tercera dimension del mismo alcance (2026-09-22): que tipos de formacion puede tocar.
+            activityTypeId: s.activityTypeId ?? null,
           })),
         });
       }

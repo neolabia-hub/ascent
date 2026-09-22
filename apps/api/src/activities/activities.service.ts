@@ -7,7 +7,13 @@ import type {
   UpdateActivityInput,
   UpdateContentInput,
 } from '@neo-pulse/shared';
-import { assertScopeAllows, processScopeWhere, scopeAllows } from '../common/analyst-scope.js';
+import {
+  assertScopeAllows,
+  assertTipoPermitido,
+  processScopeWhere,
+  scopeAllows,
+  tipoScopeWhere,
+} from '../common/analyst-scope.js';
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -46,9 +52,15 @@ export class ActivitiesService {
     const where: Prisma.ActivityWhereInput = {
       deletedAt: null,
       ...(query.active ? { active: query.active === 'true' } : {}),
-      ...(query.activityTypeId ? { activityTypeId: query.activityTypeId } : {}),
       // El analista ve SU proceso; el admin (sin alcance) ve todo. Ver common/analyst-scope.ts.
       ...processScopeWhere(actor.scopeProcessIds, query.processId),
+      /*
+        Y SOLO LOS TIPOS QUE LE TOCAN (2026-09-22). El filtro que pide la pantalla se cruza con el
+        alcance en vez de sustituirlo: si alguien pide un tipo que no es suyo, la respuesta correcta
+        es una lista vacia —no lo suyo, que seria mentirle, ni un 403, que le confirma que ese tipo
+        existe—. Mismo criterio que `processScopeWhere`.
+      */
+      ...tipoScopeWhere(actor.scopeActivityTypeIds, query.activityTypeId),
       ...(query.q
         ? {
             OR: [
@@ -120,6 +132,7 @@ export class ActivitiesService {
   /** Crea la actividad y su version 1 en borrador, en una sola transaccion. */
   async create(actor: AuthUser, input: CreateActivityInput) {
     assertScopeAllows(actor.scopeProcessIds, input.processId);
+    assertTipoPermitido(actor.scopeActivityTypeIds, input.activityTypeId);
     const tenantId = this.prisma.currentTenantId;
 
     // Si no se dice quien responde, responde el del PROCESO. Es un paso menos al crear y ademas
