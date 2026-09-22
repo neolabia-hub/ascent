@@ -178,7 +178,7 @@
           </tr>
           <tr>
             <td>Correo</td>
-            <td>A dónde llegan los avisos. También sirve para entrar</td>
+            <td>A dónde llegan los avisos. También sirve para entrar. <strong>Es opcional</strong>: si la persona no tiene, se deja vacío y entra con su cédula</td>
           </tr>
         </tbody>
       </table>
@@ -330,7 +330,7 @@
         <tbody>
           <tr><td>documento</td><td><strong>Sí</strong></td><td>Cédula. Es el usuario para entrar</td></tr>
           <tr><td>nombre_completo</td><td><strong>Sí</strong></td><td>Como se va a ver en las constancias</td></tr>
-          <tr><td>correo</td><td><strong>Sí</strong></td><td>A dónde llegan los avisos</td></tr>
+          <tr><td>correo</td><td>No</td><td>A dónde llegan los avisos. <strong>Si la persona no tiene, deja la celda vacía</strong>: entrará con su cédula igual que todo el mundo, y lo único que no recibirá es lo que se mande por correo</td></tr>
           <tr><td>cargo</td><td><strong>Sí</strong></td><td>Código o nombre del catálogo</td></tr>
           <tr><td>area</td><td><strong>Sí</strong></td><td>Código o nombre. El área <strong>grande</strong>. Si no existe, se crea</td></tr>
           <tr><td>sub_area</td><td>No</td><td>Solo si la empresa las usa. La persona queda <strong>aquí</strong>, y la sub-área se crea colgando del área de la columna anterior</td></tr>
@@ -344,9 +344,106 @@
     </div>
     <p>
       <strong>Una fila mala no tumba la carga.</strong> Al terminar, la pantalla dice cuántas
-      entraron y cuáles fallaron con el motivo (documento repetido, cargo que no existe, correo mal
-      escrito). Se corrigen esas y se vuelve a cargar solo esas: las que ya entraron no se duplican.
+      entraron y cuáles fallaron, con el motivo de cada una —qué le falta a esa celda y qué hay que
+      escribir— junto al <strong>nombre y la cédula</strong> de la persona, para no tener que buscarla
+      en el archivo.
     </p>
+
+    <h3>Volver a cargar el archivo: así se mantiene la plantilla al día</h3>
+    <p>
+      <strong>El archivo no es una carga de una sola vez: es el espejo de tu plantilla.</strong> Se
+      sube el mismo archivo cada mes, con las altas y los cambios mezclados entre los que no
+      cambiaron, y el sistema hace lo que corresponda con cada fila. La cédula es la que identifica a
+      cada persona.
+    </p>
+    <div class="tabla-envoltura"><table>
+      <thead><tr><th>Si la fila…</th><th>Qué pasa</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Es de alguien nuevo</strong></td><td>Se <strong>crea</strong>, con su contraseña inicial, y le nacen las formaciones que le correspondan</td></tr>
+        <tr><td><strong>Es de alguien que ya está, con algo distinto</strong></td><td>Se <strong>actualiza</strong> solo lo que cambió, y el resultado dice qué campos fueron</td></tr>
+        <tr><td><strong>Es de alguien que ya está, igual que antes</strong></td><td>No se toca nada. Sale como <em>«Ya estaba, sin cambios»</em></td></tr>
+        <tr><td><strong>Viene dos veces en el mismo archivo</strong></td><td>Se rechaza: deja una sola fila por persona</td></tr>
+      </tbody>
+    </table></div>
+    <div class="clave"><p>
+      <b>Una celda vacía no borra nada.</b> Vacía significa «este archivo no lo dice», no «quítaselo».
+      Así, subir una plantilla a medio llenar no vacía los teléfonos ni las fechas de ingreso de media
+      empresa. Para quitarle un dato a alguien, se abre su ficha.
+    </p></div>
+    <div class="clave"><p>
+      <b>Lo que una carga nunca toca:</b> la contraseña de quien ya está —la suya sigue sirviendo—, su
+      <b>rol</b> en la plataforma, si está activa o no, y las políticas que firmó. Un archivo de
+      personal dice dónde trabaja alguien; no puede volverlo administrador ni reactivar a quien salió.
+    </p></div>
+    <div class="clave"><p>
+      <b>Y lo que sí mueve:</b> cambiar el <b>cargo</b> o el <b>área</b> de alguien le cambia las
+      formaciones que se le exigen — pierde las de donde salió y le nacen las de donde llega. Por eso
+      el resultado marca las actualizadas en azul y dice qué campos cambiaron: es lo que hay que
+      revisar después de cada carga.
+    </p></div>
+
+    <h3>Subir no aplica: primero se ve qué pasaría</h3>
+    <p>
+      Al elegir el archivo, la pantalla <strong>no guarda nada todavía</strong>. Lo lee entero y
+      enseña la lista de lo que haría: cuántas personas se crearían, cuántas cambiarían y —en cada
+      una— <strong>qué campos</strong>. Con eso delante se pulsa <b>Aplicar</b>, o se descarta.
+    </p>
+    <p>
+      Es el paso que protege de subir el archivo equivocado. Si alguien corrigió un correo a mano la
+      semana pasada y el archivo todavía trae el anterior, sale en la vista previa como
+      <em>«Cambiaría: correo»</em> — y ahí se ve, antes de que pase.
+    </p>
+    <div class="clave"><p>
+      <b>Mientras dice «Se crearían» y «Cambiarían», no se ha escrito nada.</b> Los verbos pasan a
+      «Creadas» y «Actualizadas» cuando ya se aplicó. Y las contraseñas de la gente nueva solo
+      aparecen después de aplicar: antes no existen.
+    </p></div>
+
+    <h3>Los dos caminos, y cuál manda cuando se cruzan</h3>
+    <p>
+      Hay dos formas de mantener la plantilla y <strong>las dos escriben sobre lo mismo</strong>. Es
+      la parte que más cuidado pide, así que conviene tenerla clara antes de la primera carga.
+    </p>
+    <div class="tabla-envoltura"><table>
+      <thead><tr><th></th><th>Desde la pantalla (Usuarios → Nueva persona / abrir su ficha)</th><th>Desde el archivo (Carga masiva)</th></tr></thead>
+      <tbody>
+        <tr><td><b>Para qué es</b></td><td>Una persona, un cambio puntual: una corrección, un traslado suelto, un dato que faltaba</td><td>La plantilla entera o un grupo grande: las altas del mes, una reorganización</td></tr>
+        <tr><td><b>Qué puede hacer</b></td><td>Todo: crear, corregir cualquier campo, <b>cambiar el rol</b>, restablecer la contraseña, desactivar</td><td>Crear y actualizar los datos de la persona. <b>Nunca</b> el rol, la contraseña ni si está activa</td></tr>
+        <tr><td><b>Qué deja escrito</b></td><td>Quién hizo el cambio y cuándo</td><td>Lo mismo, y además a qué carga perteneció</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="clave"><p>
+      <b>La regla, y es la que hay que saberse: cuando una fila del archivo trae un dato, ese dato
+      manda.</b> Si alguien corrige un correo a mano el martes y el jueves se sube un archivo viejo
+      que todavía trae el correo anterior, <strong>el archivo lo vuelve a poner</strong>. No hay
+      forma de que el sistema adivine cuál de los dos es el bueno: los dos los escribió una persona
+      de la empresa, y el más reciente gana.
+    </p></div>
+    <p>Tres costumbres que lo evitan, en orden de importancia:</p>
+    <ol class="pasos">
+      <li>
+        <b>Trabaja siempre sobre el archivo más reciente</b>, no sobre la copia que alguien se bajó
+        hace dos meses. El archivo es el espejo de la plantilla: si el espejo está viejo, devuelve
+        una imagen vieja.
+      </li>
+      <li>
+        <b>Si un dato lo llevas a mano, quítalo del archivo.</b> Una celda vacía no borra nada, así
+        que borrar la columna <code>correo</code> —o dejarla en blanco en esas filas— hace que la
+        carga no la toque nunca y la ficha siga mandando. Es la forma de repartirse el trabajo sin
+        pisarse: <em>el archivo lleva el organigrama, la pantalla lleva las excepciones</em>.
+      </li>
+      <li>
+        <b>Mira el resultado de cada carga antes de cerrarlo.</b> Las filas en azul dicen a quién se
+        le cambió algo y exactamente qué campo. Si aparece un cambio que nadie pidió, ahí está — y
+        se corrige desde la ficha en dos clics, porque el dato anterior queda en la auditoría.
+      </li>
+    </ol>
+    <div class="clave"><p>
+      <b>Y al revés, lo que no hay que temer:</b> volver a subir el archivo <em>no</em> duplica a
+      nadie, <em>no</em> cambia contraseñas y <em>no</em> reactiva a quien se fue. Lo único que puede
+      pisar son los datos de la persona que el archivo trae escritos.
+    </p></div>
   </section>
 
   <section>
@@ -709,7 +806,7 @@
           </tr>
           <tr>
             <td>Filas rechazadas en la carga</td>
-            <td>Cargo o área que no existen en el catálogo, documento repetido, o correo mal escrito. El resultado dice cuál de las tres</td>
+            <td>Falta una columna obligatoria (área y cargo son las que más fallan), el documento viene dos veces en el mismo archivo, o un correo está mal escrito. El resultado lo dice fila por fila, con el nombre de la persona</td>
           </tr>
           <tr>
             <td>«Le llegó un aviso de algo que no tiene»</td>

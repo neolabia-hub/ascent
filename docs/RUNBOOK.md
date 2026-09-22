@@ -3,6 +3,92 @@
 Solo se ANEXA o se corrige; no se reescribe entre sesiones. Lo aprendido rompiendo algo va aqui.
 El diario de sesiones (que se hizo cada dia, que quedo abierto) vive en `docs/HANDOFF.md`.
 
+## El 401 de la consola al volver a una pestaña abierta NO es un fallo (2026-09-21)
+
+**Sintoma**, reportado desde produccion: se deja la aplicacion abierta, se vuelve al rato, se pulsa
+otra opcion y en la consola sale
+
+```
+v1/catalogs/areas:1   Failed to load resource: the server responded with a status of 401 ()
+```
+
+La pantalla **tarda** en pasar a la otra opcion, pero pasa.
+
+**Que esta ocurriendo, y es lo previsto.** El token de acceso dura 15 minutos y vive **solo en
+memoria**. Una pestaña quieta no lo renueva: nadie hace peticiones, asi que nadie descubre que
+caduco. Al primer clic, esa peticion sale con el token muerto, la API responde 401 —**y el navegador
+lo escribe en la consola, que es lo que se esta viendo**—; `apiFetch` lo atrapa, pide uno nuevo con
+la cookie de refresco y **reintenta la peticion una vez** (Decision #91). Por eso la pantalla acaba
+cargando: el 401 de la consola es el **primer intento**, no el resultado.
+
+**De donde sale la demora.** Es un viaje de ida y vuelta de mas —`POST /auth/refresh` y luego otra
+vez la peticion original— y, sobre todo, **no hay nada en pantalla que lo cuente**: se ve una
+interfaz quieta. Si al volver la pantalla dispara varias peticiones a la vez, todas caducan juntas y
+comparten **un solo** refresco (estan coalescidas a proposito: el servidor rota el token de refresco
+y dos refrescos en paralelo se invalidarian entre si, sacando a la persona).
+
+**Como se distingue de un problema de verdad.** Si tras el refresco sigue habiendo 401, la sesion
+murio —contrasena cambiada, sesion cerrada desde otro sitio— y el armazon **lleva al login**. Es
+decir: *401 en consola y la pantalla termina cargando* = normal; *401 y acabas en el login* = la
+sesion se cayo de verdad. Y ojo con la causa mas tonta, que ya costo una tarde: **tener abierta la
+cuenta `888888888`** en otra pestaña rota el token y tumba la sesion de al lado (ver el incidente del
+2026-08-29).
+
+**ARREGLADO el mismo dia** (ver abajo). Lo de arriba queda escrito porque el sintoma puede volver a
+verse en un navegador sin `navigator.locks` o `BroadcastChannel`, donde el comportamiento degrada al
+de antes — y porque saber distinguir ese 401 de uno de verdad sigue haciendo falta.
+
+## Como se renueva la sesion, y por que hay un cerrojo entre pestañas (2026-09-21)
+
+Ya no se espera al 401. `lib/api.ts` renueva **antes** de caducar por dos caminos:
+
+- **Temporizador al 80% de la vida del token** (`FRACCION_DE_VIDA`), para quien trabaja sin parar.
+- **Al volver a la pestaña** (`visibilitychange`), si le queda menos de un minuto — el caso que lo
+  origino: dejar la aplicacion abierta y volver al rato.
+
+Una pestaña **oculta no renueva**: no hay nadie mirandola y cada refresco cuesta una rotacion. Se
+pone al dia al volver a primer plano.
+
+**EL CERROJO, Y LO QUE DE VERDAD HACE.** Primero, lo que **no** hace, porque es facil contarlo mal:
+el servidor ya se protege solo. Al rotar, el token anterior **sigue valiendo 30 segundos**
+(`GRACE_MS`, con `previousHash`/`previousValidUntil` en `auth.service.ts`), asi que dos pestañas
+renovando a la vez **no echan a nadie**. Renovar mas a menudo no era, por si solo, un peligro.
+
+Lo que el cerrojo aporta es otra cosa, y basta para justificarlo: **N pestañas cuestan UN refresco**
+en vez de N —cada uno con su escritura y su rotacion— y quedan cubiertas las carreras mas largas que
+esa ventana de gracia. Cuatro piezas:
+
+1. Un refresco a la vez **dentro** de la pestaña (`refrescoEnCurso`, la promesa compartida).
+2. Un refresco a la vez **entre** pestañas: `navigator.locks.request('ascent-refresco', ...)`. Un
+   cerrojo de verdad del navegador — **no una bandera en `localStorage`**, que no es atomica.
+3. Quien llega tarde al cerrojo **compara** el token con el que traia y **adopta** el que ya hay en
+   vez de pedir otro. La comparacion va DENTRO del cerrojo; fuera seria mirar el reloj antes de
+   hacer la cola.
+4. El token nuevo se **reparte** por `BroadcastChannel('ascent-sesion')`: N pestañas = UN refresco.
+
+**Coste en el servidor: igual o menor.** Antes ya habia un refresco cada ~15 min por sesion activa,
+mas el 401 desperdiciado y el reintento (3 peticiones); ahora es uno cada ~12 min sin el 401 (2
+peticiones). Y varias pestañas, que antes costaban N refrescos, cuestan uno.
+
+**Y UNA PESTAÑA QUE NADIE TOCA DEJA DE RENOVARSE** (`INACTIVIDAD_MAXIMA_MS`, 30 min). El motivo
+**no es el gasto** —5 peticiones/hora no le importan a nadie— sino que la cookie de refresco dura 7
+dias **y se desliza en cada uso**: sin este limite, una pestaña abierta y visible mantendria la
+sesion viva **para siempre**, y una pantalla desatendida en un puesto compartido se queda dentro. Es
+como lo acotan los sistemas serios: la sesion se ata a la ACTIVIDAD, no al reloj.
+
+«Actividad» es **una peticion a la API**, no el raton: un portatil recibe `mousemove` por el roce del
+dedo en el panel tactil y eso no es trabajo. El refresco no cuenta como actividad (se excluye por
+`skipAuth`) o se daria vida a si mismo.
+
+Es un **limite, no un cierre de sesion forzado**: pasado ese rato el token muere solo y quien vuelva
+se recupera por el camino de siempre —al volver a la pestaña, o con el 401 y su reintento—, porque la
+cookie aguanta 7 dias. Un cierre de sesion por inactividad **es una decision de politica del
+cliente** y no se toma desde el codigo.
+
+**Un refresco anticipado que falla NO lleva al login.** Se deja que lo decida la siguiente peticion
+de verdad: un corte de red de dos segundos no puede sacar a la gente de la aplicacion. Al login solo
+se va cuando una peticion real sigue en 401 **despues** de refrescar.
+
 ## Entorno de desarrollo (decidido 2026-08-25)
 
 - **Node NATIVO de Windows** (Node 24 LTS via winget + pnpm 9.12.0 global de usuario). Los

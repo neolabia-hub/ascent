@@ -24,6 +24,222 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-21 (continuacion) — LAS SUB-AREAS, VISTAS DESDE LA PANTALLA: el motor estaba bien y la interfaz no lo contaba
+
+Sesion corta y de repaso, disparada por las preguntas del cliente sobre lo que se habia desplegado
+por la mañana. **Ninguna destapo un fallo del motor** —el arbol de areas se comporta como debe— pero
+tres destaparon que **la pantalla no dice lo que el motor hace**, que para quien configura es lo
+mismo que si no lo hiciera.
+
+Las preguntas, tal cual, porque son el mejor resumen de lo que faltaba:
+
+- *«¿de donde toma las areas el campo Area donde trabaja? si se creo Nomina, ¿no deberia salir?»*
+- *«si en Quienes seleccionan Nomina, ¿solo le asigna a los de Nomina y no a los de Gestion Humana?»*
+- *«¿en Responsable del area a quien hay que seleccionar si es una sub-area?»*
+
+### Lo que se comprobo y estaba BIEN (queda escrito para no volver a comprobarlo)
+
+- El campo **«Area donde trabaja»** de Usuarios lista areas y sub-areas **juntas**, con la rama
+  (`nombreConRama`). No hay ni hace falta un segundo campo: se elige `Gestion Humana › Nomina`
+  directamente. Elegir la madre a secas tambien es valido —quien trabaja en el area grande—.
+- **Marcar Nomina alcanza solo a Nomina; marcar Gestion Humana alcanza a todos, hijas incluidas.**
+  Verificado en las dos derivaciones de la faceta y en `manual-reach.spec.ts`: la asignacion manual
+  se comporta igual que una regla.
+- El **archivo de personas** hace lo mismo en dos columnas (`area` + `sub_area`).
+
+### Lo que se arreglo
+
+1. **La rama y la consecuencia, en los cuatro selectores de audiencia.** Pintaban el nombre pelado,
+   asi que «Gestion Humana», «Nomina» y «Seleccion» parecian tres areas hermanas, y **en ningun sitio
+   decia que marcar la madre arrastra a las hijas**. Ahora llevan `nombreConRama()` y una ayuda:
+   *«Marcar un area incluye tambien a sus sub-areas. Para acotar, marca la sub-area.»* Son cuatro:
+   Quienes, la tajada de la convocatoria (y su resumen de una linea), «Asignar a una audiencia» de un
+   programa, y las dos de Asignaciones. En `offering-form.tsx` el `arbol` que se le pasa a
+   `opcionesDe()` es el catalogo **completo** a proposito: la lista viene filtrada a lo que hay entre
+   los obligados, y si la madre no tuviera gente propia la rama de su hija se quedaria sin nombre.
+2. **Una sub-area sin responsable se marca en ambar**, con la consecuencia en el titulo: su gente
+   sale sin evaluador. **El responsable no se hereda del padre** —correcto, pero es lo contrario de
+   lo que sugiere colgar una cosa de otra—. En un area de primer nivel el mismo hueco sigue siendo la
+   tarea neutra de siempre («Asignar»): ahi nadie supone que lo cubra otro.
+3. La tilde de **«Area donde trabaja»**, y su ayuda: *«Si tiene sub-area, se elige la sub-area: de
+   ahi sale quien lo evalua.»* Que es la frase que faltaba: ese campo decide **quien evalua**, no
+   solo donde aparece la persona en un informe.
+
+`docs/arquitectura.md` §4.55 recoge las dos reglas nuevas (no se hereda el responsable; que tiene que
+decir la interfaz). Verificado con `tsc`, `eslint`, los dos guiones de selectores y la suite e2e.
+
+### 4. Y EL 401 AL VOLVER A LA PESTAÑA: arreglado, con el cerrojo que lo hace seguro
+
+Reportado desde produccion: *«sale `v1/catalogs/areas 401` y se queda, demora en pasar a la otra
+opcion»*. **No estaba roto** —el token dura 15 min, vive en memoria, y una pestaña quieta no lo
+renueva; el primer clic pagaba 401 + refresco + reintento— pero le cobraba la espera a la persona.
+
+Ahora se renueva **antes**: temporizador al 80% de la vida y puesta al dia al volver a la pestaña.
+
+Dos cosas que se dijeron mal en la conversacion y quedan corregidas aqui, porque las dos cambian la
+decision:
+
+- **El servidor YA se protege del choque de refrescos.** Al rotar, el token anterior sigue valiendo
+  30 segundos (`GRACE_MS`). Dos pestañas renovando a la vez no echan a nadie. Se habia contado como
+  un peligro inminente y no lo es. El cerrojo (`navigator.locks` + `BroadcastChannel`) se queda por
+  lo que si hace: **N pestañas cuestan UN refresco** y quedan cubiertas las carreras mas largas que
+  esa ventana.
+- **El limite de la pestaña abandonada no es por gasto.** Se habia razonado como coste —5
+  peticiones/hora, irrelevante— y el argumento bueno es otro: la cookie de refresco dura 7 dias **y
+  se desliza**, asi que una pestaña visible renovando sola mantendria la sesion **para siempre**. Una
+  pantalla desatendida en un puesto compartido se queda dentro, en una aplicacion donde se firma. Por
+  eso la renovacion se ata a la ACTIVIDAD (`INACTIVIDAD_MAXIMA_MS`, 30 min), que es como lo acotan
+  los sistemas serios. Actividad = una peticion a la API, no el raton.
+
+Es un **limite, no un cierre forzado**: el token muere solo y quien vuelva se recupera por el camino
+de siempre. Un cierre de sesion por inactividad es **politica del cliente** y queda sin decidir.
+
+Coste en servidor: **igual o menor** que antes (se ahorra el 401 y el reintento). Sin
+`navigator.locks` o `BroadcastChannel`, todo degrada al comportamiento anterior, que era correcto.
+
+### 5. Y EL 2.7, CERRADO: «como se acredita» eran DOS preguntas disfrazadas de una
+
+El cliente lo replanteo con su caso —*"la formacion tiene evaluacion y se cierra por contenido, pero
+se quiere el QR, la firma o el acta como constancia de que estuvo presente"*— y al mirarlo de cerca
+el problema no era que faltara una opcion: era que **un solo booleano respondia QUE ACREDITA y SI
+SE TOMA LISTA a la vez**. Elegir una descartaba la otra, y por eso el caso no cabia.
+
+Ahora son dos: **«que se exige»** (la lista · el contenido · **las dos cosas**) y **«¿se toma
+lista?»**, que solo se pregunta cuando acredita el contenido —si la lista acredita se toma por
+definicion, y ofrecer apagarla seria ofrecer una jornada que no se puede cerrar—.
+
+Lo que esto desbloquea, y no es solo el caso pedido:
+
+- **Evidencia sin acreditacion.** Con `CONTENT` + lista, el QR, la firma y el acta funcionan y van al
+  expediente **sin cerrar nada**. La evidencia documental deja de ser una compuerta.
+- **«Asistio Y aprobo»**, que es lo que un auditor pide en una presencial con examen y hasta hoy no
+  se podia pedir: o acreditaba la lista y el examen no obligaba, o al reves. Decision tomada al
+  abrirlo: **quien asiste pero reprueba sigue debiendola**.
+- Y el papel de un tercero **se registra desde la lista siempre que haya lista**, acredite o no.
+  Esto estuvo AL REVES unas horas —se rechazaba con `CERT_NOT_ON_THIS_LIST`, razonando que el papel
+  dice «cumplio» y esa lista no cierra nada— y lo corrigio el cliente al preguntar donde deberia
+  registrarse. La premisa era falsa: **el papel es EVIDENCIA, no una acreditacion**. Quien decide si
+  la formacion queda cumplida es la exigencia de la jornada, siempre; el papel solo fija hasta
+  cuando vale. Y el instructor lo tiene en la mano al terminar la sesion, asi que prohibirlo ahi no
+  protegia nada — solo garantizaba que la evidencia se perdiera. Sin lista, sigue siendo la ficha de
+  la persona (`PENDIENTES` 2.2).
+
+**La migracion no le cambia el significado a ninguna jornada ya dictada** (`20260921160000`):
+`true`→`ATTENDANCE`, `false`→`CONTENT`, `null`→`null`. Es total y sin perdida, y se probo desde una
+base vacia antes de aplicarla, como manda el RUNBOOK.
+
+**Lo que destapo el recorrido nuevo, que es por lo que existe.** `exigencia-y-lista.mjs` (45
+comprobaciones, cuatro formaciones de punta a punta hasta la constancia) encontro que con el temario
+terminado y sin asistir, el reproductor enseñaba **«Formacion terminada» en verde a quien NO habia
+cumplido**. El motor siempre lo supo —`missing` incluye «Asistencia a la sesion»— pero el dato no
+llegaba a la pantalla. Es el fallo tipico de *"esto no llega hasta alli"*: las dos mitades, por
+separado, estaban bien. Ahora el reproductor devuelve `exigencia` / `faltaAsistencia` y la pantalla
+lo dice en ambar, nombrando a quien lo resuelve.
+
+Cobertura: **459 unitarias** de la regla (la matriz pasa de 27 a 108 combinaciones, con dos
+invariantes que ninguna puede romper) y los cinco recorridos de asistencia en verde.
+
+### 6. DOS COSAS QUE LA REGRESION DESTAPO Y NO ERAN DE ESTE CAMBIO
+
+Se dicen aparte porque la tentacion al ver rojo es culpar a lo ultimo que se toco:
+
+- **`asistencia.mjs` llevaba en rojo desde el 2026-09-08.** Su paso 13 afirmaba que con dos reglas
+  vivas nacen DOS obligaciones, y el pendiente **4.1 lo cambio a UNA** ese mismo dia. El recorrido se
+  quedo atras y nadie lo volvio a correr. Corregido a lo que el sistema hace hoy.
+- **`tracksExternalCertificate` estaba APAGADO en RECERTIFICACION** en la base de desarrollo, y de
+  ahi salian 17 de los 19 fallos de ese recorrido y los 7 de `asistencia-combinaciones`. Es
+  configuracion del tenant, no codigo: se comprobo encendiendolo y volviendo a correr —de 19 a 2— en
+  vez de suponerlo.
+
+### 7. LA CARGA MASIVA, A RAIZ DE 1.089 FILAS EN ROJO
+
+El cliente subio su plantilla y salio esto, mil ochenta y nueve veces:
+
+```
+Columna "area": String must contain at least 2 character(s)
+```
+
+La causa era simple —la columna `area` venia vacia— pero el mensaje tenia tres cosas mal a la vez:
+en ingles, hablando de «caracteres» cuando lo que pasa es que la celda esta VACIA, y sin decir que
+hacer. Y la tabla enseñaba solo la cedula, asi que para saber de quien era cada error habia que
+abrir el archivo y buscar el numero.
+
+**Lo que se hizo, y cada cosa sale de una pregunta suya:**
+
+- **Los motivos, en español y diciendo que hacer.** «Falta "Área", y es obligatorio. Si la empresa
+  usa sub-áreas, llena también "sub_area".» Ni un codigo tecnico ni una palabra en ingles en toda la
+  pantalla. Con pruebas, porque un texto sin prueba vuelve al ingles en cuanto alguien toque la
+  validacion.
+- **El NOMBRE junto a la cedula** en cada fila del informe.
+- **El correo pasa a ser OPCIONAL** (`users.email` nulable, migracion `20260921190000`). *"Eso pasa a
+  veces, no tiene correo"*. La alternativa practica era inventar `1116267708@empresa.com`, que es
+  peor que no tener ninguno: parece un correo, nadie lo lee, y despues no hay forma de saber quien
+  tiene uno de verdad. **No deja a nadie fuera**: se entra con la cedula o con el correo (Decision
+  #10), asi que quien no tiene entra con su cedula. Lo unico que pierde es lo que se mande por
+  correo — y por eso tiene que constar, para no contarlo como entregado el dia que el correo se
+  conecte.
+- **Recargar el archivo ACTUALIZA en vez de rechazar.** Una empresa no carga su plantilla una vez:
+  la carga cada mes, con las altas y los traslados mezclados entre los 900 que no cambiaron.
+  Rechazar esos 900 con «ya existe» convertia el archivo mensual en una lista de errores, y **los
+  traslados de area no entraban nunca**. Ahora la carga es un espejo del maestro de personal, con el
+  documento como clave — que es como lo resuelven los LMS y los sistemas de nomina.
+
+**Las tres reglas de la actualizacion, y cada una evita un desastre distinto:** una celda vacia **no
+borra** (vacia = «este archivo no lo dice»); **no se toca** la contraseña, el rol, si esta activa ni
+las politicas firmadas (un archivo de RR. HH. no puede ascender a nadie a administrador); y se dice
+**que campos** cambiaron, porque un cambio de area mueve obligaciones y es lo que hay que revisar.
+
+**Dos fallos que este trabajo casi introduce, y que conviene tener presentes:**
+
+1. `updateUserSchema` es el de creacion en `.partial()`. Con la transformacion ingenua, `undefined`
+   se habria convertido en `null` y **guardar cualquier cambio de una ficha habria borrado el correo
+   de esa persona**. Se distingue «no vino» de «lo dejaron en blanco».
+2. El aviso de repaso hacia `if (!correo) return null` con el comentario «dio de baja». Funcionaba
+   porque el correo era obligatorio. Con correos nulos habria dejado a toda esa gente **sin su aviso
+   en la bandeja**, que no usa correo para nada. La condicion ahora pregunta lo que siempre quiso
+   preguntar: ¿sigue activa esta persona?
+
+Cubierto por `scripts/recorridos/sin-correo.mjs` (26 comprobaciones: crear sin correo, entrar con la
+cedula, dos sin correo que no chocan, editar sin borrar, la recarga con sus tres resultados, y que
+una celda vacia no borre) y por las unitarias de los mensajes.
+
+### 8. GUIAS DE USUARIO
+
+- `guias/asistencia.html`: seccion nueva con **las dos preguntas** de la convocatoria, la tabla de
+  que pasa con la evaluacion y la constancia en cada caso, que quien asiste y reprueba sigue
+  debiendola, y que ve el aprendiz cuando le falta la asistencia.
+- `guias/guia-usuarios.html`: el correo como opcional, la recarga del archivo con sus cuatro
+  resultados, y **«Los dos caminos, y cual manda cuando se cruzan»** — que responde la pregunta del
+  cliente sobre editar a mano y despues subir un archivo viejo.
+
+### 9. Y LA SIMULACION ANTES DE APLICAR (`PENDIENTES` 5.4)
+
+La pregunta que lo abre es del cliente, y es la buena: *"¿y si un administrador actualiza un usuario
+por la interfaz y luego suben un archivo con el correo anterior? Se va a reemplazar"*. Si.
+
+**No hay regla que lo resuelva.** Los dos datos los escribio una persona de la empresa y el sistema
+no puede saber cual es el bueno. Cualquier heuristica —«lo manual gana», «lo mas reciente gana»—
+acertaria unas veces y se equivocaria otras, en silencio. Asi que la respuesta no es una regla mas
+lista: es **enseñar lo que va a pasar antes de que pase**.
+
+Subir el archivo ya no aplica nada. Lee, compara y enseña la lista —*«se crearían 12, cambiarían 4»*,
+y en cada fila **qué campos**— y se aplica en un segundo clic. `POST /users/import/simular` recorre
+**el mismo metodo** que la carga real con un `simular: true` que solo rodea las escrituras: una vista
+previa que siguiera otro camino prometeria un resultado y entregaria otro, que es peor que no
+simular.
+
+**Como se prueba, que es lo unico que vale aqui:** `sin-correo.mjs` paso 9 mide la base **antes y
+despues** de simular —cuanta gente hay, en que area esta la persona que «cambiaria»— y comprueba que
+no se movio ni una fila; y que aplicar despues hace exactamente lo que la vista previa prometio.
+Comprobar solo las cifras que devuelve no probaria nada: las calcula el mismo codigo.
+
+### Lo que quedo ABIERTO de esta sesion
+
+- Nada. El **2.7** y el **5.4** se cierran aqui; lo que queda de `PENDIENTES` es §10 (produccion) y
+  las decisiones del cliente.
+
+---
+
 ## 2026-09-21 — PROGRAMAS CERRADO, y las SUB-AREAS: el cambio que no podia cambiarle el significado a nada
 
 Sesion larga y con dos mitades. La primera termino de cerrar **Programas** (11.5, 11.9–11.12). La

@@ -636,6 +636,22 @@ pantallas. Ese es el motivo de que sea un arbol y no un campo aparte: un campo a
 obligado a cada uno de esos sitios a decidir cual de los dos usa, y cada decision es un fallo
 silencioso esperando.
 
+**El responsable NO se hereda del padre.** El evaluador sale del `responsibleUserId` del area **de la
+persona**; una sub-area sin responsable deja a su gente en «sin evaluador» al abrir un ciclo, y el
+jefe del area madre no la cubre. Es lo correcto —heredar haria evaluar a alguien gente que no sabe
+que tiene— pero es exactamente lo contrario de lo que sugiere colgar una cosa de otra, asi que la
+fila de una **sub-area** sin responsable se marca en ambar en *Configuracion → Areas*, con la
+consecuencia escrita. En un area de primer nivel el mismo hueco se ofrece como tarea («Asignar»), sin
+alarma: ahi nadie da por hecho que lo cubra otro.
+
+**Lo que la interfaz tiene que decir, porque el motor no se ve (2026-09-21).** Que un area arrastre a
+sus hijas es invisible desde la pantalla, y las listas pintaban los nombres planos: «Gestion Humana»,
+«Nomina» y «Seleccion» parecian tres areas hermanas. Los cuatro sitios donde se eligen areas para una
+audiencia —Quienes (`activity-audience-tab.tsx`), la tajada de una convocatoria (`offering-form.tsx`),
+«Asignar a una audiencia» de un programa y las dos de Asignaciones— usan `nombreConRama()` y dicen que
+marcar el area incluye sus sub-areas. Los dos datos hacen falta: la rama dice DONDE esta cada area y
+la ayuda dice QUE hace marcarla.
+
 **Y la convocatoria (`offerings`) es otra cosa**: la JORNADA —cuando, donde, quien dicta,
 modalidad, intensidad horaria, proyectados—. La inscripcion (`enrollments`) cuelga de ella.
 

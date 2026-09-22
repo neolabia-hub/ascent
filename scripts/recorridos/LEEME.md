@@ -34,6 +34,8 @@ node scripts/recorridos/dos-reglas-una-obligacion.mjs # dos reglas vivas, una so
 node scripts/recorridos/vencimientos.mjs             # el informe: tres fuentes, eje nuevo y el aviso a la bandeja
 node scripts/recorridos/programa.mjs                # un PROGRAMA entero: modulos, asistencia, constancia del conjunto y Seguimiento
 node scripts/recorridos/desempeno.mjs               # evaluacion por JEFATURAS de sub-area: calificar, firmar, consolidado
+node scripts/recorridos/exigencia-y-lista.mjs       # que se exige x si se toma lista: las 4 formas, de punta a punta
+node scripts/recorridos/sin-correo.mjs              # gente sin correo, y la RECARGA del archivo (crea/actualiza/no toca)
 node scripts/recorridos/estandar.mjs                # TODOS los tipos contra su propia configuracion
 node scripts/recorridos/estandar.mjs REINDUCCION    # ... o uno solo
 ```
