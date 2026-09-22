@@ -113,4 +113,25 @@ export class UsersController {
     if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file' });
     return this.importer.import(actor, file.originalname, file.buffer);
   }
+
+  /**
+   * LO MISMO, PERO SIN ESCRIBIR NADA (`PENDIENTES` 5.4, 2026-09-21).
+   *
+   * Desde que una recarga ACTUALIZA a quien ya esta, subir el archivo equivocado puede pisar
+   * correcciones hechas a mano — lo cazo el cliente: *"si actualizan un usuario por la interfaz y
+   * luego suben un archivo con el correo anterior, se va a reemplazar"*. No hay forma de que el
+   * sistema adivine cual de los dos datos es el bueno, asi que la respuesta no es una regla mas
+   * lista: es **enseñar lo que va a pasar antes de que pase**.
+   *
+   * Recorre exactamente el mismo camino que `import` —las mismas validaciones, los mismos mensajes y
+   * la misma comparacion campo a campo— y no escribe ni una fila. Es un `POST` porque lleva un
+   * archivo, no porque cambie algo.
+   */
+  @Post('import/simular')
+  @RequirePermissions('users:import')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }))
+  simularImport(@CurrentUser() actor: AuthUser, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file' });
+    return this.importer.import(actor, file.originalname, file.buffer, { simular: true });
+  }
 }

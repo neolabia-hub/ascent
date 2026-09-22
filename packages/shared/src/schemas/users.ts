@@ -15,7 +15,30 @@ export const createUserSchema = z.object({
     .regex(/^[0-9A-Za-z-]+$/, 'Documento invalido'),
   fullName: z.string().min(3).max(160),
   phone: z.string().min(7).max(20).nullable().optional(),
-  email: z.string().email().max(120).transform((v) => v.toLowerCase()),
+  /**
+   * OPCIONAL: hay gente que no tiene correo (2026-09-21).
+   *
+   * Vacio o ausente se guarda como NULO, y nulo significa exactamente eso — no una direccion
+   * inventada. Quien no tiene correo **entra con su cedula**, que siempre sirve (Decision #10); lo
+   * unico que pierde es lo que se manda por correo, y por eso tiene que constar.
+   *
+   * La cadena vacia se acepta y se convierte en `null` porque un formulario manda `''` cuando el
+   * campo se deja en blanco: rechazarla obligaria a la pantalla a distinguir «vacio» de «no vino»,
+   * que es una distincion que no existe para quien lo rellena.
+   *
+   * ─── PERO `undefined` SE CONSERVA, Y ESO NO ES UN DETALLE ───
+   *
+   * `updateUserSchema` es este esquema en `.partial()`, asi que al editar a alguien el correo puede
+   * simplemente NO VENIR. Si la transformacion convirtiera tambien `undefined` en `null`, **guardar
+   * cualquier cambio de una ficha borraria el correo de esa persona** sin que nadie lo pidiera.
+   *
+   *   `undefined` -> no vino, no se toca
+   *   `''` o null -> lo dejaron en blanco a proposito: esta persona no tiene correo
+   */
+  email: z
+    .union([z.string().email().max(120), z.literal(''), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ? v.toLowerCase() : null)),
   emailKind: z.enum(['PERSONAL', 'CORPORATE']).default('PERSONAL'),
   jobTitleId: z.string().uuid(),
   areaId: z.string().uuid(),
@@ -80,7 +103,14 @@ export const IMPORT_HEADERS = [
 export const importRowSchema = z.object({
   documento: z.string().min(5).max(20),
   nombre_completo: z.string().min(3).max(160),
-  correo: z.string().email().max(120).transform((v) => v.toLowerCase()),
+  /**
+   * OPCIONAL desde el 2026-09-21: hay gente que no tiene correo, y rechazar su fila empujaba a
+   * inventar una direccion. Vacia = sin correo, y esa persona entra con su cedula.
+   */
+  correo: z
+    .union([z.string().email().max(120), z.literal('')])
+    .optional()
+    .transform((v) => (v ? v.toLowerCase() : null)),
   telefono: z.string().max(20).optional().or(z.literal('')),
   cargo: z.string().min(2).max(40), // code o nombre del catalogo job_titles
   /**

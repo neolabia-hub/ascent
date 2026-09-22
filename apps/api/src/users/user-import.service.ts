@@ -8,10 +8,30 @@ import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { generateInitialPassword } from './password.util.js';
 
+/** La ficha que ya existe, para poder comparar campo a campo antes de escribir. */
+export interface PersonaExistente {
+  id: string;
+  documentNumber: string;
+  email: string | null;
+  fullName: string;
+  phone: string | null;
+  jobTitleId: string;
+  areaId: string;
+  regionalId: string | null;
+  serviceId: string | null;
+  hiredAt: Date | null;
+  employmentType: string;
+  active: boolean;
+}
+
 interface RowResult {
   rowNumber: number;
   status: 'OK' | 'ERROR';
   documento: string;
+  /** El nombre tal como venia en el archivo, para que el informe diga DE QUIEN es cada error. */
+  nombre?: string | null;
+  /** Que se hizo con esta fila. Sin esto, «180 filas OK» no dice si se creo o se actualizo gente. */
+  accion?: 'CREADA' | 'ACTUALIZADA' | 'SIN_CAMBIOS';
   error?: string;
   /** No es un error: informa que un cargo/area/regional/servicio se creo solo, sobre la marcha. */
   note?: string;
@@ -22,9 +42,15 @@ interface RowResult {
 
 export interface ImportResult {
   batchId: string;
+  /** `true` = no se escribio nada: es la vista previa del 5.4. */
+  simulacion?: boolean;
   total: number;
   ok: number;
   failed: number;
+  /** Desglose del `ok`: cuantas nacieron, a cuantas se les cambio algo y cuantas ya estaban igual. */
+  creadas: number;
+  actualizadas: number;
+  sinCambios: number;
   rows: RowResult[];
 }
 
@@ -82,6 +108,78 @@ export function codigoDesdeNombre(nombre: string, usados: ReadonlySet<string>): 
   // Practicamente inalcanzable (1000 cargos con el mismo nombre base), pero un codigo unico
   // vale mas que un choque silencioso.
   return `${base}_${Date.now()}`;
+}
+
+/**
+ * EL ID DE UN CATALOGO QUE **SE CREARIA**, en una simulacion (`PENDIENTES` 5.4).
+ *
+ * En vista previa no se crea el area ni el cargo que faltan, pero la fila sigue necesitando un id
+ * para poder compararse con lo que la persona tiene hoy. Se usa este, que no existe en la base y por
+ * tanto **nunca coincide** con el de nadie — que es justo la respuesta correcta: si el area todavia
+ * no existe, esa persona no puede estar en ella, asi que es un cambio.
+ *
+ * Es reconocible a simple vista, a proposito: si alguna vez apareciera escrito en la base, el fallo
+ * se ve en vez de esconderse detras de un UUID cualquiera.
+ */
+function idSimulado(codigo: string): string {
+  return `SIMULADO:${codigo}`;
+}
+
+/** Como se llama cada columna cuando hay que nombrarla en un mensaje. */
+const ROTULO: Record<string, string> = {
+  documento: 'Documento',
+  nombre_completo: 'Nombre completo',
+  correo: 'Correo',
+  telefono: 'Teléfono',
+  cargo: 'Cargo',
+  tipo_cargo: 'Tipo de cargo',
+  area: 'Área',
+  sub_area: 'Sub-área',
+  regional: 'Regional',
+  servicio: 'Servicio',
+  fecha_ingreso: 'Fecha de ingreso',
+};
+
+/**
+ * EL MOTIVO, EN ESPAÑOL Y DICIENDO QUE HACER (2026-09-21).
+ *
+ * El informe del lote enseñaba el mensaje CRUDO de Zod: *«Columna "area": String must contain at
+ * least 2 character(s)»*. Lo reporto el cliente con 1.089 filas en rojo diciendo exactamente eso.
+ * Tres cosas mal en una linea: esta en ingles, habla de «caracteres» cuando el problema es que la
+ * celda esta VACIA, y no dice que hacer para arreglarlo.
+ *
+ * Aqui se traduce por COLUMNA y por CASO, no con un diccionario de frases de Zod: lo que necesita
+ * quien corrige un archivo no es la regla que se violo, es **que le falta a esa celda**. Por eso
+ * «vacia» y «demasiado corta» son mensajes distintos aunque Zod las cuente igual.
+ */
+export function mensajeDeColumna(
+  columna: string,
+  issue: { code?: string; message?: string } | undefined,
+  values: Record<string, string>,
+): string {
+  const rotulo = ROTULO[columna] ?? columna;
+  const valor = (values[columna] ?? '').trim();
+
+  /*
+    El correo VACIO ya no es un error desde el 2026-09-21 (hay gente que no tiene, y esa persona
+    entra con su cedula). Asi que aqui solo se llega cuando trae algo escrito que no es un correo, y
+    eso es casi siempre un error de captura: sobra decirle que es obligatorio, porque no lo es.
+  */
+  if (columna === 'correo') {
+    return `El correo "${valor}" está mal escrito: le falta la arroba o el dominio. Si esta persona no tiene correo, deja la celda vacía.`;
+  }
+  if (valor === '') {
+    // El caso de nueve de cada diez, y el que traia el mensaje mas confuso.
+    const comoSeArregla: Record<string, string> = {
+      area: ' Si la empresa usa sub-áreas, llena también "sub_area".',
+      cargo: ' Si el cargo todavía no existe en el catálogo, escribe además su "tipo_cargo".',
+    };
+    return `Falta "${rotulo}", y es obligatorio.${comoSeArregla[columna] ?? ''}`;
+  }
+  if (issue?.code === 'too_small') return `"${rotulo}" es demasiado corto: "${valor}".`;
+  if (issue?.code === 'too_big') return `"${rotulo}" es demasiado largo: "${valor}".`;
+  if (issue?.code === 'invalid_string') return `"${rotulo}" no tiene un formato válido: "${valor}".`;
+  return `"${rotulo}" no es válido: "${valor}".`;
 }
 
 @Injectable()
@@ -180,7 +278,22 @@ export class UserImportService {
     return Buffer.from(await libro.xlsx.writeBuffer());
   }
 
-  async import(actor: AuthUser, filename: string, buffer: Buffer): Promise<ImportResult> {
+  /**
+   * `simular: true` recorre TODO sin escribir una sola fila (`PENDIENTES` 5.4).
+   *
+   * Es el mismo metodo y no una copia a proposito: una simulacion que recorriera otro camino
+   * prometeria un resultado y entregaria otro, que es peor que no simular. Los unicos `if` que
+   * introduce son los que rodean cada ESCRITURA — crear catalogos, crear o actualizar a la persona,
+   * el lote y la auditoria—; todo lo demas (validar, resolver catalogos, comparar campo a campo,
+   * redactar el motivo) corre igual.
+   */
+  async import(
+    actor: AuthUser,
+    filename: string,
+    buffer: Buffer,
+    opciones: { simular?: boolean } = {},
+  ): Promise<ImportResult> {
+    const simular = opciones.simular === true;
     const tenantId = this.prisma.currentTenantId;
     const rawRows = await this.parseFile(filename, buffer);
     if (rawRows.length === 0) throw new BadRequestException({ code: 'EMPTY_FILE' });
@@ -219,16 +332,41 @@ export class UserImportService {
     const emails = rawRows.map((r) => (r.values.correo ?? '').toLowerCase()).filter(Boolean);
     const existing = await this.prisma.scoped.user.findMany({
       where: { OR: [{ documentNumber: { in: documents } }, { email: { in: emails } }] },
-      select: { documentNumber: true, email: true },
+      select: {
+        id: true,
+        documentNumber: true,
+        email: true,
+        // Lo que una recarga puede actualizar: se trae para poder comparar y decir QUE cambio.
+        fullName: true,
+        phone: true,
+        jobTitleId: true,
+        areaId: true,
+        regionalId: true,
+        serviceId: true,
+        hiredAt: true,
+        employmentType: true,
+        active: true,
+      },
     });
+    /*
+      QUIEN YA ESTA, POR DOCUMENTO — y no un simple «existe si/no» (2026-09-21).
+      Con la ficha entera se puede ACTUALIZAR en vez de rechazar. Ver `actualizarPersona`.
+    */
+    const existentePorDoc = new Map(existing.map((u) => [u.documentNumber, u]));
     const existingDocs = new Set(existing.map((u) => u.documentNumber));
-    const existingEmails = new Set(existing.map((u) => u.email));
+    // Los NULOS fuera: «sin correo» no choca con «sin correo». Meterlos rechazaria a la segunda
+    // persona sin correo del archivo con un «Correo ya existe» que no tendria ningun sentido.
+    const existingEmails = new Set(existing.map((u) => u.email).filter((e): e is string => e !== null));
     const seenDocs = new Set<string>();
     const seenEmails = new Set<string>();
 
-    const batch = await this.prisma.scoped.userImportBatch.create({
-      data: { tenantId, filename, status: 'PROCESSING', totalRows: rawRows.length, createdBy: actor.id },
-    });
+    // Una simulacion no deja lote: no paso nada que auditar, y un lote fantasma en el historial
+    // haria creer que el archivo se aplico.
+    const batch = simular
+      ? { id: '' }
+      : await this.prisma.scoped.userImportBatch.create({
+          data: { tenantId, filename, status: 'PROCESSING', totalRows: rawRows.length, createdBy: actor.id },
+        });
 
     const results: RowResult[] = [];
     for (const raw of rawRows) {
@@ -243,48 +381,75 @@ export class UserImportService {
         serviceByCode,
         codigosUsados,
         existingDocs,
+        existentePorDoc,
+        simular,
         existingEmails,
         seenDocs,
         seenEmails,
       });
       results.push(result);
-      await this.prisma.scoped.userImportRow.create({
-        data: {
-          tenantId,
-          batchId: batch.id,
-          rowNumber: raw.rowNumber,
-          raw: raw.values,
-          status: result.status,
-          errorDetail: result.error ?? null,
-          note: result.note ?? null,
-          userId: result.userId ?? null,
-        },
-      });
+      if (!simular) {
+        await this.prisma.scoped.userImportRow.create({
+          data: {
+            tenantId,
+            batchId: batch.id,
+            rowNumber: raw.rowNumber,
+            raw: raw.values,
+            status: result.status,
+            errorDetail: result.error ?? null,
+            note: result.note ?? null,
+            userId: result.userId ?? null,
+          },
+        });
+      }
     }
 
     // Las obligaciones del lote nacen aqui, en una sola pasada: es el criterio de aceptacion
     // del Sprint 3 (entra gente por archivo y le nace su induccion sin que nadie la asigne).
-    await this.requirements.syncPeopleSafely(
-      tenantId,
-      results.map((r) => r.userId).filter((id): id is string => Boolean(id)),
-    );
+    if (!simular) {
+      await this.requirements.syncPeopleSafely(
+        tenantId,
+        results.map((r) => r.userId).filter((id): id is string => Boolean(id)),
+      );
+    }
 
     const ok = results.filter((r) => r.status === 'OK').length;
     const failed = results.length - ok;
-    await this.prisma.scoped.userImportBatch.update({
-      where: { id: batch.id },
-      data: { status: 'COMPLETED', okRows: ok, failedRows: failed },
-    });
-    await this.audit.record({
-      tenantId,
-      userId: actor.id,
-      action: 'USERS_IMPORTED',
-      resourceType: 'user_import_batches',
-      resourceId: batch.id,
-      newValues: { filename, total: results.length, ok, failed },
-    });
+    /*
+      EL DESGLOSE, porque «180 filas bien» ya no dice lo mismo que antes (2026-09-21).
+      Desde que una recarga actualiza en vez de rechazar, el mismo numero puede significar 180 altas
+      o 180 filas que no cambiaron nada. Quien sube el archivo mensual necesita ver cuantas entraron
+      de verdad y a cuantas se les cambio algo.
+    */
+    const creadas = results.filter((r) => r.accion === 'CREADA').length;
+    const actualizadas = results.filter((r) => r.accion === 'ACTUALIZADA').length;
+    const sinCambios = results.filter((r) => r.accion === 'SIN_CAMBIOS').length;
+    if (!simular) {
+      await this.prisma.scoped.userImportBatch.update({
+        where: { id: batch.id },
+        data: { status: 'COMPLETED', okRows: ok, failedRows: failed },
+      });
+      await this.audit.record({
+        tenantId,
+        userId: actor.id,
+        action: 'USERS_IMPORTED',
+        resourceType: 'user_import_batches',
+        resourceId: batch.id,
+        newValues: { filename, total: results.length, ok, failed, creadas, actualizadas, sinCambios },
+      });
+    }
 
-    return { batchId: batch.id, total: results.length, ok, failed, rows: results };
+    return {
+      batchId: batch.id,
+      simulacion: simular,
+      total: results.length,
+      ok,
+      failed,
+      creadas,
+      actualizadas,
+      sinCambios,
+      rows: results,
+    };
   }
 
   private async processRow(
@@ -301,27 +466,62 @@ export class UserImportService {
       serviceByCode: Map<string, string>;
       codigosUsados: { jobTitle: Set<string>; area: Set<string>; regional: Set<string>; service: Set<string> };
       existingDocs: Set<string>;
+      existentePorDoc: Map<string, PersonaExistente>;
+      /** Vista previa: se recorre todo pero no se escribe nada (`PENDIENTES` 5.4). */
+      simular: boolean;
       existingEmails: Set<string>;
       seenDocs: Set<string>;
       seenEmails: Set<string>;
     },
   ): Promise<RowResult> {
     const documento = values.documento ?? '';
-    const fail = (error: string): RowResult => ({ rowNumber, status: 'ERROR', documento, error });
+    /*
+      EL NOMBRE VIAJA CON EL ERROR (2026-09-21).
+
+      El informe del lote enseñaba solo la cedula, y con mil filas en rojo eso obliga a abrir el
+      archivo y buscar cada numero para saber de quien se trata. El nombre se toma del valor CRUDO y
+      no de la fila validada a proposito: cuando la validacion falla no hay fila validada, y es justo
+      cuando mas falta hace saber quien es.
+    */
+    const nombre = (values.nombre_completo ?? '').trim() || null;
+    const fail = (error: string): RowResult => ({ rowNumber, status: 'ERROR', documento, nombre, error });
 
     const parsed = importRowSchema.safeParse(values);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const columna = issue?.path.join('.') ?? 'fila';
-      return fail(`Columna "${columna}": ${issue?.message ?? 'valor invalido'}`);
+      return fail(mensajeDeColumna(columna, issue, values));
     }
     const row: ImportRowInput = parsed.data;
 
-    if (ctx.existingDocs.has(row.documento) || ctx.seenDocs.has(row.documento)) {
-      return fail('Documento ya existe (en el sistema o repetido en el archivo)');
+    /*
+      ─── EL MISMO DOCUMENTO DOS VECES: DEPENDE DE DONDE (2026-09-21) ───
+
+      Repetido DENTRO del archivo sigue siendo un error: dos filas de la misma persona en la misma
+      carga son un error de quien la armo, y adivinar cual de las dos manda seria inventarse una
+      respuesta que el archivo no da.
+
+      Pero que la persona YA ESTE en el sistema no es un error: es lo normal. Una empresa no carga su
+      plantilla una vez — la carga cada mes, con las altas, los cambios de cargo y los traslados de
+      area mezclados con los 900 que no cambiaron. Rechazar esas 900 con «ya existe» convertia el
+      archivo mensual en una lista de errores que hay que depurar a mano para encontrar las 12 filas
+      nuevas, y **los traslados no entraban nunca**.
+
+      Asi lo resuelven los LMS y los sistemas de nomina: la carga es un ESPEJO del maestro de
+      personal, con el documento como clave. Si la persona esta, se actualiza; si no, se crea.
+    */
+    if (ctx.seenDocs.has(row.documento)) {
+      return fail('Este documento viene dos veces en el mismo archivo. Deja una sola fila por persona.');
     }
-    if (ctx.existingEmails.has(row.correo) || ctx.seenEmails.has(row.correo)) {
-      return fail('Correo ya existe (en el sistema o repetido en el archivo)');
+    /*
+      El correo solo se comprueba si HAY correo (varias personas sin correo conviven sin chocar) y si
+      no es EL SUYO: al recargar el archivo mensual, cada persona trae su propio correo, y contarlo
+      como repetido rechazaria a media plantilla por traer el dato que ya tenia.
+    */
+    const yaEstaba = ctx.existentePorDoc.get(row.documento) ?? null;
+    const correoEsDeOtro = row.correo !== null && row.correo !== yaEstaba?.email;
+    if (row.correo && correoEsDeOtro && (ctx.existingEmails.has(row.correo) || ctx.seenEmails.has(row.correo))) {
+      return fail('Ese correo ya lo tiene otra persona, o viene repetido mas arriba en este mismo archivo.');
     }
     /*
       CARGO. Si no existe, se crea SOLO cuando la fila trae `tipo_cargo` y ese tipo ya esta
@@ -338,18 +538,18 @@ export class UserImportService {
       }
       const jobTitleTypeId = ctx.jobTitleTypeByCode.get(clave(row.tipo_cargo));
       if (!jobTitleTypeId) {
-        return fail(`Columna "tipo_cargo": "${row.tipo_cargo}" no esta en el catalogo de tipos de cargo`);
+        return fail(`El tipo de cargo "${row.tipo_cargo}" no existe. Los que hay son Administrativo, Operativo y Comercial; se crean en Configuracion → Tipos de cargo`);
       }
       try {
         const codigo = codigoDesdeNombre(row.cargo, ctx.codigosUsados.jobTitle);
-        const creado = await this.prisma.scoped.jobTitle.create({
+        const creado = ctx.simular ? { id: idSimulado(codigo) } : await this.prisma.scoped.jobTitle.create({
           select: { id: true },
           data: { tenantId: ctx.tenantId, code: codigo, name: row.cargo, jobTitleTypeId, active: true },
         });
         jobTitleId = creado.id;
         ctx.codigosUsados.jobTitle.add(codigo);
       } catch {
-        return fail(`No se pudo crear el cargo "${row.cargo}" (posible choque concurrente)`);
+        return fail(`No se pudo crear el cargo "${row.cargo}". Vuelve a intentarlo; si sigue pasando, crealo en Configuracion → Cargos`);
       }
       ctx.jobTitleByCode.set(clave(row.cargo), jobTitleId);
       cargoCreado = true;
@@ -366,7 +566,7 @@ export class UserImportService {
     if (!areaId) {
       try {
         const codigo = codigoDesdeNombre(row.area, ctx.codigosUsados.area);
-        const creado = await this.prisma.scoped.area.create({
+        const creado = ctx.simular ? { id: idSimulado(codigo) } : await this.prisma.scoped.area.create({
           select: { id: true },
           data: { tenantId: ctx.tenantId, code: codigo, name: row.area, active: true },
         });
@@ -375,7 +575,7 @@ export class UserImportService {
         ctx.areaByCode.set(clave(row.area), areaId);
         areaCreada = true;
       } catch {
-        return fail(`No se pudo crear el area "${row.area}" (posible choque concurrente)`);
+        return fail(`No se pudo crear el area "${row.area}". Vuelve a intentarlo; si sigue pasando, creala en Configuracion → Areas`);
       }
     }
 
@@ -401,7 +601,7 @@ export class UserImportService {
       } else {
         try {
           const codigo = codigoDesdeNombre(row.sub_area, ctx.codigosUsados.area);
-          const creada = await this.prisma.scoped.area.create({
+          const creada = ctx.simular ? { id: idSimulado(codigo) } : await this.prisma.scoped.area.create({
             select: { id: true },
             data: { tenantId: ctx.tenantId, code: codigo, name: row.sub_area, active: true, parentId: areaId },
           });
@@ -410,7 +610,7 @@ export class UserImportService {
           areaId = creada.id;
           subAreaCreada = true;
         } catch {
-          return fail(`No se pudo crear la sub-area "${row.sub_area}" (posible choque concurrente)`);
+          return fail(`No se pudo crear la sub-area "${row.sub_area}". Vuelve a intentarlo; si sigue pasando, creala en Configuracion → Areas`);
         }
       }
     }
@@ -420,7 +620,7 @@ export class UserImportService {
     if (row.regional && !regionalId) {
       try {
         const codigo = codigoDesdeNombre(row.regional, ctx.codigosUsados.regional);
-        const creado = await this.prisma.scoped.regional.create({
+        const creado = ctx.simular ? { id: idSimulado(codigo) } : await this.prisma.scoped.regional.create({
           select: { id: true },
           data: { tenantId: ctx.tenantId, code: codigo, name: row.regional, active: true },
         });
@@ -429,7 +629,7 @@ export class UserImportService {
         ctx.regionalByCode.set(clave(row.regional), regionalId);
         regionalCreada = true;
       } catch {
-        return fail(`No se pudo crear la regional "${row.regional}" (posible choque concurrente)`);
+        return fail(`No se pudo crear la regional "${row.regional}". Vuelve a intentarlo; si sigue pasando, creala en Configuracion → Regionales`);
       }
     }
 
@@ -438,7 +638,7 @@ export class UserImportService {
     if (row.servicio && !serviceId) {
       try {
         const codigo = codigoDesdeNombre(row.servicio, ctx.codigosUsados.service);
-        const creado = await this.prisma.scoped.service.create({
+        const creado = ctx.simular ? { id: idSimulado(codigo) } : await this.prisma.scoped.service.create({
           select: { id: true },
           data: { tenantId: ctx.tenantId, code: codigo, name: row.servicio, active: true },
         });
@@ -447,7 +647,7 @@ export class UserImportService {
         ctx.serviceByCode.set(clave(row.servicio), serviceId);
         serviceCreado = true;
       } catch {
-        return fail(`No se pudo crear el servicio "${row.servicio}" (posible choque concurrente)`);
+        return fail(`No se pudo crear el servicio "${row.servicio}". Vuelve a intentarlo; si sigue pasando, crealo en Configuracion → Servicios`);
       }
     }
 
@@ -460,7 +660,48 @@ export class UserImportService {
     ].filter((v): v is string => v !== null);
     const avisoCatalogo = creados.length > 0 ? `Se creo en el catalogo: ${creados.join(', ')}.` : undefined;
 
+    /*
+      ─── SI YA ESTABA, SE ACTUALIZA (2026-09-21) ───
+
+      Las tres reglas, y cada una evita un desastre distinto:
+
+      1. **Una celda VACIA no borra nada.** Vacia significa «este archivo no lo dice», no «quitaselo».
+         Lo contrario convertiria un archivo con menos columnas —o una plantilla vieja— en un borrado
+         masivo de telefonos, regionales y fechas de ingreso. Para quitar un dato esta la ficha.
+      2. **No se toca nada que no venga en el archivo:** ni la contraseña, ni el ROL, ni si esta
+         activa, ni las politicas que firmo. Un maestro de personal dice donde trabaja alguien, no
+         que permisos tiene en la plataforma — y un archivo de RR. HH. no puede ascender a nadie a
+         administrador ni reactivar a quien se fue.
+      3. **Se dice QUE cambio, campo por campo.** «180 actualizadas» no vale: quien sube el archivo
+         necesita ver que a Fulano le cambio el area, porque **eso le mueve las obligaciones** —el
+         motor retira las de la audiencia que deja y crea las de la nueva—. Un cambio de area que
+         pasa en silencio es el que nadie revisa.
+    */
+    if (yaEstaba) {
+      return this.actualizarPersona(rowNumber, row, yaEstaba, ctx, {
+        jobTitleId,
+        areaId,
+        regionalId,
+        serviceId,
+        avisoCatalogo,
+        nombre,
+      });
+    }
+
     const generatedPassword = generateInitialPassword(row.documento);
+
+    /*
+      EN VISTA PREVIA SE PARA AQUI. Ya se sabe todo lo que hacia falta saber —que la fila es valida y
+      que esta persona NACERIA— y escribirla seria justo lo que la simulacion existe para no hacer.
+      No se devuelve contraseña: la de verdad se genera el dia que se aplique, y enseñar una que no
+      va a servir es peor que no enseñar ninguna.
+    */
+    if (ctx.simular) {
+      ctx.seenDocs.add(row.documento);
+      if (row.correo) ctx.seenEmails.add(row.correo);
+      return { rowNumber, status: 'OK', documento: row.documento, nombre, accion: 'CREADA', note: avisoCatalogo };
+    }
+
     let created: { id: string };
     try {
       created = await this.prisma.scoped.user.create({
@@ -486,12 +727,165 @@ export class UserImportService {
         },
       });
     } catch {
-      return fail('Error al crear el usuario (posible duplicado concurrente)');
+      return fail('No se pudo guardar a esta persona. Revisa que su documento y su correo no esten ya en el sistema.');
     }
 
     ctx.seenDocs.add(row.documento);
-    ctx.seenEmails.add(row.correo);
-    return { rowNumber, status: 'OK', documento: row.documento, note: avisoCatalogo, generatedPassword, userId: created.id };
+    if (row.correo) ctx.seenEmails.add(row.correo);
+    return {
+      rowNumber,
+      status: 'OK',
+      documento: row.documento,
+      nombre,
+      accion: 'CREADA',
+      note: avisoCatalogo,
+      generatedPassword,
+      userId: created.id,
+    };
+  }
+
+  /**
+   * ACTUALIZA A QUIEN YA ESTABA, y solo con lo que el archivo dice de verdad.
+   *
+   * No devuelve contraseña: esa persona ya tiene la suya y regenerarla la dejaria fuera de la
+   * plataforma en la siguiente carga mensual, sin que nadie lo hubiera pedido.
+   */
+  private async actualizarPersona(
+    rowNumber: number,
+    row: ImportRowInput,
+    antes: PersonaExistente,
+    ctx: { actorId: string; tenantId: string; simular: boolean; seenDocs: Set<string>; seenEmails: Set<string> },
+    resuelto: {
+      jobTitleId: string;
+      areaId: string;
+      regionalId: string | null;
+      serviceId: string | null;
+      avisoCatalogo?: string;
+      nombre: string | null;
+    },
+  ): Promise<RowResult> {
+    const hiredAt = row.fecha_ingreso ? new Date(`${row.fecha_ingreso}T00:00:00-05:00`) : null;
+
+    /*
+      Cada entrada dice: como se llama el campo, que hay ahora, que trae el archivo y si el archivo
+      lo dice. `dice: false` es una celda vacia, y entonces NO se toca — ver la regla 1 de arriba.
+    */
+    const campos: Array<{ rotulo: string; igual: boolean; dice: boolean; data: Record<string, unknown> }> = [
+      {
+        rotulo: 'nombre',
+        dice: true,
+        igual: antes.fullName === row.nombre_completo,
+        data: { fullName: row.nombre_completo },
+      },
+      {
+        rotulo: 'correo',
+        dice: row.correo !== null,
+        igual: antes.email === row.correo,
+        data: { email: row.correo },
+      },
+      {
+        rotulo: 'teléfono',
+        dice: Boolean(row.telefono),
+        igual: antes.phone === (row.telefono || null),
+        data: { phone: row.telefono || null },
+      },
+      { rotulo: 'cargo', dice: true, igual: antes.jobTitleId === resuelto.jobTitleId, data: { jobTitleId: resuelto.jobTitleId } },
+      { rotulo: 'área', dice: true, igual: antes.areaId === resuelto.areaId, data: { areaId: resuelto.areaId } },
+      {
+        rotulo: 'regional',
+        dice: resuelto.regionalId !== null,
+        igual: antes.regionalId === resuelto.regionalId,
+        data: { regionalId: resuelto.regionalId },
+      },
+      {
+        rotulo: 'servicio',
+        dice: resuelto.serviceId !== null,
+        igual: antes.serviceId === resuelto.serviceId,
+        data: { serviceId: resuelto.serviceId },
+      },
+      {
+        rotulo: 'fecha de ingreso',
+        dice: hiredAt !== null,
+        igual: antes.hiredAt?.getTime() === hiredAt?.getTime(),
+        data: { hiredAt },
+      },
+      {
+        rotulo: 'vinculación',
+        dice: Boolean(row.vinculacion),
+        igual: antes.employmentType === (row.vinculacion || 'DIRECTO'),
+        data: { employmentType: row.vinculacion || 'DIRECTO' },
+      },
+    ];
+
+    const cambios = campos.filter((campo) => campo.dice && !campo.igual);
+    ctx.seenDocs.add(row.documento);
+    if (row.correo) ctx.seenEmails.add(row.correo);
+
+    if (cambios.length === 0) {
+      // Nueve de cada diez filas del archivo mensual. No se escribe nada: sin esto, cada carga
+      // dejaria mil filas de auditoria diciendo que no cambio nada.
+      return {
+        rowNumber,
+        status: 'OK',
+        documento: row.documento,
+        nombre: resuelto.nombre,
+        accion: 'SIN_CAMBIOS',
+        note: resuelto.avisoCatalogo,
+        userId: antes.id,
+      };
+    }
+
+    const lista = cambios.map((campo) => campo.rotulo).join(', ');
+
+    /*
+      EN VISTA PREVIA SE PARA AQUI, y este es el caso que justifica toda la funcion: la lista de
+      campos ya esta calculada, asi que la pantalla puede decir «a esta persona le cambiaria el
+      correo y el area» ANTES de que pase. Es la unica defensa real contra subir el archivo
+      equivocado y pisar una correccion hecha a mano.
+    */
+    if (ctx.simular) {
+      return {
+        rowNumber,
+        status: 'OK',
+        documento: row.documento,
+        nombre: resuelto.nombre,
+        accion: 'ACTUALIZADA',
+        note: [`Cambiaría: ${lista}.`, resuelto.avisoCatalogo].filter(Boolean).join(' '),
+        userId: antes.id,
+      };
+    }
+
+    const data = Object.assign({}, ...cambios.map((campo) => campo.data)) as Record<string, unknown>;
+    try {
+      await this.prisma.scoped.user.update({ where: { id: antes.id }, data });
+    } catch {
+      return {
+        rowNumber,
+        status: 'ERROR',
+        documento: row.documento,
+        nombre: resuelto.nombre,
+        error: 'No se pudo actualizar a esta persona. Revisa que su correo no lo tenga ya otra.',
+      };
+    }
+
+    await this.audit.record({
+      tenantId: ctx.tenantId,
+      userId: ctx.actorId,
+      action: 'USER_UPDATED_BY_IMPORT',
+      resourceType: 'users',
+      resourceId: antes.id,
+      newValues: { documento: row.documento, campos: cambios.map((c) => c.rotulo) },
+    });
+
+    return {
+      rowNumber,
+      status: 'OK',
+      documento: row.documento,
+      nombre: resuelto.nombre,
+      accion: 'ACTUALIZADA',
+      note: [`Se actualizó: ${lista}.`, resuelto.avisoCatalogo].filter(Boolean).join(' '),
+      userId: antes.id,
+    };
   }
 
   /** Acepta .csv (separador ; o ,) y .xlsx. Devuelve filas crudas con su numero (1-based sin encabezado). */

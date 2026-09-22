@@ -102,12 +102,27 @@ export class ReviewDigestService {
       where: { id: { in: destinatarios.map(([userId]) => userId) }, active: true, deletedAt: null },
       select: { id: true, email: true },
     });
+    /*
+      SE MIRA SI LA PERSONA SIGUE VIVA, NO SI TIENE CORREO (corregido el 2026-09-21).
+
+      Esto era `if (!correo) return null`, con el comentario «dio de baja o quedo inactivo entre la
+      consulta y el envio» — y funcionaba porque el correo era obligatorio: no tenerlo solo podia
+      significar que la persona ya no estaba.
+
+      Desde que el correo puede ser NULO —hay gente que no tiene— esa misma linea habria dejado sin
+      su aviso a toda esa gente **en la bandeja**, que es el unico canal de este aviso (`IN_APP`) y
+      no necesita correo para nada. Habria sido un fallo perfectamente silencioso: nadie reclama un
+      aviso que no sabe que existe.
+
+      Ahora la condicion dice lo que siempre quiso decir: ¿sigue esta persona activa?
+    */
+    const activos = new Set(gente.map((persona) => persona.id));
     const correoPorUsuario = new Map(gente.map((persona) => [persona.id, persona.email]));
 
     const avisos = destinatarios
       .map(([userId, preguntas]) => {
-        const correo = correoPorUsuario.get(userId);
-        if (!correo) return null; // dio de baja o quedo inactivo entre la consulta y el envio
+        if (!activos.has(userId)) return null; // dio de baja o quedo inactivo entre la consulta y el envio
+        const correo = correoPorUsuario.get(userId) ?? null;
         const aviso = redactarAvisoDeRepaso(resumirParaElAvisoDeRepaso(preguntas), reviewDigestMinDue);
         if (!aviso) return null;
         return {

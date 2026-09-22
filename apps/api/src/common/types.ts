@@ -8,7 +8,8 @@ export interface JwtPayload {
   sub: string;
   tenantId: string;
   roleId: string;
-  email: string;
+  /** `null` = esta persona no tiene correo. Entra con su cedula (ver `users.email` en el esquema). */
+  email: string | null;
 }
 
 /** Usuario autenticado adjunto a la request por JwtStrategy. */
@@ -16,7 +17,8 @@ export interface AuthUser {
   id: string;
   tenantId: string;
   roleId: string;
-  email: string;
+  /** `null` = esta persona no tiene correo. Entra con su cedula (ver `users.email` en el esquema). */
+  email: string | null;
   permissions: Set<PermissionCode>;
   hasPermission: (code: PermissionCode) => boolean;
   /** Procesos que puede ver. `null` = todos (ver common/analyst-scope.ts). */

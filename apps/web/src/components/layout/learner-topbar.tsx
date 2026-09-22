@@ -217,7 +217,8 @@ function UserMenu({
   avatarKey,
 }: {
   fullName: string;
-  email: string;
+  /** `null` = no tiene correo. Entra con su cedula, y aqui se dice en vez de dejar un hueco. */
+  email: string | null;
   jobTitle: string | null;
   avatarKey: string | null;
 }) {
@@ -276,7 +277,7 @@ function UserMenu({
         <div className="animate-card-in absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-surface shadow-card-hover">
           <div className="border-b border-line px-4 py-3">
             <p className="truncate font-display text-sm font-semibold text-ink-900">{fullName}</p>
-            <p className="truncate text-xs text-ink-500">{email}</p>
+            <p className="truncate text-xs text-ink-500">{email ?? 'Sin correo registrado'}</p>
           </div>
           <Link
             href="/perfil"

@@ -10,7 +10,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export interface AuthUserView {
   id: string;
   fullName: string;
-  email: string;
+  /** `null` = sin correo: esa persona entra con su cedula. */
+  email: string | null;
   mustChangePassword: boolean;
   activated: boolean;
 }
@@ -388,7 +389,8 @@ export class AuthService {
   private toView(user: {
     id: string;
     fullName: string;
-    email: string;
+    /** `null` = sin correo. Esa persona entra con su cedula (Decision #10). */
+    email: string | null;
     mustChangePassword: boolean;
     habeasDataConsentAt: Date | null;
     esignAgreementAt: Date | null;

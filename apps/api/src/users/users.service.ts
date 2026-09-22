@@ -120,7 +120,7 @@ export class UsersService {
    */
   async create(actor: AuthUser, input: CreateUserInput) {
     const tenantId = this.prisma.currentTenantId;
-    await this.assertUnique(input.documentNumber, input.email);
+    await this.assertUnique(input.documentNumber, input.email ?? null);
 
     const role = await this.prisma.scoped.role.findFirst({ where: { code: input.roleCode } });
     if (!role) throw new NotFoundException({ code: 'ROLE_NOT_FOUND' });

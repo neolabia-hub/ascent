@@ -177,7 +177,8 @@ export interface UserRow {
   documentNumber: string;
   fullName: string;
   phone: string | null;
-  email: string;
+  /** `null` = esta persona no tiene correo. Entra con su cedula (Decision #10). */
+  email: string | null;
   emailKind: 'PERSONAL' | 'CORPORATE';
   mustChangePassword: boolean;
   hiredAt: string | null;
@@ -208,7 +209,8 @@ export interface CreateUserBody {
   documentNumber: string;
   fullName: string;
   phone?: string | null;
-  email: string;
+  /** Opcional: hay gente sin correo. Vacio o `null` se guarda como «sin correo». */
+  email?: string | null;
   emailKind?: 'PERSONAL' | 'CORPORATE';
   jobTitleId: string;
   areaId: string;
@@ -252,26 +254,42 @@ export interface ImportRowResult {
   rowNumber: number;
   status: 'OK' | 'ERROR';
   documento: string;
+  /** El nombre tal como venia en el archivo, para saber de quien es el error sin abrirlo. */
+  nombre?: string | null;
   error?: string;
   note?: string;
+  /** Que se hizo con esta fila. Ausente en las filas con error. */
+  accion?: 'CREADA' | 'ACTUALIZADA' | 'SIN_CAMBIOS';
   generatedPassword?: string;
 }
 
 export interface ImportResult {
   batchId: string;
+  /** `true` = vista previa: no se escribió nada todavía (`PENDIENTES` 5.4). */
+  simulacion?: boolean;
   total: number;
   ok: number;
   failed: number;
+  /** Desglose del `ok`: desde que una recarga actualiza, «180 bien» ya no quiere decir «180 altas». */
+  creadas: number;
+  actualizadas: number;
+  sinCambios: number;
   rows: ImportRowResult[];
 }
 
-/** Importacion masiva: multipart, fuera de apiFetch (JSON). */
-export async function importUsers(file: File): Promise<ImportResult> {
+/**
+ * Importacion masiva: multipart, fuera de apiFetch (JSON).
+ *
+ * `simular` recorre el mismo camino sin escribir nada y devuelve lo que PASARIA (`PENDIENTES` 5.4).
+ * Es la misma funcion y no dos porque la respuesta tiene la misma forma: si fueran dos, una podria
+ * dejar de parecerse a la otra y la vista previa mentiria.
+ */
+export async function importUsers(file: File, simular = false): Promise<ImportResult> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
   const form = new FormData();
   form.append('file', file);
   const token = getAccessToken();
-  const response = await fetch(`${apiUrl}/v1/users/import`, {
+  const response = await fetch(`${apiUrl}/v1/users/import${simular ? '/simular' : ''}`, {
     method: 'POST',
     credentials: 'include',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,

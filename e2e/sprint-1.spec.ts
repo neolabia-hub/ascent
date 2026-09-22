@@ -107,10 +107,26 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     });
 
     const drawer = page.getByRole('dialog').filter({ hasText: 'Importar personas' });
+
+    /*
+      DOS PASOS DESDE EL 2026-09-21 (`PENDIENTES` 5.4): subir ENSEÑA lo que pasaria, y se aplica
+      despues. Antes escribia de una, y desde que una recarga ACTUALIZA a quien ya esta, eso permitia
+      pisar en silencio una correccion hecha a mano.
+
+      Se comprueban los DOS momentos y no solo el final, porque lo que hay que garantizar es
+      justamente que el primero no aplica: mirando solo el resultado, una vista previa rota que
+      escribiera de una pasaria esta prueba igual.
+    */
+    await expect(drawer.getByText('2 SE CREARÍAN')).toBeVisible({ timeout: 30_000 });
+    await expect(drawer.getByText('1 CON ERROR')).toBeVisible();
+    await expect(drawer).toContainText('Todavía no se ha guardado nada');
+    // El reporte dice QUE fila fallo y por que (requisito de usabilidad del sprint), y en ESPAÑOL.
+    await expect(drawer).toContainText('correo');
+    await expect(drawer).not.toContainText('must contain');
+
+    await drawer.getByRole('button', { name: /^Aplicar/ }).click();
     await expect(drawer.getByText('2 CREADAS')).toBeVisible({ timeout: 30_000 });
     await expect(drawer.getByText('1 CON ERROR')).toBeVisible();
-    // El reporte dice QUE fila fallo y por que (requisito de usabilidad del sprint).
-    await expect(drawer).toContainText('correo');
   });
 
   test('preferencias: la nota minima del tenant se guarda y persiste', async ({ page }) => {
