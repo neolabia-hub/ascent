@@ -29,6 +29,9 @@ import {
   deleteActivity,
   getVersion,
   publishVersion,
+  enviarARevision,
+  aprobarRevision,
+  devolverRevision,
   removeContent,
   reorderContents,
   updateVersionSettings,
@@ -176,6 +179,9 @@ export default function ActividadDetallePage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<VersionContent | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  /** Devolver exige motivo, asi que va en dialogo y no en un boton suelto (2026-09-22). */
+  const [devolverOpen, setDevolverOpen] = useState(false);
+  const [motivoDevolucion, setMotivoDevolucion] = useState('');
   /** Confirmacion de borrado: eliminar una formacion no puede ser un clic suelto. */
   const [borrarOpen, setBorrarOpen] = useState(false);
   const [migrationPolicy, setMigrationPolicy] = useState<MigrationPolicy>('MOVE_NOT_STARTED');
@@ -234,6 +240,8 @@ export default function ActividadDetallePage() {
    */
   const selectedSummary = activity?.versions.find((row) => row.id === selectedVersionId) ?? null;
   const isDraft = selectedSummary?.status === 'DRAFT';
+  /** En que punto del traspaso esta este borrador (2026-09-22). Ver `revision.service.ts`. */
+  const revision = selectedSummary?.reviewStatus ?? 'SIN_ENVIAR';
   /** Publicar esto la exige sola a toda la empresa: hay que decirlo ANTES. */
   const seExigiraSola =
     activity !== null && quienDecide(readTypeConfig(activity.activityType.config)) === 'TODOS';
@@ -326,6 +334,70 @@ export default function ActividadDetallePage() {
             : undefined,
       });
       setBorrarOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /*
+    LAS TRES DEL TRASPASO (2026-09-22). Comparten forma a proposito: hacen la llamada, recargan y
+    dicen en el aviso QUE pasa ahora — no «listo», que no informa de nada.
+  */
+  const doEnviarARevision = async () => {
+    if (!version) return;
+    setBusy(true);
+    try {
+      await enviarARevision(version.id);
+      await loadActivity();
+      await refreshVersion();
+      showToast({
+        kind: 'success',
+        title: 'Enviada a revisión',
+        description: 'Quien administra el catálogo ya fue avisado. Mientras la revisa no se puede editar.',
+      });
+    } catch (error) {
+      // El motivo del servidor manda: dice QUE falta («Bienvenida no tiene su material asignado»).
+      showToast({ kind: 'danger', title: 'No se pudo enviar', description: motivoDelError(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doAprobar = async () => {
+    if (!version) return;
+    setBusy(true);
+    try {
+      await aprobarRevision(version.id);
+      await loadActivity();
+      await refreshVersion();
+      showToast({
+        kind: 'success',
+        title: 'Aprobada',
+        description: 'Quien la hizo ya fue avisado. Publicar sigue siendo un paso aparte.',
+      });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo aprobar', description: motivoDelError(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDevolver = async () => {
+    if (!version) return;
+    setBusy(true);
+    try {
+      await devolverRevision(version.id, motivoDevolucion.trim());
+      setDevolverOpen(false);
+      setMotivoDevolucion('');
+      await loadActivity();
+      await refreshVersion();
+      showToast({
+        kind: 'success',
+        title: 'Devuelta para corregir',
+        description: 'Quien la hizo recibió el motivo y ya puede editarla.',
+      });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo devolver', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -481,6 +553,17 @@ export default function ActividadDetallePage() {
               kind={publishedVersion ? 'ok' : 'warn'}
               label={publishedVersion ? `PUBLICADA v${publishedVersion.versionNumber}` : 'EN BORRADOR'}
             />
+            {/*
+              Y EN QUE PUNTO DEL TRASPASO VA (2026-09-22). Solo cuando hay algo que decir: «sin
+              enviar» es el estado normal de un borrador y anunciarlo seria ruido en la unica linea
+              que se lee entera.
+            */}
+            {isDraft && revision !== 'SIN_ENVIAR' ? (
+              <StatusPill
+                kind={revision === 'EN_REVISION' ? 'info' : revision === 'APROBADA' ? 'ok' : 'warn'}
+                label={revision === 'EN_REVISION' ? 'EN REVISIÓN' : revision === 'APROBADA' ? 'APROBADA' : 'DEVUELTA'}
+              />
+            ) : null}
           </div>
           <p className="mt-1 font-mono text-xs text-ink-500">
             {activity.code} · {activity.process.name}
@@ -527,9 +610,42 @@ export default function ActividadDetallePage() {
             // verde entre botones neutros no se lee como "el siguiente paso", se lee como otra cosa.
             // El verde de esta empresa se queda para los si/no de la ficha, que es donde el color SI
             // significa algo. Decision #166, retirada.
-            <Button onClick={() => setPublishOpen(true)}>
-              {canPublish ? 'Publicar cambios' : 'Enviar a aprobación'}
-            </Button>
+            /*
+              ─── Y EL TRASPASO, DESDE EL 2026-09-22 ───
+
+              Aqui habia UN boton que decia «Enviar a aprobación» a quien no podia publicar.
+              Funcionaba —creaba la solicitud— pero no era un traspaso: quien la escribia no sabia
+              en que punto estaba lo suyo, y quien revisaba no distinguia «este termino su trabajo»
+              de «este quiere saltarse una regla».
+
+              Ahora la barra ofrece SOLO lo que le toca a quien mira, y el estado se ve ademas en
+              una pastilla junto al nombre:
+
+                quien escribe   Enviar a revisión  ·  «Esperando revisión» mientras esta fuera
+                quien publica   Devolver · Aprobar  ·  Publicar cambios
+            */
+            revision === 'EN_REVISION' ? (
+              canPublish ? (
+                <>
+                  <Button variant="outline" onClick={() => setDevolverOpen(true)} disabled={busy}>
+                    Devolver
+                  </Button>
+                  <Button onClick={() => void doAprobar()} loading={busy}>
+                    Aprobar
+                  </Button>
+                </>
+              ) : (
+                <span className="text-sm text-info">Esperando revisión</span>
+              )
+            ) : canPublish ? (
+              <Button onClick={() => setPublishOpen(true)}>Publicar cambios</Button>
+            ) : revision === 'APROBADA' ? (
+              <span className="text-sm text-ok">Aprobada · pendiente de publicar</span>
+            ) : (
+              <Button onClick={() => void doEnviarARevision()} loading={busy}>
+                Enviar a revisión
+              </Button>
+            )
           ) : null}
           <Button variant="ghost" className="text-danger" onClick={() => setBorrarOpen(true)} disabled={busy}>
             <Trash2 size={16} />
@@ -843,6 +959,46 @@ export default function ActividadDetallePage() {
         onOpenChange={(open) => { if (!open) setEditing(null); }}
         onSaved={refreshVersion}
       />
+
+      {/*
+        DEVOLVER PIDE MOTIVO, y por eso es un cajon y no un boton suelto (2026-09-22).
+
+        Devolver sin decir por que convierte la revision en un muro: quien la escribio vuelve a
+        mandarla igual, o adivina. El servidor lo exige tambien —no es solo la pantalla— y el minimo
+        es el mismo criterio que la convalidacion de un papel ajeno.
+      */}
+      <Drawer
+        open={devolverOpen}
+        onOpenChange={setDevolverOpen}
+        title="Devolver para corregir"
+        description="Quien la hizo recibe este texto y podrá volver a editarla."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setDevolverOpen(false)} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void doDevolver()} loading={busy} disabled={motivoDevolucion.trim().length < 15}>
+              Devolver
+            </Button>
+          </div>
+        }
+      >
+        <Field
+          htmlFor="motivo-devolucion"
+          label="Qué hay que corregir"
+          required
+          hint="Concreto: qué falta o qué está mal. Es lo único que va a leer quien la arregle."
+        >
+          <Textarea
+            id="motivo-devolucion"
+            rows={4}
+            value={motivoDevolucion}
+            onChange={(event) => setMotivoDevolucion(event.target.value)}
+            maxLength={2000}
+            placeholder="Falta la evaluación final, y el vídeo de la lección 2 no abre."
+          />
+        </Field>
+      </Drawer>
 
       <Drawer
         open={publishOpen}

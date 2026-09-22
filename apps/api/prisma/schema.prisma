@@ -70,6 +70,27 @@ enum VersionStatus {
   RETIRED
 }
 
+/// EN QUE PUNTO DE LA REVISION ESTA UN BORRADOR (2026-09-22).
+///
+/// Es un sub-estado de `DRAFT`, no un estado paralelo: una version PUBLICADA ya no se revisa, y
+/// una RETIRADA tampoco. Existe porque el analista puede crear y no publicar —eso ya estaba— pero
+/// **no habia forma de decir «termine, revisalo»**: el administrador tenia que adivinar que mirar
+/// y cuando, y al aprobar el plan estaria aprobando a ciegas formaciones que nunca reviso.
+///
+/// La compuerta no es esto: el analista sigue sin poder publicar. Esto es el TRASPASO, que es otra
+/// cosa y es la que faltaba.
+///
+///   SIN_ENVIAR   se esta trabajando. Es el estado de siempre, y el defecto.
+///   EN_REVISION  el analista la dio por terminada. NO se puede editar mientras tanto.
+///   APROBADA     el administrador la reviso y esta conforme. Ya se puede publicar.
+///   DEVUELTA     el administrador pidio cambios, con motivo escrito. Vuelve a ser editable.
+enum ReviewStatus {
+  SIN_ENVIAR
+  EN_REVISION
+  APROBADA
+  DEVUELTA
+}
+
 // Que pasa con los inscritos al publicar la version N+1 (Decision #6 / regla de oro 4).
 enum MigrationPolicy {
   FINISH_OLD
@@ -620,6 +641,8 @@ model Role {
 
   permissions RolePermission[]
   users       User[]
+  /// Los tipos de formacion que este rol puede tocar. Sin filas = todos (2026-09-22).
+  activityTypeScopes RoleActivityTypeScope[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -677,9 +700,46 @@ model AnalystScope {
   process   Process? @relation(fields: [processId], references: [id])
   areaId    String?  @map("area_id") @db.Uuid
   area      Area?    @relation(fields: [areaId], references: [id])
+  /// QUE TIPOS DE FORMACION puede tocar esta persona (2026-09-22).
+  ///
+  /// Tercera dimension del mismo alcance, y por eso vive aqui y no en una tabla nueva: el criterio
+  /// que ya rige a las otras dos —**sin filas de esa dimension, no se acota**— es el que hace falta,
+  /// y repetirlo en otra tabla es repetir la trampa de leerlo mal en uno de los dos sitios.
+  ///
+  /// Lo pidio el cliente: *"el rol analista solo debe poder crear tipo plan"*. Pero no se cablea
+  /// «PLAN»: se configura, por rol y por persona, desde la pantalla de Permisos — porque la
+  /// siguiente empresa querra otra cosa y el tipo lo crea el propio tenant.
+  activityTypeId String?       @map("activity_type_id") @db.Uuid
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id])
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("analyst_scopes")
+}
+
+/// QUE TIPOS DE FORMACION PUEDE TOCAR UN ROL (2026-09-22).
+///
+/// El techo por defecto de todos los que tengan ese rol. **Sin filas, el rol no esta acotado**:
+/// puede con todos los tipos, que es como se comportaba el sistema hasta hoy — asi que no crear
+/// ninguna fila deja todo exactamente igual que antes.
+///
+/// ─── QUIEN GANA SI LOS DOS DICEN ALGO ───
+///
+/// **La persona manda sobre su rol.** Si a alguien se le marcaron tipos, valen los suyos —aunque
+/// sean mas que los de su rol—; si no se le marco ninguno, hereda los del rol. Es exactamente como
+/// ya funcionan los permisos sueltos (`UserPermissionOverride`): lo individual pisa lo del rol, y
+/// tener dos reglas de precedencia distintas en el mismo producto seria la forma mas corta de que
+/// alguien configure una creyendo la otra.
+model RoleActivityTypeScope {
+  roleId         String       @map("role_id") @db.Uuid
+  role           Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  activityTypeId String       @map("activity_type_id") @db.Uuid
+  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  tenantId       String       @map("tenant_id") @db.Uuid
+  setBy          String       @map("set_by") @db.Uuid
+  setAt          DateTime     @default(now()) @map("set_at")
+
+  @@id([roleId, activityTypeId])
+  @@map("role_activity_type_scopes")
 }
 
 model UserImportBatch {
@@ -733,6 +793,9 @@ model ActivityType {
   config       Json    @default("{}")
 
   activities Activity[]
+  /// Alcance por tipo: que roles y que personas pueden tocar formaciones de este tipo.
+  roleScopes    RoleActivityTypeScope[]
+  analystScopes AnalystScope[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -885,6 +948,19 @@ model ActivityVersion {
   status        VersionStatus @default(DRAFT)
   publishedAt   DateTime?     @map("published_at")
   publishedBy   String?       @map("published_by") @db.Uuid
+
+  /// EL TRASPASO ENTRE QUIEN LA HACE Y QUIEN LA APRUEBA (2026-09-22). Ver `ReviewStatus`.
+  ///
+  /// Se guarda QUIEN la envio y QUIEN decidio, no solo el estado: cuando el administrador devuelve
+  /// una formacion, el aviso tiene que llegarle a la persona que la mando, no «al analista» en
+  /// abstracto — puede haber varios, y el que la escribio es el que sabe que corregir.
+  reviewStatus  ReviewStatus  @default(SIN_ENVIAR) @map("review_status")
+  submittedBy   String?       @map("submitted_by") @db.Uuid
+  submittedAt   DateTime?     @map("submitted_at")
+  reviewedBy    String?       @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?     @map("reviewed_at")
+  /// El motivo al DEVOLVER. Se conserva tras aprobar: es el historial de que se pidio cambiar.
+  reviewNote    String?       @map("review_note")
 
   // SNAPSHOT resuelto de la cascada (tenant -> actividad) al publicar (Decision #27).
   // Incluye QUIEN RESPONDIA por la formacion cuando se publico (Decision #64): la constancia y el

@@ -27,7 +27,9 @@ const ACTIVITY_LIST_SELECT = {
   process: { select: { id: true, code: true, name: true } },
   currentVersionId: true,
   versions: {
-    select: { id: true, versionNumber: true, status: true, publishedAt: true },
+    // `reviewStatus`: la pastilla «En revision» se ve ya en el listado, que es donde el
+    // administrador mira primero cuando le avisan de que hay algo esperando (2026-09-22).
+    select: { id: true, versionNumber: true, status: true, publishedAt: true, reviewStatus: true },
     orderBy: { versionNumber: 'desc' as const },
   },
 } satisfies Prisma.ActivitySelect;
@@ -86,6 +88,14 @@ export class ActivitiesService {
             versionNumber: true,
             status: true,
             publishedAt: true,
+            // El traspaso entero (2026-09-22): en que punto esta, quien la mando, quien decidio y
+            // por que. La ficha tiene que poder decirlo sin una segunda peticion.
+            reviewStatus: true,
+            submittedBy: true,
+            submittedAt: true,
+            reviewedBy: true,
+            reviewedAt: true,
+            reviewNote: true,
             passingScore: true,
             maxAttempts: true,
             estimatedMinutes: true,

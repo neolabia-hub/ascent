@@ -107,6 +107,7 @@ export {
   updateVersionSettingsSchema,
   migrationPolicySchema,
   publishVersionSchema,
+  devolverRevisionSchema,
 } from './schemas/activities.js';
 export type {
   CreateActivityInput,
@@ -116,6 +117,7 @@ export type {
   UpdateContentInput,
   UpdateVersionSettingsInput,
   PublishVersionInput,
+  DevolverRevisionInput,
 } from './schemas/activities.js';
 
 export {

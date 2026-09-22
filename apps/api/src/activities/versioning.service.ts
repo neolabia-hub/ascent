@@ -197,13 +197,20 @@ export class VersioningService {
    *  - congela el temario (para constancias) y los ajustes academicos,
    *  - retira la version publicada anterior y apunta la actividad a la nueva.
    */
-  async publish(actor: AuthUser, versionId: string, input: PublishVersionInput) {
-    const tenantId = this.prisma.currentTenantId;
-    const draft = await this.assertDraft(versionId);
+  /**
+   * ¿ESTA VERSION ESTA LISTA PARA SALIR? Las tres compuertas, sin escribir nada (2026-09-22).
+   *
+   * Vive aparte porque ahora la usan DOS caminos: publicar, y **enviar a revision** —el analista
+   * que termina su formacion y se la pasa al administrador—. Tienen que ser exactamente las mismas
+   * comprobaciones: si «enviar a revision» fuera mas permisivo, el administrador recibiria
+   * formaciones que no se pueden publicar y lo descubriria al intentarlo, con quien las mando ya
+   * en otra cosa.
+   */
+  async comprobarQueEstaLista(versionId: string) {
+    // `paraEditar: false`: comprobar no edita, y publicar una que esta en revision es aprobarla.
+    const draft = await this.assertDraft(versionId, { paraEditar: false });
 
-    // `let` y no `const`: al publicar puede engancharse la encuesta del tipo, y el temario y el
-    // congelado de mas abajo tienen que verla (Decision #116).
-    let contents = await this.prisma.scoped.activityContent.findMany({
+    const contents = await this.prisma.scoped.activityContent.findMany({
       where: { activityVersionId: draft.id },
       orderBy: { displayOrder: 'asc' },
     });
@@ -218,6 +225,32 @@ export class VersioningService {
         items: incomplete.map((c) => ({ id: c.id, title: c.title, type: c.type })),
       });
     }
+
+    const conTipo = await this.prisma.scoped.activityVersion.findUniqueOrThrow({
+      where: { id: draft.id },
+      select: { activity: { select: { activityType: { select: { config: true } } } } },
+    });
+    const configDelTipo = (conTipo.activity.activityType.config ?? {}) as Record<string, unknown>;
+    const avisosDelTipo = loQueExigeElTipo(configDelTipo, contents);
+    if (avisosDelTipo.length > 0) {
+      throw new ConflictException({
+        code: 'TYPE_REQUIREMENTS_MISSING',
+        message: avisosDelTipo[0],
+        items: avisosDelTipo,
+      });
+    }
+
+    return { draft, contents, configDelTipo };
+  }
+
+  async publish(actor: AuthUser, versionId: string, input: PublishVersionInput) {
+    const tenantId = this.prisma.currentTenantId;
+    const listo = await this.comprobarQueEstaLista(versionId);
+    const draft = listo.draft;
+
+    // `let` y no `const`: al publicar puede engancharse la encuesta del tipo, y el temario y el
+    // congelado de mas abajo tienen que verla (Decision #116).
+    let contents = listo.contents;
 
     /**
      * LO QUE EL TIPO EXIGE: ahora es COMPUERTA, no aviso (Decision #74, cerrada el 2026-09-04).
@@ -244,19 +277,7 @@ export class VersioningService {
      * Lo que NO cambia: el aviso sigue yendo a la auditoria cuando algo pasa, y el mensaje explica
      * la consecuencia —"sin nota no hay nada que ensenarle a un auditor"— y no la regla.
      */
-    const conTipo = await this.prisma.scoped.activityVersion.findUniqueOrThrow({
-      where: { id: draft.id },
-      select: { activity: { select: { activityType: { select: { config: true } } } } },
-    });
-    const configDelTipo = (conTipo.activity.activityType.config ?? {}) as Record<string, unknown>;
-    const avisosDelTipo = loQueExigeElTipo(configDelTipo, contents);
-    if (avisosDelTipo.length > 0) {
-      throw new ConflictException({
-        code: 'TYPE_REQUIREMENTS_MISSING',
-        message: avisosDelTipo[0],
-        items: avisosDelTipo,
-      });
-    }
+    const configDelTipo = listo.configDelTipo;
 
     /*
       LA ENCUESTA SE ENGANCHA SOLA (Decision #116).
@@ -672,7 +693,18 @@ export class VersioningService {
   }
 
   /** Lanza si la version no existe o no esta en borrador (protege la inmutabilidad). */
-  async assertDraft(versionId: string) {
+  /**
+   * `paraEditar: false` cuando lo que viene detras NO es una edicion (2026-09-22).
+   *
+   * Esta es la puerta unica por la que pasa todo lo que toca un borrador —los contenidos, el
+   * orden, los ajustes de la version— y por eso es el sitio donde se bloquea la edicion **mientras
+   * la formacion esta en revision**: puesto aqui no hay forma de olvidarlo en una ruta nueva.
+   *
+   * Publicar tambien pasa por aqui y NO debe bloquearse: quien publica tiene `catalog:publish`, y
+   * publicar algo que estaba en revision es, de hecho, aprobarlo. Por eso el parametro.
+   */
+  async assertDraft(versionId: string, opciones: { paraEditar?: boolean } = {}) {
+    const paraEditar = opciones.paraEditar !== false;
     const version = await this.prisma.scoped.activityVersion.findUnique({ where: { id: versionId } });
     if (!version) throw new NotFoundException({ code: 'VERSION_NOT_FOUND' });
     if (version.status !== 'DRAFT') {
@@ -681,6 +713,36 @@ export class VersioningService {
         message: 'Esta versión esta publicada y no se puede modificar. Crea una versión nueva.',
         status: version.status,
       });
+    }
+    /*
+      EN REVISION NO SE TOCA. Sin esto, el traspaso no seria tal: quien la mando podria seguir
+      cambiandola mientras el administrador la lee, y lo aprobado no seria lo revisado. Se sale
+      pidiendo que la devuelvan —con motivo— o esperando la respuesta.
+    */
+    if (paraEditar && version.reviewStatus === 'EN_REVISION') {
+      throw new ConflictException({
+        code: 'VERSION_EN_REVISION',
+        message:
+          'Esta formación está esperando revisión y no se puede editar. Si hay que cambiarle algo, pide que la devuelvan.',
+      });
+    }
+    /*
+      TOCAR UNA APROBADA LA DESAPRUEBA.
+
+      Sin esto, «aprobada» acabaria significando «aprobada hace tres versiones»: se aprueba, se le
+      cambia el examen entero, y sigue diciendo que alguien la reviso. El sello tiene que valer por
+      lo que se reviso, no por el nombre de la formacion.
+
+      Se hace AQUI, en la puerta unica de edicion, y no en cada ruta que edita algo: repartido por
+      diez sitios, el primero que se olvide deja el sello mintiendo. Es la unica escritura de esta
+      funcion y por eso queda dicha en voz alta.
+    */
+    if (paraEditar && version.reviewStatus === 'APROBADA') {
+      await this.prisma.scoped.activityVersion.update({
+        where: { id: version.id },
+        data: { reviewStatus: 'SIN_ENVIAR', reviewedBy: null, reviewedAt: null },
+      });
+      return { ...version, reviewStatus: 'SIN_ENVIAR' as const, reviewedBy: null, reviewedAt: null };
     }
     return version;
   }

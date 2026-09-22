@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query
 import {
   createActivitySchema,
   createContentSchema,
+  devolverRevisionSchema,
   listActivitiesQuerySchema,
   publishVersionSchema,
   reorderContentsSchema,
@@ -14,6 +15,7 @@ import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { ActivitiesService } from './activities.service.js';
 import { APPROVAL_ENTITY_ACTIVITY_VERSION } from './publish-approval.js';
+import { RevisionService } from './revision.service.js';
 import { VersioningService } from './versioning.service.js';
 
 /**
@@ -26,7 +28,44 @@ export class ActivitiesController {
     private readonly activities: ActivitiesService,
     private readonly versioning: VersioningService,
     private readonly approvals: ApprovalsService,
+    private readonly revision: RevisionService,
   ) {}
+
+  /*
+    ─── EL TRASPASO: «TERMINE, REVISALO» (2026-09-22) ───
+
+    Tres rutas, y los permisos dicen quien hace que sin que haga falta mirar el rol:
+
+      enviar-a-revision   `catalog:manage_draft` — lo hace quien la escribe
+      aprobar / devolver  `catalog:publish`      — lo hace quien puede sacarla
+
+    No sustituye a la aprobacion de `publish` que hay mas abajo: aquella es para «no tengo permiso,
+    pidelo» (una excepcion) y esta es el flujo normal de trabajo del analista. Ver la cabecera de
+    `revision.service.ts`.
+  */
+
+  @Post('versions/:versionId/enviar-a-revision')
+  @RequirePermissions('catalog:manage_draft')
+  enviarARevision(@CurrentUser() actor: AuthUser, @Param('versionId', ParseUUIDPipe) versionId: string) {
+    return this.revision.enviarARevision(actor, versionId);
+  }
+
+  @Post('versions/:versionId/aprobar-revision')
+  @RequirePermissions('catalog:publish')
+  aprobarRevision(@CurrentUser() actor: AuthUser, @Param('versionId', ParseUUIDPipe) versionId: string) {
+    return this.revision.aprobar(actor, versionId);
+  }
+
+  @Post('versions/:versionId/devolver-revision')
+  @RequirePermissions('catalog:publish')
+  devolverRevision(
+    @CurrentUser() actor: AuthUser,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @Body() body: unknown,
+  ) {
+    const { motivo } = devolverRevisionSchema.parse(body);
+    return this.revision.devolver(actor, versionId, motivo);
+  }
 
   @Get()
   @RequirePermissions('catalog:read')

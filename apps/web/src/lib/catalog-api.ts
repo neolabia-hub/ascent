@@ -12,11 +12,23 @@ export type Modality = 'PRESENCIAL' | 'VIRTUAL' | 'HIBRIDA';
 export type ContentType = 'LESSON' | 'VIDEO' | 'PRESENTATION' | 'DOCUMENT' | 'ASSESSMENT' | 'SURVEY' | 'SCORM' | 'LINK';
 export type MigrationPolicy = 'FINISH_OLD' | 'RESTART_NEW' | 'MOVE_NOT_STARTED';
 
+/**
+ * EN QUE PUNTO DE LA REVISION ESTA UN BORRADOR (2026-09-22). Es un sub-estado de DRAFT: una version
+ * publicada ya no se revisa. Ver `revision.service.ts` en la API.
+ */
+export type ReviewStatus = 'SIN_ENVIAR' | 'EN_REVISION' | 'APROBADA' | 'DEVUELTA';
+
 export interface VersionSummary {
   id: string;
   versionNumber: number;
   status: VersionStatus;
   publishedAt: string | null;
+  /** El traspaso: quien la escribe la envia, quien puede publicar la aprueba o la devuelve. */
+  reviewStatus?: ReviewStatus;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  /** El motivo al DEVOLVER. Es lo que quien la escribio necesita para corregirla. */
+  reviewNote?: string | null;
   passingScore?: number;
   maxAttempts?: number;
   estimatedMinutes?: number | null;
@@ -170,6 +182,29 @@ export function publishVersion(versionId: string, migrationPolicy: MigrationPoli
     method: 'POST',
     body: { migrationPolicy, confirm: true, justification },
   });
+}
+
+/*
+  EL TRASPASO (2026-09-22). Tres llamadas, y los permisos deciden quien ve cada boton:
+  enviar lo hace quien escribe (`catalog:manage_draft`); aprobar y devolver, quien publica.
+*/
+export function enviarARevision(versionId: string) {
+  return apiFetch<{ id: string; reviewStatus: ReviewStatus }>(`/activities/versions/${versionId}/enviar-a-revision`, {
+    method: 'POST',
+  });
+}
+
+export function aprobarRevision(versionId: string) {
+  return apiFetch<{ id: string; reviewStatus: ReviewStatus }>(`/activities/versions/${versionId}/aprobar-revision`, {
+    method: 'POST',
+  });
+}
+
+export function devolverRevision(versionId: string, motivo: string) {
+  return apiFetch<{ id: string; reviewStatus: ReviewStatus; reviewNote: string | null }>(
+    `/activities/versions/${versionId}/devolver-revision`,
+    { method: 'POST', body: { motivo } },
+  );
 }
 
 export function createNextVersion(activityId: string) {

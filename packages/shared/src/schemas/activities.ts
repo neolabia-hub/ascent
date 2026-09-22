@@ -166,3 +166,16 @@ export const publishVersionSchema = z.object({
   confirm: z.literal(true),
 });
 export type PublishVersionInput = z.infer<typeof publishVersionSchema>;
+
+/**
+ * DEVOLVER UNA FORMACION A QUIEN LA ESCRIBIO, con el motivo (2026-09-22).
+ *
+ * El motivo es obligatorio y con minimo: devolver sin decir por que convierte la revision en un
+ * muro —quien la hizo vuelve a mandarla igual, o adivina—. Quince caracteres no garantizan una
+ * frase util, pero si impiden el «no» de un caracter. Mismo criterio que la convalidacion de un
+ * papel ajeno.
+ */
+export const devolverRevisionSchema = z.object({
+  motivo: z.string().trim().min(15, 'Escribe qué hay que corregir').max(2000),
+});
+export type DevolverRevisionInput = z.infer<typeof devolverRevisionSchema>;
