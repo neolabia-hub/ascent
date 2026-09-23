@@ -24,6 +24,35 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-23 — DESPLEGADO A PRODUCCION: aprobaciones, permisos de Programas y los arreglos de la carga
+
+Commit `42c3222`. Los cinco pasos de `05-reglas-de-despliegue.md` §3, mas el paso extra de permisos:
+
+| Paso | Resultado |
+|---|---|
+| 1. Copia ANTES de tocar nada | `neopulse-20260923-011332.dump`, 409 KB, subida a R2. **No vacia** |
+| 2. `git pull` | Arrastra tambien lo de la sesion anterior (revision, alcance por tipo) |
+| 3. Reconstruir imagenes | `neo-pulse-api:local` y `neo-pulse-web:local` |
+| 4. `up -d` + `restart caddy` | `migrate` Exited(0) tras aplicar **dos** migraciones y reaplicar RLS |
+| **4 bis. `dev:sincronizar-permisos -- --si`** | 3 concesiones creadas, **todas al ADMIN y ninguna al ANALISTA** |
+| 5. Comprobar que RESPONDE | `/v1/health` ok · login 200 · `/plan` 200 · tenant publico 200 |
+
+Verificado ademas en la base de produccion: las cuatro columnas `review_*` existen, la tabla
+`role_activity_type_scopes` existe, y los tres permisos de programas quedaron con **su descripcion
+en español** y no con el `Permiso programs:read` de antes — que era justo el arreglo del dia. Cero
+errores en la API desde el arranque.
+
+El paso 4 bis es el que no estaba en la lista de siempre y hay que recordar: sin el, la pantalla de
+Programas le da 403 **al administrador incluido**, y nada en el arranque lo delata. Queda escrito en
+`05-reglas-de-despliegue.md` §2.
+
+**Lo que el cliente todavia no ha visto** (regla §3 bis): el menu recortado del analista, el boton
+del plan proponiendo el año correcto, el aviso de publicacion con la encuesta, y los mensajes nuevos
+de la carga masiva. Se subio igual porque tres de esos cuatro son **arreglos de cosas que el mismo
+reporto hoy** y le estaban bloqueando la carga de su gente.
+
+---
+
 ## 2026-09-22 (tarde) — CUATRO COSAS QUE EL CLIENTE VIO EN PRODUCCION, y todas eran nuestras
 
 Subio su plantilla de 1089 personas y se llevo tres portazos seguidos. Ninguno era culpa del

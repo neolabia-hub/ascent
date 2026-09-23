@@ -53,7 +53,18 @@ para *crear*, no para *conservar lo que el administrador cambió a mano*.
 **Un despliegue que trae permisos nuevos no está terminado hasta correr ese script en el servidor.**
 El código ya exige el código de permiso, pero la concesión vive en la base: hasta que se corre, la
 pantalla nueva le da 403 **al administrador incluido**, y no da ningún error de arranque que lo
-delate. Pendiente desde el 2026-09-22: `programs:read`, `programs:manage` y `programs:publish`.
+delate.
+
+En el servidor, dentro del contenedor de la API:
+
+```bash
+docker compose -f docker/docker-compose.prod.yml --env-file .env.prod \
+  exec -T -w /app/apps/api api sh -lc "./node_modules/.bin/tsx scripts/sincronizar-permisos.ts"
+# sin `-- --si` es un ENSAYO: enseña qué falta y no escribe nada. Se lee, y solo entonces:
+#   ... scripts/sincronizar-permisos.ts -- --si
+```
+
+Corrido el 2026-09-23 para `programs:read`, `programs:manage` y `programs:publish`.
 
 ### Las llaves y los secretos no se regeneran «por si acaso»
 
