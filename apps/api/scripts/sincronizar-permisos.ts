@@ -4,6 +4,7 @@ import {
   SEED_ROLE_PERMISSIONS,
   type PermissionCode,
 } from '../../../packages/shared/src/constants/permissions.js';
+import { categoriaDePermiso, descripcionDePermiso } from '../prisma/permission-descriptions.js';
 
 /**
  * PONE AL DIA EL CATALOGO DE PERMISOS SIN TOCAR NADA MAS.
@@ -50,10 +51,13 @@ async function main(): Promise<void> {
     if (deVerdad) {
       for (const code of faltan) {
         await prisma.permission.create({
+          // El MISMO texto que pone la semilla (`prisma/permission-descriptions.ts`). Antes decia
+          // "Permiso programs:read" y en la pantalla de Permisos convivian dos idiomas en la misma
+          // columna segun por donde hubiera entrado el permiso.
           data: {
             code,
-            category: code.split(':')[0] ?? 'general',
-            description: `Permiso ${code}`,
+            category: categoriaDePermiso(code),
+            description: descripcionDePermiso(code),
           },
         });
       }

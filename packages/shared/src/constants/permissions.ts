@@ -11,6 +11,21 @@ export const PERMISSIONS = [
   'lessons:manage',
   'ai:generate',
 
+  /*
+    PROGRAMAS, CON PERMISOS PROPIOS (2026-09-22).
+
+    Hasta hoy Programas usaba los del catalogo, asi que **quien podia crear una formacion veia y
+    tocaba los programas**. No habia forma de quitarselos sin quitarle tambien el catalogo, y el
+    cliente lo pidio expreso: *"programa no pueden, solo seguimiento, inicio, convocatorias"*.
+
+    Son tres y no uno porque el reparto es el mismo del catalogo y por el mismo motivo: ver, armar
+    y sacar a la gente son decisiones distintas. Publicar un programa **apaga la constancia
+    individual de todos sus modulos**: no es «guardar».
+  */
+  'programs:read',
+  'programs:manage',
+  'programs:publish',
+
   // Convocatorias y ejecucion
   'offerings:read',
   'offerings:manage',

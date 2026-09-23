@@ -42,6 +42,7 @@ import { useToast } from '@/components/ui/toast';
 
 const CATEGORY_LABEL: Record<string, string> = {
   catalog: 'Contenido formativo',
+  programs: 'Programas',
   lessons: 'Lecciones',
   offerings: 'Convocatorias',
   enrollments: 'Ejecución y progreso',

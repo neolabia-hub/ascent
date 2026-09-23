@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { PermissionCode } from '@neo-pulse/shared';
 import { listPlans, type PlanRow } from '@/lib/delivery-api';
+import { useCan } from '@/components/providers/session-provider';
 import { cn } from '@/components/ui/cn';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { TenantMark } from '@/components/layout/tenant-mark';
@@ -30,8 +32,10 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Ver arriba: basta UNO de estos. Sin `permiso`, la entrada es para todo el que entre al panel. */
+  permiso?: PermissionCode[];
   /** Solo Configuracion: destinos propios que se despliegan debajo. */
-  hijos?: { href: string; label: string }[];
+  hijos?: { href: string; label: string; permiso?: PermissionCode[] }[];
 }
 
 interface NavGroup {
@@ -63,37 +67,65 @@ interface NavGroup {
  *
  * Un rotulo de seccion que solo agrupa por parecido —"Contenido", "Datos"— no ayuda a elegir: hay
  * que leerse las tres para saber donde esta lo que se busca.
+ *
+ * ─── CADA ENTRADA LLEVA EL PERMISO QUE LA ABRE (2026-09-22) ───
+ *
+ * El menu se pintaba ENTERO para cualquiera que entrara al panel. El analista veia Usuarios,
+ * Aprobaciones, Desempeño y Configuracion, pulsaba, y se encontraba una pantalla en blanco o un 403
+ * seco. El servidor nunca dejo pasar nada —esa es la seguridad y sigue igual—; lo que fallaba era
+ * el menu, que prometia nueve destinos donde esa persona tenia cuatro.
+ *
+ * `permiso` es una lista y **basta con uno**: Seguimiento se abre con `reports:read_all` o con
+ * `reports:read_scope` —ver todo o ver lo suyo son la misma pantalla con distinto alcance—, y
+ * Configuracion con cualquiera de los permisos de sus hijos, porque quien puede entrar a una de sus
+ * seis pantallas necesita la puerta. Un grupo al que no le queda ninguna entrada no se pinta: un
+ * rotulo "Administrar" con nada debajo es peor que no estar.
+ *
+ * Esto NO sustituye al guard del servidor y no pretende hacerlo: esconder un boton es decir la
+ * verdad sobre lo que esta persona puede hacer, no impedir que lo haga.
  */
 const NAV_GROUPS: NavGroup[] = [
   {
     titulo: null,
     items: [
+      // Inicio no lleva permiso a proposito: es el resumen de lo de cada quien y la unica pantalla
+      // que tiene garantizada cualquiera que llegue al panel.
       { href: '/inicio', label: 'Inicio', icon: House },
       // El rotulo dice SEGUIMIENTO y no "Reportes": lo que hay ahi es el estado de la ejecucion
       // —quien va como— con la analitica y los vencimientos al lado.
-      { href: '/reportes', label: 'Seguimiento', icon: ChartColumn },
-      { href: '/plan', label: 'Plan anual', icon: ClipboardList },
+      {
+        href: '/reportes',
+        label: 'Seguimiento',
+        icon: ChartColumn,
+        permiso: ['reports:read_all', 'reports:read_scope'],
+      },
+      { href: '/plan', label: 'Plan anual', icon: ClipboardList, permiso: ['plans:manage', 'plans:approve'] },
     ],
   },
   {
     titulo: 'Programar',
     items: [
-      { href: '/contenido-formativo', label: 'Formaciones', icon: BookOpen },
-      { href: '/programas', label: 'Programas', icon: Layers },
-      { href: '/convocatorias', label: 'Convocatorias', icon: CalendarDays },
-      { href: '/asignaciones', label: 'Asignaciones', icon: Target },
+      { href: '/contenido-formativo', label: 'Formaciones', icon: BookOpen, permiso: ['catalog:read'] },
+      // Programas tiene permisos PROPIOS desde el 2026-09-22 (antes usaba los del catalogo, asi que
+      // quien podia crear una formacion los veia): es la entrada que el cliente pidio quitarle al
+      // analista sin quitarle las formaciones.
+      { href: '/programas', label: 'Programas', icon: Layers, permiso: ['programs:read'] },
+      { href: '/convocatorias', label: 'Convocatorias', icon: CalendarDays, permiso: ['offerings:read'] },
+      { href: '/asignaciones', label: 'Asignaciones', icon: Target, permiso: ['assignments:manage'] },
     ],
   },
   {
     titulo: 'Administrar',
     items: [
-      { href: '/usuarios', label: 'Usuarios', icon: Users },
-      { href: '/desempeno', label: 'Desempeño', icon: ClipboardCheck },
-      { href: '/aprobaciones', label: 'Aprobaciones', icon: CheckSquare },
+      { href: '/usuarios', label: 'Usuarios', icon: Users, permiso: ['users:manage', 'users:import'] },
+      { href: '/desempeno', label: 'Desempeño', icon: ClipboardCheck, permiso: ['performance:manage', 'performance:read_all'] },
+      { href: '/aprobaciones', label: 'Aprobaciones', icon: CheckSquare, permiso: ['approvals:decide', 'plans:approve'] },
       {
         href: '/configuracion',
         label: 'Configuración',
         icon: Settings,
+        // Basta con poder abrir UNA de las seis pantallas de abajo; cada hijo pide ademas la suya.
+        permiso: ['config:manage_catalogs', 'config:manage_tenant', 'roles:manage', 'certificate_templates:manage'],
         /*
           CONFIGURACION SE DESPLIEGA Y EL PLAN NO, y la diferencia no es de gusto.
 
@@ -107,12 +139,12 @@ const NAV_GROUPS: NavGroup[] = [
           La regla: se despliega lo que son destinos propios; no se despliega lo que son filtros.
         */
         hijos: [
-          { href: '/configuracion', label: 'Catálogos' },
-          { href: '/configuracion/tipos-de-formacion', label: 'Tipos de formación' },
-          { href: '/configuracion/constancias', label: 'Constancias' },
-          { href: '/configuracion/encuestas', label: 'Encuestas' },
-          { href: '/configuracion/roles', label: 'Roles y permisos' },
-          { href: '/configuracion/preferencias', label: 'Preferencias' },
+          { href: '/configuracion', label: 'Catálogos', permiso: ['config:manage_catalogs'] },
+          { href: '/configuracion/tipos-de-formacion', label: 'Tipos de formación', permiso: ['config:manage_catalogs'] },
+          { href: '/configuracion/constancias', label: 'Constancias', permiso: ['certificate_templates:manage'] },
+          { href: '/configuracion/encuestas', label: 'Encuestas', permiso: ['config:manage_catalogs'] },
+          { href: '/configuracion/roles', label: 'Roles y permisos', permiso: ['roles:manage'] },
+          { href: '/configuracion/preferencias', label: 'Preferencias', permiso: ['config:manage_tenant'] },
         ],
       },
     ],
@@ -122,6 +154,23 @@ const NAV_GROUPS: NavGroup[] = [
 // Sin props: el nombre y la salida de la persona viven en la barra de arriba (Decision #104).
 export function Sidebar() {
   const pathname = usePathname();
+  const can = useCan();
+  /**
+   * El menu de ESTA persona. Sin `permiso` la entrada entra siempre; con lista, basta uno. Un item
+   * con hijos se queda solo si le sobrevive alguno —Configuracion sin ninguna de sus seis pantallas
+   * es una puerta a un pasillo vacio—, y un grupo sin items no pinta ni su rotulo.
+   */
+  const grupos = useMemo(() => {
+    const alcanza = (permiso?: PermissionCode[]) => !permiso || permiso.some((codigo) => can(codigo));
+    return NAV_GROUPS.map((grupo) => ({
+      ...grupo,
+      items: grupo.items
+        .filter((item) => alcanza(item.permiso))
+        .map((item) => (item.hijos ? { ...item, hijos: item.hijos.filter((hijo) => alcanza(hijo.permiso)) } : item))
+        .filter((item) => !item.hijos || item.hijos.length > 0),
+    })).filter((grupo) => grupo.items.length > 0);
+  }, [can]);
+
   const [collapsed, setCollapsed] = useState(false);
   /** Que item tiene los hijos abiertos a mano. `null` = ninguno; estar dentro ya los abre. */
   const [desplegado, setDesplegado] = useState<string | null>(null);
@@ -168,8 +217,8 @@ export function Sidebar() {
         borde de una tarjeta redondeada — se ve como si algo estuviera roto. Se oculta el adorno y
         se conserva la funcion: rueda, teclado y gesto siguen funcionando igual.
       */}
-      <nav className="sin-rail mt-2 flex-1 space-y-0.5 overflow-y-auto px-2">
-        {NAV_GROUPS.map((grupo, indice) => (
+      <nav aria-label="Navegación principal" className="sin-rail mt-2 flex-1 space-y-0.5 overflow-y-auto px-2">
+        {grupos.map((grupo, indice) => (
           <div key={grupo.titulo ?? 'principal'} className={cn(indice > 0 && 'pt-3')}>
             {/*
               EL ROTULO DESAPARECE AL PLEGAR, y en su sitio queda una linea. Con 76 px de ancho el

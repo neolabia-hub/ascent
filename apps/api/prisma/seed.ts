@@ -21,6 +21,9 @@ import {
   tenantBrandingSchema,
   tenantSettingsSchema,
 } from '../../../packages/shared/src/schemas/tenant-settings.js';
+// Los textos en español de cada permiso viven aparte: los comparte con el script
+// `dev:sincronizar-permisos`, que antes escribia "Permiso <codigo>" en esa misma columna.
+import { categoriaDePermiso, descripcionDePermiso } from './permission-descriptions.js';
 
 const prisma = new PrismaClient({
   datasources: { db: { url: process.env.DIRECT_DATABASE_URL } },
@@ -35,69 +38,6 @@ const ADMIN_PASSWORD = 'Transprensa2026*';
 interface CatalogSeedItem {
   code: string;
   name: string;
-}
-
-/** Categoria de un permiso: el prefijo antes de ":" (p. ej. "catalog:read" -> "catalog"). */
-function permissionCategory(code: string): string {
-  const [category] = code.split(':');
-  return category;
-}
-
-/** Descripcion de respaldo si un codigo de PERMISSIONS no tiene texto curado abajo. */
-function fallbackPermissionDescription(code: string): string {
-  const [category, action] = code.split(':');
-  return `Permite ${action.replace(/_/g, ' ')} en el modulo ${category}`;
-}
-
-// Descripciones curadas en español para el catalogo de permisos (mejor calidad que un
-// texto generado). Si en el futuro se agrega un permiso nuevo a PERMISSIONS sin entrada
-// aqui, se usa fallbackPermissionDescription para no romper el seed.
-const PERMISSION_DESCRIPTIONS: Partial<Record<PermissionCode, string>> = {
-  'catalog:read': 'Consultar el catalogo de actividades formativas',
-  'catalog:manage_draft': 'Crear y editar borradores de actividades formativas',
-  'catalog:publish': 'Publicar versiones de actividades formativas',
-  'lessons:manage': 'Crear y editar lecciones (tarjetas)',
-  'ai:generate': 'Generar borradores de contenido con inteligencia artificial',
-
-  'offerings:read': 'Consultar convocatorias',
-  'offerings:manage': 'Crear y editar convocatorias',
-  'offerings:publish': 'Publicar convocatorias',
-  'attendance:take': 'Registrar asistencia en convocatorias presenciales',
-  'enrollments:read_all': 'Ver las inscripciones de todo el tenant',
-  'enrollments:read_scope': 'Ver las inscripciones de su ambito (procesos/areas asignados)',
-  'enrollments:read_own': 'Ver sus propias inscripciones',
-  'enrollments:unblock': 'Rehabilitar inscripciones bloqueadas por intentos agotados',
-
-  'assignments:manage': 'Crear y gestionar asignaciones de formacion',
-  'audiences:manage': 'Crear y gestionar audiencias (reglas de segmentacion)',
-  'plans:manage': 'Crear y editar el plan de capacitacion',
-  'plans:approve': 'Aprobar el plan de capacitacion',
-
-  'questions:manage': 'Crear y editar el banco de preguntas',
-  'attempts:grade_manual': 'Calificar manualmente intentos de evaluacion',
-  'attempts:invalidate_question': 'Anular una pregunta e invalidar las respuestas asociadas',
-
-  'certificates:issue': 'Emitir certificados',
-  'certificates:revoke': 'Revocar certificados emitidos',
-  'certificate_templates:manage': 'Crear y editar plantillas de certificado',
-
-  'reports:read_all': 'Ver reportes de todo el tenant',
-  'reports:read_scope': 'Ver reportes de su ambito (procesos/areas asignados)',
-  'reports:export': 'Exportar reportes',
-  'audit:read': 'Consultar el log de auditoria',
-
-  'users:manage': 'Crear y editar usuarios',
-  'users:import': 'Importar usuarios de forma masiva',
-  'roles:manage': 'Crear y editar roles y sus permisos',
-  'users:manage_permissions': 'Asignar o revocar permisos individuales a usuarios',
-  'attendance:sign': 'Registrar la propia asistencia: escanear el QR de la sesion y firmar en pantalla',
-  'config:manage_catalogs': 'Administrar catalogos del tenant (areas, cargos, regionales, normas...)',
-  'config:manage_tenant': 'Administrar la configuracion general del tenant',
-  'approvals:decide': 'Aprobar o rechazar solicitudes de aprobacion',
-};
-
-function permissionDescription(code: PermissionCode): string {
-  return PERMISSION_DESCRIPTIONS[code] ?? fallbackPermissionDescription(code);
 }
 
 // ─────────────────────────────── 1. Tenant ───────────────────────────────
@@ -186,13 +126,13 @@ async function seedPermissions(): Promise<void> {
     await prisma.permission.upsert({
       where: { code },
       update: {
-        category: permissionCategory(code),
-        description: permissionDescription(code),
+        category: categoriaDePermiso(code),
+        description: descripcionDePermiso(code),
       },
       create: {
         code,
-        category: permissionCategory(code),
-        description: permissionDescription(code),
+        category: categoriaDePermiso(code),
+        description: descripcionDePermiso(code),
       },
     });
   }

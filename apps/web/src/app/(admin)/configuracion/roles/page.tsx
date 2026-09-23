@@ -41,6 +41,7 @@ import { useToast } from '@/components/ui/toast';
 /** Nombres de las categorias en lenguaje de negocio, no de tabla. */
 const CATEGORY_LABEL: Record<string, string> = {
   catalog: 'Contenido formativo',
+  programs: 'Programas',
   lessons: 'Lecciones',
   offerings: 'Convocatorias',
   enrollments: 'Ejecución y progreso',

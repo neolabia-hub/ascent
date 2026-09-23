@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import type { MeResponse } from '@/lib/api';
 
 /**
@@ -36,9 +36,13 @@ export function useSession(): MeResponse {
  * Se comparan CODIGOS y nunca nombres de rol, igual que en la API (Decision #19): los roles son
  * configurables por empresa y un `rol === 'ADMIN'` en la interfaz se rompe en cuanto un cliente
  * llama distinto al suyo.
+ *
+ * La funcion es ESTABLE mientras no cambie la sesion (`useCallback`), y no por gusto: quien arma
+ * una lista derivada de permisos —el menu lateral, sin ir mas lejos— la pone como dependencia de un
+ * `useMemo`, y una funcion nueva en cada render lo recalcularia siempre.
  */
 export function useCan(): (permission: string) => boolean {
   const session = useContext(SessionContext);
   const permissions = useMemo(() => new Set(session?.permissions ?? []), [session]);
-  return (permission: string) => permissions.has(permission);
+  return useCallback((permission: string) => permissions.has(permission), [permissions]);
 }

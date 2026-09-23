@@ -145,6 +145,26 @@ test.describe('Alcance del analista', () => {
     }
     await analyst.waitForURL('**/inicio', { timeout: 20_000 });
 
+    /*
+      EL MENU NO LE OFRECE PANTALLAS PROHIBIDAS (2026-09-22).
+
+      Se pintaba entero para cualquiera que entrara al panel: el analista veia Programas, Usuarios,
+      Desempeño, Aprobaciones y Configuracion, pulsaba, y se encontraba un 403 o una pantalla en
+      blanco. El servidor nunca dejo pasar nada —eso no cambia—; lo que mentia era el menu.
+
+      Se comprueban LAS DOS MITADES a proposito: solo con las ausencias, un menu roto que no pintara
+      nada pasaria esta prueba tan tranquilo.
+    */
+    const menu = analyst.getByRole('navigation', { name: 'Navegación principal' });
+    for (const visible of ['Inicio', 'Seguimiento', 'Plan anual', 'Formaciones', 'Convocatorias', 'Asignaciones']) {
+      await expect(menu.getByRole('link', { name: visible, exact: true })).toBeVisible();
+    }
+    // Programas tiene permisos PROPIOS desde el 2026-09-22 y el analista no los tiene: es el
+    // *"programa no pueden"* del cliente, y antes de separarlos le llegaba con el catalogo.
+    for (const oculto of ['Programas', 'Usuarios', 'Desempeño', 'Aprobaciones', 'Configuración']) {
+      await expect(menu.getByRole('link', { name: oculto, exact: true })).toHaveCount(0);
+    }
+
     await analyst.goto('/contenido-formativo');
     await analyst.getByPlaceholder('Buscar por nombre o código').fill('Alcance');
     await expect(analyst.getByText(suyo)).toBeVisible();
