@@ -53,4 +53,20 @@ describe('loQueExigeElTipo', () => {
     const [evaluacion] = loQueExigeElTipo({ requiresAssessment: true }, SOLO_VIDEO);
     expect(evaluacion).toContain('auditor');
   });
+
+  /*
+    LA ENCUESTA ELEGIDA EN EL TIPO YA CUENTA (Decision #116). No se agrega formacion por formacion:
+    la engancha el tipo al publicar. Por eso lo que se mira no es si esta version trae una, sino si
+    el TIPO tiene alguna elegida — y cuando no la tiene, la frase manda al sitio donde se arregla
+    para todas de una vez, que es lo que el cliente pidio poder leer sin preguntar.
+  */
+  it('si el tipo ya tiene su encuesta elegida, no se reclama nada', () => {
+    expect(loQueExigeElTipo({ requiresSurvey: true, surveyTemplateId: 'enc-1' }, CON_EXAMEN)).toEqual([]);
+  });
+
+  it('y si no la tiene, la frase dice DONDE se elige, no «agregala aqui»', () => {
+    const [encuesta] = loQueExigeElTipo({ requiresAssessment: false, requiresSurvey: true }, SOLO_VIDEO);
+    expect(encuesta).toContain('Tipos de formacion');
+    expect(encuesta).toContain('sola');
+  });
 });

@@ -138,7 +138,87 @@ const ROTULO: Record<string, string> = {
   regional: 'Regional',
   servicio: 'Servicio',
   fecha_ingreso: 'Fecha de ingreso',
+  // Faltaban las dos, asi que el aviso salia con el nombre crudo de la columna —«"fecha_nacimiento"
+  // no tiene un formato valido»—, con guion bajo y todo, que es justo la jerga que se queria evitar.
+  fecha_nacimiento: 'Fecha de nacimiento',
+  vinculacion: 'Vinculación',
 };
+
+/** Las dos columnas de fecha. Se nombran una vez: se normalizan igual y se explican igual. */
+const COLUMNAS_DE_FECHA = ['fecha_ingreso', 'fecha_nacimiento'] as const;
+
+/** `2026-09-01` a partir de una fecha, leida en UTC — que es como ExcelJS entrega las celdas. */
+function comoISO(fecha: Date): string {
+  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getUTCDate()).padStart(2, '0');
+  return `${fecha.getUTCFullYear()}-${mes}-${dia}`;
+}
+
+/**
+ * LA FECHA QUE ESCRIBE EXCEL, TRADUCIDA A LA QUE PIDE EL SISTEMA (2026-09-22).
+ *
+ * La pantalla dice «AAAA-MM-DD» y el archivo trae otra cosa, **sin que quien lo llenó haya hecho
+ * nada mal**: en una celda con formato de fecha, Excel no guarda el texto que se escribió sino un
+ * numero, y cada quien lo ve con el formato de su region. El cliente subio 1089 personas y le
+ * salio *«"fecha_nacimiento" no tiene un formato valido: "Tue Jan 06 1998 00:00:00 GMT+0000"»* —
+ * un texto que nadie escribio y que no se puede corregir en la celda, porque la celda se ve bien.
+ *
+ * Pedirle a una empresa que convierta 1089 celdas a texto plano no es una solucion: es trasladarle
+ * un detalle de implementacion. Aqui se acepta lo que Excel produce de verdad:
+ *
+ *   - una celda con formato de fecha (llega ya como `Date`, ver `parseXlsx`);
+ *   - `AAAA-MM-DD`, que es lo que pide la plantilla y sigue siendo lo recomendado;
+ *   - `D/M/AAAA` y `D-M-AAAA`, que es como lo teclea y lo exporta un Excel en español.
+ *
+ * ─── DIA/MES Y NO MES/DIA, Y POR QUE SE PUEDE AFIRMAR ───
+ *
+ * `06/01/1998` es 6 de enero o 6 de junio segun quien lo mire, y el archivo no lo dice. Se resuelve
+ * asi: si un numero pasa de 12 **solo puede ser el dia**, y eso decide la pareja sin adivinar. Si
+ * los dos caben en un mes, se lee DIA/MES — la convencion de Colombia, que es donde esta el cliente,
+ * y la del Excel con el que se arma el archivo.
+ *
+ * Lo que NO se hace es inventar: si no encaja en ninguna de esas formas, se devuelve el valor tal
+ * cual y la fila falla diciendo que esa celda no es una fecha. Una fecha mal leida en silencio es
+ * peor que una fila rechazada.
+ */
+export function normalizarFecha(valor: string): string {
+  const limpio = valor.trim();
+  if (limpio === '' || /^\d{4}-\d{2}-\d{2}$/.test(limpio)) return limpio;
+
+  const partes = limpio.match(/^(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})$/);
+  if (!partes) return limpio;
+  const [, uno, dos, tres] = partes as unknown as [string, string, string, string];
+
+  let anio: number;
+  let mes: number;
+  let dia: number;
+  if (uno.length === 4) {
+    // AAAA/MM/DD — el mismo orden de la plantilla, con otro separador.
+    anio = Number(uno);
+    mes = Number(dos);
+    dia = Number(tres);
+  } else if (tres.length === 4) {
+    anio = Number(tres);
+    const a = Number(uno);
+    const b = Number(dos);
+    // Un numero mayor que 12 no puede ser un mes: ese decide, y el otro es el mes.
+    if (b > 12) {
+      mes = a;
+      dia = b;
+    } else {
+      dia = a;
+      mes = b;
+    }
+  } else {
+    return limpio;
+  }
+
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31 || anio < 1900 || anio > 2200) return limpio;
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
+  // Rebota los dias que no existen —31 de febrero— en vez de dejar que rueden al mes siguiente.
+  if (fecha.getUTCMonth() !== mes - 1 || fecha.getUTCDate() !== dia) return limpio;
+  return comoISO(fecha);
+}
 
 /**
  * EL MOTIVO, EN ESPAÑOL Y DICIENDO QUE HACER (2026-09-21).
@@ -296,8 +376,27 @@ export class UserImportService {
     const simular = opciones.simular === true;
     const tenantId = this.prisma.currentTenantId;
     const rawRows = await this.parseFile(filename, buffer);
-    if (rawRows.length === 0) throw new BadRequestException({ code: 'EMPTY_FILE' });
-    if (rawRows.length > 2000) throw new BadRequestException({ code: 'TOO_MANY_ROWS', max: 2000 });
+    /*
+      LOS TRES ERRORES QUE TUMBAN EL ARCHIVO ENTERO LLEVAN SU FRASE (2026-09-22).
+
+      Sin `message`, el filtro de errores cae en el nombre de la clase de la excepcion y la pantalla
+      acaba diciendo **«Bad Request Exception»** — que fue exactamente lo que vio el cliente al subir
+      su plantilla. No dice que paso, no dice que hacer, y esta en ingles.
+    */
+    if (rawRows.length === 0) {
+      throw new BadRequestException({
+        code: 'EMPTY_FILE',
+        message:
+          'El archivo no tiene ninguna fila con datos debajo de los encabezados. Si llenaste otra hoja, mueve los datos a la primera.',
+      });
+    }
+    if (rawRows.length > 2000) {
+      throw new BadRequestException({
+        code: 'TOO_MANY_ROWS',
+        max: 2000,
+        message: `El archivo trae ${rawRows.length} filas y el máximo por carga es 2000. Pártelo en varios archivos y súbelos uno tras otro.`,
+      });
+    }
 
     // Resolucion de catalogos en un solo viaje, POR CODIGO O POR NOMBRE.
     const [jobTitles, jobTitleTypes, areas, regionals, services, role] = await Promise.all([
@@ -891,9 +990,28 @@ export class UserImportService {
   /** Acepta .csv (separador ; o ,) y .xlsx. Devuelve filas crudas con su numero (1-based sin encabezado). */
   private async parseFile(filename: string, buffer: Buffer): Promise<Array<{ rowNumber: number; values: Record<string, string> }>> {
     const lower = filename.toLowerCase();
-    if (lower.endsWith('.csv')) return this.parseCsv(buffer.toString('utf8'));
-    if (lower.endsWith('.xlsx')) return this.parseXlsx(buffer);
-    throw new BadRequestException({ code: 'UNSUPPORTED_FILE', supported: ['csv', 'xlsx'] });
+    const filas = lower.endsWith('.csv')
+      ? this.parseCsv(buffer.toString('utf8'))
+      : lower.endsWith('.xlsx')
+        ? await this.parseXlsx(buffer)
+        : null;
+    if (filas === null) {
+      throw new BadRequestException({
+        code: 'UNSUPPORTED_FILE',
+        supported: ['csv', 'xlsx'],
+        message:
+          'Solo se pueden subir archivos .xlsx o .csv. Si el tuyo es .xls (Excel antiguo), ábrelo y usa "Guardar como" → "Libro de Excel (.xlsx)".',
+      });
+    }
+
+    // Las fechas se normalizan aqui, en un solo sitio, para que den igual el CSV y el XLSX: quien
+    // corrige el archivo no tiene por que obtener un resultado distinto segun como lo guardo.
+    for (const fila of filas) {
+      for (const columna of COLUMNAS_DE_FECHA) {
+        if (fila.values[columna] !== undefined) fila.values[columna] = normalizarFecha(fila.values[columna]);
+      }
+    }
+    return filas;
   }
 
   private parseCsv(text: string): Array<{ rowNumber: number; values: Record<string, string> }> {
@@ -931,8 +1049,7 @@ export class UserImportService {
       if (rowIndex === 1) return;
       const values: Record<string, string> = {};
       headers.forEach((h, idx) => {
-        const cell = row.getCell(idx + 1);
-        values[h] = cell.value === null || cell.value === undefined ? '' : String(cell.text ?? cell.value).trim();
+        values[h] = this.textoDeCelda(row.getCell(idx + 1));
       });
       if (Object.values(values).some((v) => v.length > 0)) {
         rows.push({ rowNumber: rowIndex - 1, values });
@@ -941,11 +1058,49 @@ export class UserImportService {
     return rows;
   }
 
+  /**
+   * EL TEXTO DE UNA CELDA, con la fecha tratada aparte y ANTES que nada.
+   *
+   * `String(cell.text)` sobre una celda con formato de fecha devuelve el `toString()` de JavaScript:
+   * *"Tue Jan 06 1998 00:00:00 GMT+0000 (Coordinated Universal Time)"*. Eso es lo que veia el
+   * cliente en el informe de errores — un texto que no escribio nadie y que no se puede arreglar
+   * mirando la celda, porque en Excel la celda se ve perfecta.
+   */
+  private textoDeCelda(cell: ExcelJS.Cell): string {
+    const valor = cell.value;
+    if (valor === null || valor === undefined) return '';
+    if (valor instanceof Date) return comoISO(valor);
+    // Una formula trae `{ formula, result }`: lo que importa es el resultado, y puede ser una fecha.
+    if (typeof valor === 'object' && 'result' in valor) {
+      const resultado = (valor as { result?: unknown }).result;
+      if (resultado instanceof Date) return comoISO(resultado);
+    }
+    return String(cell.text ?? valor).trim();
+  }
+
+  /**
+   * QUE COLUMNAS TIENEN QUE ESTAR, que no es lo mismo que cuales hay que llenar.
+   *
+   * `correo` SALIO de esta lista el 2026-09-22. Es opcional como dato desde el 2026-09-21 —hay gente
+   * que no tiene— pero seguia siendo obligatoria como COLUMNA, asi que quitarla del archivo tumbaba
+   * la carga entera con un 400. Una columna que se puede dejar vacia en las 1089 filas no puede ser
+   * imprescindible en la primera. Y borrarla no borra nada: sin la columna, `correo` llega vacio, y
+   * vacio en una recarga significa «esto no lo dice el archivo, no lo toques» (ver `actualizarPersona`).
+   */
   private assertHeaders(headers: string[]): void {
-    const required = IMPORT_HEADERS.filter((h) => ['documento', 'nombre_completo', 'correo', 'cargo', 'area'].includes(h));
+    const required = IMPORT_HEADERS.filter((h) => ['documento', 'nombre_completo', 'cargo', 'area'].includes(h));
     const missing = required.filter((h) => !headers.includes(h));
     if (missing.length > 0) {
-      throw new BadRequestException({ code: 'MISSING_HEADERS', missing, expected: IMPORT_HEADERS });
+      const lista = missing.map((h) => `"${h}"`).join(', ');
+      throw new BadRequestException({
+        code: 'MISSING_HEADERS',
+        missing,
+        expected: IMPORT_HEADERS,
+        message:
+          `Al archivo le ${missing.length === 1 ? 'falta la columna' : 'faltan las columnas'} ${lista} en la ` +
+          'primera fila. Los encabezados se escriben exactamente así, en minúscula y sin tildes. ' +
+          'Descarga la plantilla si no estás seguro.',
+      });
     }
   }
 }

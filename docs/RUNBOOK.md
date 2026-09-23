@@ -124,6 +124,19 @@ Corre como DUEÑO de la base (`DIRECT_DATABASE_URL`), como la semilla y los dos 
 `roles` y `role_permissions` estan bajo RLS y con el rol de la aplicacion veria cero filas — y diria,
 tan tranquilo, que todos tienen lo que les toca.
 
+**El texto en español del permiso vive en `apps/api/prisma/permission-descriptions.ts`** (2026-09-22).
+Lo leen la semilla Y este script; antes el script escribia `Permiso <codigo>` y en la pantalla de
+Permisos convivian dos idiomas en la misma columna segun por donde hubiera entrado cada permiso. Al
+agregar un codigo a `PERMISSIONS`, agregar ahi su descripcion y —si la categoria es nueva— su rotulo
+en `CATEGORY_LABEL`, que esta **duplicado** en `configuracion/roles/page.tsx` y en
+`user-permissions-drawer.tsx`: sin el, la pantalla agrupa bajo el prefijo crudo.
+
+**Y si el permiso QUITA algo que antes se tenia, el menu tambien.** Las entradas de
+`apps/web/src/components/layout/sidebar.tsx` llevan su `permiso` desde el 2026-09-22 y se filtran con
+`useCan`; una entrada nueva sin `permiso` se le ofrece a todo el que entre al panel. Lo sujeta
+`e2e/alcance-analista.spec.ts`, que entra como analista y comprueba las dos mitades —lo que ve y lo
+que no—.
+
 ## Una trampa que costo un fallo silencioso: `findFirst` sobre las reglas (2026-09-08)
 
 La vigencia de una constancia sale de la recurrencia del requisito, y se leia con

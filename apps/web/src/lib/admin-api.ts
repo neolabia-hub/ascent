@@ -305,12 +305,32 @@ export async function importUsers(file: File, simular = false): Promise<ImportRe
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: form,
   });
-  const data: unknown = await response.json();
+  /*
+    LOS ERRORES QUE TUMBAN EL ARCHIVO ENTERO, EN ESPAÑOL (2026-09-22).
+
+    Aqui se leia `detail.title`, y cuando la API no manda una frase propia ese titulo es **el nombre
+    de la clase de la excepcion**: la pantalla decia «Bad Request Exception» y ahi se acababa la
+    conversacion. Ahora la API manda su frase en casi todos los casos; esto cubre los que no puede
+    mandarla —el archivo demasiado grande lo corta el servidor antes de llegar al codigo, y una
+    respuesta que ni siquiera es JSON no trae nada que leer—.
+  */
   if (!response.ok) {
-    const detail = (data ?? {}) as { title?: string; code?: string };
-    throw new Error(detail.title ?? detail.code ?? 'Error al importar');
+    const detail = (await response.json().catch(() => ({}))) as { title?: string; code?: string };
+    if (response.status === 413) {
+      throw new Error('El archivo pesa más de 5 MB. Quita las hojas y los formatos que no uses, o pártelo en varios.');
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Tu sesión no tiene permiso para cargar personas. Vuelve a entrar o pídeselo a un administrador.');
+    }
+    // Un titulo que es el nombre de una clase no se le enseña a nadie.
+    const parece_tecnico = !detail.title || /exception|error$/i.test(detail.title);
+    throw new Error(
+      parece_tecnico
+        ? 'No se pudo leer el archivo. Revisa que sea la plantilla (.xlsx o .csv) y que la primera fila tenga los encabezados.'
+        : detail.title,
+    );
   }
-  return data as ImportResult;
+  return (await response.json()) as ImportResult;
 }
 
 export async function downloadImportTemplate(): Promise<void> {

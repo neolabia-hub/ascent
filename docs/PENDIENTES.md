@@ -281,6 +281,31 @@ exactamente a los suyos y limpieza propia al terminar), `performance-scoring.spe
   datos del cliente: rediseñar una pantalla contra datos imaginados es como se llega a la tercera
   versión. Cuando se haga, va como **capa de la aplicación**, no como ventana nueva del navegador.
 
+## 13. Aprobaciones y límites del analista — abierto y **cerrado el 2026-09-22**, sin desplegar
+
+Sale de una frase del cliente: *"el rol analista solo debe ver pocas cosas, en formación solo poder
+crear tipo plan, ellos no pueden crear otros tipos de formaciones; programa no pueden, solo
+seguimiento, inicio, convocatorias... la idea es que todo esto sea por permisos en rol e individual
+por usuarios"*. Nada se cablea: **todo se configura**, en rol y en persona, y la persona manda.
+
+| | Qué | Estado |
+|---|---|---|
+| 13.1 | **Estado de revisión de la formación**: `SIN_ENVIAR → EN_REVISION → APROBADA \| DEVUELTA` (migración `20260922150000`). Enviar avisa a quien tenga `catalog:publish`; devolver **exige motivo** y avisa a quien la mandó. Una versión EN_REVISION no se edita, y editar una APROBADA la devuelve a SIN_ENVIAR — si no, se aprueba una cosa y se publica otra | **HECHO, verificado en dev (`revision-de-formacion.mjs`, 24), NO desplegado** |
+| 13.2 | **Alcance por TIPO de formación**, tercera dimensión junto a procesos y áreas (migración `20260922170000`). Se configura desde la matriz de Permisos y por persona, con lo individual ganando. **Sin filas = sin acotar**, que es lo único que permite desplegar sin dejar a la empresa sin poder crear nada | **HECHO, verificado en dev (`alcance-por-tipo.mjs`, 16), NO desplegado** |
+| 13.3 | **Programas con permisos propios** (`programs:read` / `manage` / `publish`). Usaba los del catálogo, así que quien podía crear una formación **veía y tocaba los programas**, y no había forma de quitárselo sin quitarle el catálogo | **HECHO, verificado en dev (`programas-con-permiso-propio.mjs`, 16), NO desplegado** |
+| 13.4 | **El menú deja de ofrecer pantallas prohibidas.** Cada entrada de `sidebar.tsx` lleva su permiso y un grupo sin entradas no pinta ni su rótulo. Antes el analista veía Programas, Usuarios, Desempeño, Aprobaciones y Configuración, pulsaba, y se encontraba un 403 | **HECHO, cubierto por `e2e/alcance-analista.spec.ts`, NO desplegado** |
+
+**Al desplegar hay que correr `dev:sincronizar-permisos -- --si` en el servidor**, o la pantalla de
+Programas le da 403 **al administrador incluido** sin ningún error que lo delate. `db:seed` NO.
+
+**Lo que queda abierto de aquí** —ninguno es un fallo—:
+
+- **El selector de tipos por PERSONA, en la ficha de Usuarios.** El motor, la API y la matriz de
+  Permisos por rol están; la ficha de la persona todavía solo ofrece procesos y áreas, así que hoy
+  el ajuste individual de tipos se hace por API y no por pantalla.
+- **Nada más de 13.1**: la ficha de la formación ya trae los botones —«Enviar a revisión» a quien
+  escribe, «Devolver» (con motivo) y «Aprobar» a quien publica— y el distintivo del estado.
+
 ## Lo que NO está pendiente, para no volver a abrirlo
 
 Cosas que se decidieron y conviene no reabrir sin motivo nuevo:

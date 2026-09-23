@@ -50,6 +50,11 @@ para *crear*, no para *conservar lo que el administrador cambió a mano*.
 - Inmediatamente después se vuelve a `false`.
 - ¿Hace falta un permiso nuevo? `dev:sincronizar-permisos`, que **solo añade** y no quita.
 
+**Un despliegue que trae permisos nuevos no está terminado hasta correr ese script en el servidor.**
+El código ya exige el código de permiso, pero la concesión vive en la base: hasta que se corre, la
+pantalla nueva le da 403 **al administrador incluido**, y no da ningún error de arranque que lo
+delate. Pendiente desde el 2026-09-22: `programs:read`, `programs:manage` y `programs:publish`.
+
 ### Las llaves y los secretos no se regeneran «por si acaso»
 
 | Si cambias… | Lo que pasa |

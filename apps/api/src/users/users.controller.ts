@@ -110,7 +110,7 @@ export class UsersController {
   @RequirePermissions('users:import')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }))
   import(@CurrentUser() actor: AuthUser, @UploadedFile() file?: Express.Multer.File) {
-    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file' });
+    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file', message: 'No llegó ningún archivo. Elige el archivo y vuelve a intentarlo.' });
     return this.importer.import(actor, file.originalname, file.buffer);
   }
 
@@ -131,7 +131,7 @@ export class UsersController {
   @RequirePermissions('users:import')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }))
   simularImport(@CurrentUser() actor: AuthUser, @UploadedFile() file?: Express.Multer.File) {
-    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file' });
+    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', field: 'file', message: 'No llegó ningún archivo. Elige el archivo y vuelve a intentarlo.' });
     return this.importer.import(actor, file.originalname, file.buffer, { simular: true });
   }
 }

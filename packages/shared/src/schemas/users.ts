@@ -112,7 +112,20 @@ export const importRowSchema = z.object({
     .optional()
     .transform((v) => (v ? v.toLowerCase() : null)),
   telefono: z.string().max(20).optional().or(z.literal('')),
-  cargo: z.string().min(2).max(40), // code o nombre del catalogo job_titles
+  /*
+    ─── 120 Y NO 40, QUE ES LO QUE MIDE UN CARGO DE VERDAD (2026-09-22) ───
+
+    Estas columnas admiten el CODIGO o el NOMBRE del elemento del catalogo. El codigo llega hasta 40
+    caracteres, pero el nombre llega hasta 120 (`nameSchema` en `catalogs.ts`) — y el tope de aqui
+    estaba puesto en 40 para las dos cosas. Resultado: un cargo que se puede crear perfectamente
+    desde Configuracion **no se podia nombrar en el archivo**, y la fila se rechazaba con "es
+    demasiado largo" sin decir cual es el limite ni por que.
+
+    Lo destapo el cliente con «JEFE DE SEGURIDAD Y SALUD EN EL TRABAJO», que es como se llaman los
+    cargos de verdad en una empresa con SG-SST. Se sube a 120 para que el archivo y la pantalla
+    midan lo mismo: si un nombre cabe en el catalogo, cabe en la carga.
+  */
+  cargo: z.string().min(2).max(120), // code o nombre del catalogo job_titles
   /**
    * SOLO HACE FALTA SI EL CARGO TODAVIA NO EXISTE.
    *
@@ -122,8 +135,8 @@ export const importRowSchema = z.object({
    * configurado, el cargo nuevo se crea con esa clasificacion; si no, la fila falla explicando
    * por que, en vez de crear un cargo sin tipo o inventarle uno al azar.
    */
-  tipo_cargo: z.string().max(40).optional().or(z.literal('')),
-  area: z.string().min(2).max(40), // code o nombre del catalogo areas
+  tipo_cargo: z.string().max(120).optional().or(z.literal('')),
+  area: z.string().min(2).max(120), // code o nombre del catalogo areas
   /**
    * LA SUB-AREA, si la empresa las usa (2026-09-17).
    *
@@ -137,13 +150,21 @@ export const importRowSchema = z.object({
    *
    * Vacia = la persona queda en el area, como siempre. Quien no maneje sub-areas no la nota.
    */
-  sub_area: z.string().max(40).optional().or(z.literal('')),
-  regional: z.string().max(40).optional().or(z.literal('')),
+  sub_area: z.string().max(120).optional().or(z.literal('')),
+  regional: z.string().max(120).optional().or(z.literal('')),
   // Opcionales las dos: un cliente que no las maneje deja la columna vacia y su carga entra igual.
-  servicio: z.string().max(40).optional().or(z.literal('')),
+  servicio: z.string().max(120).optional().or(z.literal('')),
+  /*
+    OJO CON ESTA EXPRESION: decia `/^d{4}-d{2}-d{2}$/` —sin las barras— y eso no pide una fecha,
+    pide la letra «d» cuatro veces. **Ninguna fecha de nacimiento paso nunca la validacion**, ni
+    siquiera una perfecta como `1998-01-06`, y el mensaje que salia era "no tiene un formato
+    valido", que manda a corregir justo donde no estaba el problema. Lo destapo el cliente el
+    2026-09-22 subiendo su plantilla de 1089 personas. `fecha_ingreso`, dos lineas mas abajo, estaba
+    bien: por eso fallaba una sola de las dos columnas de fecha y parecia cosa del dato.
+  */
   fecha_nacimiento: z
     .string()
-    .regex(/^d{4}-d{2}-d{2}$/)
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
     .or(z.literal('')),
   fecha_ingreso: z

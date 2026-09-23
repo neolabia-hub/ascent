@@ -61,6 +61,28 @@ function anosDisponibles(plans: PlanRow[] | null): number[] {
   return [enCurso - 2, enCurso - 1, enCurso, enCurso + 1].filter((year) => !ocupados.has(year));
 }
 
+/**
+ * EL AÑO QUE PROPONE EL BOTON, que no es «el primero de la lista» (2026-09-22).
+ *
+ * Lo era, y con el plan de 2026 ya creado el boton decia **«Crear el plan de 2024»** — lo vio el
+ * cliente en produccion. Los años pasados estan en la lista a proposito (una empresa que llega a
+ * mitad de camino carga el plan del año anterior como evidencia), pero **ofrecerlos de primeras es
+ * proponer rellenar el pasado**, que no es lo que va a hacer nadie con el plan del año en curso ya
+ * abierto. Lo siguiente que se planea es el año que viene.
+ *
+ * El orden es: el año EN CURSO si esta libre; si no, el siguiente hacia ADELANTE; y solo si no
+ * queda ninguno hacia adelante, el pasado mas RECIENTE. Los demas siguen en el desplegable.
+ */
+function anoPropuesto(plans: PlanRow[] | null): number | undefined {
+  const enCurso = new Date().getFullYear();
+  const libres = anosDisponibles(plans);
+  if (libres.includes(enCurso)) return enCurso;
+  const haciaAdelante = libres.filter((year) => year > enCurso);
+  if (haciaAdelante.length > 0) return Math.min(...haciaAdelante);
+  const haciaAtras = libres.filter((year) => year < enCurso);
+  return haciaAtras.length > 0 ? Math.max(...haciaAtras) : undefined;
+}
+
 export default function PlanPage() {
   const router = useRouter();
   const { showToast } = useToast();
@@ -103,10 +125,9 @@ export default function PlanPage() {
     void load();
   }, [load]);
 
-  /** Al abrir el cajon, el año propuesto es el primero libre — normalmente el que corre. */
+  /** Al abrir el cajon se propone el mismo año que anuncia el boton: ver `anoPropuesto`. */
   const abrirNuevo = () => {
-    const libres = anosDisponibles(plans);
-    const year = libres.includes(new Date().getFullYear()) ? new Date().getFullYear() : libres[0];
+    const year = anoPropuesto(plans);
     if (year === undefined) {
       showToast({ kind: 'info', title: 'Todos los años a la vista ya tienen su plan' });
       return;
@@ -180,6 +201,7 @@ export default function PlanPage() {
 
   const libres = anosDisponibles(plans);
   const enCurso = new Date().getFullYear();
+  const propuesto = anoPropuesto(plans);
 
   return (
     <div>
@@ -208,10 +230,10 @@ export default function PlanPage() {
           el cajon en ese medio segundo, las opciones del desplegable CAMBIABAN debajo de su mano
           al llegar la respuesta.
         */}
-        {plans !== null && libres.length > 0 ? (
+        {plans !== null && propuesto !== undefined ? (
           <Button onClick={abrirNuevo}>
             <Plus size={16} />
-            {libres.includes(enCurso) ? `Crear el plan de ${enCurso}` : `Crear el plan de ${libres[0]}`}
+            {`Crear el plan de ${propuesto}`}
           </Button>
         ) : null}
       </div>

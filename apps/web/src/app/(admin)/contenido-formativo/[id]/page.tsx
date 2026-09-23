@@ -252,16 +252,18 @@ export default function ActividadDetallePage() {
   /** Lo que impide publicar HOY. Vacio = se puede publicar. */
   const faltaParaPublicar = version ? loQueFaltaParaPublicar(version.contents) : [];
   /**
-   * Lo que el TIPO pide y esta version no trae. NO impide publicar —el tenant todavia no puede
-   * cambiar ese config desde la interfaz, asi que convertirlo en muro dejaria encerrado a quien
-   * no lo comparta (Decision #74)— pero se dice antes de pulsar, y el servidor lo deja en la
-   * auditoria. Lo que estaba roto no era que se pudiera publicar sin examen: era que nadie lo
-   * mencionara nunca.
+   * Lo que el TIPO pide y esta version no trae. **SI impide publicar** (2026-09-22).
+   *
+   * Se pintaba aparte y con otra voz —«Se puede publicar, pero... normalmente lleva mas»— porque
+   * arrastraba la Decision #74, de cuando el tenant no podia cambiar la configuracion del tipo
+   * desde la interfaz. Ya puede, y el servidor rechaza la publicacion. Asi que el panel prometia
+   * que se podia y al pulsar salia un error: se junta con lo demas que falta, que es lo que es.
    */
   const loQuePideElTipo =
     activity && version
       ? loQueExigeElTipo(activity.activityType.config, version.contents)
       : [];
+  const faltaTodo = [...faltaParaPublicar, ...loQuePideElTipo];
 
   const refreshVersion = useCallback(async () => {
     if (!selectedVersionId) return;
@@ -437,7 +439,18 @@ export default function ActividadDetallePage() {
             'Una seccion del examen pide mas preguntas de las que hay en su categoría. Agrega preguntas o baja cuantas pide.',
           VERSION_NOT_DRAFT: 'Esta versión ya esta publicada. Para cambiar algo, crea una nueva.',
         };
-        setPublishError(map[error.code] ?? `No se pudo publicar (${error.code}).`);
+        /*
+          EL RESPALDO ES LA FRASE DEL SERVIDOR, NO EL CODIGO (2026-09-22).
+
+          Decia `No se pudo publicar (TYPE_REQUIREMENTS_MISSING).` y asi lo vio el cliente. Lo
+          absurdo es que la API **si mandaba la explicacion entera** —«este tipo pide encuesta y no
+          tiene ninguna elegida; elige cual en Configuracion > Tipos de formacion»— y esta pantalla
+          la tiraba para imprimir el nombre interno del error. El mapa de arriba sigue mandando
+          cuando hay una frase mejor que la del servidor; el codigo pelado no se enseña nunca.
+        */
+        setPublishError(
+          map[error.code] ?? motivoDelError(error) ?? 'No se pudo publicar. Revisa lo que falta y vuelve a intentarlo.',
+        );
       } else {
         setPublishError('No se pudo publicar: no hubo respuesta del servidor.');
       }
@@ -1017,7 +1030,7 @@ export default function ActividadDetallePage() {
             <Button
               onClick={() => void doPublish()}
               loading={busy}
-              disabled={faltaParaPublicar.length > 0 || (!canPublish && justification.trim().length < 10)}
+              disabled={faltaTodo.length > 0 || (!canPublish && justification.trim().length < 10)}
             >
               {canPublish ? 'Publicar y congelar' : 'Enviar solicitud'}
             </Button>
@@ -1054,40 +1067,16 @@ export default function ActividadDetallePage() {
             que faltaba algo despues de intentarlo, con una frase que no dice cual, es la peor
             forma de descubrirlo.
           */}
-          {faltaParaPublicar.length > 0 ? (
+          {faltaTodo.length > 0 ? (
             <div className="rounded-lg border border-warn bg-warn-soft px-4 py-3">
               <p className="text-sm font-medium text-warn">Falta esto para poder publicar</p>
               <ul className="mt-1.5 space-y-1">
-                {faltaParaPublicar.map((linea) => (
+                {faltaTodo.map((linea) => (
                   <li key={linea} className="text-sm text-ink-700">
                     {linea}
                   </li>
                 ))}
               </ul>
-            </div>
-          ) : null}
-
-          {/*
-            Lo que el tipo pide y no esta. Se distingue del bloque de arriba a proposito: aquello
-            IMPIDE publicar, esto no. Pintarlos iguales ensenaria que a veces el aviso ambar deja
-            seguir y a veces no, que es la forma mas rapida de que se dejen de leer los dos.
-          */}
-          {loQuePideElTipo.length > 0 ? (
-            <div className="rounded-lg border border-line-strong bg-paper px-4 py-3">
-              <p className="text-sm font-medium text-ink-900">
-                Se puede publicar, pero {activity ? `una "${activity.activityType.name}"` : 'este tipo'} normalmente
-                lleva mas
-              </p>
-              <ul className="mt-1.5 space-y-1">
-                {loQuePideElTipo.map((linea) => (
-                  <li key={linea} className="text-sm text-ink-500">
-                    {linea}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs text-ink-500">
-                Si publicas asi, queda registrado en la auditoria que se hizo a sabiendas.
-              </p>
             </div>
           ) : null}
 

@@ -24,6 +24,127 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-22 (tarde) — CUATRO COSAS QUE EL CLIENTE VIO EN PRODUCCION, y todas eran nuestras
+
+Subio su plantilla de 1089 personas y se llevo tres portazos seguidos. Ninguno era culpa del
+archivo, y eso es lo que tienen en comun: **el sistema le echaba la culpa al dato**.
+
+**1. `d{4}` en vez de `\d{4}`.** La expresion que valida `fecha_nacimiento` pedia la letra «d»
+cuatro veces, no cuatro digitos. **Ninguna fecha de nacimiento habria pasado jamas**, ni la mejor
+escrita, y el mensaje decia *"no tiene un formato valido"* — mandando a corregir justo donde no
+estaba el problema. `fecha_ingreso`, dos lineas mas abajo, estaba bien: por eso fallaba una sola de
+las dos columnas de fecha y parecia cosa del dato.
+
+**2. La celda de fecha de Excel llegaba como texto de JavaScript.** *«"fecha_nacimiento" no tiene un
+formato valido: "Tue Jan 06 1998 00:00:00 GMT+0000 (Coordinated Universal Time)"»* — un texto que
+nadie escribio: lo fabricaba `String(cell.text)` sobre una celda con formato de fecha. No se puede
+corregir mirando la celda, porque en Excel la celda se ve perfecta. Ahora `textoDeCelda` trata la
+fecha antes que nada, y `normalizarFecha` acepta ademas `D/M/AAAA` — con la regla de que **un numero
+mayor que 12 solo puede ser el dia**, y si los dos caben en un mes se lee dia/mes, que es la
+convencion de aqui. Lo que no encaja se devuelve tal cual y la fila falla diciendolo: una fecha mal
+leida en silencio es peor que una fila rechazada.
+
+**3. «"Cargo" es demasiado largo».** El archivo medía 40 caracteres y el catalogo de la pantalla,
+120. Un cargo que se puede crear perfectamente desde Configuracion **no se podia nombrar en el
+archivo** — y el caso real era «JEFE DE SEGURIDAD Y SALUD EN EL TRABAJO», que es como se llaman los
+cargos en una empresa con SG-SST. Subidas a 120 las cinco columnas de catalogo.
+
+**4. «Bad Request Exception».** Los errores que tumban el archivo entero no llevaban frase, asi que
+el filtro caia en el nombre de la clase de la excepcion. Ahora `EMPTY_FILE`, `TOO_MANY_ROWS`,
+`UNSUPPORTED_FILE`, `MISSING_HEADERS` y `FILE_REQUIRED` traen su explicacion en español diciendo que
+hacer —el `.xls` explica el "Guardar como", y la columna que falta se nombra—, y la pantalla ya no
+imprime un codigo cuando no reconoce uno.
+
+> **Y de paso, `correo` dejo de ser obligatoria como COLUMNA.** Era opcional como dato desde el
+> 2026-09-21 pero seguia siendo imprescindible en la primera fila, asi que quitarla tumbaba la carga
+> entera con un 400. Borrarla no borra nada: sin la columna, `correo` llega vacio, y vacio en una
+> recarga significa «esto no lo dice el archivo, no lo toques».
+
+**Dos mas, de otras pantallas, del mismo dia:**
+
+- **El boton del plan decia «Crear el plan de 2024».** Los años que se pueden abrir son dos atras y
+  uno adelante, y el boton cogia *el primero de la lista*; con el plan de 2026 ya creado, el primero
+  libre era 2024. Ofrecer el pasado de primeras es proponer rellenar hacia atras. Ahora propone el
+  año en curso si esta libre, si no el siguiente hacia adelante, y solo al final el pasado mas
+  reciente (`anoPropuesto`). Los demas siguen en el desplegable.
+- **«No se pudo publicar (TYPE_REQUIREMENTS_MISSING)».** La API mandaba la explicacion entera —«este
+  tipo pide encuesta y no tiene ninguna elegida; elige cual en Configuracion > Tipos de formacion»—
+  y la pantalla la tiraba para imprimir el nombre interno del error. Ademas el panel de arriba decia
+  *«Se puede publicar, pero...»* cuando el servidor **rechaza**: arrastraba la Decision #74, de
+  cuando el tenant no podia editar la configuracion del tipo. Y su frase de la encuesta se habia
+  quedado vieja dos veces: decia «agregala antes de publicar» —ya no se hace ahi (Decision #116)— y
+  **no miraba `surveyTemplateId`**, asi que salia tambien cuando el tipo si tenia una elegida y no
+  habia nada que arreglar. Ahora las dos listas son una sola, bloquean, y dicen donde se arregla.
+
+**Pruebas:** recorrido nuevo `carga-de-excel-real.mjs` (26 comprobaciones) que sube .xlsx **de
+verdad**, con celdas de fecha de verdad y armados con la misma libreria que usa el servidor — el CSV
+no reproducia ninguno de los tres fallos, porque el fallo estaba en como se lee una celda de Excel.
+Mas 7 unitarias de fechas y topes, 2 de la encuesta del tipo, y la de «ninguna columna sin rotulo»
+reescrita para recorrer `IMPORT_HEADERS` en vez de una lista a mano: esa lista tenia cinco columnas
+y por eso no cazo que a `fecha_nacimiento` y `vinculacion` les faltara el suyo — el cliente leyo el
+nombre crudo de la columna, con guion bajo. Total: 1008 unitarias, 27/27 e2e, lint limpio.
+
+---
+
+## 2026-09-22 (continuacion) — APROBACIONES Y LIMITES DEL ANALISTA: que puede crear, que puede ver, y un menu que dejo de mentir
+
+Todo esto sale de una sola frase del cliente: *"el rol analista solo debe ver pocas cosas, en
+formacion solo poder crear tipo plan, ellos no pueden crear otros tipos de formaciones; programa no
+pueden, solo seguimiento, inicio, convocatorias... la idea es que todo esto sea por permisos en rol e
+individual por usuarios"*. Lo importante de esa frase es el final: **no se cablea nada, se
+configura** — y se configura en dos niveles, rol y persona, con la persona mandando.
+
+**1. Estado de revision de la formacion.** `SIN_ENVIAR -> EN_REVISION -> APROBADA | DEVUELTA`
+(`revision.service.ts`, migracion `20260922150000_revision_de_formacion`). Enviar avisa a quien
+tenga `catalog:publish`; devolver exige motivo y avisa a quien la mando. Una version EN_REVISION **no
+se edita**, y editar una APROBADA la devuelve a SIN_ENVIAR — si no, se aprueba una cosa y se publica
+otra. Recorrido: `revision-de-formacion.mjs` (24 comprobaciones).
+
+**2. Alcance por TIPO de formacion**, la tercera dimension junto a procesos y areas
+(`20260922170000_alcance_por_tipo`). Se configura desde la matriz de Permisos —unas filas mas, con
+borde punteado cuando el rol esta sin acotar— y por persona, con la misma precedencia de siempre: lo
+individual gana. **Sin filas = sin acotar**, que es lo unico que permite desplegar sin dejar a la
+empresa entera sin poder crear una formacion. Recorrido: `alcance-por-tipo.mjs` (16).
+
+> **El fallo silencioso que se comio esta parte y hay que recordar.** Al meter `activity_type_id` en
+> `analyst_scopes`, `getAnalystScope` empezo a ver filas donde antes no habia ninguna y devolvia una
+> lista de procesos VACIA: la persona veia cero formaciones **sin ningun error**. Lo cazo el paso 5
+> del recorrido. La consulta ahora filtra por dimension (`OR: [{processId: {not: null}}, {areaId:
+> {not: null}}]`). Moraleja: una tabla de alcance con tres dimensiones no se consulta entera.
+
+**3. Programas, con permisos PROPIOS** (`programs:read` / `programs:manage` / `programs:publish`).
+Usaba los del catalogo, asi que **quien podia crear una formacion veia y tocaba los programas**, y no
+habia forma de quitarselo sin quitarle el catalogo — que es justo lo que el analista necesita. Son
+tres y no uno por el mismo motivo que en el catalogo: publicar un programa **apaga la constancia
+individual de todos sus modulos**, y eso no es «guardar». Recorrido:
+`programas-con-permiso-propio.mjs` (16), que ademas comprueba que conceder `programs:read` por
+permiso individual abre la consulta **y nada mas**.
+
+**4. El menu dejo de ofrecer pantallas prohibidas.** Se pintaba entero para cualquiera que entrara al
+panel: el analista veia Programas, Usuarios, Desempeño, Aprobaciones y Configuracion, pulsaba, y se
+encontraba un 403 o una pantalla en blanco. Cada entrada de `sidebar.tsx` lleva ahora su `permiso`
+—lista, basta uno— y un grupo sin entradas no pinta ni su rotulo. Lo sujeta
+`e2e/alcance-analista.spec.ts`, que comprueba **las dos mitades**: lo que el analista ve y lo que no
+(solo con las ausencias, un menu roto que no pintara nada pasaria la prueba).
+
+**5. De paso, una incoherencia de la pantalla de Permisos.** El script `dev:sincronizar-permisos`
+creaba las filas con `description: 'Permiso programs:read'`, asi que los permisos llegados por
+semilla se leian en español y los llegados por el script como una fila de tabla, en la misma columna.
+Los textos viven ahora en `apps/api/prisma/permission-descriptions.ts` y los leen los dos. Faltaban
+ademas los tres de `performance:*`, que salian como *"Permite manage en el modulo performance"*.
+
+**Estado:** `pnpm lint` limpio, 999 pruebas unitarias en verde, 27/27 e2e, y los cuatro recorridos
+nuevos pasando. **NO desplegado**: todo esto es posterior al commit `2d36e23`.
+
+> **Al desplegar hay que correr `pnpm --filter @neo-pulse/api dev:sincronizar-permisos -- --si` en el
+> servidor.** Sin eso los tres permisos de programas no existen en la base y la pantalla de Programas
+> le da 403 **al administrador incluido**, sin ningun error de arranque que lo delate. `db:seed` NO
+> —reemplaza el juego completo de permisos de cada rol y ya borro una vez la parametrizacion de un
+> cliente—. En desarrollo ya se corrio: concedio los tres al ADMIN y ninguno al ANALISTA, que es
+> exactamente lo que pidio el cliente.
+
+---
+
 ## 2026-09-22 — DESPLEGADO A PRODUCCION: todo lo de la sesion del 21
 
 Commit `2d36e23`. Los cinco pasos de `05-reglas-de-despliegue.md` §3, en orden:

@@ -149,8 +149,18 @@ export function consecuenciasDelTipo(config: ActivityTypeConfig): string[] {
  * `requiresAssessment` y `requiresSurvey` se sembraron en el Sprint 1 y no los leia nadie: una
  * "Capacitacion del plan" se publicaba con un video y ninguna pantalla lo mencionaba.
  *
- * NO impide publicar (Decision #74): el tenant todavia no puede editar el config del tipo desde la
- * interfaz, asi que convertirlo en muro dejaria encerrado a quien no comparta la regla.
+ * ─── SI IMPIDE PUBLICAR, Y AQUI SE DECIA LO CONTRARIO (2026-09-22) ───
+ *
+ * Esto arrastraba la Decision #74 —«avisa, no bloquea»— de cuando el tenant no podia editar la
+ * configuracion del tipo desde la interfaz. Ya puede, y el servidor **rechaza** la publicacion
+ * (`TYPE_REQUIREMENTS_MISSING`). El resultado que vio el cliente: el panel decia *"Se puede
+ * publicar, pero..."*, pulsaba, y le salia un error. Un aviso que se equivoca sobre si algo va a
+ * funcionar es peor que no estar.
+ *
+ * Y la frase de la encuesta se habia quedado vieja dos veces: decia «agregala antes de publicar»
+ * —cosa que ya no se hace aqui, la engancha el tipo sola (Decision #116)— y **no miraba
+ * `surveyTemplateId`**, asi que salia tambien cuando el tipo SI tenia una elegida y no habia nada
+ * que arreglar. Ahora dice donde se arregla de verdad: Configuracion > Tipos de formacion.
  */
 export function loQueExigeElTipo(
   raw: Record<string, unknown> | null | undefined,
@@ -159,15 +169,20 @@ export function loQueExigeElTipo(
   const config = readTypeConfig(raw);
   const tipos = new Set(contenidos.map((c) => c.type));
   const faltan: string[] = [];
+  // Se lee del crudo: `readTypeConfig` normaliza los ajustes de comportamiento, y este es un
+  // puntero a otra fila. Lo unico que importa aqui es si hay alguna elegida o no.
+  const encuestaDelTipo = typeof raw?.surveyTemplateId === 'string' && raw.surveyTemplateId.length > 0;
 
   if (config.requiresAssessment && !tipos.has('ASSESSMENT')) {
     faltan.push(
       'Este tipo de formación se evalúa: agrega una evaluación antes de publicar. Sin nota no hay nada que enseñarle a un auditor.',
     );
   }
-  if (config.requiresSurvey && !tipos.has('SURVEY')) {
+  if (config.requiresSurvey && !tipos.has('SURVEY') && !encuestaDelTipo) {
     faltan.push(
-      'Este tipo de formación pide encuesta de satisfacción: agregala antes de publicar. Es la evaluación de reaccion que revisan BASC e ISO.',
+      'Este tipo de formación pide encuesta de satisfacción y su tipo no tiene ninguna elegida. No se agrega aquí: ' +
+        'entra a Configuración → Tipos de formación, elige la encuesta de este tipo, y se enganchará sola al final ' +
+        'de todas las formaciones que lo usen.',
     );
   }
 
