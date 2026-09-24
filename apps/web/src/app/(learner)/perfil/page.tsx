@@ -70,6 +70,13 @@ export default function ProfilePage() {
         <p className="mt-2 text-xs uppercase tracking-[0.04em] text-ink-500">{tenant.name}</p>
       </section>
 
+      {/*
+        TUS DATOS VA ARRIBA, pegado a la cabecera (2026-09-24). Se puso primero debajo de la racha y
+        en el telefono quedaba fuera de la pantalla: el cliente abrio el perfil buscando donde
+        cambiar su correo y no lo encontro. La ficha es la continuacion natural del nombre y la foto.
+      */}
+      <TusDatos />
+
       {progress === null ? (
         <Skeleton className="h-32 w-full rounded-xl" />
       ) : (
@@ -105,8 +112,6 @@ export default function ProfilePage() {
         en la navegacion para algo que se mira dos veces al año.
       */}
       <MisConstancias />
-
-      <TusDatos />
 
       {/*
         SU DESEMPENO YA NO VIVE AQUI (Decision #140). Estaba debajo de las constancias, y era el
