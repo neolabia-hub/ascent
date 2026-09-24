@@ -41,8 +41,9 @@ El archivo copiado **vive solo en ese contenedor**: un `up -d` que lo recree lo 
 cierre, si todavia no se ha desplegado, se repite el `scp` + `docker cp`. Tras desplegar ya viene en
 la imagen. Ningun despliegue lo ejecuta: `release.sh` solo aplica migraciones y RLS.
 
-**Ojo:** el cliente hablaba de ~1.200 personas y hay **1001 activas**. Conviene preguntarle si la
-carga quedo completa o si faltan filas por errores.
+**Confirmado por el cliente:** las 1001 activas son la plantilla completa (se hablaba de ~1.200 de
+memoria). Y **no habra cierre**: no es una campaña con plazo, cada persona es responsable de cambiar
+su clave, que el sistema le exige al entrar.
 
 Tambien quedo hecho y **sin desplegar**: filtros en todos los catalogos de Configuracion (buscador,
 estado, tipo de cargo, area, responsable, y en Áreas la rama y el nivel), `5eb7ca8`.

@@ -137,13 +137,11 @@ Ascent está viva en `https://transprensa.ascentio.app`. Lo que queda no es cód
 que rodea a un sistema que ya tiene un cliente dentro. El detalle, en `HANDOFF` 2026-09-09 (noche),
 `docs/05-reglas-de-despliegue.md` y `ASCENT - CREDENCIALES Y ACCESOS.md`.
 
-> **Campaña de primer ingreso con la cédula: ABIERTA el 2026-09-24** (998 personas, 3 ADMIN fuera).
-> Falta **cerrarla** al vencer el plazo que se anuncie: `--cierre` (ensayo) y `--cierre --si`.
-> Comando exacto en `05-reglas-de-despliegue.md` §2. Mientras no se cierre, quien conozca la cédula
-> de otra persona puede entrar por ella. El script no esta en la imagen desplegada todavia: si se
-> cierra antes del proximo despliegue, hay que volver a copiarlo al contenedor (ver `HANDOFF`).
+> **Clave igual a la cédula: aplicada el 2026-09-24 a las 998 personas no ADMIN, y NO se cierra.**
+> Decision del cliente: no es una campaña con plazo; cada persona es responsable de cambiarla (el
+> sistema se lo exige al entrar). El modo `--cierre` del script queda disponible pero no se usara.
 >
-> Y está **pendiente de desplegar**: el perfil con «Tus datos» y los filtros de Configuración
+> Está **pendiente de desplegar**: el perfil con «Tus datos» y los filtros de Configuración
 > (commits `3cc0796`..`5eb7ca8`, ya en GitHub).
 
 | | Qué falta | Por qué importa |
