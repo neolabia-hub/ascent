@@ -414,6 +414,36 @@ export function setMyAvatar(avatarKey: string | null): Promise<{ avatarKey: stri
   return apiFetch('/auth/me/avatar', { method: 'PUT', body: { avatarKey } });
 }
 
+/**
+ * La ficha propia, tal como la ve la persona en su perfil. Solo `email` y `phone` los cambia ella;
+ * el resto es de la empresa y lo cambia quien administra o el archivo de personal.
+ */
+export interface MisDatos {
+  documentNumber: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  /** AAAA-MM-DD. */
+  birthDate: string | null;
+  hiredAt: string | null;
+  employmentType: string;
+  role: string;
+  jobTitle: string | null;
+  /** Con su rama: «Operaciones / Bodega Norte». */
+  area: string | null;
+  regional: string | null;
+  service: string | null;
+}
+
+export function getMisDatos(): Promise<MisDatos> {
+  return apiFetch('/auth/me/datos');
+}
+
+/** `''` quita el dato; ausente, no lo toca. */
+export function updateMiContacto(input: { email?: string; phone?: string }): Promise<MisDatos> {
+  return apiFetch('/auth/me/contacto', { method: 'PATCH', body: input });
+}
+
 export interface AuthUser {
   id: string;
   fullName: string;

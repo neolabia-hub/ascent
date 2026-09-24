@@ -278,11 +278,16 @@ export class UsersService {
       data: {
         passwordHash: await argon2.hash(generatedPassword),
         mustChangePassword: true,
-        refreshTokenHash: null, // cierra sesiones vivas
         failedLoginAttempts: 0,
         lockedUntil: null,
       },
     });
+    /*
+      CIERRA SUS SESIONES VIVAS, que es lo que decia hacer y no hacia (2026-09-24). Ponia a nulo
+      `refreshTokenHash`, columna que dejo de leerse con la Decision #91: las sesiones viven en
+      `user_sessions`, asi que quien ya estaba dentro seguia dentro siete dias con la clave vieja.
+    */
+    await this.prisma.scoped.userSession.deleteMany({ where: { userId: id } });
     await this.audit.record({
       tenantId: this.prisma.currentTenantId,
       userId: actor.id,

@@ -1,8 +1,8 @@
 'use client';
 
-import { Award, Camera, Download, Flame, LogOut, Shield, Trophy } from 'lucide-react';
+import { Award, Camera, Download, Flame, LogOut, Pencil, Shield, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { logout, setMyAvatar, motivoDelError } from '@/lib/api';
+import { ApiError, getMisDatos, logout, setMyAvatar, motivoDelError, updateMiContacto, type MisDatos } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { getMyProgress, type MyProgress } from '@/lib/learner-api';
 import { useLearnerProfile } from '@/components/layout/learner-session';
@@ -11,6 +11,8 @@ import { useTenant } from '@/components/providers/tenant-provider';
 import { descargarPdf, getMyCertificates, type CertificateRow } from '@/lib/certificates-api';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { uploadMedia } from '@/lib/catalog-api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,7 +61,12 @@ export default function ProfilePage() {
       <section className="card rounded-xl p-6 text-center">
         <MiFoto fullName={profile.fullName} avatarKey={avatarKey} onChange={setAvatarKey} />
         <h2 className="mt-3 font-display text-lg font-semibold text-ink-900">{profile.fullName}</h2>
-        <p className="mt-0.5 text-sm text-ink-500">{profile.email}</p>
+        {/*
+          EL CARGO Y NO EL CORREO bajo el nombre (2026-09-24). El correo ahora se edita en «Tus
+          datos», y repetirlo aqui dejaba dos copias que no coincidian hasta recargar: esta sale del
+          perfil cacheado de la sesion y la otra de la ficha recien guardada.
+        */}
+        {profile.jobTitle ? <p className="mt-0.5 text-sm text-ink-500">{profile.jobTitle}</p> : null}
         <p className="mt-2 text-xs uppercase tracking-[0.04em] text-ink-500">{tenant.name}</p>
       </section>
 
@@ -98,6 +105,8 @@ export default function ProfilePage() {
         en la navegacion para algo que se mira dos veces al año.
       */}
       <MisConstancias />
+
+      <TusDatos />
 
       {/*
         SU DESEMPENO YA NO VIVE AQUI (Decision #140). Estaba debajo de las constancias, y era el
@@ -320,5 +329,186 @@ function MisConstancias() {
         })}
       </div>
     </section>
+  );
+}
+
+const VINCULACION: Record<string, string> = {
+  DIRECTO: 'Directo',
+  CONTRATISTA: 'Contratista',
+  TEMPORAL: 'Temporal',
+  EN_MISION: 'En misión',
+};
+
+/**
+ * La frase que se le ensena a la persona si no se guardo. En una validacion el titulo del error es
+ * el generico en ingles de la API; la frase util esta en el primer campo que fallo, y viene del
+ * esquema compartido ya escrita en español.
+ */
+function fraseDelError(e: unknown): string {
+  if (e instanceof ApiError && e.code === 'VALIDATION_ERROR') {
+    const errores = e.body.errors as Array<{ message?: string }> | undefined;
+    const primera = errores?.find((x) => x.message)?.message;
+    if (primera) return primera;
+  }
+  return motivoDelError(e) ?? 'No se pudieron guardar tus datos. Inténtalo de nuevo.';
+}
+
+/** AAAA-MM-DD a «5 de enero de 2024». A mediodia para que ninguna zona horaria le reste un dia. */
+function fechaLarga(fecha: string | null): string | null {
+  if (!fecha) return null;
+  return new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/**
+ * TUS DATOS (2026-09-24): lo que la empresa tiene de ti, y lo que puedes cambiar tu.
+ *
+ * Dos bloques y la frontera se ve: **contacto** (correo y telefono) lo edita la persona, porque
+ * solo ella sabe cual es su correo o si cambio de numero; **lo laboral** (documento, cargo, area,
+ * regional, vinculacion, fechas) es de solo lectura, porque de ahi cuelgan sus obligaciones de
+ * formacion y lo mantiene quien administra o el archivo de personal. Es la misma linea que trazan
+ * los LMS corporativos.
+ *
+ * Se ensena lo laboral aunque no se pueda tocar para que la persona detecte un error —«esa no es
+ * mi area»— y lo pida corregir: le cambia lo que se le exige, y nadie mas lo mira con sus ojos.
+ *
+ * Nada de lo vacio se pinta: una fila «Regional: —» en una empresa sin regionales es ruido.
+ */
+function TusDatos() {
+  const { showToast } = useToast();
+  const [datos, setDatos] = useState<MisDatos | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [correo, setCorreo] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getMisDatos()
+      .then(setDatos)
+      .catch(() => setDatos(null));
+  }, []);
+
+  if (datos === null) return <Skeleton className="h-48 w-full rounded-xl" />;
+
+  function abrir() {
+    if (!datos) return;
+    setCorreo(datos.email ?? '');
+    setTelefono(datos.phone ?? '');
+    setError(null);
+    setEditando(true);
+  }
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    try {
+      const nuevos = await updateMiContacto({ email: correo.trim(), phone: telefono.trim() });
+      setDatos(nuevos);
+      setEditando(false);
+      showToast({ kind: 'success', title: 'Datos guardados' });
+    } catch (e) {
+      // El error se queda EN el formulario, no en un aviso que se va solo: la persona tiene que
+      // corregir el campo y necesita seguir leyendo que le falla mientras lo hace.
+      setError(fraseDelError(e));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const laborales: Array<[string, string | null]> = [
+    ['Documento', datos.documentNumber],
+    ['Cargo', datos.jobTitle],
+    ['Área', datos.area],
+    ['Regional', datos.regional],
+    ['Servicio', datos.service],
+    ['Vinculación', VINCULACION[datos.employmentType] ?? datos.employmentType],
+    ['Fecha de ingreso', fechaLarga(datos.hiredAt)],
+    ['Fecha de nacimiento', fechaLarga(datos.birthDate)],
+  ];
+
+  return (
+    <section className="card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display text-base font-semibold text-ink-900">Tus datos</h3>
+          <p className="mt-0.5 text-sm text-ink-500">Tu correo y tu teléfono los puedes cambiar tú.</p>
+        </div>
+        {editando ? null : (
+          <Button variant="outline" size="sm" onClick={abrir}>
+            <Pencil className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            Editar
+          </Button>
+        )}
+      </div>
+
+      {editando ? (
+        <form
+          className="mt-4 space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void guardar();
+          }}
+        >
+          <Field htmlFor="mi-correo" label="Correo" hint="Déjalo en blanco si no tienes. Siempre puedes entrar con tu documento.">
+            <Input
+              id="mi-correo"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              placeholder="nombre@correo.com"
+            />
+          </Field>
+          <Field htmlFor="mi-telefono" label="Teléfono">
+            <Input
+              id="mi-telefono"
+              type="tel"
+              autoComplete="tel"
+              inputMode="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="300 123 4567"
+            />
+          </Field>
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <Button type="submit" loading={guardando} className="flex-1">
+              Guardar
+            </Button>
+            <Button type="button" variant="outline" disabled={guardando} onClick={() => setEditando(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <dl className="mt-3 divide-y divide-line">
+          <FilaDato etiqueta="Correo" valor={datos.email ?? 'Sin correo. Entras con tu documento.'} tenue={!datos.email} />
+          <FilaDato etiqueta="Teléfono" valor={datos.phone ?? 'Sin teléfono'} tenue={!datos.phone} />
+        </dl>
+      )}
+
+      <h4 className="mt-5 text-xs font-medium uppercase tracking-[0.04em] text-ink-500">En la empresa</h4>
+      <dl className="mt-1 divide-y divide-line">
+        {laborales.map(([etiqueta, valor]) => (valor ? <FilaDato key={etiqueta} etiqueta={etiqueta} valor={valor} /> : null))}
+      </dl>
+      <p className="mt-3 text-xs text-ink-500">
+        Si algo de esto no es correcto, pide a quien administra la plataforma que lo corrija: de tu cargo y tu área
+        dependen las formaciones que te corresponden.
+      </p>
+    </section>
+  );
+}
+
+function FilaDato({ etiqueta, valor, tenue = false }: { etiqueta: string; valor: string; tenue?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-2.5">
+      <dt className="shrink-0 text-sm text-ink-500">{etiqueta}</dt>
+      <dd className={`min-w-0 break-words text-right text-sm ${tenue ? 'text-ink-500' : 'font-medium text-ink-900'}`}>{valor}</dd>
+    </div>
   );
 }

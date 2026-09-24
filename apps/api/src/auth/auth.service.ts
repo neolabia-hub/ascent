@@ -1,6 +1,14 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { BadRequestException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import type { MyContactInput } from '@neo-pulse/shared';
 import * as argon2 from 'argon2';
 import { AuditService } from '../common/audit.service.js';
 import type { JwtPayload } from '../common/types.js';
@@ -23,6 +31,27 @@ export interface LoginResult {
   /** Cual de las sesiones de esta persona es (Decision #91). Viaja en la cookie. */
   sessionId: string;
   user: AuthUserView;
+}
+
+/**
+ * La ficha de la persona tal como la ve ella misma en su perfil. Todo es de lectura salvo `email`
+ * y `phone`, que cambia con `updateMyContact`; el resto es de la empresa (ver `myContactSchema`).
+ */
+export interface MisDatos {
+  documentNumber: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  /** AAAA-MM-DD, sin hora: es una fecha de calendario y no un instante. */
+  birthDate: string | null;
+  hiredAt: string | null;
+  employmentType: string;
+  role: string;
+  jobTitle: string | null;
+  /** Con su rama: «Operaciones / Bodega Norte». */
+  area: string | null;
+  regional: string | null;
+  service: string | null;
 }
 
 /** Contexto de la peticion (IP/UA) para el rastro de auditoria. */
@@ -290,6 +319,90 @@ export class AuthService {
       .forTenant(tenantId)
       .user.update({ where: { id: userId }, data: { avatarKey }, select: { avatarKey: true } });
     return { avatarKey: user.avatarKey };
+  }
+
+  /**
+   * LA FICHA DE LA PROPIA PERSONA, para su perfil (2026-09-24).
+   *
+   * Separada de `me()` a proposito: `me()` viaja en cada carga de pagina y se cachea en el cliente,
+   * y esto solo lo mira quien abre su perfil. Meterlo alli seria pagar cinco uniones en cada
+   * pantalla para enseñarlas en una.
+   *
+   * El area viaja con su rama («Operaciones / Bodega Norte»): el nombre suelto de un sub-area no
+   * dice donde esta, y es justo lo que la persona necesita para ver si la tienen bien ubicada.
+   */
+  async misDatos(userId: string, tenantId: string): Promise<MisDatos> {
+    const user = await this.prisma.forTenant(tenantId).user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        documentNumber: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        birthDate: true,
+        hiredAt: true,
+        employmentType: true,
+        role: { select: { name: true } },
+        jobTitle: { select: { name: true } },
+        area: { select: { name: true, parent: { select: { name: true } } } },
+        regional: { select: { name: true } },
+        service: { select: { name: true } },
+      },
+    });
+    const soloFecha = (fecha: Date | null) => (fecha ? fecha.toISOString().slice(0, 10) : null);
+    return {
+      documentNumber: user.documentNumber,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      birthDate: soloFecha(user.birthDate),
+      hiredAt: soloFecha(user.hiredAt),
+      employmentType: user.employmentType,
+      role: user.role.name,
+      jobTitle: user.jobTitle?.name ?? null,
+      area: user.area ? [user.area.parent?.name, user.area.name].filter(Boolean).join(' / ') : null,
+      regional: user.regional?.name ?? null,
+      service: user.service?.name ?? null,
+    };
+  }
+
+  /**
+   * LA PERSONA CAMBIA SU CORREO O SU TELEFONO (2026-09-24). Solo esos dos: ver `myContactSchema`.
+   *
+   * Opera sobre la sesion, sin id en la ruta, por lo mismo que la foto (Decision #105): no es una
+   * via para tocar a otro. El correo es tambien identificador de ingreso (Decision #10), asi que
+   * no puede repetirse dentro de la empresa; la cedula sigue sirviendo siempre, cambie lo que
+   * cambie el correo.
+   *
+   * Queda en auditoria con el antes y el despues: si mañana alguien dice «yo no puse ese correo»,
+   * esa fila es la unica respuesta.
+   */
+  async updateMyContact(userId: string, tenantId: string, input: MyContactInput): Promise<MisDatos> {
+    const scoped = this.prisma.forTenant(tenantId);
+    const antes = await scoped.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true, phone: true } });
+
+    if (input.email && input.email !== antes.email) {
+      const otra = await scoped.user.findFirst({ where: { email: input.email, id: { not: userId } }, select: { id: true } });
+      if (otra) {
+        throw new ConflictException({
+          code: 'DUPLICATE_EMAIL',
+          message:
+            'Ese correo ya está registrado en otra cuenta de la empresa. Si es tuyo, pide ayuda a quien administra la plataforma.',
+        });
+      }
+    }
+
+    await scoped.user.update({ where: { id: userId }, data: { email: input.email, phone: input.phone } });
+    await this.audit.record({
+      tenantId,
+      userId,
+      action: 'PROFILE_CONTACT_UPDATED',
+      resourceType: 'users',
+      resourceId: userId,
+      oldValues: antes,
+      newValues: { email: input.email, phone: input.phone },
+    });
+    return this.misDatos(userId, tenantId);
   }
 
   private async registerFailedAttempt(user: ThrottledUser, identifier: string, ctx: AuthContext): Promise<void> {

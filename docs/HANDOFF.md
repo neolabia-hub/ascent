@@ -24,6 +24,53 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-24 — «TUS DATOS» EN EL PERFIL, y la campaña de primer ingreso con la cédula
+
+El cliente va a cargar ~1.200 personas y pidio dos cosas: que cada quien pueda agregar o cambiar su
+correo (muchos no tienen), y que **solo esta vez** la clave de todos sea su cedula, con cambio
+obligatorio al entrar. Los administradores no se tocan.
+
+**1. El perfil del aprendiz ensena la ficha entera y deja editar el CONTACTO.** Tarjeta «Tus datos»
+(`perfil/page.tsx`): correo y telefono editables; documento, cargo, area con su rama, regional,
+servicio, vinculacion y fechas **de solo lectura**, con la nota de pedir la correccion a quien
+administra. Es la linea de los LMS corporativos: el contacto es de la persona; lo laboral es de la
+empresa porque de ahi cuelgan las obligaciones. API: `GET /auth/me/datos` y `PATCH /auth/me/contacto`,
+sin id en la ruta (como la foto, Decision #105); esquema `myContactSchema` —las claves que no conoce
+las descarta, asi que por ahi no se cuela ni el cargo ni el rol—; correo unico en el tenant (409
+`DUPLICATE_EMAIL`); auditoria `PROFILE_CONTACT_UPDATED` con antes y despues. Bajo el nombre ya no va
+el correo sino el cargo. **Sin correo de confirmacion**: no hay recuperacion de clave por correo (se
+pide ayuda desde el login), asi que un correo mal escrito no abre ninguna puerta; si algun dia se
+agrega recuperacion por correo, esto tiene que pasar a verificar con codigo.
+
+> Ojo con la RECARGA del archivo: si una persona pone su correo y el archivo mensual trae OTRO en
+> esa celda, gana el del archivo (vacio no toca nada). La vista previa de la carga lo enseña campo
+> por campo.
+
+**2. `scripts/clave-igual-a-documento.ts`** (`dev:clave-igual-a-documento`). Ensayo por defecto,
+`--si` para escribir, `--tenant` obligatorio. **Abrir**: a toda persona activa menos rol ADMIN,
+clave = documento, cambio obligatorio, sesiones cerradas (si no, quien estuviera dentro veria «clave
+actual» y no sabria cual). **Cerrar** (`--cierre`): a quien siga con la cedula como clave —se
+comprueba con `argon2.verify`, sin columna nueva— le pone una aleatoria; entra pidiendo ayuda. El
+generador de claves NO se toco: quien se cree despues recibe la de siempre. `--solo <doc>` es para
+probarlo en desarrollo.
+
+**3. De paso, un fallo del restablecer clave del admin:** decia cerrar las sesiones vivas y ponia a
+nulo `refreshTokenHash`, columna muerta desde la Decision #91. Ahora borra las `user_sessions`.
+
+**Pruebas:** recorrido `perfil-propio.mjs` (24), e2e nuevo `perfil-tus-datos.spec.ts`, el script
+probado de punta a punta con `--solo` (entra con cedula, se le exige cambio, el cierre respeta a
+quien cambio y deja fuera a quien no, el admin sale en 0). 1008 unitarias, **28/28 e2e**, lint limpio.
+
+> **Trampa que costo una corrida:** una API arrancada a mano sin `PORT` escucha en **3002**, que es
+> el puerto de la suite, y Playwright la REUTILIZA (`reuseExistingServer`). La suite corrio contra una
+> compilacion vieja y fallo por una tilde. Antes de `pnpm test:e2e`, que 3002 y 3100 esten libres.
+
+**Orden acordado con el cliente:** subir el archivo completo primero, y SOLO despues abrir la
+campaña (a todos menos ADMIN, incluidos quienes ya habian cambiado su clave). Anunciar un plazo y,
+al vencer, correr el cierre.
+
+---
+
 ## 2026-09-23 — DESPLEGADO A PRODUCCION: aprobaciones, permisos de Programas y los arreglos de la carga
 
 Commit `42c3222`. Los cinco pasos de `05-reglas-de-despliegue.md` §3, mas el paso extra de permisos:

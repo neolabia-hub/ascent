@@ -1,5 +1,12 @@
-import { Body, Controller, Get, HttpCode, Post, Put, Req, Res, UnauthorizedException } from '@nestjs/common';
-import { activationSchema, avatarSchema, changePasswordSchema, helpRequestSchema, loginSchema } from '@neo-pulse/shared';
+import { Body, Controller, Get, HttpCode, Patch, Post, Put, Req, Res, UnauthorizedException } from '@nestjs/common';
+import {
+  activationSchema,
+  avatarSchema,
+  changePasswordSchema,
+  helpRequestSchema,
+  loginSchema,
+  myContactSchema,
+} from '@neo-pulse/shared';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public } from '../common/decorators.js';
@@ -167,6 +174,22 @@ export class AuthController {
   async setAvatar(@CurrentUser() user: AuthUser, @Body() body: unknown) {
     const input = avatarSchema.parse(body);
     return this.auth.setAvatar(user.id, user.tenantId, input.avatarKey);
+  }
+
+  /**
+   * LA FICHA PROPIA, para el perfil (2026-09-24). Sin permiso y sin id, igual que la foto: cada
+   * quien ve la suya y solo la suya.
+   */
+  @Get('me/datos')
+  async misDatos(@CurrentUser() user: AuthUser) {
+    return this.auth.misDatos(user.id, user.tenantId);
+  }
+
+  /** Cambia SOLO correo y telefono de quien pregunta. El resto de la ficha es de la empresa. */
+  @Patch('me/contacto')
+  async updateMyContact(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const input = myContactSchema.parse(body);
+    return this.auth.updateMyContact(user.id, user.tenantId, input);
   }
 
   /** Extrae el tenantId del payload del access recien emitido (evita otra consulta). */

@@ -66,6 +66,22 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env.prod \
 
 Corrido el 2026-09-23 para `programs:read`, `programs:manage` y `programs:publish`.
 
+### Campaña de primer ingreso con la cédula (un solo uso, 2026-09-24)
+
+No va con ningún despliegue: se corre cuando el cliente ya subió su archivo completo. Misma forma
+que el de permisos, ensayo por defecto:
+
+```bash
+docker compose -f docker/docker-compose.prod.yml --env-file .env.prod \
+  exec -T -w /app/apps/api api sh -lc "./node_modules/.bin/tsx scripts/clave-igual-a-documento.ts --tenant transprensa"
+#   ... --tenant transprensa --si             abre: todos menos ADMIN entran con su documento y deben cambiarla
+#   ... --tenant transprensa --cierre         ensayo del cierre: cuántos siguen con la cédula
+#   ... --tenant transprensa --cierre --si    cierra: a esos, clave aleatoria; piden ayuda desde el login
+```
+
+Antes de `--si`, la copia de la base (§3 paso 1): cambia la clave de cientos de personas y no tiene
+vuelta atrás sin ella.
+
 ### Las llaves y los secretos no se regeneran «por si acaso»
 
 | Si cambias… | Lo que pasa |

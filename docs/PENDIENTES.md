@@ -137,6 +137,12 @@ Ascent está viva en `https://transprensa.ascentio.app`. Lo que queda no es cód
 que rodea a un sistema que ya tiene un cliente dentro. El detalle, en `HANDOFF` 2026-09-09 (noche),
 `docs/05-reglas-de-despliegue.md` y `ASCENT - CREDENCIALES Y ACCESOS.md`.
 
+> **Campaña de primer ingreso con la cédula (2026-09-24).** Cuando el cliente termine de subir su
+> archivo: `clave-igual-a-documento.ts --tenant transprensa` (ensayo) y luego `--si`. Al vencer el
+> plazo que se anuncie: `--cierre` y `--cierre --si`. Comando exacto en `HANDOFF` 2026-09-24 y en
+> `05-reglas-de-despliegue.md` §2. Mientras no se cierre, quien conozca la cédula de otra persona
+> puede entrar por ella.
+
 | | Qué falta | Por qué importa |
 |---|---|---|
 | 10.1 | **Rotar las credenciales de R2** (las cuatro variables `R2_*` de `/opt/ascent/.env.prod`) y **la contraseña de la cuenta de plataforma** | Las dos se escribieron en una conversación. Una credencial que salió de su sitio ya no vuelve a estar secreta: se cambia, no se borra el rastro. Cómo, en el archivo de credenciales §2 y §3 |

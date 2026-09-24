@@ -94,3 +94,39 @@ export const revokeCertificateSchema = z.object({
   reason: z.string().min(10, 'Explica por que se anula').max(500),
 });
 export type RevokeCertificateInput = z.infer<typeof revokeCertificateSchema>;
+
+/**
+ * LO QUE LA PERSONA PUEDE CAMBIAR DE SI MISMA (2026-09-24): su correo y su telefono. Nada mas.
+ *
+ * Es la misma linea que trazan los LMS corporativos: los datos de CONTACTO son de la persona —ella
+ * sabe cual es su correo y si cambio de numero—; los de la RELACION LABORAL (nombre legal,
+ * documento, cargo, area, regional, fecha de ingreso, vinculacion, rol) son de la empresa, porque
+ * de ellos cuelgan las obligaciones de formacion y los permisos. Esos se ven en el perfil pero solo
+ * los cambia quien administra, o el archivo de personal.
+ *
+ * Mismas reglas de forma que la ficha del administrador, para que un dato valido en un sitio no
+ * sea invalido en el otro. Y la misma convencion de vacios:
+ *
+ *   `undefined` -> no vino, no se toca
+ *   `''` o null -> lo dejo en blanco a proposito: se quita
+ */
+export const myContactSchema = z.object({
+  email: z
+    .union([z.string().trim().email('Escribe un correo válido').max(120), z.literal(''), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ? v.toLowerCase() : null)),
+  phone: z
+    .union([
+      z
+        .string()
+        .trim()
+        .min(7, 'El teléfono debe tener al menos 7 dígitos')
+        .max(20)
+        .regex(/^[0-9+() -]+$/, 'Solo números, espacios y los signos + ( ) -'),
+      z.literal(''),
+      z.null(),
+    ])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ? v : null)),
+});
+export type MyContactInput = z.infer<typeof myContactSchema>;
