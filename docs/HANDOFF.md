@@ -24,6 +24,31 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-24 (tarde) — CAMPAÑA DE LA CÉDULA ABIERTA EN PRODUCCIÓN, sin desplegar
+
+Con el archivo del cliente ya subido. **No se desplego**: por peticion expresa, solo se corrio el
+script, y como la imagen de produccion es la de `42c3222` y no lo trae, se copio a mano:
+
+| Paso | Resultado |
+|---|---|
+| Copia antes de tocar nada | `neopulse-20260924-174945.dump`, 981 KB, subida a R2 |
+| `scp` a `/tmp` + `docker cp` al contenedor `api` | `/app/apps/api/scripts/clave-igual-a-documento.ts` |
+| Ensayo | 1001 activas · 3 ADMIN fuera · 998 a cambiar |
+| `--si` | 998 hechas |
+| Comprobacion (`--cierre` en ensayo + consulta) | 998 con la cedula como clave; USUARIO 985 y ANALISTA 13 con cambio obligatorio; ADMIN intactos (uno ya tenia el cambio pendiente de antes) |
+
+El archivo copiado **vive solo en ese contenedor**: un `up -d` que lo recree lo borra. Para el
+cierre, si todavia no se ha desplegado, se repite el `scp` + `docker cp`. Tras desplegar ya viene en
+la imagen. Ningun despliegue lo ejecuta: `release.sh` solo aplica migraciones y RLS.
+
+**Ojo:** el cliente hablaba de ~1.200 personas y hay **1001 activas**. Conviene preguntarle si la
+carga quedo completa o si faltan filas por errores.
+
+Tambien quedo hecho y **sin desplegar**: filtros en todos los catalogos de Configuracion (buscador,
+estado, tipo de cargo, area, responsable, y en Áreas la rama y el nivel), `5eb7ca8`.
+
+---
+
 ## 2026-09-24 — «TUS DATOS» EN EL PERFIL, y la campaña de primer ingreso con la cédula
 
 El cliente va a cargar ~1.200 personas y pidio dos cosas: que cada quien pueda agregar o cambiar su
