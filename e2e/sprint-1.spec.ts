@@ -45,8 +45,9 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     const name = `Regional Prueba ${suffix}`;
 
     await page.getByRole('button', { name: 'Nueva regional' }).click();
-    await page.getByLabel('Código').fill(code);
-    await page.getByLabel('Nombre').fill(name);
+    // Por id: desde el 2026-09-24 la tabla tiene un buscador «por código o nombre» que tambien casaria.
+    await page.locator('#cat-code').fill(code);
+    await page.locator('#cat-name').fill(name);
     await page.getByRole('button', { name: 'Crear' }).click();
 
     const row = page.getByRole('row', { name: new RegExp(name) });

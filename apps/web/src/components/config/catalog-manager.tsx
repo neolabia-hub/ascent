@@ -19,6 +19,7 @@ import { cn } from '@/components/ui/cn';
 import { Drawer } from '@/components/ui/drawer';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { FilterPill, ListFilter } from '@/components/ui/list-filter';
 import { Select } from '@/components/ui/select';
 import { PersonPicker } from '@/components/ui/person-picker';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -232,7 +233,75 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
     await toggleActive(fila);
   };
 
-  const { visibles: filasVisibles, paginador } = usePaginacion(rows ?? []);
+  /*
+    FILTROS (2026-09-24), en TODOS los catalogos de Configuracion. Los pidio el cliente cuando el
+    arbol de areas paso de un puñado a decenas con sus sub-areas y los cargos a cientos: la lista
+    paginada de quince en quince obligaba a pasar paginas buscando uno.
+
+    Cada catalogo filtra por lo que TIENE, sin configuracion aparte: el buscador y el estado valen
+    para todos; el selector de la columna de relacion sale solo donde la hay (tipo de cargo en
+    Cargos, area responsable en Procesos) y el de responsable donde hay responsable (Áreas y
+    Procesos). Áreas, que es el unico con arbol, suma la rama y el nivel.
+  */
+  const [busqueda, setBusqueda] = useState('');
+  const [estado, setEstado] = useState<'TODOS' | 'ACTIVOS' | 'INACTIVOS'>('TODOS');
+  const [filtroRelacion, setFiltroRelacion] = useState('');
+  const [filtroResponsable, setFiltroResponsable] = useState('');
+  const [nivel, setNivel] = useState<'TODAS' | 'AREAS' | 'SUB'>('TODAS');
+  const esAreas = catalogKey === 'areas';
+  /** La relacion que se puede filtrar: la rama en Áreas, y si no el desplegable propio del catalogo. */
+  const relacion = useMemo(
+    () =>
+      esAreas ? undefined : extraFields.find((f) => f.kind === 'select' && (f.key === 'jobTitleTypeId' || f.key === 'areaId')),
+    [extraFields, esAreas],
+  );
+  const tieneResponsable = extraFields.some((f) => f.key === 'responsibleUserId');
+
+  const filasFiltradas = useMemo(() => {
+    const todas = rows ?? [];
+    const normal = (texto: string | null | undefined) =>
+      (texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    const q = normal(busqueda.trim());
+    const padre = (row: CatalogRow) => (row.parentId ? todas.find((otra) => otra.id === row.parentId) : undefined);
+    return todas.filter((row) => {
+      if (q) {
+        const texto = [row.code, row.name, padre(row)?.name, row.responsible?.fullName, row.area?.name, row.jobTitleType?.name]
+          .map(normal)
+          .join(' ');
+        if (!texto.includes(q)) return false;
+      }
+      if (estado === 'ACTIVOS' && !row.active) return false;
+      if (estado === 'INACTIVOS' && row.active) return false;
+      if (filtroRelacion) {
+        if (esAreas) {
+          // Elegir un area trae el area y TODAS sus sub-areas: la rama entera, que es lo que se busca.
+          if (row.id !== filtroRelacion && row.parentId !== filtroRelacion) return false;
+        } else {
+          const valor = relacion?.key === 'areaId' ? row.areaId : row.jobTitleTypeId;
+          if (filtroRelacion === 'NINGUNO' ? Boolean(valor) : valor !== filtroRelacion) return false;
+        }
+      }
+      if (filtroResponsable === 'NINGUNO' && row.responsible) return false;
+      if (filtroResponsable && filtroResponsable !== 'NINGUNO' && row.responsible?.id !== filtroResponsable) return false;
+      if (esAreas && nivel === 'AREAS' && row.parentId) return false;
+      if (esAreas && nivel === 'SUB' && !row.parentId) return false;
+      return true;
+    });
+  }, [rows, busqueda, estado, filtroRelacion, filtroResponsable, nivel, esAreas, relacion]);
+
+  /** Opciones del selector de relacion: las areas de primer nivel en Áreas, el catalogo ligado en los demas. */
+  const opcionesRelacion = useMemo(() => {
+    const lista = esAreas ? (rows ?? []).filter((row) => !row.parentId) : relacion ? (options[relacion.key] ?? []) : [];
+    return [...lista].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [rows, options, relacion, esAreas]);
+  /** Solo quien ES responsable de algo: ofrecer a las 1.200 personas seria un selector inservible. */
+  const responsables = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const row of rows ?? []) if (row.responsible) vistos.set(row.responsible.id, row.responsible.fullName);
+    return [...vistos].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }, [rows]);
+
+  const { visibles: filasVisibles, paginador } = usePaginacion(filasFiltradas);
 
   const extraColumn = useMemo(
     () => extraFields.find((f) => f.kind === 'select' || f.kind === 'number' || f.kind === 'user'),
@@ -259,6 +328,71 @@ export function CatalogManager({ catalogKey, singular, feminine = false, extraFi
           {nuevoLabel}
         </Button>
       </div>
+
+      <ListFilter
+        value={busqueda}
+        onChange={setBusqueda}
+        placeholder={esAreas ? 'Buscar área, sub-área o responsable' : 'Buscar por código o nombre'}
+        shown={filasFiltradas.length}
+        total={rows.length}
+      >
+        {esAreas || relacion ? (
+          <Select
+            aria-label={esAreas ? 'Filtrar por área' : `Filtrar por ${relacion?.label.toLowerCase()}`}
+            className="w-full sm:w-56"
+            value={filtroRelacion}
+            onChange={(event) => setFiltroRelacion(event.target.value)}
+          >
+            <option value="">{esAreas ? 'Todas las áreas' : `${relacion?.label}: todos`}</option>
+            {!esAreas && !relacion?.required ? <option value="NINGUNO">Sin {relacion?.label.toLowerCase()}</option> : null}
+            {opcionesRelacion.map((opcion) => (
+              <option key={opcion.id} value={opcion.id}>
+                {opcion.name}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+        {tieneResponsable ? (
+          <Select
+            aria-label="Filtrar por responsable"
+            className="w-full sm:w-56"
+            value={filtroResponsable}
+            onChange={(event) => setFiltroResponsable(event.target.value)}
+          >
+            <option value="">Cualquier responsable</option>
+            <option value="NINGUNO">Sin responsable</option>
+            {responsables.map((persona) => (
+              <option key={persona.id} value={persona.id}>
+                {persona.nombre}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+        {esAreas ? (
+          <div className="flex gap-1">
+            <FilterPill active={nivel === 'TODAS'} onClick={() => setNivel('TODAS')}>
+              Todas
+            </FilterPill>
+            <FilterPill active={nivel === 'AREAS'} onClick={() => setNivel('AREAS')}>
+              Áreas
+            </FilterPill>
+            <FilterPill active={nivel === 'SUB'} onClick={() => setNivel('SUB')}>
+              Sub-áreas
+            </FilterPill>
+          </div>
+        ) : null}
+        <div className="flex gap-1">
+          <FilterPill active={estado === 'TODOS'} onClick={() => setEstado('TODOS')}>
+            Todos
+          </FilterPill>
+          <FilterPill active={estado === 'ACTIVOS'} onClick={() => setEstado('ACTIVOS')}>
+            Activos
+          </FilterPill>
+          <FilterPill active={estado === 'INACTIVOS'} onClick={() => setEstado('INACTIVOS')}>
+            Inactivos
+          </FilterPill>
+        </div>
+      </ListFilter>
 
       <div className="card overflow-hidden">
         <Table>
