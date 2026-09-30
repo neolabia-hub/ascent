@@ -804,15 +804,33 @@ export function ActivityAudienceTab({
           estos tres, por la novedad de la semana"— y ponerla al mismo nivel que el requisito
           invita a resolver con ella cosas que deberian ser permanentes.
 
-          En una induccion general NUNCA se ofrece: o ya se exige a todos, o se exigira al
-          publicar. Y que aparezca antes de publicar para desaparecer despues es peor que no
-          estar: el usuario ve un formulario que cambia solo. Donde SI tiene sentido es en la
-          especifica —"Juan no es conductor pero va a manejar el mes que viene"— y en el resto.
+          En una REINDUCCION no se ofrece: ya se exige a toda la empresa, y no hay nadie que falte.
+
+          ─── EN LA INDUCCION DE INGRESO SI, UNA VEZ PUBLICADA (2026-09-30) ───
+
+          Antes tampoco se ofrecia, con el argumento de que «ya se exige a todos». Es falso para la
+          de ingreso: su regla solo alcanza a quien entre DESDE que se publico, asi que la gente que
+          ya estaba no la tiene, y no habia forma de darsela a unos pocos. El cliente lo pidio para
+          las pruebas —*"asignarle la induccion a algunos, no a todos, y ese alguien puede ser un
+          usuario antiguo"*— y pasa igual con las novedades: alguien que se reintegra, un traslado.
+
+          Se descarto la otra salida que se penso, cambiar la regla a «desde ahora»: se la exigiria a
+          la plantilla ENTERA. Y abrir aqui cargo, area y regional tambien: la regla de la induccion
+          es y debe seguir siendo «toda la empresa, al ingresar», que es lo que hace que nadie nuevo
+          se quede sin ella. La obligacion suelta es justo la herramienta del caso puntual, y el
+          motor no la duplica: si mañana la regla se amplia, quien ya la tenia no recibe otra.
+
+          Solo despues de publicar: antes no hay contenido que hacer, y asignarla seria obligar a
+          algo imposible.
         */}
-        {decide === 'TODOS' ? null : (
+        {decide === 'TODOS' && !(typeConfig.requiresBeforeHire && hayContenidoPublicado) ? null : (
         <section className="card p-5">
           <h2 className="font-display text-base font-semibold text-ink-900">O a personas concretas</h2>
-          <p className="mb-4 mt-1 text-sm text-ink-500">Obligación suelta: no alcanza a quien entre después.</p>
+          <p className="mb-4 mt-1 text-sm text-ink-500">
+            {decide === 'TODOS'
+              ? 'Para quien ya estaba en la empresa: la regla solo alcanza a quien entre desde que se publicó.'
+              : 'Obligación suelta: no alcanza a quien entre después.'}
+          </p>
           <div className="space-y-4">
             <Field htmlFor="q-people" label="Personas" hint={peopleError ?? undefined}>
               <MultiSelect
@@ -821,7 +839,10 @@ export function ActivityAudienceTab({
                 options={people.map((person) => ({
                   id: person.id,
                   label: person.fullName,
-                  hint: person.jobTitle?.name ?? undefined,
+                  // La cedula a la vista: con mil personas hay nombres repetidos, y es lo que se
+                  // tiene en la mano cuando la lista llega de RR. HH.
+                  hint: [person.documentNumber, person.jobTitle?.name].filter(Boolean).join(' · '),
+                  keywords: person.documentNumber,
                 }))}
                 value={manual.userIds}
                 onChange={(userIds) => setManual({ ...manual, userIds })}

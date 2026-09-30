@@ -55,6 +55,9 @@ export class UsersService {
       select: {
         id: true,
         fullName: true,
+        // La cedula, para encontrar a alguien por ella en los selectores (2026-09-30): con mil
+        // personas, dos se llaman igual y el documento es lo unico que no se repite.
+        documentNumber: true,
         jobTitle: { select: { id: true, name: true } },
         area: { select: { id: true, name: true } },
         regional: { select: { id: true, name: true } },

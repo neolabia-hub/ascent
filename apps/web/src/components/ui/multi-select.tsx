@@ -1,13 +1,34 @@
 'use client';
 
-import { Check, ChevronDown, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Check, ChevronDown, Search, X } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cn } from './cn';
 
 export interface MultiSelectOption {
   id: string;
   label: string;
   hint?: string;
+  /**
+   * Por donde TAMBIEN se encuentra esta opcion aunque no se vea escrito: la cedula de una persona,
+   * el codigo de un cargo. Sirve para el buscador y para pegar una lista (ver `aTokens`).
+   */
+  keywords?: string;
+}
+
+/** A partir de cuantas opciones sale el buscador. Con menos, todo cabe a la vista. */
+const CON_BUSCADOR = 8;
+
+const normalizar = (texto: string) =>
+  texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+/**
+ * Una LISTA pegada —«1045876321, 1116267708» o una columna copiada de Excel— se parte en sus
+ * piezas. Solo cuenta como lista si hay dos o mas Y TODAS LLEVAN NUMEROS: «Juan Perez» tambien son
+ * dos palabras, y es una busqueda por nombre, no una lista de dos personas.
+ */
+function aTokens(texto: string): string[] {
+  const piezas = texto.split(/[\s,;]+/).map((pieza) => pieza.trim()).filter(Boolean);
+  return piezas.length >= 2 && piezas.every((pieza) => /\d/.test(pieza)) ? piezas : [];
 }
 
 export interface MultiSelectProps {
@@ -48,7 +69,48 @@ export function MultiSelect({ options, value, onChange, placeholder = 'Seleccion
   const generatedId = useId();
   const controlId = id ?? generatedId;
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const conBuscador = options.length > CON_BUSCADOR;
+
+  /*
+    EL BUSCADOR (2026-09-30). Se pidio para elegir personas —*"que se pueda buscar por cedula
+    tambien, y varios"*— con 1.001 en la lista y ninguna forma de encontrar una que no fuera bajar a
+    ojo. Vive aqui y no en un selector de personas aparte para que lo tengan TODAS las listas largas:
+    cargos, areas y normas crecen igual.
+
+    Se abre con el foco puesto, y al cerrarse se vacia: volver a abrir y encontrar la lista filtrada
+    por lo que se busco hace un rato hace creer que faltan opciones.
+  */
+  useEffect(() => {
+    if (open && conBuscador) searchRef.current?.focus();
+    if (!open) setQuery('');
+  }, [open, conBuscador]);
+
+  const indice = useMemo(
+    () => options.map((option) => ({ option, texto: normalizar(`${option.label} ${option.hint ?? ''} ${option.keywords ?? ''}`) })),
+    [options],
+  );
+  const tokens = aTokens(query);
+  /** Modo LISTA: cada pieza pegada se busca EXACTA por su clave o su nombre, nunca por parecido. */
+  const lista = useMemo(() => {
+    if (tokens.length === 0) return null;
+    const encontradas: MultiSelectOption[] = [];
+    const faltan: string[] = [];
+    for (const token of tokens) {
+      const t = normalizar(token);
+      const hit = options.find((option) => normalizar(option.keywords ?? '') === t || normalizar(option.label) === t);
+      if (hit) {
+        if (!encontradas.includes(hit)) encontradas.push(hit);
+      } else faltan.push(token);
+    }
+    return { encontradas, faltan };
+  }, [tokens.join('|'), options]); // eslint-disable-line react-hooks/exhaustive-deps
+  const q = normalizar(query);
+  const visibles = lista ? lista.encontradas : q ? indice.filter((row) => row.texto.includes(q)).map((row) => row.option) : options;
+
+  const marcarTodas = (ids: string[]) => onChange([...new Set([...value, ...ids])]);
 
   useEffect(() => {
     if (!open) return;
@@ -115,15 +177,63 @@ export function MultiSelect({ options, value, onChange, placeholder = 'Seleccion
       </button>
 
       {open ? (
-        <ul
-          role="listbox"
-          aria-multiselectable="true"
-          className="card absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto p-1"
-        >
+        <div className="card absolute left-0 right-0 z-20 mt-1 p-1">
+          {conBuscador ? (
+            <div className="border-b border-line p-1 pb-2">
+              <div className="relative">
+                <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-500" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  /*
+                    UNA COLUMNA COPIADA DE EXCEL llega con saltos de linea, y un campo de una sola
+                    linea los TRAGA sin separador: «1045876321» y «1116267708» se pegaban en un
+                    solo numero que no es de nadie. Se convierten en comas antes de que se pierdan.
+                  */
+                  onPaste={(event) => {
+                    const texto = event.clipboardData.getData('text');
+                    if (!/[\r\n]/.test(texto)) return;
+                    event.preventDefault();
+                    setQuery(texto.replace(/[\r\n]+/g, ', ').replace(/,\s*$/, ''));
+                  }}
+                  placeholder="Buscar, o pegar varias cédulas"
+                  aria-label="Buscar en la lista"
+                  className="focus-ring h-9 w-full rounded-md border border-line-strong bg-surface pl-8 pr-2 text-sm text-ink-900 placeholder:text-ink-300"
+                />
+              </div>
+              {lista ? (
+                <div className="mt-2 space-y-1 px-1 text-xs">
+                  <p className="text-ink-700">
+                    {lista.encontradas.length} de {tokens.length} encontradas
+                    {lista.faltan.length > 0 ? (
+                      <span className="text-warn"> · no están: {lista.faltan.join(', ')}</span>
+                    ) : null}
+                  </p>
+                  {lista.encontradas.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        marcarTodas(lista.encontradas.map((option) => option.id));
+                        setQuery('');
+                      }}
+                      className="focus-ring rounded font-medium text-info hover:underline"
+                    >
+                      Marcar las {lista.encontradas.length} encontradas
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <ul role="listbox" aria-multiselectable="true" className="max-h-64 overflow-y-auto pt-1">
           {options.length === 0 ? (
             <li className="px-3 py-2 text-sm text-ink-500">No hay opciones. Se crean en Configuración.</li>
+          ) : visibles.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-ink-500">Nada coincide con «{query}».</li>
           ) : (
-            options.map((option) => {
+            visibles.map((option) => {
               const checked = value.includes(option.id);
               return (
                 <li key={option.id}>
@@ -152,7 +262,8 @@ export function MultiSelect({ options, value, onChange, placeholder = 'Seleccion
               );
             })
           )}
-        </ul>
+          </ul>
+        </div>
       ) : null}
     </div>
   );

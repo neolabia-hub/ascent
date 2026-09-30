@@ -141,6 +141,8 @@ export interface UserDetail extends UserRow {
 export interface PickableUser {
   id: string;
   fullName: string;
+  /** Para encontrarla por cedula en los selectores: el nombre se repite, el documento no. */
+  documentNumber: string;
   jobTitle: { id: string; name: string } | null;
   area: { id: string; name: string } | null;
   regional: { id: string; name: string } | null;

@@ -331,6 +331,7 @@ export default function ConvocatoriaDetallePage() {
     return todos.filter(
       (persona) =>
         persona.fullName.toLowerCase().includes(q) ||
+        persona.documentNumber.includes(q) ||
         persona.jobTitle.name.toLowerCase().includes(q) ||
         persona.area.name.toLowerCase().includes(q),
     );
@@ -894,7 +895,7 @@ export default function ConvocatoriaDetallePage() {
               <Input
                 autoFocus
                 className="h-9 rounded-lg pl-9"
-                placeholder="Buscar por nombre, cargo o area"
+                placeholder="Buscar por nombre, cédula, cargo o área"
                 aria-label="Buscar entre quienes faltan por convocar"
                 value={buscaFaltan}
                 onChange={(event) => {

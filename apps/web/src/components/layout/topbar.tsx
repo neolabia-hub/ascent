@@ -47,10 +47,11 @@ const ADMIN_COMMANDS: Command[] = [
  * Si una de las dos consultas falla por permisos —un analista sin `users:manage`— se devuelve lo
  * que si se pudo traer en vez de dejar el buscador vacio.
  */
-async function loadAdminCommands(): Promise<Command[]> {
+async function loadAdminCommands(q?: string): Promise<Command[]> {
+  const cuantos = q ? 8 : 50;
   const [activities, users] = await Promise.all([
-    listActivities({ pageSize: 50 }).catch(() => ({ items: [] })),
-    listUsers({ active: 'true', pageSize: 50 }).catch(() => ({ items: [] })),
+    listActivities({ q, pageSize: cuantos }).catch(() => ({ items: [] })),
+    listUsers({ q, active: 'true', pageSize: cuantos }).catch(() => ({ items: [] })),
   ]);
   return [
     ...activities.items.map((activity) => ({
@@ -64,13 +65,20 @@ async function loadAdminCommands(): Promise<Command[]> {
     ...users.items.map((user) => ({
       id: `usr-${user.id}`,
       label: user.fullName,
-      hint: user.jobTitle.name,
-      href: '/usuarios',
+      // La cedula a la vista: casa con lo que se tecleo, y distingue a dos que se llaman igual.
+      hint: `${user.documentNumber} · ${user.jobTitle.name}`,
+      // A SU ficha, no a la lista de Usuarios: aterrizar en una lista de mil y volver a buscar a
+      // quien se acaba de elegir era hacer dos veces la misma busqueda.
+      href: `/usuarios/${user.id}`,
       icon: Users,
       group: 'Personas',
     })),
   ];
 }
+
+/** Lo que se escribe, en el servidor: busca en TODA la empresa, por nombre, cedula o codigo. */
+const searchAdminCommands = (q: string) => loadAdminCommands(q);
+const loadAdminCommandsIniciales = () => loadAdminCommands();
 
 function useOutsideClick(ref: RefObject<HTMLElement>, onOutside: () => void) {
   useEffect(() => {
@@ -413,8 +421,9 @@ export function Topbar({ userFullName }: TopbarProps) {
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         staticCommands={ADMIN_COMMANDS}
-        loadCommands={loadAdminCommands}
-        placeholder="Buscar una formación, una persona o ir a una pantalla"
+        loadCommands={loadAdminCommandsIniciales}
+        searchCommands={searchAdminCommands}
+        placeholder="Buscar una formación, una persona (nombre o cédula) o ir a una pantalla"
       />
     </header>
   );

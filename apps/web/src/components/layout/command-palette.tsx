@@ -78,12 +78,20 @@ export function CommandPalette({
   onOpenChange,
   staticCommands = LEARNER_COMMANDS,
   loadCommands = loadLearnerCommands,
+  searchCommands,
   placeholder = 'Buscar una formación o ir a una pantalla',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   staticCommands?: Command[];
   loadCommands?: () => Promise<Command[]>;
+  /**
+   * BUSQUEDA EN EL SERVIDOR mientras se escribe (2026-09-30). `loadCommands` trae una tanda fija al
+   * abrir, y con 1.001 personas esa tanda —las 50 primeras por orden alfabetico— dejaba fuera a
+   * casi todas: se escribia un nombre que existe y el buscador decia que no. Lo que se escribe se
+   * le pregunta al servidor, que busca en todo, tambien por cedula.
+   */
+  searchCommands?: (query: string) => Promise<Command[]>;
   placeholder?: string;
 }) {
   const router = useRouter();
@@ -91,6 +99,28 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const [dynamic, setDynamic] = useState<Command[]>([]);
+  const [remotos, setRemotos] = useState<Command[]>([]);
+
+  useEffect(() => {
+    const texto = query.trim();
+    if (!searchCommands || texto.length < 2) {
+      setRemotos([]);
+      return;
+    }
+    let cancelled = false;
+    // Un respiro antes de preguntar: una consulta por cada tecla es ruido para el servidor.
+    const espera = setTimeout(() => {
+      void searchCommands(texto)
+        .then((encontrados) => {
+          if (!cancelled) setRemotos(encontrados);
+        })
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(espera);
+    };
+  }, [query, searchCommands]);
 
   useEffect(() => {
     if (!open) return;
@@ -113,8 +143,12 @@ export function CommandPalette({
     const all = [...staticCommands, ...dynamic];
     if (query.trim().length === 0) return all.slice(0, 12);
     const needle = normalize(query.trim());
-    return all.filter((command) => normalize(command.label).includes(needle)).slice(0, 12);
-  }, [dynamic, query, staticCommands]);
+    // Lo del servidor ya viene filtrado (y puede haber casado por la cedula, que no esta en la
+    // etiqueta): se suma sin volver a filtrarlo, y sin repetir lo que ya estaba en la tanda local.
+    const locales = all.filter((command) => normalize(`${command.label} ${command.hint ?? ''}`).includes(needle));
+    const vistos = new Set(locales.map((command) => command.id));
+    return [...locales, ...remotos.filter((command) => !vistos.has(command.id))].slice(0, 12);
+  }, [dynamic, query, staticCommands, remotos]);
 
   useEffect(() => {
     setCursor(0);

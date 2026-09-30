@@ -24,6 +24,39 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-30 (tarde) — INDUCCIÓN A PERSONAS SUELTAS, y buscar por cédula en todos los selectores
+
+**NO desplegado.** Dos pedidos del cliente, el segundo nacido del primero:
+
+**1. «O a personas concretas» en la inducción de INGRESO, una vez publicada.** Se ocultaba con el
+argumento de que «ya se exige a todos», que es falso para la de ingreso: su regla solo alcanza a quien
+entre desde que se publico. El caso: *"asignarle la induccion a algunos, no a todos, y ese alguien
+puede ser un usuario antiguo"* (pruebas, novedades, reintegros). Se descarto abrir cargo/area en el
+«Ajustar» de la induccion —la regla debe seguir siendo «toda la empresa, al ingresar»— y se descarto
+pasarla a «desde ahora», que la exigiria a las 1001. El motor no duplica: `abiertaPorOtraRegla` y
+`completadaPorOtraRegla` miran cualquier obligacion de la formacion, manual o no. Recorrido
+`induccion-general.mjs` paso «5 bis». En la reinduccion sigue oculto: ahi no falta nadie.
+
+**2. Cédula en todos los selectores de personas.**
+- `MultiSelect` (17 usos) tiene ahora BUSCADOR a partir de 8 opciones, con `keywords` por opcion. Pegar
+  varias cedulas (comas, espacios o una columna de Excel: los saltos de linea se convierten, porque un
+  input de una linea los traga sin separador) dice «N de M encontradas · no están: …» y marca todas de
+  un clic. Solo es lista si todas las piezas llevan numeros: «Juan Perez» es una busqueda.
+- `PersonPicker`: busca y ensena la cedula; y al escribir busca en TODA la empresa, no solo en el area
+  sugerida.
+- **Fallo encontrado de paso:** el buscador general de la barra cargaba **las 50 primeras personas** y
+  filtraba sobre ellas: con 1001, a casi nadie lo encontraba ni por nombre. Ahora pregunta al servidor
+  mientras se escribe (`searchCommands`), y la persona lleva a SU ficha, no a la lista de Usuarios.
+- «Faltan por inscribir» de la convocatoria busca tambien por cedula. `/users/pickable` trae
+  `documentNumber`.
+
+**Pruebas:** e2e nuevo `buscar-por-cedula.spec.ts` (los tres selectores; lista con cedula
+inexistente, columna de Excel, nombre de dos palabras, nada coincide). 1008 unitarias, **31/31 e2e**.
+`quienes-desde-la-ficha` fallo UNA vez en una corrida completa y paso sola: el clic en «Exigirla» no
+llego a disparar. Intermitente, vigilar.
+
+---
+
 ## 2026-09-30 — DESPLEGADO A PRODUCCION: «Tus datos» en el perfil y filtros en Configuración
 
 Commit `9dc6bb8`. Los cinco pasos de `05-reglas-de-despliegue.md` §3:

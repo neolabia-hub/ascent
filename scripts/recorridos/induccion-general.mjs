@@ -87,6 +87,16 @@ const contExamen = await admin.post(`/activities/versions/${versionId}/contents`
 });
 comprobar(contExamen.ok, 'el examen entra como contenido', `contenido examen: ${contExamen.estado} ${JSON.stringify(contExamen.cuerpo).slice(0, 200)}`);
 
+// UNA PERSONA "ANTIGUA": existe ANTES de publicar, asi que la regla de ingreso no la alcanza. Se usa
+// en el paso 5 bis para darle la induccion a mano, que es lo que pidio el cliente el 2026-09-30.
+const veterana = await admin.post('/users', {
+  documentNumber: `VT${marca}`,
+  fullName: `Veterana Recorrido ${SUFIJO}`,
+  jobTitleId: cargo.id,
+  areaId: area.id,
+});
+const veteranaId = veterana.cuerpo?.id ?? veterana.cuerpo?.user?.id;
+
 paso(5, 'PUBLICAR: y ver si se exige sola');
 const antesDePublicar = (await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo;
 comprobar((antesDePublicar ?? []).length === 0, 'antes de publicar no se le exige a nadie', `ya habia ${antesDePublicar?.length} requisitos antes de publicar`);
@@ -104,6 +114,19 @@ if (req) {
   comprobar(req.dueDaysAfterTrigger < 0, 'vence ANTES del ingreso (D1072)', `deberia vencer antes del ingreso: ${req.dueDaysAfterTrigger}`);
   comprobar(req.assignmentCount === 0, 'hoy no obliga a nadie: la gente ya estaba', `obliga a ${req.assignmentCount} y no deberia`);
 }
+
+paso('5 bis', 'A UNA PERSONA ANTIGUA SE LE ASIGNA A MANO, sin tocar la regla');
+/*
+  La regla de ingreso no alcanza a quien ya estaba. Pasarla a «desde ahora» se la exigiria a la
+  plantilla ENTERA; para darsela a unos pocos esta la obligacion suelta, que la pantalla ofrece en la
+  induccion de ingreso desde el 2026-09-30.
+*/
+const aMano = await admin.post('/assignments', { targetType: 'ACTIVITY', targetId: creado.activityId, userIds: [veteranaId] });
+comprobar(aMano.ok && aMano.cuerpo?.created === 1, 'se le crea UNA obligacion suelta', `${aMano.estado} ${JSON.stringify(aMano.cuerpo)}`);
+const otraVez = await admin.post('/assignments', { targetType: 'ACTIVITY', targetId: creado.activityId, userIds: [veteranaId] });
+comprobar(otraVez.cuerpo?.created === 0 && otraVez.cuerpo?.skipped === 1, 'asignarla dos veces no la duplica', JSON.stringify(otraVez.cuerpo));
+const reglaTras = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? [])[0];
+comprobar(reglaTras?.soloNuevos === true && reglaTras?.assignmentCount === 0, 'y la regla sigue igual: solo nuevos, cero por ella', JSON.stringify(reglaTras));
 
 paso(6, 'LA CONVOCATORIA: la abre el tipo, no la persona');
 const versionPublicada = ((await admin.get(`/activities/${creado.activityId}`)).cuerpo?.versions ?? [])

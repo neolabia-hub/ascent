@@ -7,6 +7,8 @@ import { cn } from './cn';
 export interface PersonOption {
   id: string;
   fullName: string;
+  /** Si viene, tambien se busca por ella (2026-09-30): el nombre se repite, el documento no. */
+  documentNumber?: string;
   jobTitle?: { name: string } | null;
   area?: { id: string; name: string } | null;
 }
@@ -76,11 +78,16 @@ export function PersonPicker({
   const haySugeridas = sugeridas.length > 0;
 
   const visibles = useMemo(() => {
-    const base = haySugeridas && !showAll ? sugeridas : people;
-    const termino = query.trim().toLowerCase();
-    if (!termino) return base;
-    return base.filter((person) =>
-      `${person.fullName} ${person.jobTitle?.name ?? ''} ${person.area?.name ?? ''}`.toLowerCase().includes(termino),
+    const normal = (texto: string) => texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    const termino = normal(query.trim());
+    if (!termino) return haySugeridas && !showAll ? sugeridas : people;
+    /*
+      AL ESCRIBIR SE BUSCA EN TODA LA EMPRESA, no solo en las sugeridas (2026-09-30). Quien teclea
+      una cedula o un nombre ya sabe a quien quiere; limitarlo al area sugerida le decia «no esta»
+      de alguien que si existe, en otra area.
+    */
+    return people.filter((person) =>
+      normal(`${person.fullName} ${person.documentNumber ?? ''} ${person.jobTitle?.name ?? ''} ${person.area?.name ?? ''}`).includes(termino),
     );
   }, [people, sugeridas, haySugeridas, showAll, query]);
 
@@ -151,7 +158,7 @@ export function PersonPicker({
               ref={searchRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por nombre, cargo o area"
+              placeholder="Buscar por nombre, cédula, cargo o área"
               className="min-w-0 flex-1 bg-transparent text-sm text-ink-900 outline-none placeholder:text-ink-500"
             />
           </div>
@@ -180,7 +187,7 @@ export function PersonPicker({
                     <span className="min-w-0">
                       <span className="block truncate text-sm text-ink-900">{person.fullName}</span>
                       <span className="block truncate text-xs text-ink-500">
-                        {[person.jobTitle?.name, person.area?.name].filter(Boolean).join(' · ') || 'Sin cargo'}
+                        {[person.documentNumber, person.jobTitle?.name, person.area?.name].filter(Boolean).join(' · ') || 'Sin cargo'}
                       </span>
                     </span>
                   </button>
