@@ -136,7 +136,7 @@ function PlayerRail() {
       >
       <Link
         href="/hoy"
-        aria-label={`Ir al inicio de ${tenant.name}`}
+        aria-label={`Ir al inicio de ${tenant.displayName}`}
         className={cn('focus-ring flex shrink-0 items-center px-4 py-4', !expanded && 'justify-center px-0')}
       >
         <TenantMark collapsed={!expanded} />

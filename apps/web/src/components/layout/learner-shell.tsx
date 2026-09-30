@@ -1,13 +1,13 @@
 'use client';
 
 import {
+  ArrowRight,
   CircleUser,
   ClipboardCheck,
   Flame,
   GraduationCap,
   House,
   Repeat2,
-  Snowflake,
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
@@ -21,6 +21,7 @@ import { cn } from '@/components/ui/cn';
 import { TenantMark } from '@/components/layout/tenant-mark';
 import { CommandPalette } from './command-palette';
 import { LearnerTopbar } from './learner-topbar';
+import { useProximoPaso } from '@/components/modules/learner/proximo-paso';
 
 /**
  * El chrome del aprendiz, en las DOS superficies donde se usa.
@@ -452,61 +453,54 @@ function StreakBubble({ progress }: { progress: MyProgress | null }) {
 }
 
 /**
- * EL PROGRESO PROPIO: racha, puntos y congelaciones, en la barra lateral de escritorio.
+ * EL PROGRESO PROPIO, al pie de la barra lateral de escritorio: racha, puntos y EL PROXIMO PASO.
+ *
+ * Pedido del cliente el 2026-09-30: *"que invite a terminar lo que le falta, o si no le falta, a
+ * que siga para mas puntos"*. La invitacion la decide `decidirProximoPaso`, la misma del perfil.
+ *
+ * MINIMA, Y NO ES UN CAPRICHO. Se probo primero como un bloque con los colores de la empresa y los
+ * numeros grandes, y despues como una tarjeta con boton; las dos veces el cliente la vio grande
+ * dentro del carril: *"ocupa mucho espacio"*. El carril es navegacion, y esto es un recordatorio al
+ * pie: una linea con la racha y los puntos, y otra que es un enlace a lo siguiente. El detalle —la
+ * semana, los protectores, la mejor racha— esta en el perfil, que es donde se mira con calma.
+ *
+ * LA LLAMA RELLENA: en contorno, a este tamaño, se leia como una gota.
  */
 function ProgresoPropio({ progress }: { progress: MyProgress | null }) {
+  const paso = useProximoPaso(progress);
   if (!progress) return null;
+  const racha = progress.currentStreak;
 
   return (
-    <div className="m-3 mt-auto rounded-2xl bg-paper p-3.5">
-      <div className="flex items-center gap-3">
-        {/*
-          La llama crece con la racha en vez de ser un icono fijo: a los 30 dias tiene que
-          sentirse distinta que a los 2, y es lo unico que puede decirlo sin una frase mas.
-        */}
-        <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--brand-accent) 14%, transparent)' }}
-        >
+    <div className="mx-3 mb-3 mt-auto border-t border-line px-2 pt-3">
+      <Link href="/perfil" className="focus-ring flex items-center gap-3 rounded-md text-xs text-ink-500 hover:text-ink-900">
+        <span className="inline-flex items-center gap-1" title={racha === 1 ? '1 día seguido' : `${racha} días seguidos`}>
           <Flame
-            className="h-6 w-6"
-            strokeWidth={progress.currentStreak > 0 ? 2 : 1.5}
-            style={{ color: progress.currentStreak > 0 ? 'var(--brand-accent)' : 'var(--ink-300)' }}
+            className={cn('h-3.5 w-3.5', racha > 0 && 'animate-breathe')}
+            fill="currentColor"
+            strokeWidth={1.5}
+            style={{ color: racha > 0 ? 'var(--brand-accent)' : 'var(--ink-300)' }}
             aria-hidden="true"
           />
+          <strong className="font-semibold tabular-nums text-ink-900">{racha}</strong>
+          {racha === 1 ? 'día' : 'días'}
         </span>
-        <div className="min-w-0">
-          <p className="font-display text-xl font-bold leading-none tabular-nums text-ink-900">
-            {progress.currentStreak}
-          </p>
-          <p className="text-xs text-ink-500">
-            {progress.currentStreak === 1 ? 'dia seguido' : 'dias seguidos'}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
-        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
-          <Sparkles className="h-4 w-4" strokeWidth={2} style={{ color: 'var(--brand-accent)' }} aria-hidden="true" />
-          <span className="tabular-nums">{progress.points}</span>
-          <span className="text-xs font-normal text-ink-500">pts</span>
+        <span className="inline-flex items-center gap-1">
+          <Sparkles className="h-3.5 w-3.5" strokeWidth={2} style={{ color: 'var(--brand-accent)' }} aria-hidden="true" />
+          <strong className="font-semibold tabular-nums text-ink-900">{progress.points}</strong>
+          pts
         </span>
-        {/*
-          Las congelaciones solo se ensenan si quedan: un "0 congelaciones" no ayuda a nadie y
-          convierte un premio en un reproche.
-        */}
-        {progress.freezesAvailable > 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs text-ink-500" title="Te salvan la racha un día">
-            <Snowflake className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-            {progress.freezesAvailable}
-          </span>
-        ) : null}
-      </div>
-
-      {progress.longestStreak > progress.currentStreak ? (
-        <p className="mt-2 text-[11px] leading-tight text-ink-300">
-          Tu mejor racha fueron {progress.longestStreak} dias.
-        </p>
+      </Link>
+      {paso ? (
+        <Link
+          href={paso.href}
+          title={paso.detalle}
+          className="focus-ring group mt-2 flex items-center gap-1 rounded-md text-xs font-semibold"
+          style={{ color: 'var(--brand-primary)' }}
+        >
+          <span className="min-w-0 truncate">{paso.corto}</span>
+          <ArrowRight className="h-3 w-3 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={2.5} aria-hidden="true" />
+        </Link>
       ) : null}
     </div>
   );

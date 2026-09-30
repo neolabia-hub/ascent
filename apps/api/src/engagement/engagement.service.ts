@@ -5,7 +5,7 @@ import { toLearnerView } from '../assessments/question-payload.js';
 import { gradeQuestion } from '../learning/grading.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import { enterQueue, nextState, REVIEW_SESSION_SIZE } from './spaced-repetition.js';
-import { advanceStreak, lastActivityLabel, POINTS, type StreakState } from './streak.js';
+import { advanceStreak, lastActivityLabel, POINTS, rachaVigente, type StreakState } from './streak.js';
 
 /**
  * ENGAGEMENT: lo que hace que la gente vuelva sin convertir la formacion en un concurso.
@@ -211,7 +211,13 @@ export class EngagementService {
       lastActivityDate: streak?.lastActivityDate ?? null,
       freezesAvailable: streak?.freezesAvailable ?? 2,
     };
-    return { ...state, lastActivityDate: lastActivityLabel(state), points: points._sum.points ?? 0 };
+    return {
+      ...state,
+      // La vigente, no la guardada: ver `rachaVigente`.
+      currentStreak: rachaVigente(state, new Date()),
+      lastActivityDate: lastActivityLabel(state),
+      points: points._sum.points ?? 0,
+    };
   }
 
   private async updateStreak(db: TenantPrisma, tenantId: string, userId: string) {

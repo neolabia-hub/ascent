@@ -50,9 +50,9 @@ test.describe('Perfil: tus datos', () => {
 
     // Se deja como estaba.
     await tarjeta.getByRole('button', { name: 'Editar' }).click();
-    await page.locator('#mi-telefono').fill(telefonoAntes === 'Sin teléfono' ? '' : telefonoAntes);
+    await page.locator('#mi-telefono').fill(telefonoAntes === 'Agrega tu teléfono' ? '' : telefonoAntes);
     await tarjeta.getByRole('button', { name: 'Guardar' }).click();
-    await expect(tarjeta.locator('dt:text-is("Teléfono") + dd')).toHaveText(telefonoAntes || 'Sin teléfono', {
+    await expect(tarjeta.locator('dt:text-is("Teléfono") + dd')).toHaveText(telefonoAntes || 'Agrega tu teléfono', {
       timeout: 20_000,
     });
   });

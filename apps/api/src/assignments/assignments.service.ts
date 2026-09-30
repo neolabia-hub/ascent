@@ -150,6 +150,32 @@ export class AssignmentsService {
       await this.engine.withdrawLeavers(this.prisma.scoped);
     }
     if (input.active === true) {
+      /*
+        VOLVER A ENCENDER UNA REGLA DEVUELVE LO QUE ELLA MISMA RETIRO (2026-09-30).
+
+        Retirar pasa lo pendiente a WITHDRAWN_LEFT_AUDIENCE. Al reactivar, el motor veia esa fila
+        como HISTORIA de la persona con la regla y, en una formacion que no se repite, no le abria
+        nada: quien la debia antes del retiro se quedaba sin ella para siempre. Lo destapo el cliente
+        en produccion con «Inducción Corporativa SST», retirada y sin forma de volver.
+
+        Solo al pasar de APAGADA a ENCENDIDA, solo las de ESTA regla y solo a quien sigue en su
+        grupo: a quien salio de verdad del grupo no se le devuelve nada. Lo cumplido, eximido o
+        cerrado no se toca: no estaba pendiente cuando se retiro.
+      */
+      if (!before.active) {
+        await this.prisma.scoped.assignment.updateMany({
+          where: {
+            ruleId: id,
+            status: 'WITHDRAWN_LEFT_AUDIENCE',
+            user: {
+              active: true,
+              deletedAt: null,
+              audienceMembers: { some: { audienceId: before.audienceId, leftAt: null } },
+            },
+          },
+          data: { status: 'PENDING' },
+        });
+      }
       await this.engine.generate(this.prisma.scoped, tenantId, { ruleId: id });
     }
 

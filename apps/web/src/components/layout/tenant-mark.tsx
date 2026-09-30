@@ -20,7 +20,7 @@ import { cn } from '@/components/ui/cn';
  * una palabra alargada, y con `cover` el primero que se subio salio cortado por la mitad.
  */
 export function TenantMark({ collapsed = false }: { collapsed?: boolean }) {
-  const { name, branding } = useTenant();
+  const { displayName: name, branding } = useTenant();
   const logo = useMediaUrl(branding.logoKey);
 
   /*
@@ -47,7 +47,7 @@ export function TenantMark({ collapsed = false }: { collapsed?: boolean }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={logo}
-          alt={branding.companyDisplayName || name}
+          alt={name}
           className="h-11 w-11 shrink-0 rounded-2xl border border-line bg-white object-contain p-1.5"
         />
       ) : (

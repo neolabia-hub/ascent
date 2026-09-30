@@ -5,8 +5,9 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { uploadMedia } from '@/lib/catalog-api';
 import { useMediaUrl } from '@/lib/use-media-url';
-import { applyTenantBranding } from '@/components/providers/tenant-provider';
+import { avisarMarcaNueva } from '@/components/providers/tenant-provider';
 import { Button } from '@/components/ui/button';
+import { ColorField } from '@/components/ui/color-field';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -58,8 +59,8 @@ export default function PreferenciasPage() {
     try {
       const r = await putTenantBranding(branding);
       setBranding(r.branding);
-      // Aplica los colores de inmediato: el admin VE su marca sin recargar.
-      applyTenantBranding({ ...r.branding, logoKey: r.branding.logoKey });
+      // La marca entera de inmediato —colores, nombre y logo en la barra—: se VE sin recargar.
+      avisarMarcaNueva({ ...r.branding, logoKey: r.branding.logoKey });
       showToast({ kind: 'success', title: 'Marca actualizada' });
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo guardar la marca', description: motivoDelError(error) });
@@ -398,21 +399,17 @@ export default function PreferenciasPage() {
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field htmlFor="brand-primary" label="Color primario">
-                <input
+                <ColorField
                   id="brand-primary"
-                  type="color"
                   value={branding.primaryColor}
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="h-10 w-full cursor-pointer rounded-md border border-line bg-surface p-1"
+                  onChange={(primaryColor) => setBranding({ ...branding, primaryColor })}
                 />
               </Field>
               <Field htmlFor="brand-accent" label="Color de acento">
-                <input
+                <ColorField
                   id="brand-accent"
-                  type="color"
                   value={branding.accentColor}
-                  onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
-                  className="h-10 w-full cursor-pointer rounded-md border border-line bg-surface p-1"
+                  onChange={(accentColor) => setBranding({ ...branding, accentColor })}
                 />
               </Field>
             </div>

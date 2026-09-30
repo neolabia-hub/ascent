@@ -402,6 +402,38 @@ export function ActivityAudienceTab({
   };
 
   const yaEsDeTodos = (requirements ?? []).some((requirement) => requirement.reachesEveryone);
+  /**
+   * LA AUTOMATICA SE RETIRO (2026-09-30): publicada, del tipo que se exige solo, y sin regla de toda
+   * la empresa viva. La lista de «Lo que se exige hoy» solo trae las activas, asi que una retirada
+   * desaparecia sin rastro y no habia forma de volver a encenderla. Paso en produccion.
+   */
+  const retirada = decide === 'TODOS' && hayContenidoPublicado && requirements !== null && !yaEsDeTodos && !esDelPlan;
+
+  /**
+   * Vuelve a exigirla a toda la empresa con el plazo QUE PONE EL TIPO, el mismo que al publicar: -1
+   * dia del ingreso en la de ingreso (D1072: previa al inicio), un mes en las demas. El servidor
+   * reconoce la regla por su alcance y la REACTIVA en vez de crear otra, con su corte de «solo
+   * nuevos» intacto, y devuelve lo que ella misma habia retirado.
+   */
+  const volverAExigir = async () => {
+    setBusy(true);
+    try {
+      await setActivityRequirement(activityId, {
+        scope: EMPTY_RULE,
+        trigger: typeConfig.requiresBeforeHire ? 'ON_HIRE' : 'ON_JOIN',
+        dueDaysAfterTrigger: typeConfig.requiresBeforeHire ? -1 : 30,
+        everyMonths: typeConfig.defaultAnnualDate ? null : typeConfig.defaultRecurrenceMonths,
+        fixedDate: typeConfig.defaultAnnualDate,
+        reason: null,
+      });
+      await load();
+      showToast({ kind: 'success', title: 'Se vuelve a exigir a toda la empresa' });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo volver a exigir', description: motivoDelError(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
   /** Todas sus reglas obligan solo a quien entre desde ahora: hoy puede no haber NADIE, y esta bien. */
   const soloParaNuevos =
     (requirements ?? []).length > 0 && (requirements ?? []).every((requirement) => requirement.soloNuevos);
@@ -460,12 +492,20 @@ export function ActivityAudienceTab({
                     />
                     <div>
                       <p className="text-sm font-medium text-ink-900">
-                        {yaEsDeTodos ? 'Ya se le exige a toda la empresa' : 'Es para toda la empresa'}
+                        {yaEsDeTodos
+                          ? 'Ya se le exige a toda la empresa'
+                          : retirada
+                            ? 'La regla automática está retirada'
+                            : 'Es para toda la empresa'}
                       </p>
                       <p className="mt-0.5 text-sm text-ink-500">
                         {yaEsDeTodos
                           ? 'Se aplico sola al publicar: en este tipo de formación no hay nada que decidir.'
-                          : typeConfig.requiresBeforeHire
+                          : retirada
+                            ? typeConfig.requiresBeforeHire
+                              ? 'Hoy no se le exige a quien ingresa. Vuelve a exigirla para que ningún ingreso se quede sin ella.'
+                              : 'Hoy no se le exige a nadie por esta regla. Vuelve a exigirla a toda la empresa.'
+                            : typeConfig.requiresBeforeHire
                             ? 'Es una inducción de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su inducción se hizo cuando entró. Lo que le toca cada año es la reinducción, que es otra formación.'
                             : `Al publicar quedara exigida a ${reach ?? '...'} personas, y a quien entre despues. No hay que marcar a nadie.`}
                       </p>
@@ -546,6 +586,13 @@ export function ActivityAudienceTab({
                     onChange={(jobTitleIds) => setScope({ ...scope, jobTitleIds })}
                   />
                 </Field>
+              ) : null}
+
+              {retirada && ajustando === null && !grupoAbierto ? (
+                <Button className="w-full" onClick={() => void volverAExigir()} loading={busy}>
+                  <ShieldCheck size={16} />
+                  Volver a exigirla a toda la empresa
+                </Button>
               ) : null}
 
               {/*

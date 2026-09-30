@@ -1,6 +1,28 @@
 'use client';
 
-import { Award, Camera, Download, Flame, LogOut, Pencil, Shield, Trophy } from 'lucide-react';
+import {
+  Award,
+  BriefcaseBusiness,
+  Building2,
+  Cake,
+  CalendarDays,
+  Camera,
+  Download,
+  Flame,
+  Handshake,
+  IdCard,
+  Info,
+  Layers,
+  LogOut,
+  Mail,
+  MapPin,
+  Network,
+  Pencil,
+  Phone,
+  Play,
+  type LucideIcon,
+} from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, getMisDatos, logout, setMyAvatar, motivoDelError, updateMiContacto, type MisDatos } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
@@ -16,6 +38,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { uploadMedia } from '@/lib/catalog-api';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/components/ui/cn';
+import { useProximoPaso } from '@/components/modules/learner/proximo-paso';
 
 /**
  * PERFIL. Aqui vive la racha, y vive SOLA: es privada (Decision #23), no se compara con nadie y
@@ -23,6 +47,20 @@ import { Skeleton } from '@/components/ui/skeleton';
  *
  * Los puntos se ganan por logro real (terminar una leccion, aprobar un examen, hacer el repaso),
  * nunca por entrar. Por eso no hay "puntos por racha" ni moneda que gastar.
+ *
+ * ─── UN PERFIL «TIPO STREAMING» (2026-09-30, pedido del cliente) ───
+ *
+ * La primera version del heroe llevaba cuatro recuadros de cristal con un numero cada uno, y el
+ * cliente lo vio generico: es la rejilla de estadisticas de cualquier panel. La idea ahora es la de
+ * una ficha de plataforma de video:
+ *
+ *   - el NOMBRE grande, como un titulo, y debajo una linea de datos separada por puntos —como
+ *     «2024 · 1 h 40 min · 16+»— en vez de tarjetas: «3 días seguidos · 370 puntos · mejor racha 5»;
+ *   - la SEMANA de la racha, siete circulos con los dias en que aprendio: se entiende de un vistazo
+ *     y dice lo que un numero no dice, que la racha se hace dia a dia;
+ *   - y el BOTON principal es el proximo paso, como el «Reproducir»: la cosa que hay que hacer.
+ *
+ * Debajo, las constancias como una FILA que se desliza —la de «seguir viendo»—, siempre visible.
  */
 export default function ProfilePage() {
   const profile = useLearnerProfile();
@@ -30,6 +68,7 @@ export default function ProfilePage() {
   const [progress, setProgress] = useState<MyProgress | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [avatarKey, setAvatarKey] = useState<string | null>(profile.avatarKey);
+  const paso = useProximoPaso(progress);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,102 +95,189 @@ export default function ProfilePage() {
     }
   }
 
+  const racha = progress?.currentStreak ?? 0;
+
   return (
-    <div className="space-y-6">
-      <section className="card rounded-xl p-6 text-center">
-        <MiFoto fullName={profile.fullName} avatarKey={avatarKey} onChange={setAvatarKey} />
-        <h2 className="mt-3 font-display text-lg font-semibold text-ink-900">{profile.fullName}</h2>
-        {/*
-          EL CARGO Y NO EL CORREO bajo el nombre (2026-09-24). El correo ahora se edita en «Tus
-          datos», y repetirlo aqui dejaba dos copias que no coincidian hasta recargar: esta sale del
-          perfil cacheado de la sesion y la otra de la ficha recien guardada.
-        */}
-        {profile.jobTitle ? <p className="mt-0.5 text-sm text-ink-500">{profile.jobTitle}</p> : null}
-        <p className="mt-2 text-xs uppercase tracking-[0.04em] text-ink-500">{tenant.name}</p>
+    <div className="space-y-8">
+      <section
+        className="relative overflow-hidden rounded-3xl text-white shadow-card"
+        style={{
+          backgroundImage:
+            'radial-gradient(80% 60% at 85% 0%, color-mix(in srgb, var(--brand-accent) 50%, transparent), transparent 65%), radial-gradient(60% 50% at 0% 100%, color-mix(in srgb, var(--brand-accent) 22%, transparent), transparent 70%), linear-gradient(160deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 55%, #000) 100%)',
+        }}
+      >
+        {/* La vineta de abajo hace de «pie de cartel»: el texto blanco se apoya en algo oscuro. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent" />
+
+        <div className="relative px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-10">
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
+            <MiFoto fullName={profile.fullName} avatarKey={avatarKey} onChange={setAvatarKey} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">{tenant.displayName}</p>
+              <h1 className="mt-1.5 font-display text-[30px] font-extrabold leading-[1.05] tracking-tight sm:text-[40px]">
+                {profile.fullName}
+              </h1>
+              {/*
+                EL CARGO Y NO EL CORREO bajo el nombre (2026-09-24). El correo se edita en «Tus
+                datos», y repetirlo aqui dejaba dos copias que no coincidian hasta recargar.
+              */}
+              {profile.jobTitle ? <p className="mt-1 text-sm text-white/75">{profile.jobTitle}</p> : null}
+
+              {progress ? (
+                <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-sm text-white/80 sm:justify-start">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-white">
+                    <Flame className="h-4 w-4" fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
+                    {racha} {racha === 1 ? 'día seguido' : 'días seguidos'}
+                  </span>
+                  <Punto />
+                  <span>
+                    <strong className="font-semibold text-white">{formatNumber(progress.points)}</strong> puntos
+                  </span>
+                  {progress.longestStreak > 0 ? (
+                    <>
+                      <Punto />
+                      <span>mejor racha {progress.longestStreak}</span>
+                    </>
+                  ) : null}
+                  {progress.freezesAvailable > 0 ? (
+                    <>
+                      <Punto />
+                      <span title="Te salvan la racha un día sin conexión">
+                        {progress.freezesAvailable} {progress.freezesAvailable === 1 ? 'protector' : 'protectores'}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+              ) : (
+                <div className="mx-auto mt-3 h-5 w-64 animate-pulse rounded-full bg-white/15 sm:mx-0" />
+              )}
+            </div>
+          </div>
+
+          {progress ? <SemanaDeRacha progress={progress} /> : null}
+
+          {/*
+            EL «REPRODUCIR»: el proximo paso es el boton principal de la cabecera. Sin rojo aunque
+            haya atrasadas (lo pidio el cliente): la frase ya lo dice, y un boton rojo en el perfil
+            se lee como un error, no como una invitacion.
+          */}
+          {paso ? (
+            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <Link
+                href={paso.href}
+                className="focus-ring inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white px-7 text-base font-bold shadow-lg transition-transform duration-150 ease-pulse hover:-translate-y-0.5 sm:w-auto"
+                style={{ color: 'var(--brand-primary)' }}
+              >
+                <Play className="h-4 w-4" fill="currentColor" strokeWidth={0} aria-hidden="true" />
+                {paso.accion}
+              </Link>
+              <div className="min-w-0 text-center sm:text-left">
+                <p className="text-sm font-semibold">{paso.titulo}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-white/75">{paso.detalle}</p>
+              </div>
+            </div>
+          ) : null}
+
+          <p className="mt-6 text-center text-[11px] text-white/55 sm:text-left">Tu racha es privada: nadie más la ve.</p>
+        </div>
       </section>
 
       {/*
-        TUS DATOS VA ARRIBA, pegado a la cabecera (2026-09-24). Se puso primero debajo de la racha y
-        en el telefono quedaba fuera de la pantalla: el cliente abrio el perfil buscando donde
-        cambiar su correo y no lo encontro. La ficha es la continuacion natural del nombre y la foto.
-      */}
-      <TusDatos />
-
-      {progress === null ? (
-        <Skeleton className="h-32 w-full rounded-xl" />
-      ) : (
-        <section className="grid grid-cols-2 gap-3">
-          <StatTile
-            icon={Flame}
-            label="Racha actual"
-            value={`${progress.currentStreak}`}
-            hint={progress.currentStreak === 1 ? 'dia seguido' : 'dias seguidos'}
-          />
-          <StatTile icon={Trophy} label="Puntos" value={formatNumber(progress.points)} hint="por logro real" />
-          <StatTile
-            icon={Flame}
-            label="Racha mas larga"
-            value={`${progress.longestStreak}`}
-            hint={progress.longestStreak === 1 ? 'dia' : 'dias'}
-          />
-          <StatTile
-            icon={Shield}
-            label="Protectores"
-            value={`${progress.freezesAvailable}`}
-            hint="cubren un día sin señal"
-          />
-        </section>
-      )}
-
-      {/*
-        LAS CONSTANCIAS, en el perfil y no en una pantalla aparte (Decision #112).
-
-        Es el expediente formativo de la persona y lo consulta ella misma, casi siempre porque se
-        la esta pidiendo alguien: el cliente al que va a entrar, una empresa a la que se postula.
-        Una pantalla propia para una lista que casi siempre tiene tres filas seria una entrada mas
-        en la navegacion para algo que se mira dos veces al año.
+        LAS CONSTANCIAS, en el perfil y no en una pantalla aparte (Decision #112), y SIEMPRE
+        visibles desde el 2026-09-30: el cliente creyo que se habian quitado porque la cuenta con la
+        que miraba no tenia ninguna y la seccion no se pintaba.
       */}
       <MisConstancias />
 
       {/*
-        SU DESEMPENO YA NO VIVE AQUI (Decision #140). Estaba debajo de las constancias, y era el
-        sitio equivocado por dos motivos: nadie busca su evaluacion en el perfil, y el mismo asunto
-        tenia dos entradas segun si calificas o no. Ahora todo esta en "Desempeno", que aparece en
-        el menu cuando hay algo — lo tuyo o lo de tu gente.
+        TUS DATOS, DEBAJO DE LA GAMIFICACION (2026-09-30, pedido del cliente). La ficha se consulta
+        de vez en cuando; lo que se mira cada dia va arriba.
       */}
+      <TusDatos />
 
-      <p className="text-center text-sm text-ink-500">
-        Tu racha es privada: nadie mas la ve.
-      </p>
+      {/*
+        SU DESEMPENO YA NO VIVE AQUI (Decision #140): esta en "Desempeno", que aparece en el menu
+        cuando hay algo — lo tuyo o lo de tu gente.
+      */}
 
       <Button variant="outline" size="lg" className="w-full" loading={leaving} onClick={() => void handleLogout()}>
         <LogOut className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-        Cerrar sesion
+        Cerrar sesión
       </Button>
     </div>
   );
 }
 
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof Flame;
-  label: string;
-  value: string;
-  hint: string;
-}) {
+/** El separador de la linea de datos, como en una ficha de pelicula. */
+function Punto() {
+  return <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/50" />;
+}
+
+/** Fecha civil en Colombia (AAAA-MM-DD): el servidor cuenta la racha en esa zona. */
+const FECHA_BOGOTA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' });
+const INICIAL_DEL_DIA = new Intl.DateTimeFormat('es-CO', { weekday: 'narrow', timeZone: 'America/Bogota' });
+const DIA_LARGO = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', timeZone: 'America/Bogota' });
+
+/**
+ * LA SEMANA DE LA RACHA: los ultimos siete dias, con los que cuentan encendidos.
+ *
+ * Se deduce de dos datos que ya existen —cuantos dias lleva y cual fue el ultimo— porque la racha
+ * es exactamente eso: los N dias seguidos que terminan en el ultimo. No hace falta pedir el
+ * historial al servidor.
+ *
+ * HOY se marca aparte cuando todavia no cuenta: es el dia en que la racha se mantiene o se pierde,
+ * y el circulo punteado dice «aqui falta algo» sin decirlo en rojo.
+ */
+function SemanaDeRacha({ progress }: { progress: MyProgress }) {
+  const hoy = FECHA_BOGOTA.format(new Date());
+  const ultimo = progress.lastActivityDate;
+  const racha = progress.currentStreak;
+  // El primer dia de la racha: el ultimo menos (racha - 1). A mediodia para no cruzar de dia por la zona.
+  const primero =
+    ultimo && racha > 0
+      ? FECHA_BOGOTA.format(new Date(new Date(`${ultimo}T12:00:00-05:00`).getTime() - (racha - 1) * 86_400_000))
+      : null;
+
+  const dias = Array.from({ length: 7 }, (_, i) => {
+    const fecha = new Date(Date.now() - (6 - i) * 86_400_000);
+    const iso = FECHA_BOGOTA.format(fecha);
+    return {
+      iso,
+      inicial: INICIAL_DEL_DIA.format(fecha).toUpperCase(),
+      largo: DIA_LARGO.format(fecha),
+      activo: Boolean(ultimo && primero && iso >= primero && iso <= ultimo),
+      esHoy: iso === hoy,
+    };
+  });
+
   return (
-    <div className="card rounded-xl p-4">
-      <div className="flex items-center gap-2 text-ink-500">
-        <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-        <span className="text-xs font-medium uppercase tracking-[0.04em]">{label}</span>
-      </div>
-      <p className="mt-2 font-display text-[28px] font-extrabold tabular-nums leading-none text-ink-900">{value}</p>
-      <p className="mt-1 text-xs text-ink-500">{hint}</p>
-    </div>
+    <ol className="mt-6 flex items-center justify-center gap-2 sm:justify-start" aria-label="Tu racha esta semana">
+      {dias.map((dia) => (
+        <li key={dia.iso} className="flex flex-col items-center gap-1.5">
+          <span
+            title={`${dia.largo}: ${dia.activo ? 'aprendiste' : dia.esHoy ? 'aún no' : 'sin actividad'}`}
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-200 sm:h-10 sm:w-10',
+              dia.activo && 'bg-white shadow-md',
+              !dia.activo && dia.esHoy && 'border-2 border-dashed border-white/60',
+              !dia.activo && !dia.esHoy && 'bg-white/10',
+            )}
+          >
+            {dia.activo ? (
+              <Flame
+                className={cn('h-4 w-4', dia.esHoy && 'animate-breathe')}
+                fill="currentColor"
+                strokeWidth={1.5}
+                style={{ color: 'var(--brand-accent)' }}
+                aria-hidden="true"
+              />
+            ) : null}
+          </span>
+          <span className={cn('text-[11px] font-semibold', dia.esHoy ? 'text-white' : 'text-white/55')}>{dia.inicial}</span>
+          <span className="sr-only">{`${dia.largo}: ${dia.activo ? 'aprendiste' : 'sin actividad'}`}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -195,7 +321,9 @@ function MiFoto({
   return (
     <div className="flex flex-col items-center">
       <div className="relative">
-        <Avatar avatarKey={avatarKey} fullName={fullName} size={88} />
+        <span className="block rounded-full ring-4 ring-white/25">
+          <Avatar avatarKey={avatarKey} fullName={fullName} size={88} />
+        </span>
         <button
           type="button"
           onClick={() => input.current?.click()}
@@ -207,8 +335,8 @@ function MiFoto({
             hay que explicarlo; ademas deja el nombre justo debajo de la cara, que es como se lee
             una ficha de persona.
           */
-          className="focus-ring absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-surface text-white shadow-btn transition-transform duration-150 hover:-translate-y-px disabled:opacity-60"
-          style={{ backgroundColor: 'var(--brand-primary)' }}
+          className="focus-ring absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white/60 bg-white shadow-btn transition-transform duration-150 hover:-translate-y-px disabled:opacity-60"
+          style={{ color: 'var(--brand-primary)' }}
         >
           <Camera className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
         </button>
@@ -218,12 +346,12 @@ function MiFoto({
         <button
           type="button"
           onClick={() => void guardar(null)}
-          className="focus-ring mt-2 text-xs text-ink-500 underline-offset-2 hover:text-ink-900 hover:underline"
+          className="focus-ring mt-2 text-xs text-white/75 underline-offset-2 hover:text-white hover:underline"
         >
           Quitar la foto
         </button>
       ) : (
-        <p className="mt-2 text-xs text-ink-500">Ponle cara a tu cuenta</p>
+        <p className="mt-2 text-xs text-white/75">Ponle cara a tu cuenta</p>
       )}
 
       <input
@@ -253,11 +381,15 @@ function MiFoto({
 }
 
 /**
- * LAS CONSTANCIAS PROPIAS, para descargar.
+ * LAS CONSTANCIAS PROPIAS, para ver y descargar: una FILA que se desliza (2026-09-30).
  *
- * Si no hay ninguna NO se pinta nada. Un bloque vacio diciendo "aun no tienes constancias" en el
- * perfil de alguien que lleva tres dias en la empresa se lee como un reproche, y ademas ocupa el
- * sitio de la racha, que si tiene algo que decirle.
+ * Como la fila de «seguir viendo» de una plataforma de video: tarjetas con portada, una al lado de
+ * otra, y en el telefono se pasan con el dedo. Cada una dice que es, cuando se emitio y si esta
+ * vencida o anulada, y se descarga desde ella misma.
+ *
+ * SIEMPRE SE PINTA. Antes, sin ninguna, la seccion no salia, y el cliente creyo que se habian
+ * quitado del perfil. Sin constancias se dice que van a aparecer aqui y cuando: es una promesa, no
+ * un reproche.
  */
 function MisConstancias() {
   const { showToast } = useToast();
@@ -269,8 +401,6 @@ function MisConstancias() {
       .then(setFilas)
       .catch(() => setFilas([]));
   }, []);
-
-  if (filas === null || filas.length === 0) return null;
 
   async function descargar(fila: CertificateRow) {
     setBajando(fila.id);
@@ -284,55 +414,94 @@ function MisConstancias() {
   }
 
   return (
-    <section className="card p-5">
-      <h3 className="font-display text-base font-semibold text-ink-900">Tus constancias</h3>
-      <p className="mt-0.5 text-sm text-ink-500">Descargalas cuando te las pidan.</p>
+    <section aria-labelledby="titulo-constancias">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 id="titulo-constancias" className="font-display text-lg font-bold text-ink-900">
+            Tus constancias
+          </h2>
+          <p className="text-sm text-ink-500">Descárgalas cuando te las pidan.</p>
+        </div>
+        {filas && filas.length > 0 ? (
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-ink-500">{filas.length}</span>
+        ) : null}
+      </div>
 
-      <div className="mt-3 divide-y divide-line">
-        {filas.map((fila) => {
-          const vencida = fila.validUntil !== null && new Date(fila.validUntil).getTime() < Date.now();
-          return (
-            <div key={fila.id} className="flex items-center gap-3 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                <Award className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 truncate text-sm font-medium text-ink-900">
-                  {fila.activityName}
-                  {/*
-                    LA UNICA SEÑAL de que esto no es una formacion suelta: por debajo agrupa
-                    varios modulos, y sin esta pastilla se ve identica a cualquier otra.
-                  */}
-                  {fila.typeName === 'Programa' ? (
-                    <span className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary">
-                      Programa
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-xs text-ink-500">
-                  {new Date(fila.issuedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  {fila.hours ? ` · ${fila.hours} horas` : ''}
+      {filas === null ? (
+        <div className="flex gap-3 overflow-hidden">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-[230px] w-[210px] shrink-0 rounded-2xl" />
+          ))}
+        </div>
+      ) : filas.length === 0 ? (
+        <div className="card flex items-center gap-4 rounded-2xl p-5">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+            <Award className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <p className="text-sm text-ink-500">
+            Aún no tienes constancias. Cuando termines una formación que la entregue, aparecerá aquí lista para descargar.
+          </p>
+        </div>
+      ) : (
+        /*
+          LA FILA SE DESLIZA y se engancha tarjeta a tarjeta (`snap`). La barra de desplazamiento se
+          oculta: en una fila de tarjetas lo que dice «hay mas» es la tarjeta cortada contra el borde.
+        */
+        <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {filas.map((fila) => {
+            const vencida = fila.validUntil !== null && new Date(fila.validUntil).getTime() < Date.now();
+            const estado = fila.revoked ? 'Anulada' : vencida ? 'Vencida' : null;
+            return (
+              <article
+                key={fila.id}
+                className={cn('card flex w-[210px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl', fila.revoked && 'opacity-70')}
+              >
+                {/* LA PORTADA: el color de la empresa y el sello. Es lo que hace de la lista una fila. */}
+                <div
+                  className="relative flex h-24 items-center justify-center"
+                  style={{
+                    backgroundImage:
+                      'radial-gradient(70% 90% at 100% 0%, color-mix(in srgb, var(--brand-accent) 55%, transparent), transparent 70%), linear-gradient(150deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 60%, #000))',
+                  }}
+                >
+                  <Award className="h-10 w-10 text-white/85" strokeWidth={1.5} aria-hidden="true" />
+                  <span className="absolute left-2.5 top-2.5 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    {fila.typeName ?? 'Constancia'}
+                  </span>
                   {/*
                     Vencida y anulada se dicen distinto porque significan cosas distintas: la
                     vencida acredita que se hizo y hay que repetirla; la anulada la retiro la
-                    empresa. Confundirlas en una sola etiqueta gris seria lo peor de las dos.
+                    empresa.
                   */}
-                  {fila.revoked ? ' · Anulada' : vencida ? ' · Vencida' : ''}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                loading={bajando === fila.id}
-                onClick={() => void descargar(fila)}
-                aria-label={`Descargar la constancia de ${fila.activityName}`}
-              >
-                <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-              </Button>
-            </div>
-          );
-        })}
-      </div>
+                  {estado ? (
+                    <span className="absolute right-2.5 top-2.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-900">
+                      {estado}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-1 flex-col p-3.5">
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink-900">{fila.activityName}</p>
+                  <p className="mt-1 text-xs text-ink-500">
+                    {new Date(fila.issuedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {fila.hours ? ` · ${fila.hours} h` : ''}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-auto w-full"
+                    loading={bajando === fila.id}
+                    onClick={() => void descargar(fila)}
+                    aria-label={`Descargar la constancia de ${fila.activityName}`}
+                  >
+                    <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                    Descargar
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -420,22 +589,34 @@ function TusDatos() {
     }
   }
 
-  const laborales: Array<[string, string | null]> = [
-    ['Documento', datos.documentNumber],
-    ['Cargo', datos.jobTitle],
-    ['Área', datos.area],
-    ['Regional', datos.regional],
-    ['Servicio', datos.service],
-    ['Vinculación', VINCULACION[datos.employmentType] ?? datos.employmentType],
-    ['Fecha de ingreso', fechaLarga(datos.hiredAt)],
-    ['Fecha de nacimiento', fechaLarga(datos.birthDate)],
+  const laborales: Array<{ etiqueta: string; valor: string | null; icono: LucideIcon }> = [
+    { etiqueta: 'Documento', valor: datos.documentNumber, icono: IdCard },
+    { etiqueta: 'Cargo', valor: datos.jobTitle, icono: BriefcaseBusiness },
+    { etiqueta: 'Área', valor: datos.area, icono: Network },
+    { etiqueta: 'Regional', valor: datos.regional, icono: MapPin },
+    { etiqueta: 'Servicio', valor: datos.service, icono: Layers },
+    { etiqueta: 'Vinculación', valor: VINCULACION[datos.employmentType] ?? datos.employmentType, icono: Handshake },
+    { etiqueta: 'Fecha de ingreso', valor: fechaLarga(datos.hiredAt), icono: CalendarDays },
+    { etiqueta: 'Fecha de nacimiento', valor: fechaLarga(datos.birthDate), icono: Cake },
   ];
 
+  /*
+    TUS DATOS COMO UNA FICHA (2026-09-30, pedido del cliente: *"con iconos, que se vea mejor, tipo
+    CRM"*). Era una tabla de dos columnas —etiqueta a la izquierda, valor a la derecha— que se leia
+    como un formulario de papel. Ahora:
+
+      - el CONTACTO son dos tarjetas con su icono, y la que falta invita a agregarla en vez de decir
+        «Sin correo» en gris: es lo unico que la persona puede cambiar, y tiene que parecerlo;
+      - lo de LA EMPRESA es una rejilla de fichas, cada una con su icono. Un icono por dato hace que
+        se encuentre de un vistazo el que se busca —«¿en que area me tienen?»— sin leer la lista.
+
+    Siguen siendo `dt`/`dd`: es una lista de definiciones, y asi la leen los lectores de pantalla.
+  */
   return (
-    <section className="card p-5">
+    <section className="card rounded-2xl p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-display text-base font-semibold text-ink-900">Tus datos</h3>
+          <h3 className="font-display text-lg font-bold text-ink-900">Tus datos</h3>
           <p className="mt-0.5 text-sm text-ink-500">Tu correo y tu teléfono los puedes cambiar tú.</p>
         </div>
         {editando ? null : (
@@ -491,17 +672,33 @@ function TusDatos() {
           </div>
         </form>
       ) : (
-        <dl className="mt-3 divide-y divide-line">
-          <FilaDato etiqueta="Correo" valor={datos.email ?? 'Sin correo. Entras con tu documento.'} tenue={!datos.email} />
-          <FilaDato etiqueta="Teléfono" valor={datos.phone ?? 'Sin teléfono'} tenue={!datos.phone} />
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+          <TarjetaContacto icono={Mail} etiqueta="Correo" valor={datos.email} vacio="Agrega tu correo" onAgregar={abrir} />
+          <TarjetaContacto icono={Phone} etiqueta="Teléfono" valor={datos.phone} vacio="Agrega tu teléfono" onAgregar={abrir} />
         </dl>
       )}
 
-      <h4 className="mt-5 text-xs font-medium uppercase tracking-[0.04em] text-ink-500">En la empresa</h4>
-      <dl className="mt-1 divide-y divide-line">
-        {laborales.map(([etiqueta, valor]) => (valor ? <FilaDato key={etiqueta} etiqueta={etiqueta} valor={valor} /> : null))}
+      <div className="mt-6 flex items-center gap-2">
+        <Building2 className="h-4 w-4 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
+        <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">En la empresa</h4>
+      </div>
+      <dl className="mt-3 grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 lg:grid-cols-4">
+        {laborales.map(({ etiqueta, valor, icono: Icono }) =>
+          valor ? (
+            <div key={etiqueta} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-2.5">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface text-ink-500 shadow-sm">
+                <Icono className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <dt className="text-[11px] font-medium uppercase tracking-[0.04em] text-ink-500">{etiqueta}</dt>
+                <dd className="break-words text-sm font-semibold text-ink-900">{valor}</dd>
+              </div>
+            </div>
+          ) : null,
+        )}
       </dl>
-      <p className="mt-3 text-xs text-ink-500">
+      <p className="mt-4 flex items-start gap-2 text-xs text-ink-500">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
         Si algo de esto no es correcto, pide a quien administra la plataforma que lo corrija: de tu cargo y tu área
         dependen las formaciones que te corresponden.
       </p>
@@ -509,11 +706,50 @@ function TusDatos() {
   );
 }
 
-function FilaDato({ etiqueta, valor, tenue = false }: { etiqueta: string; valor: string; tenue?: boolean }) {
+/**
+ * UN DATO DE CONTACTO, en su tarjeta. Si falta, la tarjeta entera invita a agregarlo: es lo unico
+ * de la ficha que la persona puede cambiar, y un «Sin correo» en gris no dice que se pueda.
+ */
+function TarjetaContacto({
+  icono: Icono,
+  etiqueta,
+  valor,
+  vacio,
+  onAgregar,
+}: {
+  icono: LucideIcon;
+  etiqueta: string;
+  valor: string | null;
+  vacio: string;
+  onAgregar: () => void;
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2.5">
-      <dt className="shrink-0 text-sm text-ink-500">{etiqueta}</dt>
-      <dd className={`min-w-0 break-words text-right text-sm ${tenue ? 'text-ink-500' : 'font-medium text-ink-900'}`}>{valor}</dd>
+    <div className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-3">
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+        style={{ backgroundColor: valor ? 'var(--brand-primary)' : 'var(--ink-300)' }}
+      >
+        <Icono className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <dt className="text-[11px] font-medium uppercase tracking-[0.04em] text-ink-500">{etiqueta}</dt>
+        {valor ? (
+          <dd className="truncate text-sm font-semibold text-ink-900" title={valor}>
+            {valor}
+          </dd>
+        ) : (
+          <dd>
+            <button
+              type="button"
+              onClick={onAgregar}
+              className="focus-ring rounded text-sm font-semibold hover:underline"
+              style={{ color: 'var(--brand-primary)' }}
+            >
+              {vacio}
+            </button>
+          </dd>
+        )}
+      </div>
     </div>
   );
 }

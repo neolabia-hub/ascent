@@ -285,5 +285,44 @@ paso(10, 'ASISTENCIA: solo aplica a lo presencial');
 console.log('   ... la formacion es VIRTUAL: se acredita completando el contenido, no marcando asistencia');
 ok('no aplica, y es correcto');
 
+paso(12, 'RETIRAR LA AUTOMATICA Y VOLVER A EXIGIRLA (lo que el cliente hizo en produccion)');
+/*
+  «Inducción Corporativa SST» quedo en produccion con su regla automatica RETIRADA. La pantalla no la
+  lista (solo lista las activas) y hasta el 2026-09-30 no habia forma de volver a encenderla. Aqui se
+  comprueba lo que hace el servidor al volver a exigirla: que la regla es LA MISMA —no nace otra— y
+  que a quien se le habia retirado la obligacion por el retiro, le vuelve.
+*/
+const nueva = await admin.post('/users', {
+  documentNumber: `NV${marca}`,
+  fullName: `Nueva tras publicar ${SUFIJO}`,
+  jobTitleId: cargo.id,
+  areaId: area.id,
+});
+const nuevaId = nueva.cuerpo?.id ?? nueva.cuerpo?.user?.id;
+const abiertasDe = async (userId) =>
+  ((await admin.get(`/assignments?targetId=${creado.activityId}&userId=${userId}`)).cuerpo?.items ?? []).filter((a) =>
+    ['PENDING', 'IN_PROGRESS', 'OVERDUE'].includes(a.status),
+  );
+comprobar((await abiertasDe(nuevaId)).length === 1, 'quien entra despues de publicar la tiene pendiente');
+
+const laAutomatica = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? []).find((r) => r.reachesEveryone);
+const retiro = await admin.pedir(`/activities/${creado.activityId}/requirements/${laAutomatica.id}`, { method: 'DELETE' });
+comprobar(retiro.ok, 'se retira la automatica', `${retiro.estado}`);
+comprobar((await abiertasDe(nuevaId)).length === 0, 'y su obligacion pendiente queda retirada');
+const trasRetiro = (await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? [];
+comprobar(!trasRetiro.some((r) => r.reachesEveryone), 'la automatica ya no se lista (solo se listan las activas)');
+
+const vuelve = await admin.post(`/activities/${creado.activityId}/requirements`, {
+  scope: vacio,
+  trigger: 'ON_HIRE',
+  dueDaysAfterTrigger: -1,
+});
+comprobar(vuelve.ok && vuelve.cuerpo?.updated === true, 'volver a exigirla REACTIVA la misma regla, no crea otra', `${vuelve.estado} ${JSON.stringify(vuelve.cuerpo)}`);
+const deNuevo = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? []).find((r) => r.reachesEveryone);
+comprobar(deNuevo?.id === laAutomatica.id, 'es la misma regla de antes', `${deNuevo?.id} vs ${laAutomatica.id}`);
+comprobar(deNuevo?.soloNuevos === true && deNuevo?.trigger === 'ON_HIRE', 'con su corte de solo nuevos intacto', JSON.stringify(deNuevo));
+const abiertasTras = await abiertasDe(nuevaId);
+comprobar(abiertasTras.length === 1, 'y a quien se le habia retirado, le vuelve a nacer la obligacion', `abiertas=${abiertasTras.length}`);
+
 console.log(`\nCREADO PARA LIMPIAR: actividad=${creado.activityId} usuario=${creado.userId} sufijo=${SUFIJO}`);
 process.exit(resumen() === 0 ? 0 : 1);

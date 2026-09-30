@@ -91,6 +91,26 @@ export function advanceStreak(state: StreakState, now: Date): StreakUpdate {
   return { ...state, currentStreak: 1, lastActivityDate: asDateOnly(today), outcome: 'RESET' };
 }
 
+/**
+ * LA RACHA QUE VALE HOY, no la guardada (2026-09-30).
+ *
+ * La racha solo se recalcula al completar una leccion (`advanceStreak`), asi que la fila guardada
+ * se queda con el numero de la ultima vez: alguien que aprendio tres dias seguidos hasta el 1 de
+ * septiembre seguia leyendo «3 dias seguidos» el 30. Se veia en el perfil al lado de una semana sin
+ * ningun dia encendido — las dos cosas no podian ser verdad a la vez.
+ *
+ * Es la MISMA regla que `advanceStreak`, leida sin escribir: sigue viva si la ultima actividad fue
+ * hoy o ayer, o anteayer con un protector disponible (que se gastaria al volver). Si no, hoy vale 0.
+ * La mejor racha no se toca: esa si es historia.
+ */
+export function rachaVigente(state: StreakState, now: Date): number {
+  if (!state.lastActivityDate || state.currentStreak <= 0) return 0;
+  const gap = daysBetween(fromDateOnly(state.lastActivityDate), toBogotaDate(now));
+  if (gap <= 1) return state.currentStreak;
+  if (gap === 2 && state.freezesAvailable > 0) return state.currentStreak;
+  return 0;
+}
+
 /** Fecha civil de la ultima actividad (columna de solo fecha: se lee tal cual, sin zona). */
 export function lastActivityLabel(state: StreakState): string | null {
   return state.lastActivityDate ? formatCalendarDate(fromDateOnly(state.lastActivityDate)) : null;

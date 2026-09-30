@@ -1,4 +1,4 @@
-import { advanceStreak, type StreakState } from './streak.js';
+import { advanceStreak, rachaVigente, type StreakState } from './streak.js';
 
 /** `last_activity_date` es columna de SOLO FECHA: se construye a medianoche UTC. */
 const dateOnly = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
@@ -48,5 +48,28 @@ describe('racha', () => {
   it('el record historico nunca baja', () => {
     const result = advanceStreak({ ...base, currentStreak: 1, longestStreak: 9 }, at('2026-08-27T09:00:00'));
     expect(result.longestStreak).toBe(9);
+  });
+});
+
+describe('racha vigente (la que se LEE, sin escribir)', () => {
+  it('hoy o ayer: vale la guardada', () => {
+    expect(rachaVigente({ ...base, lastActivityDate: dateOnly('2026-08-27') }, at('2026-08-27T20:00:00'))).toBe(3);
+    expect(rachaVigente(base, at('2026-08-27T09:00:00'))).toBe(3);
+  });
+
+  it('anteayer con protector: sigue viva (se gastaria al volver)', () => {
+    expect(rachaVigente(base, at('2026-08-28T09:00:00'))).toBe(3);
+  });
+
+  it('anteayer SIN protector: hoy vale 0', () => {
+    expect(rachaVigente({ ...base, freezesAvailable: 0 }, at('2026-08-28T09:00:00'))).toBe(0);
+  });
+
+  it('un mes sin aprender: 0, aunque la fila guardada diga 3 (el caso que se vio en el perfil)', () => {
+    expect(rachaVigente(base, at('2026-09-30T09:00:00'))).toBe(0);
+  });
+
+  it('sin actividad nunca: 0', () => {
+    expect(rachaVigente({ ...base, lastActivityDate: null }, at('2026-09-30T09:00:00'))).toBe(0);
   });
 });

@@ -260,14 +260,22 @@ function UserMenu({
           "Jose Sanchez" salia "Jo e ". Falla callado — no revienta nada, solo escribe mal el
           nombre de quien acaba de entrar.
         */}
+        {/*
+          EL RELLENO VA DENTRO, NO EN LA PIEZA QUE SE PLIEGA (2026-09-30). Estaba en el hijo de la
+          rejilla, y una columna `0fr` no baja del relleno de su hijo: quedaban 6px abiertos y por
+          ahi se asomaba la primera letra del nombre con el menu cerrado. Dentro de una caja que se
+          recorta, el relleno se recorta con el texto.
+        */}
         <span className="hidden grid-cols-[0fr] overflow-hidden transition-[grid-template-columns] duration-200 ease-pulse group-focus-visible/av:grid-cols-[1fr] group-hover/av:grid-cols-[1fr] lg:grid">
-          <span className="min-w-0 overflow-hidden pl-0.5 pr-1 text-left">
-            <span className="block whitespace-nowrap text-xs font-semibold leading-tight text-ink-900">
-              {fullName.trim().split(/\s+/).slice(0, 2).join(' ')}
+          <span className="min-w-0 overflow-hidden text-left">
+            <span className="block pl-0.5 pr-1">
+              <span className="block whitespace-nowrap text-xs font-semibold leading-tight text-ink-900">
+                {fullName.trim().split(/\s+/).slice(0, 2).join(' ')}
+              </span>
+              {jobTitle ? (
+                <span className="block whitespace-nowrap text-[11px] leading-tight text-ink-500">{jobTitle}</span>
+              ) : null}
             </span>
-            {jobTitle ? (
-              <span className="block whitespace-nowrap text-[11px] leading-tight text-ink-500">{jobTitle}</span>
-            ) : null}
           </span>
         </span>
         <ChevronDown className="mr-1 h-4 w-4 shrink-0 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
@@ -418,16 +426,12 @@ export function LearnerTopbar({
           </p>
         )}
 
-        {buscador ? (
-          <button
-            type="button"
-            onClick={onSearch}
-            aria-label="Buscar"
-            className="focus-ring shrink-0 flex h-10 w-10 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-paper hover:text-ink-900 lg:hidden"
-          >
-            <Search className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        ) : null}
+        {/*
+          SIN LUPA EN TELEFONO (2026-09-30, pedido del cliente). La fila ya va justa a 402px —nombre,
+          campana y cuenta— y la lupa era la que menos se usaba: en el telefono se llega a una
+          formacion desde Inicio y Aprender, que estan en la barra de abajo. En escritorio el
+          buscador sigue en el centro, y Ctrl K funciona en todas partes.
+        */}
 
         {/*
           EL BUSCADOR OCUPA EL CENTRO y se lleva el espacio sobrante (Decision #90).

@@ -149,9 +149,10 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     // 8. La racha avanzo. Se comprueba que NO sea cero en vez de exigir un numero exacto: la
     // racha es del dia, y varias corridas el mismo dia no la inflan (es justo lo que se quiso).
     await page.goto('/perfil');
-    await expect(page.getByText('Racha actual')).toBeVisible({ timeout: 20_000 });
-    const streak = page.locator('div').filter({ hasText: /^Racha actual/ }).first();
-    await expect(streak).not.toContainText(/^Racha actual0/);
+    // Desde el 2026-09-30 la racha va en la linea de datos de la cabecera: «3 días seguidos».
+    const streak = page.getByText(/^\d+ días? seguidos?$/).first();
+    await expect(streak).toBeVisible({ timeout: 20_000 });
+    await expect(streak).not.toHaveText(/^0 /);
 
     // 9. Y quedo en su historial, que es su hoja de vida formativa.
     await page.goto('/mi-formacion');
