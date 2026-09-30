@@ -27,6 +27,7 @@ import {
   discardDraft,
   getActivity,
   deleteActivity,
+  eliminarFormacionDePrueba,
   getVersion,
   publishVersion,
   enviarARevision,
@@ -188,6 +189,15 @@ export default function ActividadDetallePage() {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [justification, setJustification] = useState('');
   const [canPublish, setCanPublish] = useState(true);
+  /**
+   * ELIMINAR UNA FORMACION DE PRUEBA YA USADA (2026-09-30). Solo con el permiso individual
+   * `catalog:force_delete`, que ningun rol tiene. `modoPrueba` se enciende cuando el borrado normal
+   * se niega por estar en uso: ahi, y solo ahi, se ofrece el camino de la papelera con motivo.
+   */
+  const [puedeEliminarPrueba, setPuedeEliminarPrueba] = useState(false);
+  const [modoPrueba, setModoPrueba] = useState(false);
+  const [confirmacion, setConfirmacion] = useState('');
+  const [motivoPrueba, setMotivoPrueba] = useState('');
 
   // Al volver del editor de tarjetas se aterriza en Contenido, que es de donde se salio.
   useEffect(() => {
@@ -225,7 +235,10 @@ export default function ActividadDetallePage() {
 
   useEffect(() => {
     void me()
-      .then((session) => setCanPublish(session.permissions.includes('catalog:publish')))
+      .then((session) => {
+        setCanPublish(session.permissions.includes('catalog:publish'));
+        setPuedeEliminarPrueba(session.permissions.includes('catalog:force_delete'));
+      })
       .catch(() => undefined);
   }, []);
 
@@ -324,6 +337,11 @@ export default function ActividadDetallePage() {
       showToast({ kind: 'success', title: 'Formación eliminada' });
       router.push('/contenido-formativo');
     } catch (error) {
+      // En uso y con el permiso individual: el cajon se queda abierto y ofrece la papelera.
+      if (error instanceof ApiError && error.code === 'ACTIVITY_IN_USE' && puedeEliminarPrueba) {
+        setModoPrueba(true);
+        return;
+      }
       showToast({
         kind: 'danger',
         title:
@@ -336,6 +354,24 @@ export default function ActividadDetallePage() {
             : undefined,
       });
       setBorrarOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const eliminarComoPrueba = async () => {
+    if (!activity) return;
+    setBusy(true);
+    try {
+      const r = await eliminarFormacionDePrueba(activity.id, { confirmacion, motivo: motivoPrueba });
+      showToast({
+        kind: 'success',
+        title: 'Formación de prueba eliminada',
+        description: `Va a la papelera. ${r.constanciasAnuladas} constancia(s) anulada(s) y ${r.obligacionesEximidas} obligación(es) eximida(s), con tu motivo.`,
+      });
+      router.push('/contenido-formativo');
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo eliminar', description: motivoDelError(error) });
     } finally {
       setBusy(false);
     }
@@ -1128,21 +1164,69 @@ export default function ActividadDetallePage() {
 
       <Drawer
         open={borrarOpen}
-        onOpenChange={setBorrarOpen}
-        title="Eliminar esta formación"
-        description="Deja de aparecer en el catálogo. Lo que ya curso alguien no se borra."
+        onOpenChange={(abierto) => {
+          setBorrarOpen(abierto);
+          if (!abierto) {
+            setModoPrueba(false);
+            setConfirmacion('');
+            setMotivoPrueba('');
+          }
+        }}
+        title={modoPrueba ? 'Eliminar como formación de prueba' : 'Eliminar esta formación'}
+        description={
+          modoPrueba
+            ? 'Ya se usó, así que no se borra: va a la papelera y se retira de todas partes.'
+            : 'Deja de aparecer en el catálogo. Lo que ya curso alguien no se borra.'
+        }
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setBorrarOpen(false)}>
               Cancelar
             </Button>
             {/* Se repite el objeto en el boton: "Si" a secas sobre algo destructivo no dice que se borra. */}
-            <Button variant="danger" onClick={() => void eliminarFormacion()} loading={busy}>
-              Eliminar formacion
-            </Button>
+            {modoPrueba ? (
+              <Button
+                variant="danger"
+                onClick={() => void eliminarComoPrueba()}
+                loading={busy}
+                disabled={confirmacion.trim().length === 0 || motivoPrueba.trim().length < 15}
+              >
+                Eliminar formación de prueba
+              </Button>
+            ) : (
+              <Button variant="danger" onClick={() => void eliminarFormacion()} loading={busy}>
+                Eliminar formacion
+              </Button>
+            )}
           </div>
         }
       >
+        {modoPrueba ? (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-700">
+              <span className="font-medium text-ink-900">{activity.name}</span> tiene convocatorias o personas que ya la
+              hicieron. Como formación de prueba:
+            </p>
+            <ul className="space-y-1 text-sm text-ink-500">
+              <li>Va a la papelera y deja de aparecer para todos, también para el aprendiz.</li>
+              <li>Sus convocatorias se cancelan y lo pendiente se exime con tu motivo.</li>
+              <li>Sus constancias quedan ANULADAS con tu motivo: el código de verificación lo dirá.</li>
+              <li>Nada se borra de la base, y queda en la auditoría con tu nombre.</li>
+            </ul>
+            <Field htmlFor="prueba-motivo" label="Motivo" required hint="Queda escrito en cada constancia anulada.">
+              <Textarea
+                id="prueba-motivo"
+                rows={2}
+                value={motivoPrueba}
+                onChange={(e) => setMotivoPrueba(e.target.value)}
+                placeholder="Formación de prueba creada por error"
+              />
+            </Field>
+            <Field htmlFor="prueba-confirmacion" label={`Para confirmar, escribe su nombre: ${activity.name}`} required>
+              <Input id="prueba-confirmacion" value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} />
+            </Field>
+          </div>
+        ) : (
         <div className="space-y-3">
           <p className="text-sm text-ink-700">
             Se va a eliminar <span className="font-medium text-ink-900">{activity.name}</span>.
@@ -1153,6 +1237,7 @@ export default function ActividadDetallePage() {
             <li>Si tiene convocatorias, el sistema no la deja: primero se cancelan.</li>
           </ul>
         </div>
+        )}
       </Drawer>
     </div>
   );

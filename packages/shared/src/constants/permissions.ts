@@ -10,6 +10,20 @@ export const PERMISSIONS = [
   'catalog:publish',
   'lessons:manage',
   'ai:generate',
+  /*
+    ELIMINAR UNA FORMACION DE PRUEBA QUE YA SE USO (2026-09-30).
+
+    El borrado normal se niega en cuanto la formacion tiene una convocatoria, y hace bien: lo que
+    ya se dicto es evidencia del SG-SST y se guarda 20 años. Pero en produccion quedo «videos3», una
+    induccion de prueba con convocatoria, 998 obligaciones retiradas y 3 constancias de cuentas de
+    administrador, y no habia forma de quitarla de en medio.
+
+    Este permiso NO lo tiene ningun rol, tampoco ADMIN (ver `SOLO_POR_PERSONA`): se concede a una
+    persona concreta desde su ficha. Y no borra nada: manda la formacion a la papelera, cierra su
+    convocatoria, retira lo pendiente y ANULA sus constancias con el motivo escrito. Todo queda en
+    la base y en la auditoria.
+  */
+  'catalog:force_delete',
 
   /*
     PROGRAMAS, CON PERMISOS PROPIOS (2026-09-22).
@@ -136,10 +150,18 @@ export const LEARNER_ONLY_PERMISSIONS: readonly PermissionCode[] = PERMISSIONS.f
   (permission) => permission.endsWith(':read_own') || PROPIOS_QUE_NO_SIGUEN_EL_PATRON.has(permission),
 );
 
+/**
+ * LOS PERMISOS QUE NO VAN CON NINGUN ROL, ni siquiera con ADMIN: se conceden a una persona desde su
+ * ficha. Son los que pueden hacer desaparecer evidencia de la vista de todos, y eso no puede venir
+ * de pertenecer a un grupo —el dia que alguien nuevo entra como administrador, lo heredaria sin que
+ * nadie lo decidiera—.
+ */
+export const SOLO_POR_PERSONA: ReadonlySet<PermissionCode> = new Set<PermissionCode>(['catalog:force_delete']);
+
 /** Roles semilla del tenant y sus permisos por defecto (el admin puede ajustarlos por UI). */
 export const SEED_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]> = {
-  // Control total del tenant.
-  ADMIN: PERMISSIONS,
+  // Control total del tenant, menos lo que solo se concede persona a persona.
+  ADMIN: PERMISSIONS.filter((permission) => !SOLO_POR_PERSONA.has(permission)),
   // Gestiona la formacion de su area/proceso; publicar y editar lo publicado pasa por aprobacion.
   ANALISTA: [
     'catalog:read',

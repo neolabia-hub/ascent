@@ -1,8 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
   CreateActivityInput,
   CreateContentInput,
+  EliminarPruebaInput,
   ListActivitiesQuery,
   UpdateActivityInput,
   UpdateContentInput,
@@ -17,6 +18,7 @@ import {
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { eliminarFormacionDePrueba } from './eliminar-prueba.js';
 import { assertResponsibleChangeAllowed } from './responsible-rules.js';
 import { VersioningService } from './versioning.service.js';
 
@@ -301,6 +303,42 @@ export class ActivitiesService {
       oldValues: { code: activity.code, name: activity.name },
     });
     return { ok: true as const };
+  }
+
+  /**
+   * ELIMINAR UNA FORMACION DE PRUEBA QUE YA SE USO (2026-09-30). Solo con `catalog:force_delete`,
+   * que ningun rol tiene: se concede persona a persona. La logica esta en `eliminar-prueba.ts`.
+   *
+   * El nombre escrito tiene que coincidir (sin mirar mayusculas ni tildes): es lo que impide que un
+   * clic en la formacion equivocada se lleve la induccion de verdad.
+   */
+  async eliminarPrueba(actor: AuthUser, id: string, input: EliminarPruebaInput) {
+    const activity = await this.prisma.scoped.activity.findFirst({ where: { id, deletedAt: null } });
+    if (!activity) throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+
+    const normal = (texto: string) =>
+      texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (normal(input.confirmacion) !== normal(activity.name)) {
+      throw new BadRequestException({
+        code: 'CONFIRMATION_MISMATCH',
+        message: `Para confirmar, escribe exactamente el nombre de la formación: «${activity.name}».`,
+      });
+    }
+
+    const tenantId = this.prisma.currentTenantId;
+    const resultado = await this.prisma.tx((tx) =>
+      eliminarFormacionDePrueba(tx, { tenantId, activityId: id, actorId: actor.id, motivo: input.motivo }),
+    );
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'ACTIVITY_TEST_DELETED',
+      resourceType: 'activities',
+      resourceId: id,
+      oldValues: { code: activity.code, name: activity.name },
+      newValues: { motivo: input.motivo, ...resultado },
+    });
+    return { ok: true as const, ...resultado };
   }
 
   // ─────────────────────── Contenidos de la version en borrador ───────────────────────

@@ -3,6 +3,7 @@ import {
   createActivitySchema,
   createContentSchema,
   devolverRevisionSchema,
+  eliminarPruebaSchema,
   listActivitiesQuerySchema,
   publishVersionSchema,
   reorderContentsSchema,
@@ -89,6 +90,16 @@ export class ActivitiesController {
   @RequirePermissions('catalog:manage_draft')
   update(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     return this.activities.update(actor, id, updateActivitySchema.parse(body));
+  }
+
+  /**
+   * ELIMINAR UNA FORMACION DE PRUEBA YA USADA (2026-09-30): papelera, convocatorias canceladas y
+   * constancias anuladas con motivo. Ver `eliminar-prueba.ts`. El permiso no lo tiene ningun rol.
+   */
+  @Post(':id/eliminar-prueba')
+  @RequirePermissions('catalog:force_delete')
+  eliminarPrueba(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.activities.eliminarPrueba(actor, id, eliminarPruebaSchema.parse(body));
   }
 
   @Delete(':id')

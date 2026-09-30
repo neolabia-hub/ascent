@@ -679,3 +679,21 @@ export function deleteActivity(id: string): Promise<void> {
 export function deleteAssessment(assessmentId: string) {
   return apiFetch<{ ok: true }>(`/assessments/${assessmentId}`, { method: 'DELETE' });
 }
+
+/**
+ * Eliminar una formacion de PRUEBA que ya se uso (2026-09-30): papelera, convocatorias canceladas y
+ * constancias anuladas con el motivo. Solo con el permiso individual `catalog:force_delete`.
+ */
+export function eliminarFormacionDePrueba(
+  id: string,
+  body: { confirmacion: string; motivo: string },
+): Promise<{
+  ok: true;
+  reglasApagadas: number;
+  obligacionesEximidas: number;
+  convocatoriasCanceladas: number;
+  inscripcionesRetiradas: number;
+  constanciasAnuladas: number;
+}> {
+  return apiFetch(`/activities/${id}/eliminar-prueba`, { method: 'POST', body });
+}

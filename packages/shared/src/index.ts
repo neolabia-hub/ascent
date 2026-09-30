@@ -101,6 +101,7 @@ export {
   modalitySchema,
   createActivitySchema,
   updateActivitySchema,
+  eliminarPruebaSchema,
   listActivitiesQuerySchema,
   contentTypeSchema,
   contentConfigSchema,
@@ -121,6 +122,7 @@ export type {
   UpdateVersionSettingsInput,
   PublishVersionInput,
   DevolverRevisionInput,
+  EliminarPruebaInput,
 } from './schemas/activities.js';
 
 export {

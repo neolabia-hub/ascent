@@ -155,7 +155,13 @@ export class AuthController {
   @Get('me')
   async me(@CurrentUser() user: AuthUser) {
     const profile = await this.auth.me(user.id, user.tenantId);
-    return { ...profile, scopeProcessIds: user.scopeProcessIds };
+    /*
+      LOS PERMISOS EFECTIVOS, no los del rol (2026-09-30). `me()` devolvia solo los del ROL, asi que
+      un permiso concedido a una persona desde su ficha funcionaba en el servidor pero la pantalla no
+      se enteraba: el menu no le ofrecia la entrada y los botones seguian ocultos. Los efectivos
+      —rol + concesiones - retiradas— ya vienen resueltos en la sesion validada.
+    */
+    return { ...profile, permissions: [...user.permissions], scopeProcessIds: user.scopeProcessIds };
   }
 
   /**

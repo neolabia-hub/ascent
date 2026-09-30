@@ -179,3 +179,14 @@ export const devolverRevisionSchema = z.object({
   motivo: z.string().trim().min(15, 'Escribe qué hay que corregir').max(2000),
 });
 export type DevolverRevisionInput = z.infer<typeof devolverRevisionSchema>;
+
+/**
+ * ELIMINAR UNA FORMACION DE PRUEBA YA USADA (2026-09-30): doble seguro. Hay que escribir su NOMBRE
+ * —como el «escribe el nombre del repositorio» de las acciones que no tienen vuelta— y dar un motivo
+ * real, que queda en cada constancia anulada y en la auditoria.
+ */
+export const eliminarPruebaSchema = z.object({
+  confirmacion: z.string().trim().min(1, 'Escribe el nombre de la formación'),
+  motivo: z.string().trim().min(15, 'Explica por qué se elimina (mínimo 15 caracteres)').max(300),
+});
+export type EliminarPruebaInput = z.infer<typeof eliminarPruebaSchema>;

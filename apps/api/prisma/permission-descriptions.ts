@@ -16,6 +16,7 @@ export const PERMISSION_DESCRIPTIONS: Partial<Record<PermissionCode, string>> = 
   'catalog:read': 'Consultar el catalogo de actividades formativas',
   'catalog:manage_draft': 'Crear y editar borradores de actividades formativas',
   'catalog:publish': 'Publicar versiones de actividades formativas',
+  'catalog:force_delete': 'Eliminar formaciones de prueba ya usadas (se anulan sus constancias; solo por persona)',
   'lessons:manage': 'Crear y editar lecciones (tarjetas)',
   'ai:generate': 'Generar borradores de contenido con inteligencia artificial',
 
