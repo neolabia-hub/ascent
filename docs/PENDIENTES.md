@@ -140,9 +140,6 @@ que rodea a un sistema que ya tiene un cliente dentro. El detalle, en `HANDOFF` 
 > **Clave igual a la cédula: aplicada el 2026-09-24 a las 998 personas no ADMIN, y NO se cierra.**
 > Decision del cliente: no es una campaña con plazo; cada persona es responsable de cambiarla (el
 > sistema se lo exige al entrar). El modo `--cierre` del script queda disponible pero no se usara.
->
-> Está **pendiente de desplegar**: el perfil con «Tus datos» y los filtros de Configuración
-> (commits `3cc0796`..`5eb7ca8`, ya en GitHub).
 
 | | Qué falta | Por qué importa |
 |---|---|---|

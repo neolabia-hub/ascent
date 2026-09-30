@@ -24,6 +24,27 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-30 — DESPLEGADO A PRODUCCION: «Tus datos» en el perfil y filtros en Configuración
+
+Commit `9dc6bb8`. Los cinco pasos de `05-reglas-de-despliegue.md` §3:
+
+| Paso | Resultado |
+|---|---|
+| 1. Copia ANTES de tocar nada | `neopulse-20260930-153342.dump`, 1,2 MB, subida a R2. **No vacia** |
+| 2. `git pull` | De `42c3222` a `9dc6bb8`. Sin migraciones ni permisos nuevos |
+| 3. Reconstruir imagenes | `neo-pulse-api:local` y `neo-pulse-web:local` |
+| 4. `up -d` + `restart caddy` | `migrate` Exited(0) |
+| 5. Comprobar que RESPONDE | `/v1/health` ok · login 200 · `/perfil` 200 · `/v1/auth/me/datos` 401 sin sesion (la ruta existe) · cero errores en la API |
+
+Desde aqui `clave-igual-a-documento.ts` ya viaja en la imagen; la copia a mano del 24 desaparecio con
+el contenedor viejo, y no hace falta.
+
+**Inducción general, decidido con el cliente:** se queda como esta. Se exige sola a quien entre de
+aqui en adelante; si la quieren para la plantilla actual, en la formacion «Ajustar» y cambiar «Se le
+exige» a «Desde ahora». No se toca el codigo del corte.
+
+---
+
 ## 2026-09-24 (tarde) — CAMPAÑA DE LA CÉDULA ABIERTA EN PRODUCCIÓN, sin desplegar
 
 Con el archivo del cliente ya subido. **No se desplego**: por peticion expresa, solo se corrio el
