@@ -66,6 +66,9 @@ docker compose -f docker/docker-compose.prod.yml --env-file .env.prod \
 
 Corrido el 2026-09-23 para `programs:read`, `programs:manage` y `programs:publish`.
 
+**Pendiente para el próximo despliegue:** `catalog:force_delete`. El script lo CREA pero no se lo da a
+ningún rol (está en `SOLO_POR_PERSONA`); después se concede a la cuenta del dueño desde su ficha.
+
 ### Campaña de primer ingreso con la cédula (un solo uso, 2026-09-24)
 
 No va con ningún despliegue: se corre cuando el cliente ya subió su archivo completo. Misma forma

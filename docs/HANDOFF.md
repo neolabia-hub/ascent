@@ -24,6 +24,47 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-30 (cierre) — VIDEOS3 FUERA DE PRODUCCIÓN, y una tanda de arreglos de marca y del aprendiz
+
+**Desplegado a produccion: nada nuevo.** Solo se corrio, a mano, la eliminacion de «videos3".
+
+**1. Eliminar una formación de prueba ya usada (como los LMS).** «videos3» —induccion de prueba con
+convocatoria, 998 obligaciones retiradas y 3 constancias de cuentas ADMIN— no se podia borrar. Ahora:
+papelera (`deletedAt`), reglas apagadas, pendiente eximido y en curso retirado, convocatorias
+canceladas y **constancias ANULADAS con el motivo**; nada se borra. Logica unica en
+`src/activities/eliminar-prueba.ts`, usada por `POST /activities/:id/eliminar-prueba` (nombre escrito
++ motivo) y por `scripts/eliminar-formacion-de-prueba.ts`. Permiso `catalog:force_delete` en
+`SOLO_POR_PERSONA`: **ningun rol lo tiene, tampoco ADMIN**; se concede por persona. En produccion se
+corrio el script (copia `neopulse-20260930-183758.dump` antes): «videos3» en la papelera, 3 constancias
+anuladas; «videos logistica1» intacta.
+
+**2. `/auth/me` devolvia solo los permisos del ROL**, no los efectivos: un permiso dado por persona
+funcionaba en el servidor y la pantalla no se enteraba (menu, botones). Ahora devuelve los efectivos.
+
+**3. Reactivar la regla automatica retirada.** La lista solo trae reglas activas: una automatica
+retirada desaparecia sin forma de volver («Inducción Corporativa SST» en produccion). Boton «Volver a
+exigirla a toda la empresa». Y al reactivar una regla APAGADA, lo que ella misma retiro vuelve a
+pendiente para quien sigue en el grupo (antes el motor veia esa fila como historia y no devolvia nada).
+Recorrido `induccion-general.mjs` paso 12.
+
+**4. Marca:** el nombre visible no se veia porque barra, perfil y reproductor pintaban el nombre
+INTERNO; ahora `displayName`, y guardar la marca la aplica sin recargar. Colores en hexadecimal
+(`ColorField`).
+
+**5. Aprendiz:** racha VIGENTE en la lectura (`rachaVigente`: la guardada se quedaba vieja hasta la
+siguiente leccion — «3 dias seguidos» con la ultima actividad un mes atras); perfil con cabecera de
+marcadores grandes, «Esta semana», proximo paso en su tarjeta, constancias siempre visibles en fila
+deslizable, «Tus datos» con iconos; carril con racha, puntos e invitacion (`proximo-paso.tsx`); sin lupa
+en la barra del telefono; el avatar ya no asoma la primera letra del nombre.
+
+**Pruebas:** 1013 unitarias, **33/33 e2e** (servidores nuevos), recorridos induccion-general,
+exigencia-del-tipo, eliminar-prueba (nuevo), perfil-propio y sin-correo en verde.
+
+> **Al desplegar: `dev:sincronizar-permisos -- --si`** (crea `catalog:force_delete` SIN darselo a
+> nadie) y luego concederlo a la cuenta del dueño desde Usuarios > ficha > Permisos individuales.
+
+---
+
 ## 2026-09-30 (noche) — LA INDUCCIÓN: GRUPOS APARTE y A QUIÉN SE LE EXIGE desde Configuración
 
 **NO desplegado.** El cliente pregunto si quitar la asignacion automatica de la induccion. Se le

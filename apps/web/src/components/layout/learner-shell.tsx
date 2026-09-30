@@ -458,11 +458,10 @@ function StreakBubble({ progress }: { progress: MyProgress | null }) {
  * Pedido del cliente el 2026-09-30: *"que invite a terminar lo que le falta, o si no le falta, a
  * que siga para mas puntos"*. La invitacion la decide `decidirProximoPaso`, la misma del perfil.
  *
- * MINIMA, Y NO ES UN CAPRICHO. Se probo primero como un bloque con los colores de la empresa y los
- * numeros grandes, y despues como una tarjeta con boton; las dos veces el cliente la vio grande
- * dentro del carril: *"ocupa mucho espacio"*. El carril es navegacion, y esto es un recordatorio al
- * pie: una linea con la racha y los puntos, y otra que es un enlace a lo siguiente. El detalle —la
- * semana, los protectores, la mejor racha— esta en el perfil, que es donde se mira con calma.
+ * EL TAMAÑO SALIO DE TRES PRUEBAS el mismo dia: un bloque lleno de color con numeros grandes («muy
+ * grande, esos colores no»), una linea suelta con un enlace («muy chico») y esto: una tarjeta tenida
+ * con la racha y los puntos bien visibles, el titulo de la invitacion y su boton. SIN la frase larga
+ * —«termina tal y suma tanto»—: en el carril solo cabe lo importante; el detalle esta en el perfil.
  *
  * LA LLAMA RELLENA: en contorno, a este tamaño, se leia como una gota.
  */
@@ -472,35 +471,52 @@ function ProgresoPropio({ progress }: { progress: MyProgress | null }) {
   const racha = progress.currentStreak;
 
   return (
-    <div className="mx-3 mb-3 mt-auto border-t border-line px-2 pt-3">
-      <Link href="/perfil" className="focus-ring flex items-center gap-3 rounded-md text-xs text-ink-500 hover:text-ink-900">
-        <span className="inline-flex items-center gap-1" title={racha === 1 ? '1 día seguido' : `${racha} días seguidos`}>
-          <Flame
-            className={cn('h-3.5 w-3.5', racha > 0 && 'animate-breathe')}
-            fill="currentColor"
-            strokeWidth={1.5}
-            style={{ color: racha > 0 ? 'var(--brand-accent)' : 'var(--ink-300)' }}
-            aria-hidden="true"
-          />
-          <strong className="font-semibold tabular-nums text-ink-900">{racha}</strong>
-          {racha === 1 ? 'día' : 'días'}
+    <div
+      className="m-3 mt-auto rounded-2xl border border-line p-3.5"
+      style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 5%, var(--surface))' }}
+    >
+      <Link href="/perfil" className="focus-ring flex items-center justify-between gap-2 rounded-lg">
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-full"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--brand-accent) 16%, transparent)' }}
+          >
+            <Flame
+              className={cn('h-4 w-4', racha > 0 && 'animate-breathe')}
+              fill="currentColor"
+              strokeWidth={1.5}
+              style={{ color: racha > 0 ? 'var(--brand-accent)' : 'var(--ink-300)' }}
+              aria-hidden="true"
+            />
+          </span>
+          <span className="leading-none">
+            <span className="block font-display text-lg font-bold tabular-nums text-ink-900">{racha}</span>
+            <span className="text-[11px] text-ink-500">{racha === 1 ? 'día' : 'días'}</span>
+          </span>
         </span>
-        <span className="inline-flex items-center gap-1">
-          <Sparkles className="h-3.5 w-3.5" strokeWidth={2} style={{ color: 'var(--brand-accent)' }} aria-hidden="true" />
-          <strong className="font-semibold tabular-nums text-ink-900">{progress.points}</strong>
-          pts
+        <span className="text-right leading-none">
+          <span className="inline-flex items-center gap-1 font-display text-lg font-bold tabular-nums text-ink-900">
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} style={{ color: 'var(--brand-accent)' }} aria-hidden="true" />
+            {progress.points}
+          </span>
+          <span className="block text-[11px] text-ink-500">puntos</span>
         </span>
       </Link>
+
       {paso ? (
-        <Link
-          href={paso.href}
-          title={paso.detalle}
-          className="focus-ring group mt-2 flex items-center gap-1 rounded-md text-xs font-semibold"
-          style={{ color: 'var(--brand-primary)' }}
-        >
-          <span className="min-w-0 truncate">{paso.corto}</span>
-          <ArrowRight className="h-3 w-3 shrink-0 transition-transform duration-150 group-hover:translate-x-0.5" strokeWidth={2.5} aria-hidden="true" />
-        </Link>
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="truncate text-xs font-semibold text-ink-900" title={paso.detalle}>
+            {paso.titulo}
+          </p>
+          <Link
+            href={paso.href}
+            className="focus-ring mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-white shadow-btn transition-transform duration-150 ease-pulse hover:-translate-y-px"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+          >
+            {paso.accion}
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+          </Link>
+        </div>
       ) : null}
     </div>
   );

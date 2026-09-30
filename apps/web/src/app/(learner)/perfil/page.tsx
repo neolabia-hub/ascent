@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArrowRight,
   Award,
   BriefcaseBusiness,
   Building2,
@@ -20,6 +21,8 @@ import {
   Pencil,
   Phone,
   Play,
+  Sparkles,
+  Trophy,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -48,19 +51,15 @@ import { useProximoPaso } from '@/components/modules/learner/proximo-paso';
  * Los puntos se ganan por logro real (terminar una leccion, aprobar un examen, hacer el repaso),
  * nunca por entrar. Por eso no hay "puntos por racha" ni moneda que gastar.
  *
- * ─── UN PERFIL «TIPO STREAMING» (2026-09-30, pedido del cliente) ───
+ * ─── COMO QUEDO LA CABECERA (2026-09-30, tres vueltas con el cliente) ───
  *
- * La primera version del heroe llevaba cuatro recuadros de cristal con un numero cada uno, y el
- * cliente lo vio generico: es la rejilla de estadisticas de cualquier panel. La idea ahora es la de
- * una ficha de plataforma de video:
- *
- *   - el NOMBRE grande, como un titulo, y debajo una linea de datos separada por puntos —como
- *     «2024 · 1 h 40 min · 16+»— en vez de tarjetas: «3 días seguidos · 370 puntos · mejor racha 5»;
- *   - la SEMANA de la racha, siete circulos con los dias en que aprendio: se entiende de un vistazo
- *     y dice lo que un numero no dice, que la racha se hace dia a dia;
- *   - y el BOTON principal es el proximo paso, como el «Reproducir»: la cosa que hay que hacer.
- *
- * Debajo, las constancias como una FILA que se desliza —la de «seguir viendo»—, siempre visible.
+ *   1. Cuatro recuadros de cristal con un numero cada uno: «generico, la rejilla de cualquier panel».
+ *   2. Una linea de datos tipo ficha de pelicula con el boton «Empezar» dentro: el boton se comia la
+ *      cabecera y los numeros perdian peso.
+ *   3. AHORA: la cabecera es de la PERSONA y de lo que LLEVA. Los tres numeros son grandes, sin cajas,
+ *      separados por un filo —como los marcadores de una retransmision—, porque son lo que se viene a
+ *      mirar. La semana dice para que esta: «Esta semana». Y lo que hay que HACER sale de la
+ *      cabecera y va debajo, en su propia pieza.
  */
 export default function ProfilePage() {
   const profile = useLearnerProfile();
@@ -106,7 +105,6 @@ export default function ProfilePage() {
             'radial-gradient(80% 60% at 85% 0%, color-mix(in srgb, var(--brand-accent) 50%, transparent), transparent 65%), radial-gradient(60% 50% at 0% 100%, color-mix(in srgb, var(--brand-accent) 22%, transparent), transparent 70%), linear-gradient(160deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 55%, #000) 100%)',
         }}
       >
-        {/* La vineta de abajo hace de «pie de cartel»: el texto blanco se apoya en algo oscuro. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent" />
 
         <div className="relative px-5 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-10">
@@ -122,65 +120,70 @@ export default function ProfilePage() {
                 datos», y repetirlo aqui dejaba dos copias que no coincidian hasta recargar.
               */}
               {profile.jobTitle ? <p className="mt-1 text-sm text-white/75">{profile.jobTitle}</p> : null}
-
-              {progress ? (
-                <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-sm text-white/80 sm:justify-start">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-white">
-                    <Flame className="h-4 w-4" fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
-                    {racha} {racha === 1 ? 'día seguido' : 'días seguidos'}
-                  </span>
-                  <Punto />
-                  <span>
-                    <strong className="font-semibold text-white">{formatNumber(progress.points)}</strong> puntos
-                  </span>
-                  {progress.longestStreak > 0 ? (
-                    <>
-                      <Punto />
-                      <span>mejor racha {progress.longestStreak}</span>
-                    </>
-                  ) : null}
-                  {progress.freezesAvailable > 0 ? (
-                    <>
-                      <Punto />
-                      <span title="Te salvan la racha un día sin conexión">
-                        {progress.freezesAvailable} {progress.freezesAvailable === 1 ? 'protector' : 'protectores'}
-                      </span>
-                    </>
-                  ) : null}
-                </p>
-              ) : (
-                <div className="mx-auto mt-3 h-5 w-64 animate-pulse rounded-full bg-white/15 sm:mx-0" />
-              )}
             </div>
           </div>
 
-          {progress ? <SemanaDeRacha progress={progress} /> : null}
-
-          {/*
-            EL «REPRODUCIR»: el proximo paso es el boton principal de la cabecera. Sin rojo aunque
-            haya atrasadas (lo pidio el cliente): la frase ya lo dice, y un boton rojo en el perfil
-            se lee como un error, no como una invitacion.
-          */}
-          {paso ? (
-            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <Link
-                href={paso.href}
-                className="focus-ring inline-flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-white px-7 text-base font-bold shadow-lg transition-transform duration-150 ease-pulse hover:-translate-y-0.5 sm:w-auto"
-                style={{ color: 'var(--brand-primary)' }}
-              >
-                <Play className="h-4 w-4" fill="currentColor" strokeWidth={0} aria-hidden="true" />
-                {paso.accion}
-              </Link>
-              <div className="min-w-0 text-center sm:text-left">
-                <p className="text-sm font-semibold">{paso.titulo}</p>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-white/75">{paso.detalle}</p>
+          {progress ? (
+            <>
+              <div className="mt-8 grid grid-cols-3 divide-x divide-white/15">
+                <Marcador icono={Flame} rellena={racha > 0} valor={racha} etiqueta={racha === 1 ? 'día seguido' : 'días seguidos'} />
+                <Marcador icono={Sparkles} valor={progress.points} etiqueta="puntos" />
+                <Marcador icono={Trophy} valor={progress.longestStreak} etiqueta="mejor racha" />
               </div>
-            </div>
-          ) : null}
+              <SemanaDeRacha progress={progress} />
+            </>
+          ) : (
+            <div className="mt-8 h-24 animate-pulse rounded-2xl bg-white/10" />
+          )}
 
-          <p className="mt-6 text-center text-[11px] text-white/55 sm:text-left">Tu racha es privada: nadie más la ve.</p>
+          <p className="mt-6 text-center text-[11px] text-white/55 sm:text-left">
+            Tu racha es privada: nadie más la ve.
+            {progress && progress.freezesAvailable > 0
+              ? ` Tienes ${progress.freezesAvailable} ${progress.freezesAvailable === 1 ? 'protector' : 'protectores'}: te cuidan la racha si un día no tienes señal.`
+              : ''}
+          </p>
         </div>
       </section>
+
+      {/*
+        LO QUE HAY QUE HACER, FUERA DE LA CABECERA y en su propia pieza (pedido del cliente). Nunca en
+        rojo aunque haya atrasadas: la frase ya lo dice, y un rojo en el perfil se lee como un error.
+        Es la misma decision que la del carril (`decidirProximoPaso`).
+      */}
+      {paso ? (
+        <section className="card flex items-center gap-4 rounded-2xl p-4 sm:p-5">
+          <span
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-btn"
+            style={{
+              backgroundImage:
+                'linear-gradient(150deg, var(--brand-primary), color-mix(in srgb, var(--brand-accent) 60%, var(--brand-primary)))',
+            }}
+          >
+            <Play className="h-5 w-5" fill="currentColor" strokeWidth={0} aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-base font-semibold text-ink-900">{paso.titulo}</p>
+            <p className="mt-0.5 line-clamp-2 text-sm text-ink-500">{paso.detalle}</p>
+          </div>
+          <Link
+            href={paso.href}
+            className="focus-ring hidden h-10 shrink-0 items-center gap-1.5 rounded-full px-5 text-sm font-semibold text-white shadow-btn transition-transform duration-150 ease-pulse hover:-translate-y-px sm:inline-flex"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+          >
+            {paso.accion}
+            <ArrowRight className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
+          </Link>
+          {/* En telefono el boton es la flecha: el texto no cabe al lado de la frase. */}
+          <Link
+            href={paso.href}
+            aria-label={paso.accion}
+            className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white sm:hidden"
+            style={{ backgroundColor: 'var(--brand-primary)' }}
+          >
+            <ArrowRight className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
+          </Link>
+        </section>
+      ) : null}
 
       {/*
         LAS CONSTANCIAS, en el perfil y no en una pantalla aparte (Decision #112), y SIEMPRE
@@ -208,9 +211,35 @@ export default function ProfilePage() {
   );
 }
 
-/** El separador de la linea de datos, como en una ficha de pelicula. */
-function Punto() {
-  return <span aria-hidden="true" className="h-1 w-1 rounded-full bg-white/50" />;
+/**
+ * UN MARCADOR: el numero grande, sin caja. Como el de una retransmision: lo que importa es la cifra,
+ * y la etiqueta va pequeña debajo. La llama va rellena solo con la racha viva.
+ */
+function Marcador({
+  icono: Icono,
+  valor,
+  etiqueta,
+  rellena = false,
+}: {
+  icono: LucideIcon;
+  valor: number;
+  etiqueta: string;
+  rellena?: boolean;
+}) {
+  return (
+    <div role="group" aria-label={`${valor} ${etiqueta}`} className="flex flex-col items-center px-2 text-center">
+      <Icono
+        className={cn('h-4 w-4 text-white/70', rellena && 'animate-breathe text-white')}
+        fill={rellena ? 'currentColor' : 'none'}
+        strokeWidth={rellena ? 1.5 : 2}
+        aria-hidden="true"
+      />
+      <p className="mt-1.5 font-display text-[34px] font-extrabold leading-none tabular-nums sm:text-[44px]">
+        {formatNumber(valor)}
+      </p>
+      <p className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-white/65">{etiqueta}</p>
+    </div>
+  );
 }
 
 /** Fecha civil en Colombia (AAAA-MM-DD): el servidor cuenta la racha en esa zona. */
@@ -251,7 +280,10 @@ function SemanaDeRacha({ progress }: { progress: MyProgress }) {
   });
 
   return (
-    <ol className="mt-6 flex items-center justify-center gap-2 sm:justify-start" aria-label="Tu racha esta semana">
+    <div className="mt-7 flex flex-col items-center gap-2.5 sm:flex-row sm:gap-5">
+      {/* PARA QUE ESTA: los dias de esta semana en que aprendiste. Sin el rotulo, siete circulos no decian nada. */}
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">Esta semana</p>
+    <ol className="flex items-center justify-center gap-2 sm:justify-start" aria-label="Los días de esta semana en que aprendiste">
       {dias.map((dia) => (
         <li key={dia.iso} className="flex flex-col items-center gap-1.5">
           <span
@@ -278,6 +310,7 @@ function SemanaDeRacha({ progress }: { progress: MyProgress }) {
         </li>
       ))}
     </ol>
+    </div>
   );
 }
 
@@ -620,10 +653,20 @@ function TusDatos() {
           <p className="mt-0.5 text-sm text-ink-500">Tu correo y tu teléfono los puedes cambiar tú.</p>
         </div>
         {editando ? null : (
-          <Button variant="outline" size="sm" onClick={abrir}>
-            <Pencil className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-            Editar
-          </Button>
+          /*
+            PROPIO Y NO EL GENERICO (2026-09-30): el cliente vio el boton con borde como «uno mas de
+            cualquier formulario». Pastilla tenida del color de la empresa, y dice QUE se edita —el
+            contacto—, porque lo demas de esta ficha no se puede tocar.
+          */
+          <button
+            type="button"
+            onClick={abrir}
+            className="focus-ring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-transform duration-150 ease-pulse hover:-translate-y-px"
+            style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)', color: 'var(--brand-primary)' }}
+          >
+            <Pencil className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            Editar contacto
+          </button>
         )}
       </div>
 
@@ -672,21 +715,24 @@ function TusDatos() {
           </div>
         </form>
       ) : (
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+        <dl className="mt-5 grid gap-4 sm:grid-cols-2">
           <TarjetaContacto icono={Mail} etiqueta="Correo" valor={datos.email} vacio="Agrega tu correo" onAgregar={abrir} />
           <TarjetaContacto icono={Phone} etiqueta="Teléfono" valor={datos.phone} vacio="Agrega tu teléfono" onAgregar={abrir} />
         </dl>
       )}
 
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-6 flex items-center gap-2 border-t border-line pt-5">
         <Building2 className="h-4 w-4 text-ink-500" strokeWidth={1.75} aria-hidden="true" />
         <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">En la empresa</h4>
       </div>
-      <dl className="mt-3 grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 min-[420px]:grid-cols-2 lg:grid-cols-3">
         {laborales.map(({ etiqueta, valor, icono: Icono }) =>
           valor ? (
-            <div key={etiqueta} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-2.5">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface text-ink-500 shadow-sm">
+            <div key={etiqueta} className="flex items-start gap-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--brand-primary) 8%, transparent)', color: 'var(--brand-primary)' }}
+              >
                 <Icono className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
               </span>
               <div className="min-w-0">
@@ -724,10 +770,14 @@ function TarjetaContacto({
   onAgregar: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-3">
+    <div className="flex items-center gap-3">
       <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
-        style={{ backgroundColor: valor ? 'var(--brand-primary)' : 'var(--ink-300)' }}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+        style={
+          valor
+            ? { backgroundColor: 'var(--brand-primary)', color: '#ffffff' }
+            : { backgroundColor: 'color-mix(in srgb, var(--brand-primary) 8%, transparent)', color: 'var(--brand-primary)' }
+        }
       >
         <Icono className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
       </span>
