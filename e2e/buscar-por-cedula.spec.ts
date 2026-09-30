@@ -29,7 +29,7 @@ test.describe('Buscar personas por cédula', () => {
     await page.locator('#a-type').selectOption({ label: 'Capacitacion del plan' });
     await page.locator('#a-code-open').click();
     await page.locator('#a-code').fill(`CED_${suffix}`);
-    await page.locator('#a-name').fill(`Buscar por cedula ${suffix}`);
+    await page.locator('#a-name').fill(`Buscar por cedula E2E${suffix}`);
     await page.locator('#a-process').selectOption({ index: 1 });
     await page.getByRole('button', { name: 'Crear actividad' }).click();
     await page.waitForURL('**/contenido-formativo/**', { timeout: 20_000 });

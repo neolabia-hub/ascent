@@ -97,6 +97,19 @@ const veterana = await admin.post('/users', {
 });
 const veteranaId = veterana.cuerpo?.id ?? veterana.cuerpo?.user?.id;
 
+// UN GRUPO DE ANTIGUOS: un area propia del recorrido con una persona que ya estaba. Se usa en el
+// paso 5 ter para exigirle la induccion al GRUPO sin tocar la regla automatica. Area propia para no
+// obligar a gente real de desarrollo.
+const areaGrupo = await admin.post('/catalogs/areas', { code: `GRP_${marca}`, name: `Grupo recorrido ${SUFIJO}` });
+const areaGrupoId = areaGrupo.cuerpo?.id;
+const delGrupo = await admin.post('/users', {
+  documentNumber: `GR${marca}`,
+  fullName: `Del grupo ${SUFIJO}`,
+  jobTitleId: cargo.id,
+  areaId: areaGrupoId,
+});
+const delGrupoId = delGrupo.cuerpo?.id ?? delGrupo.cuerpo?.user?.id;
+
 paso(5, 'PUBLICAR: y ver si se exige sola');
 const antesDePublicar = (await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo;
 comprobar((antesDePublicar ?? []).length === 0, 'antes de publicar no se le exige a nadie', `ya habia ${antesDePublicar?.length} requisitos antes de publicar`);
@@ -128,6 +141,26 @@ comprobar(otraVez.cuerpo?.created === 0 && otraVez.cuerpo?.skipped === 1, 'asign
 const reglaTras = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? [])[0];
 comprobar(reglaTras?.soloNuevos === true && reglaTras?.assignmentCount === 0, 'y la regla sigue igual: solo nuevos, cero por ella', JSON.stringify(reglaTras));
 
+paso('5 ter', 'A UN GRUPO DE ANTIGUOS, con una regla APARTE que no toca la automatica');
+const vacio = { match: 'ALL', jobTitleIds: [], jobTitleTypeIds: [], areaIds: [], regionalIds: [], serviceIds: [], employmentTypes: [], roadActors: [] };
+const alGrupo = await admin.post(`/activities/${creado.activityId}/requirements`, {
+  scope: { ...vacio, areaIds: [areaGrupoId] },
+  trigger: 'ON_JOIN',
+  dueDaysAfterTrigger: 30,
+});
+comprobar(alGrupo.ok && alGrupo.cuerpo?.updated === false, 'nace una regla NUEVA para el grupo', `${alGrupo.estado} ${JSON.stringify(alGrupo.cuerpo)}`);
+comprobar(alGrupo.cuerpo?.created === 1, 'y le nace la obligacion a quien ya estaba en el grupo', `nacieron ${alGrupo.cuerpo?.created}`);
+const reglas = (await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? [];
+comprobar(reglas.length === 2, 'quedan DOS reglas: la automatica y la del grupo', `hay ${reglas.length}`);
+const automatica = reglas.find((r) => r.reachesEveryone);
+comprobar(
+  automatica?.soloNuevos === true && automatica?.trigger === 'ON_HIRE' && automatica?.assignmentCount === 0,
+  'la automatica sigue igual: toda la empresa, al ingresar, solo nuevos',
+  JSON.stringify(automatica),
+);
+const obligDelGrupo = (await admin.get(`/assignments?targetId=${creado.activityId}&userId=${delGrupoId}`)).cuerpo;
+comprobar((obligDelGrupo?.items ?? []).length === 1, 'la persona del grupo tiene UNA obligacion, no dos', JSON.stringify(obligDelGrupo?.items?.length));
+
 paso(6, 'LA CONVOCATORIA: la abre el tipo, no la persona');
 const versionPublicada = ((await admin.get(`/activities/${creado.activityId}`)).cuerpo?.versions ?? [])
   .find((v) => v.status === 'PUBLISHED');
@@ -156,7 +189,7 @@ creado.userId = alta.cuerpo?.id ?? alta.cuerpo?.user?.id;
 const clave = alta.cuerpo?.generatedPassword ?? alta.cuerpo?.password;
 comprobar(!!clave, 'la contrasena se entrega UNA vez, al crearla', 'no vino ninguna contrasena generada');
 
-const trasElAlta = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? [])[0];
+const trasElAlta = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? []).find((r) => r.reachesEveryone);
 comprobar(
   trasElAlta?.assignmentCount === 1,
   'a la persona nueva le nacio la obligacion SOLA',

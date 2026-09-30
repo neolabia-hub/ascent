@@ -24,6 +24,37 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-30 (noche) — LA INDUCCIÓN: GRUPOS APARTE y A QUIÉN SE LE EXIGE desde Configuración
+
+**NO desplegado.** El cliente pregunto si quitar la asignacion automatica de la induccion. Se le
+recomendo NO: es lo que garantiza que ningun ingreso se quede sin ella (D1072, lo mas auditado). Se
+hicieron las dos piezas que faltaban:
+
+**1. «Exigirla además a un grupo»** en Quiénes de una induccion de INGRESO publicada: cargo, area,
+regional o servicio, «desde ahora» por defecto. Crea una regla APARTE; la automatica no se toca. Dos
+guardas: sin nada marcado no deja exigir, y al AJUSTAR una regla de grupo tampoco deja guardarla vacia
+—se guarda aparte si lo ajustado es un grupo (`ajustandoGrupo`), porque deducirlo del alcance editado
+convertia «desmarcar todo» en «toda la empresa» y pisaba la automatica—. En la reinduccion no sale:
+ya alcanza a todos. Solo pantalla: el servidor ya aceptaba cualquier alcance.
+
+**2. Configuración > Tipos de formación > «A quién se le exige»:** «Quién decide» (sola al publicar /
+matriz de cargos / quien la crea) y, si es sola, «A quién alcanza» (solo quien ingrese / toda la
+plantilla). Son `defaultAssignmentMode` y `requiresBeforeHire`, que vivian solo en la semilla. Rige
+para lo que se publique desde ahora; lo publicado conserva su regla. Bloqueado en tipos del plan. La
+tarjeta del tipo lo dice en su resumen, y al ELEGIR el tipo la de ingreso ya no promete «toda la
+empresa»: «Se exige sola a quien ingrese. A quien ya está se le puede dar desde Quiénes».
+
+**Pruebas:** recorrido nuevo `exigencia-del-tipo.mjs` y `induccion-general.mjs` paso «5 ter»; e2e
+nuevo `exigencia-de-la-induccion.spec.ts`. Los datos de las pruebas nuevas llevan la firma `E2E` +
+digitos, que es lo que `dev:limpiar-pruebas` reconoce. 1008 unitarias y **33/33 e2e** con servidores
+recien arrancados.
+
+> **Trampa, otra vez:** tras una corrida interrumpida quedaron vivos los servidores de la suite en
+> 3002 y 3100, y Playwright los REUTILIZA. Se pararon y se repitio. Antes de dar por buena una
+> suite: `netstat` sobre 3002/3100 vacio.
+
+---
+
 ## 2026-09-30 (tarde) — INDUCCIÓN A PERSONAS SUELTAS, y buscar por cédula en todos los selectores
 
 **NO desplegado.** Dos pedidos del cliente, el segundo nacido del primero:

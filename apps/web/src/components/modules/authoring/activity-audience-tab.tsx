@@ -138,6 +138,25 @@ export function ActivityAudienceTab({
   const [novedad, setNovedad] = useState('');
   /** El requisito que se esta corrigiendo, si hay alguno. */
   const [ajustando, setAjustando] = useState<string | null>(null);
+  /*
+    UN GRUPO ADEMAS DE TODA LA EMPRESA (2026-09-30), en los tipos que se exigen solos.
+
+    La induccion de ingreso alcanza a quien entre desde que se publico, y la gente que ya estaba no
+    la tiene. El cliente pidio poder dársela a un grupo —«a todo bodega, que ya esta»— como en los
+    demas tipos. Se hace con una regla APARTE, al lado de la automatica, que no se toca: esa es la
+    que garantiza que ningun ingreso se quede sin induccion.
+
+    `porGrupo` vale tambien al AJUSTAR una de esas reglas de grupo: su alcance tiene facetas, y hay
+    que enseñarlas para poder cambiarlas. La automatica no tiene ninguna, y por eso no las enseña.
+  */
+  const [grupoAbierto, setGrupoAbierto] = useState(false);
+  /**
+   * Si lo que se AJUSTA es una regla de grupo. Se guarda al abrir el ajuste y no se deduce del
+   * alcance que se esta editando: si se dedujera, desmarcar todos los campos convertiria el ajuste
+   * en «toda la empresa» y el guardado pisaria la regla automatica.
+   */
+  const [ajustandoGrupo, setAjustandoGrupo] = useState(false);
+  const porGrupo = decide === 'TODOS' && (grupoAbierto || (ajustando !== null && ajustandoGrupo));
 
   /** Obligaciones sueltas: el atajo para cuando no hay regla que lo cubra. */
   const [manual, setManual] = useState<{ userIds: string[]; dueAt: string }>({ userIds: [], dueAt: '' });
@@ -223,8 +242,9 @@ export function ActivityAudienceTab({
    * llegaria cuando ya les hubiera llegado el aviso a las 116.
    */
   useEffect(() => {
-    const consultar = decide === 'TODOS' ? EMPTY_RULE : scope;
-    if (decide !== 'TODOS' && sinMarcar(scope)) {
+    const todaLaEmpresa = decide === 'TODOS' && !porGrupo;
+    const consultar = todaLaEmpresa ? EMPTY_RULE : scope;
+    if (!todaLaEmpresa && sinMarcar(scope)) {
       setReach(null);
       return;
     }
@@ -234,7 +254,7 @@ export function ActivityAudienceTab({
         setMuestra(preview.sample);
       })
       .catch(() => setReach(null));
-  }, [scope, decide]);
+  }, [scope, decide, porGrupo]);
 
 
 
@@ -242,7 +262,9 @@ export function ActivityAudienceTab({
     setBusy(true);
     try {
       const result = await setActivityRequirement(activityId, {
-        scope: decide === 'TODOS' ? EMPTY_RULE : scope,
+        // El grupo NUNCA viaja vacio (el boton lo impide): vacio seria «toda la empresa» y pisaria
+        // la regla automatica en vez de crear otra al lado.
+        scope: decide === 'TODOS' && !porGrupo ? EMPTY_RULE : scope,
         trigger: plazo.trigger,
         dueDaysAfterTrigger: Number(plazo.dias || 0),
         everyMonths: plazo.modoRepite === "MESES" && plazo.everyMonths ? Number(plazo.everyMonths) : null,
@@ -251,6 +273,11 @@ export function ActivityAudienceTab({
       });
       setNovedad('');
       setAjustando(null);
+      if (decide === 'TODOS') {
+        setAjustandoGrupo(false);
+        setGrupoAbierto(false);
+        setScope({ ...EMPTY_RULE });
+      }
       await load();
       showToast({
         kind: 'success',
@@ -293,6 +320,20 @@ export function ActivityAudienceTab({
       fixedDate: requirement.fixedDate ?? '',
     });
     setAjustando(requirement.id);
+    setAjustandoGrupo(!sinMarcar(requirement.scope));
+    setGrupoAbierto(false);
+  };
+
+  /** Abre el panel para exigirla ADEMAS a un grupo. Por defecto «desde ahora»: es para quien ya esta. */
+  const abrirGrupo = () => {
+    setScope({ ...EMPTY_RULE });
+    setPlazo((previo) => ({ ...previo, trigger: 'ON_JOIN', dias: '30' }));
+    setAjustando(null);
+    setGrupoAbierto(true);
+  };
+  const cerrarGrupo = () => {
+    setScope({ ...EMPTY_RULE });
+    setGrupoAbierto(false);
   };
 
   const retirar = async (requirement: ActivityRequirement) => {
@@ -393,7 +434,11 @@ export function ActivityAudienceTab({
   const pideNovedad = decide === 'POR_CARGO' && esCambio;
   const novedadLista = !pideNovedad || novedad.trim().length >= 10;
   const puedeExigir =
-    !busy && novedadLista && (ajustando !== null || (decide === 'TODOS' ? !yaEsDeTodos : !sinMarcar(scope)));
+    !busy &&
+    novedadLista &&
+    (porGrupo
+      ? !sinMarcar(scope)
+      : ajustando !== null || (decide === 'TODOS' ? !yaEsDeTodos : !sinMarcar(scope)));
 
   return (
     <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
@@ -503,7 +548,28 @@ export function ActivityAudienceTab({
                 </Field>
               ) : null}
 
-              {decide === 'EL_ANALISTA' ? (
+              {/*
+                ADEMAS, A UN GRUPO: solo en los tipos que se exigen solos, y solo publicada (antes no
+                hay contenido que hacer). Plegado detras de un boton: lo normal es que la regla
+                automatica baste, y el formulario abierto invitaria a tocar algo que no hace falta.
+              */}
+              {decide === 'TODOS' && typeConfig.requiresBeforeHire && hayContenidoPublicado && ajustando === null && !esDelPlan ? (
+                grupoAbierto ? (
+                  <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
+                    <p className="text-sm font-medium text-ink-900">Además, a un grupo de los que ya están</p>
+                    <Button variant="ghost" size="sm" onClick={cerrarGrupo}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" className="w-full" onClick={abrirGrupo}>
+                    <Users size={16} />
+                    Exigirla además a un grupo
+                  </Button>
+                )
+              ) : null}
+
+              {decide === 'EL_ANALISTA' || porGrupo ? (
                 <>
                   <Field htmlFor="q-jobs" label="A todos los de un cargo">
                     <MultiSelect
@@ -584,7 +650,7 @@ export function ActivityAudienceTab({
                 publicar, hace creer que hay algo que rellenar y que sin rellenarlo no pasara nada.
                 Aparecen solo al pulsar "Ajustar", que es cuando de verdad se estan cambiando.
               */}
-              {(decide !== 'TODOS' || ajustando !== null) && !esDelPlan ? (
+              {(decide !== 'TODOS' || ajustando !== null || grupoAbierto) && !esDelPlan ? (
                 <>
               <div className="grid grid-cols-2 gap-3">
                 <Field htmlFor="q-trigger" label="Se le exige">
@@ -776,7 +842,7 @@ export function ActivityAudienceTab({
                 </p>
               ) : null}
 
-              {ajustando !== null || decide !== 'TODOS' ? (
+              {ajustando !== null || decide !== 'TODOS' || grupoAbierto ? (
                 <Button className="w-full" onClick={() => void exigir()} loading={busy} disabled={!puedeExigir}>
                   <ShieldCheck size={16} />
                   {/*
@@ -784,14 +850,14 @@ export function ActivityAudienceTab({
                     debajo estan los cargos marcados: "Guardar a quien se le exige" decia por
                     tercera vez lo que ya se estaba mirando, y en 380px se partia en dos lineas.
                   */}
-                  {ajustando !== null ? 'Guardar el ajuste' : 'Exigirla'}
+                  {ajustando !== null ? 'Guardar el ajuste' : grupoAbierto ? 'Exigirla a este grupo' : 'Exigirla'}
                 </Button>
               ) : null}
 
-              {decide !== 'TODOS' && sinMarcar(scope) ? (
+              {(decide !== 'TODOS' || porGrupo) && sinMarcar(scope) ? (
                 <p className="text-center text-xs text-ink-500">Marca al menos un cargo, area, regional o servicio.</p>
               ) : null}
-              {decide !== 'TODOS' && !sinMarcar(scope) && reach !== null ? (
+              {(decide !== 'TODOS' || porGrupo) && !sinMarcar(scope) && reach !== null ? (
                 <p className="text-center text-xs text-ink-500">Alcanza a {reach} personas hoy.</p>
               ) : null}
             </div>

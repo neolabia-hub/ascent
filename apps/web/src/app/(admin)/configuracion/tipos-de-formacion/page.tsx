@@ -73,6 +73,10 @@ interface TipoConfig {
   defaultOnExpiry?: 'CIERRA' | 'ACUMULA' | 'ESPERA';
   /** No se le exige a quien entro hace menos de N meses. 0 = no se excluye a nadie. */
   exemptRecentHiresMonths?: number;
+  /** Quien decide a quien se le exige (2026-09-30: se puede cambiar aqui). Ver `aQuienSeExige`. */
+  defaultAssignmentMode?: 'ON_HIRE' | 'BY_JOB_TITLE' | 'MANUAL';
+  /** Con ON_HIRE: si alcanza solo a quien ingresa (vence antes del ingreso) o a toda la plantilla. */
+  requiresBeforeHire?: boolean;
   [clave: string]: unknown;
 }
 
@@ -746,6 +750,79 @@ function Tarjeta({
         hizo, se cierra y nace la nueva"— y los campos salen al pulsar Ajustar. Es lo mismo que hace
         la encuesta debajo de su casilla: se enseña la decision, no el formulario.
       */}
+      {/*
+        A QUIEN SE LE EXIGE (2026-09-30).
+
+        Lo decidia el tipo desde la semilla y no se podia ver ni cambiar en ninguna pantalla —la
+        misma historia que la repeticion antes del 2026-09-04—. El cliente pregunto si la induccion
+        debia asignarse sola o dejarlo a quien la crea, y la respuesta es que eso es politica de cada
+        empresa: aqui se dice.
+
+        Dos preguntas y no una, porque «se exige sola» tiene dos formas muy distintas: la induccion
+        de INGRESO (solo a quien entra, antes de su primer dia: la gente que ya esta no esta
+        ingresando) y la obligacion de TODA la plantilla (la reinduccion). Confundirlas es obligar a
+        mil personas o a ninguna.
+
+        Rige para lo que se publique DESDE AHORA: la regla de una formacion ya publicada se creo con la
+        politica de entonces y no se reescribe por la espalda. Para cambiarla, esta Quiénes -> Ajustar.
+      */}
+      <div className="mt-6 border-t border-line pt-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">A quién se le exige</p>
+        <p className="mb-3 mt-1 text-sm text-ink-700">{aQuienSeExige(tipo.config)}</p>
+        <div className="space-y-2.5">
+          <Field
+            htmlFor={`t-asigna-${tipo.id}`}
+            label="Quién decide"
+            hint={
+              tipo.config.participatesInPlan === true
+                ? 'En un tipo del plan la obligación la dispara el plan aprobado: aquí solo se elige a quiénes.'
+                : 'Rige para lo que se publique desde ahora. Lo ya publicado conserva su regla.'
+            }
+          >
+            <Select
+              id={`t-asigna-${tipo.id}`}
+              disabled={tipo.config.participatesInPlan === true}
+              value={tipo.config.defaultAssignmentMode ?? 'MANUAL'}
+              onChange={(e) =>
+                onGuardar({
+                  config: {
+                    ...tipo.config,
+                    defaultAssignmentMode: e.target.value as NonNullable<TipoConfig['defaultAssignmentMode']>,
+                  },
+                })
+              }
+            >
+              <option value="ON_HIRE">Se exige sola al publicar, a toda la empresa</option>
+              <option value="BY_JOB_TITLE">La matriz de cargos: los cargos que la tengan</option>
+              <option value="MANUAL">Quien la crea, en la pestaña Quiénes</option>
+            </Select>
+          </Field>
+
+          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' ? (
+            <Field
+              htmlFor={`t-alcance-${tipo.id}`}
+              label="Al publicar, a quién alcanza"
+              hint={
+                tipo.config.requiresBeforeHire
+                  ? 'A la gente que ya está no se le exige. Se le puede dar a un grupo o a personas desde Quiénes.'
+                  : 'Se le exige a todas las personas activas en cuanto se publica.'
+              }
+            >
+              <Select
+                id={`t-alcance-${tipo.id}`}
+                value={tipo.config.requiresBeforeHire ? 'INGRESO' : 'PLANTILLA'}
+                onChange={(e) =>
+                  onGuardar({ config: { ...tipo.config, requiresBeforeHire: e.target.value === 'INGRESO' } })
+                }
+              >
+                <option value="INGRESO">Solo a quien ingrese: vence antes de su fecha de ingreso</option>
+                <option value="PLANTILLA">A toda la plantilla, con un mes de plazo</option>
+              </Select>
+            </Field>
+          ) : null}
+        </div>
+      </div>
+
       <div className="mt-6 border-t border-line pt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Cada cuanto vuelve</p>
         <p className="mb-3 mt-1 text-sm text-ink-700">{comoSeRepite(tipo.config)}</p>
@@ -899,7 +976,7 @@ function resumenDelTipo(config: TipoConfig, encuestas: SurveyTemplate[]): string
   if (config.requiresEfficacy) partes.push('Se mide la eficacia');
   if (config.isMicro) partes.push('Microaprendizaje');
   if (partes.length === 0) partes.push('No exige nada: se publica sin evaluacion y no acredita');
-  return `${partes.join(' · ')} · ${comoSeRepite(config)}`;
+  return `${partes.join(' · ')} · ${aQuienSeExige(config)} · ${comoSeRepite(config)}`;
 }
 
 /**
@@ -922,6 +999,18 @@ function comoSeRepite(config: TipoConfig): string {
     return `Cada ${config.defaultRecurrenceMonths} meses desde que cada quien la hizo · ${alVencer(config)}`;
   }
   return 'No se repite: se hace una vez.';
+}
+
+/** A quien se le exige, en una linea: lo que la tarjeta dice sin abrir el cajon. */
+function aQuienSeExige(config: TipoConfig): string {
+  const modo = config.defaultAssignmentMode ?? 'MANUAL';
+  if (modo === 'ON_HIRE') {
+    return config.requiresBeforeHire
+      ? 'Se exige sola a quien ingrese, antes de su primer día'
+      : 'Se exige sola a toda la plantilla al publicar';
+  }
+  if (modo === 'BY_JOB_TITLE') return 'Se exige a los cargos que la tengan en su matriz';
+  return 'La decide quien la crea';
 }
 
 /** La segunda mitad de la frase: que pasa si llega la siguiente y no hizo la anterior. */

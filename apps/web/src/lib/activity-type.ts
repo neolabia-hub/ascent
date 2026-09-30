@@ -113,7 +113,15 @@ export function consecuenciasDelTipo(config: ActivityTypeConfig): string[] {
   const frases: string[] = [];
 
   const quien = quienDecide(config);
-  if (quien === 'TODOS') frases.push('Se le exige a toda la empresa, sin marcar a nadie.');
+  // La de INGRESO no alcanza a la gente que ya esta (2026-09-30): decir «toda la empresa» a secas
+  // hacia esperar mil obligaciones al publicar, y no nacia ninguna.
+  if (quien === 'TODOS') {
+    frases.push(
+      config.requiresBeforeHire
+        ? 'Se exige sola a quien ingrese. A quien ya está se le puede dar desde Quiénes.'
+        : 'Se le exige a toda la empresa, sin marcar a nadie.',
+    );
+  }
   if (quien === 'POR_CARGO') frases.push('Se le exige a los cargos que la tengan en su matriz.');
   if (quien === 'EL_ANALISTA') frases.push('Tu decides a quien se le exige, en la pestana Quienes.');
 
