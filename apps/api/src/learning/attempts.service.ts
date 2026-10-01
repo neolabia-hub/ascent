@@ -8,6 +8,7 @@ import { EngagementService } from '../engagement/engagement.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CompletionService } from './completion.service.js';
+import { maximoDeIntentos } from './maximo-de-intentos.js';
 import { applyGradingPolicy, detectAnomalies, gradeQuestion, scoreAttempt, type GradingPolicy } from './grading.js';
 
 interface SelectedQuestion {
@@ -104,12 +105,6 @@ export class AttemptsService {
   async start(actor: AuthUser, enrollmentId: string, assessmentId: string) {
     const tenantId = this.prisma.currentTenantId;
     const enrollment = await this.requireOwn(actor, enrollmentId);
-    if (enrollment.blockedAt) {
-      throw new ConflictException({
-        code: 'ENROLLMENT_BLOCKED',
-        message: 'Agotaste los intentos. Tu analista debe habilitarte un refuerzo.',
-      });
-    }
 
     const version = await this.prisma.scoped.assessment.findUnique({
       where: { id: assessmentId },
@@ -133,6 +128,31 @@ export class AttemptsService {
       select: { id: true, attemptNumber: true, status: true, submittedAt: true, passed: true },
     });
 
+    const maxAttempts = await maximoDeIntentos(this.prisma.scoped, {
+      activityId: enrollment.activityVersion.activityId,
+      assessmentId,
+      maximoDeSuVersion: enrollment.activityVersion.maxAttempts,
+      extra: enrollment.extraAttempts,
+    });
+
+    /*
+      BLOQUEADA, PERO CON INTENTOS DE NUEVO (2026-10-01). Si despues del bloqueo se subio el maximo
+      de la formacion, ya no esta agotada: se levanta el bloqueo aqui mismo. La publicacion ya lo
+      hace con todos (`VersioningService.desbloquearPorMaximoNuevo`); esto cubre cualquier camino.
+    */
+    if (enrollment.blockedAt) {
+      if (previous.length >= maxAttempts) {
+        throw new ConflictException({
+          code: 'ENROLLMENT_BLOCKED',
+          message: 'Agotaste los intentos. Tu analista debe habilitarte un refuerzo.',
+        });
+      }
+      await this.prisma.scoped.enrollment.update({
+        where: { id: enrollmentId },
+        data: { blockedAt: null, blockedReason: null, status: 'IN_PROGRESS' },
+      });
+    }
+
     const open = previous.find((attempt) => attempt.status === 'IN_PROGRESS');
     if (open) return this.view(actor, open.id); // retomar el que quedo a medias, no abrir otro
 
@@ -140,7 +160,6 @@ export class AttemptsService {
       throw new ConflictException({ code: 'ALREADY_PASSED', message: 'Ya aprobaste esta evaluación.' });
     }
 
-    const maxAttempts = (version.maxAttempts ?? enrollment.activityVersion.maxAttempts) + enrollment.extraAttempts;
     if (previous.length >= maxAttempts) {
       throw new ConflictException({ code: 'NO_ATTEMPTS_LEFT', maxAttempts });
     }
@@ -376,8 +395,12 @@ export class AttemptsService {
     const attemptsUsed = await this.prisma.scoped.attempt.count({
       where: { enrollmentId: attempt.enrollmentId, assessmentId: attempt.assessmentId },
     });
-    const maxAttempts =
-      (attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts) + attempt.enrollment.extraAttempts;
+    const maxAttempts = await maximoDeIntentos(this.prisma.scoped, {
+      activityId: attempt.enrollment.activityVersion.activityId,
+      assessmentId: attempt.assessmentId,
+      maximoDeSuVersion: attempt.enrollment.activityVersion.maxAttempts,
+      extra: attempt.enrollment.extraAttempts,
+    });
     const isLast = attempt.passed === true || attemptsUsed >= maxAttempts;
     const detailAllowed = !(policy.onlyAfterLastAttempt ?? true) || isLast;
 
@@ -447,8 +470,12 @@ export class AttemptsService {
     attempt: { id: string; enrollmentId: string; assessmentId: string; assessment: { maxAttempts: number | null }; enrollment: { extraAttempts: number; activityVersion: { maxAttempts: number; activityId: string } } },
   ): Promise<boolean> {
     const tenantId = this.prisma.currentTenantId;
-    const maxAttempts =
-      (attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts) + attempt.enrollment.extraAttempts;
+    const maxAttempts = await maximoDeIntentos(this.prisma.scoped, {
+      activityId: attempt.enrollment.activityVersion.activityId,
+      assessmentId: attempt.assessmentId,
+      maximoDeSuVersion: attempt.enrollment.activityVersion.maxAttempts,
+      extra: attempt.enrollment.extraAttempts,
+    });
     const used = await this.prisma.scoped.attempt.count({
       where: { enrollmentId: attempt.enrollmentId, assessmentId: attempt.assessmentId },
     });
@@ -482,11 +509,13 @@ export class AttemptsService {
         recipientEmail: target.email,
         subject: 'Alguien agoto los intentos de una evaluacion',
         body: `${person?.fullName ?? 'Un colaborador'} (${person?.area.name ?? 'sin area'}) agoto los ${maxAttempts} intentos de ${activity?.name ?? 'una formacion'}. Requiere refuerzo.`,
-        // Apunta a la FORMACION y no a la inscripcion: la referencia de un aviso existe para
-        // llevar a quien lo lee a donde puede hacer algo, y de una inscripcion ajena no hay
-        // pantalla. El rastro exacto (que inscripcion, que intento) queda en la auditoria.
-        referenceType: 'activities',
-        referenceId: attempt.enrollment.activityVersion.activityId,
+        /*
+          Apunta a la PERSONA (2026-10-01, pedido del cliente). Antes llevaba a la formacion, donde no
+          hay nada que hacer por alguien en concreto. Ahora abre su perfil y baja hasta la fila de
+          «intentos agotados», que es donde esta el boton «Dar un intento mas».
+        */
+        referenceType: 'users',
+        referenceId: actor.id,
       });
     }
     return true;

@@ -75,7 +75,7 @@ interface TipoConfig {
   exemptRecentHiresMonths?: number;
   /** Quien decide a quien se le exige (2026-09-30: se puede cambiar aqui). Ver `aQuienSeExige`. */
   defaultAssignmentMode?: 'ON_HIRE' | 'BY_JOB_TITLE' | 'MANUAL';
-  /** Con ON_HIRE: si alcanza solo a quien ingresa (vence antes del ingreso) o a toda la plantilla. */
+  /** Con ON_HIRE: si alcanza solo a quien ingresa (8 dias desde el ingreso) o a toda la plantilla. */
   requiresBeforeHire?: boolean;
   [clave: string]: unknown;
 }
@@ -815,7 +815,7 @@ function Tarjeta({
                   onGuardar({ config: { ...tipo.config, requiresBeforeHire: e.target.value === 'INGRESO' } })
                 }
               >
-                <option value="INGRESO">Solo a quien ingrese: vence antes de su fecha de ingreso</option>
+                <option value="INGRESO">Solo a quien ingrese: vence 8 días después de su fecha de ingreso</option>
                 <option value="PLANTILLA">A toda la plantilla, con un mes de plazo</option>
               </Select>
             </Field>
@@ -1006,7 +1006,7 @@ function aQuienSeExige(config: TipoConfig): string {
   const modo = config.defaultAssignmentMode ?? 'MANUAL';
   if (modo === 'ON_HIRE') {
     return config.requiresBeforeHire
-      ? 'Se exige sola a quien ingrese, antes de su primer día'
+      ? 'Se exige sola a quien ingrese, con 8 días desde su ingreso'
       : 'Se exige sola a toda la plantilla al publicar';
   }
   if (modo === 'BY_JOB_TITLE') return 'Se exige a los cargos que la tengan en su matriz';

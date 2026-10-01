@@ -59,7 +59,7 @@ test.describe('Exigencia de la inducción', () => {
     await expect(page.getByText('Se exige sola a toda la plantilla al publicar').first()).toBeVisible();
 
     await alcance.selectOption('INGRESO');
-    await expect(page.getByText('Se exige sola a quien ingrese, antes de su primer día').first()).toBeVisible({
+    await expect(page.getByText('Se exige sola a quien ingrese, con 8 días desde su ingreso').first()).toBeVisible({
       timeout: 10_000,
     });
 
@@ -67,7 +67,7 @@ test.describe('Exigencia de la inducción', () => {
     await page.getByRole('button', { name: 'Listo' }).click();
     await page.reload();
     await expect(page.locator('section').filter({ hasText: nombre })).toContainText(
-      'Se exige sola a quien ingrese, antes de su primer día',
+      'Se exige sola a quien ingrese, con 8 días desde su ingreso',
       { timeout: 20_000 },
     );
 

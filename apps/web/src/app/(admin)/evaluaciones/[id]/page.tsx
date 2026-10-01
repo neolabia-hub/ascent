@@ -1507,7 +1507,10 @@ function ComoSeCalifica({
         {/*
           LA HERENCIA, A LA VISTA (2026-09-09, decidido con el cliente).
 
-          Estos dos numeros se piden en DOS sitios —aqui y en «Reglas de la versión» de la ficha— y
+          DESDE EL 2026-10-01, ESTE ES EL UNICO SITIO (pedido del cliente): «Reglas de la versión» se
+          quito de la ficha de la formacion. Lo que sigue es la historia de por que hubo dos.
+
+          Estos dos numeros se pedian en DOS sitios —aqui y en «Reglas de la versión» de la ficha— y
           el cliente preguntó, con razón, cuál manda. No son redundantes: son una CASCADA de tres
           pisos —empresa → formación → examen— y el vacío significa «lo que diga el piso de arriba».
           Lo que fallaba era que eso no se veía: una caja vacía no dice con qué nota se aprueba.
@@ -1520,7 +1523,7 @@ function ComoSeCalifica({
         <Field
           htmlFor="cc-score"
           label="Nota mínima (%)"
-          ayuda="Déjalo vacío y se aplica la nota de cada formación que use esta evaluación —que nace de la de la empresa—. Ponle un número solo si ESTE examen tiene que exigir más que la formación, como un piso legal."
+          ayuda="Vacío = la nota de la empresa (Configuración > Preferencias). Ponle un número si este examen pide otra nota. Afecta a quien lo presente desde la próxima publicación de la formación."
         >
           <Input
             id="cc-score"
@@ -1536,7 +1539,7 @@ function ComoSeCalifica({
         <Field
           htmlFor="cc-attempts"
           label="Intentos maximos"
-          ayuda="Cuántas veces puede presentar el examen la misma persona. Al agotarlos, la formación queda bloqueada y se avisa. Vacío = los que diga la formación."
+          ayuda="Cuántas veces puede presentar el examen la misma persona. Vacío = los de la empresa. Si lo subes, le llega en el acto también a quien ya los había agotado. A una sola persona se le da uno más desde su perfil."
         >
           <Input
             id="cc-attempts"

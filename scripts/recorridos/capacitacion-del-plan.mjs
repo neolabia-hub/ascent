@@ -175,7 +175,7 @@ const anosOcupados = new Set((planes?.items ?? planes ?? []).map((p) => p.year))
 let ano = 2030;
 while (anosOcupados.has(ano)) ano += 1;
 const plan = await admin.post('/plans', {
-  year: año,
+  year: ano,
   name: `Plan de capacitacion ${ano} ${SUFIJO}`,
   objective: 'Recorrido automatico de punta a punta.',
   goalPct: 80,

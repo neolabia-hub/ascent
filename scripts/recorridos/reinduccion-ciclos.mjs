@@ -206,19 +206,26 @@ console.log(`   ... el informe trae ${informe?.items?.length ?? 0} renglon(es) e
 for (const f of suyas) console.log(`   ... ronda #${f.cycleNumber ?? '?'} -> "${f.estado}"`);
 console.log(`   ... resumen: total=${informe?.resumen?.total} terminadas=${informe?.resumen?.terminadas} atrasadas=${informe?.resumen?.atrasadas} sinEmpezar=${informe?.resumen?.sinEmpezar} avance=${informe?.resumen?.avancePct}%`);
 
-const cerrada = suyas.find((f) => f.cycleNumber === 1);
+/*
+  ACTUALIZADO EL 2026-10-01 a lo que se decidio el 2026-09-14 (PENDIENTES 5.2): Seguimiento tiene UN
+  renglon por PERSONA, la ronda vigente, y `rondas` dice cuantas hubo. La ronda 1 NO REALIZADA no
+  desaparece: sigue en la ficha de la persona y en sus obligaciones (paso 7 la comprueba alli).
+*/
+comprobar(suyas.length === 1, 'sale UNA vez: un renglon por persona', `sale ${suyas.length} veces`);
 comprobar(
-  cerrada?.estado === 'NO_REALIZADA',
-  'la ronda cerrada se lee "No realizada", y NO "sin empezar"',
-  `la ronda 1 cerrada como NO REALIZADA sale en el informe como "${cerrada?.estado}", que es lo mismo que dice de quien todavia no ha empezado`,
+  suyas[0]?.cycleNumber === 2 && suyas[0]?.estado === 'SIN_EMPEZAR',
+  'y es la ronda vigente (#2), sin empezar',
+  `renglon: #${suyas[0]?.cycleNumber} ${suyas[0]?.estado}`,
 );
+comprobar(suyas[0]?.rondas === 2, 'con «2 rondas» a la vista: la historia no se esconde', `rondas=${suyas[0]?.rondas}`);
+const enSuFicha = (await admin.get(`/assignments?targetId=${creado.activityId}&userId=${creado.userId}&pageSize=50`)).cuerpo?.items ?? [];
 comprobar(
-  (informe?.resumen?.noRealizadas ?? 0) === 1,
-  'y el resumen la cuenta aparte: el incumplimiento del periodo tiene su cifra',
-  `noRealizadas=${informe?.resumen?.noRealizadas}`,
+  enSuFicha.some((a) => a.cycleNumber === 1 && a.status === 'EXPIRED_NOT_DONE'),
+  'y la ronda 1 NO REALIZADA sigue en sus obligaciones, para el auditor',
+  enSuFicha.map((a) => `#${a.cycleNumber} ${a.status}`).join(' · '),
 );
 /*
-  LO QUE QUEDA ABIERTO, Y NO ES UN FALLO SINO UNA PREGUNTA PARA EL CLIENTE.
+  (HISTORIA) LO QUE QUEDABA ABIERTO, decidido el 2026-09-14 por PERSONA:
 
   La persona sale DOS veces —una por ronda— asi que cuenta dos en el denominador del avance. Las dos
   lecturas se defienden:
@@ -232,8 +239,6 @@ comprobar(
 
   No se elige aqui: cambia lo que lee quien audita. Queda anotado en el modulo y en el HANDOFF.
 */
-console.log(`   ... ABIERTO: la persona sale ${suyas.length} veces (una por ronda) y cuenta ${suyas.length} en el denominador.`);
-console.log('   ... Decidir con el cliente: un renglon por ronda (historial) o por persona (campaña en curso).');
 
 paso(10, 'DOS REGLAS SOBRE LA MISMA PERSONA: ¿se pisan los ciclos?');
 /*
@@ -288,12 +293,13 @@ const leerB = async () => {
 const nacidas = await leerB();
 const cuenta = (lista, n, estado) => lista.filter((a) => a.cycleNumber === n && (!estado || a.status === estado)).length;
 console.log(`   ... le nacieron ${nacidas.length} obligacion(es): ${nacidas.map((a) => `#${a.cycleNumber} ${a.status}`).join(' · ')}`);
-comprobar(nacidas.length === 2, 'le nacen DOS: una por regla, no una compartida', `le nacieron ${nacidas.length}`);
-comprobar(
-  cuenta(nacidas, 1) === 2,
-  'las DOS empiezan en la ronda 1: cada regla lleva su propio contador',
-  `rondas: ${nacidas.map((a) => a.cycleNumber).join(', ')} — si compartieran contador, la segunda habria nacido como #2`,
-);
+/*
+  ACTUALIZADO EL 2026-10-01 a lo que se decidio el 2026-09-08 (una obligacion por persona, ver
+  `dos-reglas-una-obligacion.mjs`): dos reglas sobre la misma persona y la misma formacion le
+  dejan UNA obligacion, no dos. Debia lo mismo dos veces y cumplirlo una vez no cerraba la otra.
+*/
+comprobar(nacidas.length === 1, 'le nace UNA: dos reglas no le piden lo mismo dos veces', `le nacieron ${nacidas.length}`);
+comprobar(cuenta(nacidas, 1) === 1, 'en la ronda 1', `rondas: ${nacidas.map((a) => a.cycleNumber).join(', ')}`);
 
 // Y ahora la vuelta de tuerca: se COMPLETA una de las dos y se hace pasar el tiempo. La cerrada sin
 // hacer tiene que cerrarse como NO REALIZADA; la que se hizo, no.
@@ -302,21 +308,9 @@ comprobar(empujon2.ok, 'el motor vuelve a pasar por esta persona', `patch: ${emp
 
 const trasVuelta = await leerB();
 console.log(`   ... ahora tiene ${trasVuelta.length}: ${trasVuelta.sort((x, y) => x.cycleNumber - y.cycleNumber).map((a) => `#${a.cycleNumber} ${a.status}`).join(' · ')}`);
-comprobar(
-  trasVuelta.length === 4,
-  'CADA regla abrio su ronda 2 por su cuenta: dos cadenas en paralelo, no una compartida',
-  `tiene ${trasVuelta.length} obligaciones y deberian ser 4 (dos reglas x dos rondas)`,
-);
-comprobar(
-  cuenta(trasVuelta, 1, 'EXPIRED_NOT_DONE') === 2,
-  'las DOS rondas 1 se cerraron como NO REALIZADA',
-  `cerradas: ${cuenta(trasVuelta, 1, 'EXPIRED_NOT_DONE')} de 2`,
-);
-comprobar(
-  cuenta(trasVuelta, 2, 'PENDING') === 2,
-  'y las DOS rondas 2 nacieron pendientes: ninguna regla piso a la otra',
-  `abiertas: ${cuenta(trasVuelta, 2, 'PENDING')} de 2`,
-);
+comprobar(trasVuelta.length === 2, 'una sola cadena: ronda 1 y ronda 2', `tiene ${trasVuelta.length}`);
+comprobar(cuenta(trasVuelta, 1, 'EXPIRED_NOT_DONE') === 1, 'la ronda 1 se cerro como NO REALIZADA', `cerradas: ${cuenta(trasVuelta, 1, 'EXPIRED_NOT_DONE')}`);
+comprobar(cuenta(trasVuelta, 2, 'PENDING') === 1, 'y la ronda 2 nacio pendiente', `abiertas: ${cuenta(trasVuelta, 2, 'PENDING')}`);
 
 paso(11, 'Y EL INFORME NO LA CUENTA DE MAS por estar en dos reglas');
 /*
@@ -327,11 +321,7 @@ paso(11, 'Y EL INFORME NO LA CUENTA DE MAS por estar en dos reglas');
 const informeB = (await admin.get(`/reportes/actividades/${creado.activityId}/ejecucion`)).cuerpo;
 const suyasB = (informeB?.items ?? []).filter((f) => f.userId === creado.userIdB || f.user?.id === creado.userIdB);
 console.log(`   ... sale ${suyasB.length} vez/veces: ${suyasB.map((f) => `#${f.cycleNumber} ${f.estado}`).join(' · ')}`);
-comprobar(
-  suyasB.length === trasVuelta.length,
-  'una fila por obligacion viva o cerrada, ni una mas',
-  `tiene ${trasVuelta.length} obligaciones y el informe enseña ${suyasB.length} filas`,
-);
+comprobar(suyasB.length === 1, 'un renglon por persona, aunque la alcancen dos reglas', `el informe enseña ${suyasB.length} filas`);
 
 paso(12, 'LIMPIEZA');
 for (const id of [creado.ruleId, creado.ruleIdB].filter(Boolean)) {

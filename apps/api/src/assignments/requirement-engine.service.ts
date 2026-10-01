@@ -69,9 +69,15 @@ export class RequirementEngineService {
   async syncTenant(tenantId: string): Promise<EngineSummary> {
     const db = this.prisma.forTenant(tenantId);
     const audienceResult = await this.audiences.reevaluateAll(db, tenantId);
+    /*
+      PRIMERO SE RETIRA, DESPUES SE GENERA (2026-10-01). Al reves, quien cambiaba de cargo se quedaba
+      sin su induccion del cargo nuevo: el motor veia abierta la del cargo viejo (`abiertaPorOtraRegla`)
+      y no creaba la nueva; un instante despues retiraba la vieja por haber salido del grupo. Quedaba
+      en cero hasta la siguiente pasada. Lo destapo el recorrido `induccion-especifica`, paso 15.
+    */
+    const withdrawn = await this.withdrawLeavers(db);
     const generated = await this.generate(db, tenantId, {});
     const overdue = await this.markOverdue(db);
-    const withdrawn = await this.withdrawLeavers(db);
     return {
       audiencesJoined: audienceResult.joined,
       audiencesLeft: audienceResult.left,
@@ -89,8 +95,14 @@ export class RequirementEngineService {
   async syncPerson(tenantId: string, userId: string): Promise<EngineSummary> {
     const db = this.prisma.forTenant(tenantId);
     const audienceResult = await this.audiences.syncPerson(db, tenantId, userId);
-    const generated = await this.generate(db, tenantId, { userIds: [userId] });
+    /*
+      PRIMERO SE RETIRA, DESPUES SE GENERA (2026-10-01). Al reves, quien cambiaba de cargo se quedaba
+      sin su induccion del cargo nuevo: el motor veia abierta la del cargo viejo (`abiertaPorOtraRegla`)
+      y no creaba la nueva; un instante despues retiraba la vieja por haber salido del grupo. Quedaba
+      en cero hasta la siguiente pasada. Lo destapo el recorrido `induccion-especifica`, paso 15.
+    */
     const withdrawn = await this.withdrawLeavers(db, userId);
+    const generated = await this.generate(db, tenantId, { userIds: [userId] });
     return {
       ...EMPTY_SUMMARY,
       audiencesJoined: audienceResult.joined,
@@ -110,6 +122,10 @@ export class RequirementEngineService {
     if (userIds.length === 0) return { ...EMPTY_SUMMARY };
     const db = this.prisma.forTenant(tenantId);
     const audienceResult = await this.audiences.reevaluateAll(db, tenantId);
+    // Igual que una persona: lo del grupo que dejo se retira ANTES de generar. La carga masiva no
+    // retiraba nada y lo dejaba a la pasada siguiente (2026-10-01).
+    let withdrawn = 0;
+    for (const userId of userIds) withdrawn += await this.withdrawLeavers(db, userId);
     const generated = await this.generate(db, tenantId, { userIds });
     return {
       ...EMPTY_SUMMARY,
@@ -117,6 +133,7 @@ export class RequirementEngineService {
       audiencesLeft: audienceResult.left,
       created: generated.created,
       cyclesOpened: generated.cyclesOpened,
+      withdrawn,
     };
   }
 

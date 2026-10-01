@@ -124,7 +124,8 @@ if (req) {
   console.log(`   ... alcance=${req.reach} obligadas=${req.assignmentCount} soloNuevos=${req.soloNuevos} disparador=${req.trigger} vence=${req.dueDaysAfterTrigger}d`);
   comprobar(req.soloNuevos === true, 'es "solo a quien entre desde ahora" (correcto para una induccion de ingreso)', 'deberia ser solo para nuevos y no lo es');
   comprobar(req.trigger === 'ON_HIRE', 'se dispara con el INGRESO', `disparador inesperado: ${req.trigger}`);
-  comprobar(req.dueDaysAfterTrigger < 0, 'vence ANTES del ingreso (D1072)', `deberia vencer antes del ingreso: ${req.dueDaysAfterTrigger}`);
+  // Desde el 2026-10-01 son 8 dias DESPUES del ingreso: con -1 nacia vencida a quien se creaba el mismo dia.
+comprobar(req.dueDaysAfterTrigger === 8, 'vence 8 dias despues del ingreso', `vence a los ${req.dueDaysAfterTrigger} dias`);
   comprobar(req.assignmentCount === 0, 'hoy no obliga a nadie: la gente ya estaba', `obliga a ${req.assignmentCount} y no deberia`);
 }
 

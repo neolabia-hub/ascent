@@ -45,7 +45,32 @@ Moodle). `enrollments.extra_attempts` (migracion `20261001120000_intentos_extra`
 solo de esa inscripcion. `POST /enrollments/:id/intento-extra` {motivo >= 10}, permiso
 `enrollments:unblock`: desbloquea, FAILED -> IN_PROGRESS, aviso IN_APP y auditoria
 ENROLLMENT_EXTRA_ATTEMPT. La lista de obligaciones trae `bloqueada` y la ficha de la persona pinta
-INTENTOS AGOTADOS con el boton. Recorrido `intento-extra.mjs`. En dev; falta desplegar.
+INTENTOS AGOTADOS con el boton. Recorrido `intento-extra.mjs`.
+
+**4. Intentos en TRES niveles: empresa, evaluacion y persona.** Se quito «Reglas de la versión» de la
+ficha de la formacion (nota e intentos repetidos con la evaluacion). `learning/maximo-de-intentos.ts`:
+el examen manda (mayor entre copia congelada y su origen editable); si no fija, el mayor entre la
+version cursada y la publicada; mas los extra de la persona. Subir el maximo DESBLOQUEA en el acto a
+quien ya lo agoto (`levantarBloqueosVencidos`: al publicar, al guardar la evaluacion y al abrir el
+reproductor), con aviso. Recorrido `intentos-de-la-formacion.mjs`. «Inducción Gestión Humana» tenia
+nota 90 en la version: se paso a su examen en produccion.
+
+**5. Induccion de ingreso: 8 dias DESPUES del ingreso** (`PLAZO_INDUCCION_DE_INGRESO`, era -1). El -1
+solo fallaba al crear a la persona 0-1 dias antes de su ingreso: la gracia de 30 dias (Decision #70)
+no salta porque la fecha aun no paso a esa hora; las 12 de prueba se crearon a las 22:33 del dia
+anterior. En produccion: 9 reglas a 8 y 79 obligaciones recalculadas (solo se alargan).
+
+**6. Motor: retirar ANTES de generar.** Quien cambiaba de cargo se quedaba sin la induccion del cargo
+nuevo hasta la siguiente pasada (`abiertaPorOtraRegla` veia la vieja aun abierta). Venia del
+2026-09-08. La carga masiva tampoco retiraba: ahora si.
+
+**7. Otros:** aviso «agoto los intentos» lleva al perfil de la persona (#intentos-agotados); el
+programa dice «· solo a quien ingrese» junto a «Toda la empresa»; el Popover se recoloca al desplazar
+en vez de cerrarse (asistencia-a-mano fallaba 3 de 3); `reinduccion-ciclos` y `capacitacion-del-plan`
+actualizados (decisiones del 08 y 14-sep, y una variable `año`). OJO: la suite e2e usa `.next`
+compilado: sin `pnpm build` antes, prueba la web vieja.
+
+Pruebas: 1015 unitarias, 39 recorridos, 33 e2e. Desplegado el 2026-10-01.
 
 ---
 

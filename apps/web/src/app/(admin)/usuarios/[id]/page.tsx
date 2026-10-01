@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Archive,
   ArrowLeft,
@@ -12,39 +12,36 @@ import {
   Download,
   ExternalLink,
   FileCheck2,
+  Lock,
   Mail,
   Phone,
   Printer,
+  RotateCcw,
   Search,
   ShieldCheck,
-} from "lucide-react";
-import { getUser, type UserDetail } from "@/lib/admin-api";
-import {
-  abrirPdfEnPestana,
-  descargarPdf,
-  getCertificatesOf,
-  type CertificateRow,
-} from "@/lib/certificates-api";
+} from 'lucide-react';
+import { getUser, type UserDetail } from '@/lib/admin-api';
+import { abrirPdfEnPestana, descargarPdf, getCertificatesOf, type CertificateRow } from '@/lib/certificates-api';
 import {
   darIntentoExtra,
   papelesDePersona,
   todasLasObligacionesDe,
   type AssignmentRow,
   type PapelDeTercero,
-} from "@/lib/delivery-api";
-import { me, motivoDelError } from "@/lib/api";
-import { Drawer } from "@/components/ui/drawer";
-import { Field } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
-import { formatDate } from "@/lib/format";
-import { PapelesDePersona } from "@/components/modules/admin/papeles-de-persona";
-import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
-import { StatusPill } from "@/components/ui/status-pill";
-import { useToast } from "@/components/ui/toast";
-import { cn } from "@/components/ui/cn";
+} from '@/lib/delivery-api';
+import { me, motivoDelError } from '@/lib/api';
+import { Drawer } from '@/components/ui/drawer';
+import { Field } from '@/components/ui/field';
+import { Textarea } from '@/components/ui/textarea';
+import { formatDate } from '@/lib/format';
+import { PapelesDePersona } from '@/components/modules/admin/papeles-de-persona';
+import { Avatar } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatusPill } from '@/components/ui/status-pill';
+import { useToast } from '@/components/ui/toast';
+import { cn } from '@/components/ui/cn';
 
 /**
  * EL EXPEDIENTE DE UNA PERSONA — PÁGINA COMPLETA.
@@ -75,63 +72,48 @@ import { cn } from "@/components/ui/cn";
  *    mismo: una la emite la empresa con código de verificación, el otro lo emite la ARL o el SENA.
  */
 
-const ESTADO: Record<
-  AssignmentRow["status"],
-  { label: string; kind: "ok" | "warn" | "danger" | "info" | "neutral" }
-> = {
-  PENDING: { label: "PENDIENTE", kind: "info" },
-  IN_PROGRESS: { label: "EN CURSO", kind: "info" },
-  COMPLETED: { label: "CUMPLIDA", kind: "ok" },
-  OVERDUE: { label: "VENCIDA", kind: "danger" },
-  EXPIRED_NOT_DONE: { label: "NO SE HIZO", kind: "danger" },
-  WAIVED: { label: "EXIMIDA", kind: "neutral" },
-  WITHDRAWN_LEFT_AUDIENCE: { label: "RETIRADA", kind: "neutral" },
-  WITHDRAWN_PLAN_ITEM_CANCELLED: { label: "RETIRADA", kind: "neutral" },
-};
+const ESTADO: Record<AssignmentRow['status'], { label: string; kind: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' }> =
+  {
+    PENDING: { label: 'PENDIENTE', kind: 'info' },
+    IN_PROGRESS: { label: 'EN CURSO', kind: 'info' },
+    COMPLETED: { label: 'CUMPLIDA', kind: 'ok' },
+    OVERDUE: { label: 'VENCIDA', kind: 'danger' },
+    EXPIRED_NOT_DONE: { label: 'NO SE HIZO', kind: 'danger' },
+    WAIVED: { label: 'EXIMIDA', kind: 'neutral' },
+    WITHDRAWN_LEFT_AUDIENCE: { label: 'RETIRADA', kind: 'neutral' },
+    WITHDRAWN_PLAN_ITEM_CANCELLED: { label: 'RETIRADA', kind: 'neutral' },
+  };
 
 /**
  * POR QUE SE RETIRO, en palabras (2026-09-30). La fila no guarda un motivo escrito —lo retira el
  * sistema, no una persona—, pero el estado dice cual de los dos casos fue, y es lo que pregunta un
  * auditor delante de una obligacion que no se cumplio y no cuenta.
  */
-const POR_QUE_RETIRADA: Partial<Record<AssignmentRow["status"], string>> = {
-  WITHDRAWN_LEFT_AUDIENCE:
-    "dejó de exigírsele: cambió de cargo o área, o se retiró la regla",
-  WITHDRAWN_PLAN_ITEM_CANCELLED: "se canceló el renglón del plan que la creó",
+const POR_QUE_RETIRADA: Partial<Record<AssignmentRow['status'], string>> = {
+  WITHDRAWN_LEFT_AUDIENCE: 'dejó de exigírsele: cambió de cargo o área, o se retiró la regla',
+  WITHDRAWN_PLAN_ITEM_CANCELLED: 'se canceló el renglón del plan que la creó',
 };
 
 /** Dejaron de exigirse sin cumplirse: no son trayectoria (2026-09-30). */
-const RETIRADA: string[] = [
-  "WITHDRAWN_LEFT_AUDIENCE",
-  "WITHDRAWN_PLAN_ITEM_CANCELLED",
-];
-const PENDIENTE: AssignmentRow["status"][] = [
-  "OVERDUE",
-  "EXPIRED_NOT_DONE",
-  "PENDING",
-  "IN_PROGRESS",
-];
-const CAIDO: AssignmentRow["status"][] = ["OVERDUE", "EXPIRED_NOT_DONE"];
+const RETIRADA: string[] = ['WITHDRAWN_LEFT_AUDIENCE', 'WITHDRAWN_PLAN_ITEM_CANCELLED'];
+const PENDIENTE: AssignmentRow['status'][] = ['OVERDUE', 'EXPIRED_NOT_DONE', 'PENDING', 'IN_PROGRESS'];
+const CAIDO: AssignmentRow['status'][] = ['OVERDUE', 'EXPIRED_NOT_DONE'];
 
 export default function PerfilDePersonaPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const id = params?.id ?? "";
+  const id = params?.id ?? '';
 
   const { showToast } = useToast();
 
   const [persona, setPersona] = useState<UserDetail | null>(null);
   const [noExiste, setNoExiste] = useState(false);
-  const [obligaciones, setObligaciones] = useState<AssignmentRow[] | null>(
-    null,
-  );
+  const [obligaciones, setObligaciones] = useState<AssignmentRow[] | null>(null);
   const [verRetiradas, setVerRetiradas] = useState(false);
   /** Pulsar una cifra la convierte en filtro (2026-09-30): vencidas, pendientes o cumplidas. */
-  const [vista, setVista] = useState<
-    "vencidas" | "pendientes" | "cumplidas" | null
-  >(null);
+  const [vista, setVista] = useState<'vencidas' | 'pendientes' | 'cumplidas' | null>(null);
   /** Buscador rapido de la trayectoria, para cuando sean muchas. */
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = useState('');
   /** Qué tipo de formación se está mirando, si alguno. `null` = toda su historia. */
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
   /** Qué constancia se está bajando o abriendo, para que el botón diga que está trabajando. */
@@ -143,7 +125,7 @@ export default function PerfilDePersonaPage() {
   /** «Dar un intento mas» (2026-10-01): solo con el permiso de desbloquear inscripciones. */
   const [puedeDesbloquear, setPuedeDesbloquear] = useState(false);
   const [aDesbloquear, setADesbloquear] = useState<AssignmentRow | null>(null);
-  const [motivoIntento, setMotivoIntento] = useState("");
+  const [motivoIntento, setMotivoIntento] = useState('');
   const [dandoIntento, setDandoIntento] = useState(false);
 
   useEffect(() => {
@@ -163,16 +145,27 @@ export default function PerfilDePersonaPage() {
       .then(setConstancias)
       .catch(() => setConstancias([]));
     void papelesDePersona(id)
-      .then((filas) =>
-        setPapeles(filas.filter((papel) => papel.number || papel.fileKey)),
-      )
+      .then((filas) => setPapeles(filas.filter((papel) => papel.number || papel.fileKey)))
       .catch(() => setPapeles([]));
     void me()
-      .then((sesion) =>
-        setPuedeDesbloquear(sesion.permissions.includes("enrollments:unblock")),
-      )
+      .then((sesion) => setPuedeDesbloquear(sesion.permissions.includes('enrollments:unblock')))
       .catch(() => undefined);
   }, [id]);
+
+  /*
+    LLEGANDO DESDE EL AVISO «agoto los intentos» (2026-10-01): el enlace trae #intentos-agotados y
+    aqui se baja hasta esa fila en cuanto las obligaciones cargan. El ancla del navegador no sirve
+    sola: cuando la pagina abre, la fila todavia no existe.
+  */
+  useEffect(() => {
+    if (!obligaciones || typeof window === 'undefined' || window.location.hash !== '#intentos-agotados') return;
+    const fila = document.querySelector<HTMLElement>('[data-intentos-agotados]');
+    if (!fila) return;
+    fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    fila.classList.add('ring-2', 'ring-danger/50');
+    const quitar = window.setTimeout(() => fila.classList.remove('ring-2', 'ring-danger/50'), 2600);
+    return () => window.clearTimeout(quitar);
+  }, [obligaciones]);
 
   const confirmarIntento = async () => {
     const enrollmentId = aDesbloquear?.bloqueada?.enrollmentId;
@@ -181,20 +174,19 @@ export default function PerfilDePersonaPage() {
     try {
       await darIntentoExtra(enrollmentId, motivoIntento.trim());
       showToast({
-        kind: "success",
-        title: "Intento concedido",
-        description:
-          "Ya puede volver a presentar la evaluación. Le llegó un aviso.",
+        kind: 'success',
+        title: 'Intento concedido',
+        description: 'Ya puede volver a presentar la evaluación. Le llegó un aviso.',
       });
       setADesbloquear(null);
-      setMotivoIntento("");
+      setMotivoIntento('');
       void todasLasObligacionesDe(id)
         .then(setObligaciones)
         .catch(() => undefined);
     } catch (error) {
       showToast({
-        kind: "danger",
-        title: "No se pudo dar el intento",
+        kind: 'danger',
+        title: 'No se pudo dar el intento',
         description: motivoDelError(error),
       });
     } finally {
@@ -205,7 +197,7 @@ export default function PerfilDePersonaPage() {
   if (noExiste) {
     return (
       <div>
-        <Volver onClick={() => router.push("/usuarios")} />
+        <Volver onClick={() => router.push('/usuarios')} />
         <EmptyState
           className="mt-6"
           icon={ShieldCheck}
@@ -247,19 +239,11 @@ export default function PerfilDePersonaPage() {
     LO QUE SE VE, Y SOLO ESO, se cuenta en las pastillas (2026-09-30). Con las retiradas plegadas,
     «Reinducción 2» contaba dos retiradas que la lista no enseñaba: se pulsaba y no salia nada.
   */
-  const visibles = (obligaciones ?? []).filter(
-    (fila) => verRetiradas || !RETIRADA.includes(fila.status),
-  );
-  const tiposDeLaPersona = [
-    ...new Set(
-      visibles.map((fila) => fila.tipo).filter((t): t is string => !!t),
-    ),
-  ].sort();
-  const enElFiltro = (fila: AssignmentRow) =>
-    filtroTipo === null || fila.tipo === filtroTipo;
+  const visibles = (obligaciones ?? []).filter((fila) => verRetiradas || !RETIRADA.includes(fila.status));
+  const tiposDeLaPersona = [...new Set(visibles.map((fila) => fila.tipo).filter((t): t is string => !!t))].sort();
+  const enElFiltro = (fila: AssignmentRow) => filtroTipo === null || fila.tipo === filtroTipo;
 
-  const nombreDeArchivo = (fila: CertificateRow) =>
-    `${persona?.fullName ?? "Constancia"} - ${fila.activityName}.pdf`;
+  const nombreDeArchivo = (fila: CertificateRow) => `${persona?.fullName ?? 'Constancia'} - ${fila.activityName}.pdf`;
 
   const bajarConstancia = async (fila: CertificateRow) => {
     setBajando(fila.id);
@@ -267,8 +251,8 @@ export default function PerfilDePersonaPage() {
       await descargarPdf(`/certificates/${fila.id}/pdf`, nombreDeArchivo(fila));
     } catch (error) {
       showToast({
-        kind: "danger",
-        title: "No se pudo descargar la constancia",
+        kind: 'danger',
+        title: 'No se pudo descargar la constancia',
         description: motivoDelError(error),
       });
     } finally {
@@ -288,8 +272,8 @@ export default function PerfilDePersonaPage() {
       await abrirPdfEnPestana(`/certificates/${fila.id}/pdf`);
     } catch (error) {
       showToast({
-        kind: "danger",
-        title: "No se pudo abrir la constancia",
+        kind: 'danger',
+        title: 'No se pudo abrir la constancia',
         description: motivoDelError(error),
       });
     } finally {
@@ -303,72 +287,52 @@ export default function PerfilDePersonaPage() {
     cifras Vencidas o Pendientes: dos controles para una sola cosa. Quedan las tarjetas, que ademas
     filtran Cumplidas.
   */
-  const abiertas = (obligaciones ?? []).filter(
-    (fila) => PENDIENTE.includes(fila.status) && enElFiltro(fila),
-  );
-  const cerradasTodas = (obligaciones ?? []).filter(
-    (fila) => !PENDIENTE.includes(fila.status) && enElFiltro(fila),
-  );
+  const abiertas = (obligaciones ?? []).filter((fila) => PENDIENTE.includes(fila.status) && enElFiltro(fila));
+  const cerradasTodas = (obligaciones ?? []).filter((fila) => !PENDIENTE.includes(fila.status) && enElFiltro(fila));
   /*
     LAS RETIRADAS, PLEGADAS (2026-09-30). Una obligacion retirada no la cumplio nadie: dejo de
     exigirse (cambio de cargo, regla apagada). En la trayectoria se leia como historia de la persona,
     y no lo es. Como en los LMS: por defecto lo cumplido y lo eximido, y lo retirado a un clic —se
     conserva, porque explica por que alguien creyo tener esa formacion—.
   */
-  const retiradasDeLaPersona = cerradasTodas.filter((fila) =>
-    RETIRADA.includes(fila.status),
-  );
-  const cerradas = verRetiradas
-    ? cerradasTodas
-    : cerradasTodas.filter((fila) => !RETIRADA.includes(fila.status));
+  const retiradasDeLaPersona = cerradasTodas.filter((fila) => RETIRADA.includes(fila.status));
+  const cerradas = verRetiradas ? cerradasTodas : cerradasTodas.filter((fila) => !RETIRADA.includes(fila.status));
   const normal = (texto: string) =>
     texto
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
       .toLowerCase();
   const abiertasVistas =
-    vista === "cumplidas"
+    vista === 'cumplidas'
       ? []
-      : vista === "vencidas"
+      : vista === 'vencidas'
         ? abiertas.filter((fila) => CAIDO.includes(fila.status))
-        : vista === "pendientes"
+        : vista === 'pendientes'
           ? abiertas.filter((fila) => !CAIDO.includes(fila.status))
           : abiertas;
   const cerradasVistas = (
-    vista === "vencidas" || vista === "pendientes"
+    vista === 'vencidas' || vista === 'pendientes'
       ? []
-      : vista === "cumplidas"
-        ? cerradas.filter((fila) => fila.status === "COMPLETED")
+      : vista === 'cumplidas'
+        ? cerradas.filter((fila) => fila.status === 'COMPLETED')
         : cerradas
-  ).filter(
-    (fila) =>
-      !busca.trim() ||
-      normal(fila.targetName ?? "").includes(normal(busca.trim())),
-  );
-  const alternarVista = (nueva: typeof vista) =>
-    setVista((actual) => (actual === nueva ? null : nueva));
+  ).filter((fila) => !busca.trim() || normal(fila.targetName ?? '').includes(normal(busca.trim())));
+  const alternarVista = (nueva: typeof vista) => setVista((actual) => (actual === nueva ? null : nueva));
   /** Sin filtrar: las cuatro cifras de arriba son sobre la persona entera, no sobre lo que se mira. */
-  const abiertasTodas = (obligaciones ?? []).filter((fila) =>
-    PENDIENTE.includes(fila.status),
-  ).length;
-  const caidas = (obligaciones ?? []).filter((fila) =>
-    CAIDO.includes(fila.status),
-  ).length;
-  const cumplidas = (obligaciones ?? []).filter(
-    (fila) => fila.status === "COMPLETED",
-  ).length;
+  const abiertasTodas = (obligaciones ?? []).filter((fila) => PENDIENTE.includes(fila.status)).length;
+  const caidas = (obligaciones ?? []).filter((fila) => CAIDO.includes(fila.status)).length;
+  const cumplidas = (obligaciones ?? []).filter((fila) => fila.status === 'COMPLETED').length;
   const total = (obligaciones ?? []).length;
   /*
     AL DIA = de lo que ya se le exigio, cuanto cumplio. No cuenta lo que todavia no vence: una
     persona con tres formaciones abiertas y en plazo no esta «al 40 %», esta al dia.
   */
   const exigidas = cumplidas + caidas;
-  const alDia =
-    exigidas === 0 ? null : Math.round((cumplidas / exigidas) * 100);
+  const alDia = exigidas === 0 ? null : Math.round((cumplidas / exigidas) * 100);
 
   return (
     <div className="pb-4">
-      <Volver onClick={() => router.push("/usuarios")} />
+      <Volver onClick={() => router.push('/usuarios')} />
 
       {/* ─────────────── QUIEN ES ─────────────── */}
       <header className="card mt-3 overflow-hidden">
@@ -380,8 +344,7 @@ export default function PerfilDePersonaPage() {
         <div
           className="h-16 w-full"
           style={{
-            background:
-              "linear-gradient(100deg, var(--brand-primary), var(--brand-accent))",
+            background: 'linear-gradient(100deg, var(--brand-primary), var(--brand-accent))',
           }}
         />
         <div className="flex flex-wrap items-end gap-4 px-6 pb-5">
@@ -404,13 +367,11 @@ export default function PerfilDePersonaPage() {
                   <h1 className="font-display text-[26px] font-semibold leading-tight text-ink-900">
                     {persona.fullName}
                   </h1>
-                  {persona.active ? null : (
-                    <StatusPill kind="neutral" label="INACTIVA" />
-                  )}
+                  {persona.active ? null : <StatusPill kind="neutral" label="INACTIVA" />}
                 </div>
                 <p className="mt-0.5 text-sm text-ink-700">
                   {persona.jobTitle.name} · {persona.area.name}
-                  {persona.regional ? ` · ${persona.regional.name}` : ""}
+                  {persona.regional ? ` · ${persona.regional.name}` : ''}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-500">
                   <span>
@@ -418,8 +379,7 @@ export default function PerfilDePersonaPage() {
                   </span>
                   {persona.hiredAt ? (
                     <span className="inline-flex items-center gap-1">
-                      <CalendarDays size={12} aria-hidden /> Ingresó el{" "}
-                      {formatDate(persona.hiredAt)}
+                      <CalendarDays size={12} aria-hidden /> Ingresó el {formatDate(persona.hiredAt)}
                     </span>
                   ) : null}
                   {persona.email ? (
@@ -432,7 +392,7 @@ export default function PerfilDePersonaPage() {
                   ) : null}
                   {persona.phone ? (
                     <a
-                      href={`tel:${persona.phone.replace(/[^+\d]/g, "")}`}
+                      href={`tel:${persona.phone.replace(/[^+\d]/g, '')}`}
                       className="focus-ring inline-flex items-center gap-1 hover:text-ink-900"
                     >
                       <Phone size={12} aria-hidden /> {persona.phone}
@@ -458,19 +418,11 @@ export default function PerfilDePersonaPage() {
                 debajo de la lista de papeles, y es una ACCION sobre la persona: se busca donde estan
                 las acciones, junto a imprimir.
               */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRegistrandoPapel(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setRegistrandoPapel(true)}>
                 <BadgeCheck size={15} />
                 Registrar certificado externo
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-              >
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer size={15} />
                 Imprimir
               </Button>
@@ -485,8 +437,8 @@ export default function PerfilDePersonaPage() {
           valor={obligaciones === null ? null : caidas}
           etiqueta="Vencidas"
           alarmante={caidas > 0}
-          activa={vista === "vencidas"}
-          onClick={() => alternarVista("vencidas")}
+          activa={vista === 'vencidas'}
+          onClick={() => alternarVista('vencidas')}
         />
         {/* Las cuatro cifras NO se filtran: contestan "¿esta persona está al día?", y esa pregunta
             es sobre ella entera. Si cambiaran al pulsar una pestaña, el mismo número diría dos
@@ -494,14 +446,14 @@ export default function PerfilDePersonaPage() {
         <Cifra
           valor={obligaciones === null ? null : abiertasTodas - caidas}
           etiqueta="Pendientes"
-          activa={vista === "pendientes"}
-          onClick={() => alternarVista("pendientes")}
+          activa={vista === 'pendientes'}
+          onClick={() => alternarVista('pendientes')}
         />
         <Cifra
           valor={obligaciones === null ? null : cumplidas}
           etiqueta="Cumplidas"
-          activa={vista === "cumplidas"}
-          onClick={() => alternarVista("cumplidas")}
+          activa={vista === 'cumplidas'}
+          onClick={() => alternarVista('cumplidas')}
         />
         <Cifra
           valor={obligaciones === null ? null : alDia}
@@ -533,37 +485,23 @@ export default function PerfilDePersonaPage() {
             <div className="flex flex-wrap items-center gap-1.5">
               {[null, ...tiposDeLaPersona].map((tipo) => {
                 const activo = filtroTipo === tipo;
-                const cuantas =
-                  tipo === null
-                    ? visibles.length
-                    : visibles.filter((fila) => fila.tipo === tipo).length;
+                const cuantas = tipo === null ? visibles.length : visibles.filter((fila) => fila.tipo === tipo).length;
                 return (
                   <button
-                    key={tipo ?? "__todas__"}
+                    key={tipo ?? '__todas__'}
                     type="button"
                     aria-pressed={activo}
                     onClick={() => setFiltroTipo(tipo)}
                     className={cn(
-                      "focus-ring rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-150",
+                      'focus-ring rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-150',
                       activo
-                        ? "border-transparent font-semibold text-white shadow-btn"
-                        : "border-line bg-surface text-ink-700 hover:bg-paper",
+                        ? 'border-transparent font-semibold text-white shadow-btn'
+                        : 'border-line bg-surface text-ink-700 hover:bg-paper',
                     )}
-                    style={
-                      activo
-                        ? { backgroundColor: "var(--brand-primary)" }
-                        : undefined
-                    }
+                    style={activo ? { backgroundColor: 'var(--brand-primary)' } : undefined}
                   >
-                    {tipo ?? "Todo"}{" "}
-                    <span
-                      className={cn(
-                        "tabular-nums",
-                        activo ? "text-white/80" : "text-ink-500",
-                      )}
-                    >
-                      {cuantas}
-                    </span>
+                    {tipo ?? 'Todo'}{' '}
+                    <span className={cn('tabular-nums', activo ? 'text-white/80' : 'text-ink-500')}>{cuantas}</span>
                   </button>
                 );
               })}
@@ -572,28 +510,19 @@ export default function PerfilDePersonaPage() {
 
           {/* Filtrando puede no quedar nada abierto Y nada cerrado: se dice, en vez de dejar dos
               bloques vacíos que parecen un fallo de carga. */}
-          {filtroTipo !== null &&
-          abiertas.length === 0 &&
-          cerradas.length === 0 ? (
+          {filtroTipo !== null && abiertas.length === 0 && cerradas.length === 0 ? (
             <p className="rounded-md bg-paper px-3 py-2 text-sm text-ink-500">
-              No tiene ninguna formación de tipo{" "}
-              <strong className="font-medium">{filtroTipo}</strong>.
+              No tiene ninguna formación de tipo <strong className="font-medium">{filtroTipo}</strong>.
             </p>
           ) : null}
 
           {abiertasVistas.length > 0 ? (
-            <Bloque
-              titulo="Lo que le falta"
-              cuantos={abiertasVistas.length}
-              resaltado
-            >
+            <Bloque titulo="Lo que le falta" cuantos={abiertasVistas.length} resaltado>
               {abiertasVistas.map((fila) => (
                 <Obligacion
                   key={fila.id}
                   fila={fila}
-                  onIntentoExtra={
-                    puedeDesbloquear ? () => setADesbloquear(fila) : undefined
-                  }
+                  onIntentoExtra={puedeDesbloquear ? () => setADesbloquear(fila) : undefined}
                 />
               ))}
             </Bloque>
@@ -605,14 +534,9 @@ export default function PerfilDePersonaPage() {
             agrupado por tipo: lo que se comprueba es una historia, no un catalogo.
           */}
           {/* BUSCADOR RAPIDO, cuando la historia ya es larga: con cinco se lee de un vistazo. */}
-          {cerradas.length > 5 &&
-          vista !== "vencidas" &&
-          vista !== "pendientes" ? (
+          {cerradas.length > 5 && vista !== 'vencidas' && vista !== 'pendientes' ? (
             <div className="relative max-w-sm">
-              <Search
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500"
-              />
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
               <input
                 type="search"
                 value={busca}
@@ -627,19 +551,13 @@ export default function PerfilDePersonaPage() {
           <Bloque
             titulo="Su trayectoria"
             cuantos={cerradasVistas.length}
-            vacio={
-              busca.trim()
-                ? "Nada coincide con esa búsqueda."
-                : "Todavía no ha cumplido ninguna."
-            }
+            vacio={busca.trim() ? 'Nada coincide con esa búsqueda.' : 'Todavía no ha cumplido ninguna.'}
           >
             {cerradasVistas.map((fila) => (
               <Obligacion
                 key={fila.id}
                 fila={fila}
-                onIntentoExtra={
-                  puedeDesbloquear ? () => setADesbloquear(fila) : undefined
-                }
+                onIntentoExtra={puedeDesbloquear ? () => setADesbloquear(fila) : undefined}
               />
             ))}
             {retiradasDeLaPersona.length > 0 ? (
@@ -648,9 +566,7 @@ export default function PerfilDePersonaPage() {
                 onClick={() => setVerRetiradas((actual) => !actual)}
                 className="focus-ring mt-2 rounded text-xs font-medium text-ink-500 hover:text-ink-900 hover:underline"
               >
-                {verRetiradas
-                  ? "Ocultar las retiradas"
-                  : `Ver también las retiradas (${retiradasDeLaPersona.length})`}
+                {verRetiradas ? 'Ocultar las retiradas' : `Ver también las retiradas (${retiradasDeLaPersona.length})`}
               </button>
             ) : null}
           </Bloque>
@@ -683,16 +599,12 @@ export default function PerfilDePersonaPage() {
                 tachado={fila.revoked}
                 /* EL TIPO VA DELANTE, y sobre todo para una palabra: «Programa». Es lo que explica
                    por qué las formaciones que lo componen no tienen papel propio. */
-                detalle={`${fila.typeName ? `${fila.typeName} · ` : ""}Nº ${fila.serialNumber} · ${formatDate(
+                detalle={`${fila.typeName ? `${fila.typeName} · ` : ''}Nº ${fila.serialNumber} · ${formatDate(
                   fila.issuedAt,
-                )}${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ""}${
-                  fila.hours ? ` · ${fila.hours} h` : ""
+                )}${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ''}${
+                  fila.hours ? ` · ${fila.hours} h` : ''
                 }`}
-                pastilla={
-                  fila.revoked ? (
-                    <StatusPill kind="danger" label="REVOCADA" />
-                  ) : null
-                }
+                pastilla={fila.revoked ? <StatusPill kind="danger" label="REVOCADA" /> : null}
                 /*
                   ABRIR Y DESCARGAR, AQUÍ MISMO (2026-09-17, pedido del cliente).
 
@@ -741,10 +653,10 @@ export default function PerfilDePersonaPage() {
                 key={fila.enrollmentId}
                 icono={fila.fileKey ? FileCheck2 : Archive}
                 titulo={fila.actividad}
-                detalle={`${fila.number ? `Nº ${fila.number}` : "sin número"}${
-                  fila.issuer ? ` · ${fila.issuer}` : ""
-                }${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ""}${
-                  fila.fileKey ? "" : " · sin archivo"
+                detalle={`${fila.number ? `Nº ${fila.number}` : 'sin número'}${
+                  fila.issuer ? ` · ${fila.issuer}` : ''
+                }${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ''}${
+                  fila.fileKey ? '' : ' · sin archivo'
                 }`}
               />
             ))}
@@ -756,17 +668,13 @@ export default function PerfilDePersonaPage() {
           Usuarios. Al cerrarlo se recarga la lista, porque convalidar cambia lo que hay arriba. */}
       <PapelesDePersona
         userId={registrandoPapel ? id : null}
-        nombre={persona?.fullName ?? ""}
+        nombre={persona?.fullName ?? ''}
         open={registrandoPapel}
         onOpenChange={(abierto) => {
           if (abierto) return;
           setRegistrandoPapel(false);
           void papelesDePersona(id)
-            .then((filas) =>
-              setPapeles(
-                filas.filter((papel) => papel.number || papel.fileKey),
-              ),
-            )
+            .then((filas) => setPapeles(filas.filter((papel) => papel.number || papel.fileKey)))
             .catch(() => undefined);
           void todasLasObligacionesDe(id)
             .then(setObligaciones)
@@ -780,15 +688,11 @@ export default function PerfilDePersonaPage() {
         onOpenChange={(abierto) => {
           if (!abierto) {
             setADesbloquear(null);
-            setMotivoIntento("");
+            setMotivoIntento('');
           }
         }}
         title="Dar un intento más"
-        description={
-          aDesbloquear
-            ? `${persona?.fullName ?? ""} · ${aDesbloquear.targetName ?? ""}`
-            : ""
-        }
+        description={persona?.fullName ?? ''}
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setADesbloquear(null)}>
@@ -799,60 +703,97 @@ export default function PerfilDePersonaPage() {
               disabled={motivoIntento.trim().length < 10}
               loading={dandoIntento}
             >
+              <RotateCcw size={15} />
               Dar el intento
             </Button>
           </div>
         }
       >
-        <div className="space-y-4 text-sm text-ink-700">
-          <p>
-            Agotó los intentos de la evaluación. Se le suma{" "}
-            <strong className="font-medium text-ink-900">
-              uno más solo a esta persona
-            </strong>
-            : el máximo de la formación no cambia para nadie más. Queda en la
-            auditoría con tu nombre.
-          </p>
-          <Field
-            htmlFor="ie-motivo"
-            label="Motivo"
-            required
-            hint="Por ejemplo: reforzó el tema con su jefe el 3 de octubre."
-          >
-            <Textarea
-              id="ie-motivo"
-              rows={3}
-              maxLength={500}
-              value={motivoIntento}
-              onChange={(event) => setMotivoIntento(event.target.value)}
-            />
-          </Field>
-        </div>
+        {aDesbloquear?.bloqueada ? (
+          <div className="space-y-5 text-sm text-ink-700">
+            {/* De cuanto a cuanto: lo que cambia, en una linea que se lee sin pensar. */}
+            <div className="rounded-xl border border-line bg-paper p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Formación</p>
+              <p className="mt-1 font-medium text-ink-900">{aDesbloquear.targetName ?? '—'}</p>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="flex-1 rounded-lg bg-danger-soft px-3 py-2 text-center">
+                  <p className="font-display text-xl font-semibold tabular-nums text-danger">
+                    {aDesbloquear.bloqueada.intentosUsados} de {aDesbloquear.bloqueada.intentosMaximos}
+                  </p>
+                  <p className="text-xs text-ink-500">intentos usados hoy</p>
+                </div>
+                <span aria-hidden className="text-ink-300">
+                  →
+                </span>
+                <div className="flex-1 rounded-lg bg-ok-soft px-3 py-2 text-center">
+                  <p className="font-display text-xl font-semibold tabular-nums text-ok">
+                    {aDesbloquear.bloqueada.intentosUsados} de {aDesbloquear.bloqueada.intentosMaximos + 1}
+                  </p>
+                  <p className="text-xs text-ink-500">le queda 1 intento</p>
+                </div>
+              </div>
+            </div>
+
+            <ul className="space-y-2">
+              <li className="flex gap-2">
+                <span
+                  aria-hidden
+                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: 'var(--brand-primary)' }}
+                />
+                <span>
+                  <strong className="font-medium text-ink-900">Solo a esta persona.</strong> El máximo de la formación
+                  no cambia para nadie más.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span
+                  aria-hidden
+                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: 'var(--brand-primary)' }}
+                />
+                <span>Queda desbloqueada y le llega un aviso de que puede volver a presentar.</span>
+              </li>
+              <li className="flex gap-2">
+                <span
+                  aria-hidden
+                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: 'var(--brand-primary)' }}
+                />
+                <span>Queda en la auditoría con tu nombre y el motivo.</span>
+              </li>
+            </ul>
+
+            <Field
+              htmlFor="ie-motivo"
+              label="Motivo"
+              required
+              hint="Por ejemplo: reforzó el tema con su jefe el 3 de octubre."
+            >
+              <Textarea
+                id="ie-motivo"
+                rows={3}
+                maxLength={500}
+                value={motivoIntento}
+                onChange={(event) => setMotivoIntento(event.target.value)}
+              />
+            </Field>
+            {motivoIntento.trim().length > 0 && motivoIntento.trim().length < 10 ? (
+              <p className="-mt-3 text-xs text-ink-500">Faltan {10 - motivoIntento.trim().length} caracteres.</p>
+            ) : null}
+          </div>
+        ) : null}
       </Drawer>
     </div>
   );
 }
 
 /** El rotulo que separa los dos origenes de una certificacion: una barra de color y su explicacion. */
-function OrigenDeCertificacion({
-  titulo,
-  detalle,
-  color,
-}: {
-  titulo: string;
-  detalle: string;
-  color: string;
-}) {
+function OrigenDeCertificacion({ titulo, detalle, color }: { titulo: string; detalle: string; color: string }) {
   return (
     <div className="flex items-center gap-2.5 pb-1 pt-3 first:pt-0">
-      <span
-        aria-hidden="true"
-        className="h-4 w-1 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-900">
-        {titulo}
-      </p>
+      <span aria-hidden="true" className="h-4 w-1 rounded-full" style={{ backgroundColor: color }} />
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-900">{titulo}</p>
       <p className="text-xs text-ink-500">{detalle}</p>
     </div>
   );
@@ -875,7 +816,7 @@ function Volver({ onClick }: { onClick: () => void }) {
 function Cifra({
   valor,
   etiqueta,
-  sufijo = "",
+  sufijo = '',
   alarmante = false,
   ayuda,
   activa = false,
@@ -891,101 +832,118 @@ function Cifra({
   /** Con onClick, la cifra es un filtro (2026-09-30): se pulsa y deja ver solo eso. */
   onClick?: () => void;
 }) {
-  const Caja = onClick ? "button" : "div";
+  const Caja = onClick ? 'button' : 'div';
   return (
     <Caja
-      {...(onClick
-        ? { type: "button" as const, onClick, "aria-pressed": activa }
-        : {})}
+      {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': activa } : {})}
       className={cn(
-        "card p-4 text-left",
-        onClick &&
-          "focus-ring transition-transform duration-150 hover:-translate-y-px",
-        alarmante && "border-danger/30 bg-danger-soft",
+        'card p-4 text-left',
+        onClick && 'focus-ring transition-transform duration-150 hover:-translate-y-px',
+        alarmante && 'border-danger/30 bg-danger-soft',
       )}
-      style={
-        activa ? { boxShadow: "0 0 0 2px var(--brand-primary)" } : undefined
-      }
-      title={
-        ayuda ??
-        (onClick
-          ? activa
-            ? "Quitar el filtro"
-            : `Ver solo las ${etiqueta.toLowerCase()}`
-          : undefined)
-      }
+      style={activa ? { boxShadow: '0 0 0 2px var(--brand-primary)' } : undefined}
+      title={ayuda ?? (onClick ? (activa ? 'Quitar el filtro' : `Ver solo las ${etiqueta.toLowerCase()}`) : undefined)}
     >
       {valor === null ? (
         <Skeleton className="h-8 w-12" />
       ) : (
         <p
           className={cn(
-            "font-display text-[30px] font-bold leading-none tabular-nums",
-            alarmante ? "text-danger" : "text-ink-900",
+            'font-display text-[30px] font-bold leading-none tabular-nums',
+            alarmante ? 'text-danger' : 'text-ink-900',
           )}
         >
           {valor}
           {sufijo}
         </p>
       )}
-      <p
-        className={cn(
-          "mt-1.5 text-xs",
-          alarmante ? "font-medium text-danger" : "text-ink-500",
-        )}
-      >
-        {etiqueta}
-      </p>
+      <p className={cn('mt-1.5 text-xs', alarmante ? 'font-medium text-danger' : 'text-ink-500')}>{etiqueta}</p>
     </Caja>
   );
 }
 
-function Obligacion({
-  fila,
-  onIntentoExtra,
-}: {
-  fila: AssignmentRow;
-  onIntentoExtra?: () => void;
-}) {
+function Obligacion({ fila, onIntentoExtra }: { fila: AssignmentRow; onIntentoExtra?: () => void }) {
   const estado = ESTADO[fila.status];
   /*
     AGOTO LOS INTENTOS (2026-10-01). Se dice en la fila —si no, «pendiente» engaña: no puede hacer
     nada hasta que alguien la desbloquee— y, a quien puede, se le ofrece darle uno mas aqui mismo.
   */
-  if (fila.bloqueada) {
-    return (
-      <Fila
-        icono={BadgeCheck}
-        titulo={fila.targetName ?? "—"}
-        detalle={`Agotó los intentos de la evaluación${fila.dueAt ? ` · vence el ${formatDate(fila.dueAt)}` : ""}`}
-        pastilla={<StatusPill kind="danger" label="INTENTOS AGOTADOS" />}
-        acciones={
-          onIntentoExtra ? (
-            <Button variant="outline" size="sm" onClick={onIntentoExtra}>
-              Dar un intento más
-            </Button>
-          ) : null
-        }
-      />
-    );
-  }
+  if (fila.bloqueada) return <IntentosAgotados fila={fila} bloqueo={fila.bloqueada} onIntentoExtra={onIntentoExtra} />;
   return (
     <Fila
       icono={BadgeCheck}
-      titulo={fila.targetName ?? "—"}
+      titulo={fila.targetName ?? '—'}
       detalle={`${
         fila.completedAt
           ? `cumplida el ${formatDate(fila.completedAt)}`
           : fila.dueAt
             ? `vence el ${formatDate(fila.dueAt)}`
-            : "sin plazo"
-      }${fila.cycleNumber > 1 ? ` · ronda ${fila.cycleNumber}` : ""}${fila.waivedReason ? ` · ${fila.waivedReason}` : ""}${
-        POR_QUE_RETIRADA[fila.status]
-          ? ` · ${POR_QUE_RETIRADA[fila.status]}`
-          : ""
+            : 'sin plazo'
+      }${fila.cycleNumber > 1 ? ` · ronda ${fila.cycleNumber}` : ''}${fila.waivedReason ? ` · ${fila.waivedReason}` : ''}${
+        POR_QUE_RETIRADA[fila.status] ? ` · ${POR_QUE_RETIRADA[fila.status]}` : ''
       }`}
       pastilla={<StatusPill kind={estado.kind} label={estado.label} />}
     />
+  );
+}
+
+/**
+ * LA FILA DE QUIEN AGOTO LOS INTENTOS (2026-10-01). No es una fila mas de «lo que le falta»: es la
+ * unica que NO puede resolver la persona sola, asi que se distingue —fondo de alerta, candado— y dice
+ * lo que hace falta para decidir: cuantos intentos uso, desde cuando esta bloqueada y cuando vence.
+ * Los puntos son los intentos, gastados en rojo: se lee de un vistazo, sin contar.
+ */
+function IntentosAgotados({
+  fila,
+  bloqueo,
+  onIntentoExtra,
+}: {
+  fila: AssignmentRow;
+  bloqueo: NonNullable<AssignmentRow['bloqueada']>;
+  onIntentoExtra?: () => void;
+}) {
+  return (
+    <div
+      data-intentos-agotados=""
+      className="flex scroll-mt-24 flex-wrap items-center gap-3 rounded-xl border border-danger/25 bg-danger-soft px-3.5 py-3 transition-shadow duration-300"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-danger shadow-sm">
+        <Lock size={16} strokeWidth={2} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium text-ink-900">{fila.targetName ?? '—'}</p>
+          <StatusPill kind="danger" label="INTENTOS AGOTADOS" />
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-700">
+          <span className="flex items-center gap-1.5">
+            <span className="flex gap-0.5" aria-hidden>
+              {Array.from({ length: Math.min(bloqueo.intentosMaximos, 10) }, (_, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'h-2 w-2 rounded-full',
+                    i < bloqueo.intentosUsados ? 'bg-danger' : 'border border-danger/40',
+                  )}
+                />
+              ))}
+            </span>
+            Usó {bloqueo.intentosUsados} de {bloqueo.intentosMaximos}{' '}
+            {bloqueo.intentosMaximos === 1 ? 'intento' : 'intentos'}
+          </span>
+          {bloqueo.desde ? <span>Bloqueada desde el {formatDate(bloqueo.desde)}</span> : null}
+          {fila.dueAt ? <span>Vence el {formatDate(fila.dueAt)}</span> : null}
+        </div>
+      </div>
+      {onIntentoExtra ? (
+        <Button size="sm" onClick={onIntentoExtra} className="shrink-0">
+          <RotateCcw size={14} />
+          Dar un intento más
+        </Button>
+      ) : (
+        <p className="text-xs text-ink-500">Solo quien tenga el permiso «Dar un intento más» puede desbloquearla.</p>
+      )}
+    </div>
   );
 }
 
@@ -1009,22 +967,13 @@ function Fila({
 }) {
   return (
     <div className="flex items-start gap-2.5 rounded-lg bg-paper px-3.5 py-2.5 transition-colors duration-150 hover:bg-primary-soft">
-      <Icono
-        size={15}
-        className="mt-0.5 shrink-0 text-ink-500"
-        strokeWidth={1.75}
-        aria-hidden
-      />
+      <Icono size={15} className="mt-0.5 shrink-0 text-ink-500" strokeWidth={1.75} aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className={cn("text-sm text-ink-900", tachado && "line-through")}>
-          {titulo}
-        </p>
+        <p className={cn('text-sm text-ink-900', tachado && 'line-through')}>{titulo}</p>
         <p className="mt-0.5 text-xs text-ink-500">{detalle}</p>
       </div>
       {pastilla}
-      {acciones ? (
-        <div className="flex shrink-0 items-center gap-0.5">{acciones}</div>
-      ) : null}
+      {acciones ? <div className="flex shrink-0 items-center gap-0.5">{acciones}</div> : null}
     </div>
   );
 }
@@ -1048,16 +997,12 @@ function Bloque({
     <section className="card p-5">
       <h2
         className={cn(
-          "text-[11px] font-semibold uppercase tracking-[0.12em]",
-          resaltado && cuantos > 0 ? "text-danger" : "text-ink-500",
+          'text-[11px] font-semibold uppercase tracking-[0.12em]',
+          resaltado && cuantos > 0 ? 'text-danger' : 'text-ink-500',
         )}
       >
         {titulo}
-        {cuantos > 0 ? (
-          <span className="ml-1.5 tabular-nums">{cuantos}</span>
-        ) : (
-          ""
-        )}
+        {cuantos > 0 ? <span className="ml-1.5 tabular-nums">{cuantos}</span> : ''}
       </h2>
       {cargando ? (
         <Skeleton className="mt-3 h-12 w-full" />

@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { Prisma } from '@prisma/client';
 import { tenantSettingsSchema, type PresentationInput, type UpdateAssessmentDraftInput } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
+import { levantarBloqueosVencidos } from '../learning/maximo-de-intentos.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { columnsToPayload } from './question-payload.js';
@@ -32,6 +34,7 @@ export class AssessmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Solo las EDITABLES: las copias congeladas viven dentro de una formacion, no en el listado. */
@@ -234,6 +237,33 @@ export class AssessmentsService {
       oldValues: { passingScore: antes.passingScore, maxAttempts: antes.maxAttempts },
       newValues: input,
     });
+    /*
+      SUBIR LOS INTENTOS AQUI LLEGA A QUIEN YA LOS AGOTO (2026-10-01). Las copias congeladas leen el
+      maximo de intentos de su origen (`maximoDeIntentos`), asi que quien estaba bloqueado en
+      cualquier formacion con este examen y ahora tiene intentos queda desbloqueado y avisado.
+    */
+    if (input.maxAttempts !== undefined && (input.maxAttempts ?? 0) > (antes.maxAttempts ?? 0)) {
+      const levantadas = await levantarBloqueosVencidos(this.prisma.scoped, { copiasDe: id });
+      for (const fila of levantadas) {
+        await this.audit.record({
+          tenantId,
+          userId: actor.id,
+          action: 'ENROLLMENT_UNBLOCKED_BY_NEW_MAX',
+          resourceType: 'enrollments',
+          resourceId: fila.enrollmentId,
+          newValues: { usados: fila.usados, maximo: fila.maximo },
+        });
+        await this.notifications.notify(tenantId, {
+          eventType: 'EXTRA_ATTEMPT_GRANTED',
+          recipientUserId: fila.userId,
+          subject: 'Tienes más intentos',
+          body: `Se ampliaron los intentos de ${fila.activityName}: puedes volver a presentar la evaluación.`,
+          referenceType: 'activities',
+          referenceId: fila.activityId,
+          channels: ['IN_APP'],
+        });
+      }
+    }
     return this.getById(id, true);
   }
 

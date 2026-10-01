@@ -31,7 +31,7 @@ export const PERMISSION_DESCRIPTIONS: Partial<Record<PermissionCode, string>> = 
   'enrollments:read_all': 'Ver las inscripciones de todo el tenant',
   'enrollments:read_scope': 'Ver las inscripciones de su ambito (procesos/areas asignados)',
   'enrollments:read_own': 'Ver sus propias inscripciones',
-  'enrollments:unblock': 'Rehabilitar inscripciones bloqueadas por intentos agotados',
+  'enrollments:unblock': 'Dar un intento más a quien agotó los intentos de una evaluación',
 
   'assignments:manage': 'Crear y gestionar asignaciones de formacion',
   'audiences:manage': 'Crear y gestionar audiencias (reglas de segmentacion)',

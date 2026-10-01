@@ -5,6 +5,7 @@ import { EngagementService } from '../engagement/engagement.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CompletionService } from './completion.service.js';
+import { levantarBloqueosVencidos } from './maximo-de-intentos.js';
 import { meetsCompletion, mergeProgressData, readLastCard, resolveMinWatchPct } from './progress-rules.js';
 import { queSeExige } from '../offerings/cierre-de-la-jornada.js';
 
@@ -29,7 +30,12 @@ export class PlayerService {
 
   /** La ejecucion con sus piezas en orden y lo que la persona ya lleva de cada una. */
   async openEnrollment(actor: AuthUser, enrollmentId: string) {
-    const enrollment = await this.requireOwn(actor, enrollmentId);
+    let enrollment = await this.requireOwn(actor, enrollmentId);
+    // Bloqueada pero con intentos de nuevo (subieron el maximo): se levanta antes de pintar el
+    // candado. Sin esto la pantalla seguiria diciendo «agotaste los intentos» (2026-10-01).
+    if (enrollment.blockedAt && (await levantarBloqueosVencidos(this.prisma.scoped, { enrollmentId })).length > 0) {
+      enrollment = await this.requireOwn(actor, enrollmentId);
+    }
 
     const [contents, progress, attempts] = await Promise.all([
       this.prisma.scoped.activityContent.findMany({

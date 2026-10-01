@@ -34,6 +34,7 @@ import { TBody, THead, Table, Td, Th, Tr } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { motivoDelError } from '@/lib/api';
+import { PLAZO_INDUCCION_DE_INGRESO } from '@neo-pulse/shared';
 import { usePaginacion } from '@/components/ui/use-paginacion';
 
 /**
@@ -421,7 +422,7 @@ export function ActivityAudienceTab({
       await setActivityRequirement(activityId, {
         scope: EMPTY_RULE,
         trigger: typeConfig.requiresBeforeHire ? 'ON_HIRE' : 'ON_JOIN',
-        dueDaysAfterTrigger: typeConfig.requiresBeforeHire ? -1 : 30,
+        dueDaysAfterTrigger: typeConfig.requiresBeforeHire ? PLAZO_INDUCCION_DE_INGRESO : 30,
         everyMonths: typeConfig.defaultAnnualDate ? null : typeConfig.defaultRecurrenceMonths,
         fixedDate: typeConfig.defaultAnnualDate,
         reason: null,

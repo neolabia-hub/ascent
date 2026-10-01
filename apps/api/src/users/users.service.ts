@@ -168,7 +168,7 @@ export class UsersService {
     });
 
     // Al entrar alguien, sus obligaciones formativas nacen SOLAS: la induccion general con
-    // vencimiento antes de su fecha de ingreso (D1072) y las especificas de su cargo. Si el
+    // vencimiento a los 8 dias de su fecha de ingreso y las especificas de su cargo. Si el
     // motor fallara, el alta no se pierde: el cron de requisitos lo recupera en la proxima hora.
     await this.requirements.syncPersonSafely(tenantId, user.id);
 

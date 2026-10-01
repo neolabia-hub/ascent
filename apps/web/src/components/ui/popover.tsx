@@ -104,12 +104,21 @@ export function Popover({
       disparador.current?.focus();
     }
     /*
-      Se cierra al rodar la pagina o la tabla y no se recoloca: mantenerlo pegado a una celda
-      mientras se desplaza obliga a recalcular en cada fotograma, y lo que la persona quiere al
-      empezar a rodar es ver la lista, no arrastrar un panel. `capture` para enterarse tambien del
-      desplazamiento del contenedor de la tabla, que no burbujea.
+      Hasta el 2026-10-01 se cerraba al rodar la pagina o la tabla (ver abajo por que ya no).
+      `capture` para enterarse tambien del desplazamiento del contenedor de la tabla, que no burbujea.
     */
-    const cerrar = () => setAbierta(false);
+    /*
+      SE RECOLOCA EN VEZ DE CERRARSE MIENTRAS LA FILA SIGA A LA VISTA (2026-10-01). Cerrar con
+      cualquier desplazamiento seguia dejando la carrera de arriba viva cuando la fila estaba cerca
+      del borde: el navegador rodaba para mostrar el campo enfocado y el panel se cerraba. Lo
+      destapo la suite (asistencia-a-mano, tres de tres). Ahora solo se cierra si quien lo abrio
+      ya no se ve; si se ve, el panel lo acompaña.
+    */
+    const cerrar = () => {
+      const b = disparador.current?.getBoundingClientRect();
+      if (!b || b.bottom < 0 || b.top > window.innerHeight) setAbierta(false);
+      else colocar();
+    };
     document.addEventListener('mousedown', fuera, true);
     document.addEventListener('keydown', escape);
     window.addEventListener('scroll', cerrar, true);

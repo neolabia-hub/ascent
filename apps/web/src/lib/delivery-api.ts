@@ -548,7 +548,15 @@ export interface AssignmentRow {
   waivedReason: string | null;
   user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string }; area: { name: string } };
   /** Si agoto los intentos de la evaluacion: su inscripcion bloqueada (2026-10-01). */
-  bloqueada?: { enrollmentId: string; motivo: string | null } | null;
+  bloqueada?: {
+    enrollmentId: string;
+    motivo: string | null;
+    /** Desde cuando esta bloqueada. */
+    desde: string | null;
+    intentosUsados: number;
+    /** El maximo que tenia: el de la formacion mas los que ya se le hubieran dado. */
+    intentosMaximos: number;
+  } | null;
 }
 
 /** Un intento mas para UNA persona en una formacion, con motivo (2026-10-01). */

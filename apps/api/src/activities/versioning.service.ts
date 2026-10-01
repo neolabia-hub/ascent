@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import {
   activityTypeConfigSchema,
   audienceRuleSchema,
+  PLAZO_INDUCCION_DE_INGRESO,
   tenantSettingsSchema,
   type PublishVersionInput,
   type UpdateVersionSettingsInput,
@@ -14,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AssignmentsService } from '../assignments/assignments.service.js';
 import { OfferingsService } from '../offerings/offerings.service.js';
 import { loQueExigeElTipo } from './type-requirements.js';
+import { levantarBloqueosVencidos } from '../learning/maximo-de-intentos.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { decidirConstancia, decidirEficacia } from '../certificates/certificate-policy.js';
 
 /**
@@ -45,7 +48,42 @@ export class VersioningService {
     // Publicar CONGELA una copia de cada evaluacion (Decision #87), igual que hace con las
     // lecciones. Lo hace quien sabe: aqui solo se pide la copia.
     private readonly assessments: AssessmentsService,
+    // Avisar a quien la publicacion le devolvio intentos (ver `desbloquearPorMaximoNuevo`).
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * SUBIR EL MAXIMO DE INTENTOS LE LLEGA A QUIEN YA LOS AGOTO (2026-10-01, pedido del cliente).
+   *
+   * Al publicar, quien estaba BLOQUEADO por intentos agotados en esta formacion y ahora tiene
+   * intentos disponibles —porque el maximo publicado subio— queda desbloqueado y vuelve a «en
+   * curso», con aviso. Como en Moodle. Las cuentas son las de `maximoDeIntentos`, las mismas que
+   * usa el examen: no pueden discrepar. Quien sigue sin intentos sigue bloqueado.
+   */
+  private async desbloquearPorMaximoNuevo(actor: AuthUser, activityId: string): Promise<number> {
+    const levantadas = await levantarBloqueosVencidos(this.prisma.scoped, { activityId });
+    for (const fila of levantadas) {
+      await this.audit.record({
+        tenantId: this.prisma.currentTenantId,
+        userId: actor.id,
+        action: 'ENROLLMENT_UNBLOCKED_BY_NEW_MAX',
+        resourceType: 'enrollments',
+        resourceId: fila.enrollmentId,
+        newValues: { usados: fila.usados, maximo: fila.maximo },
+      });
+      await this.notifications.notify(this.prisma.currentTenantId, {
+        eventType: 'EXTRA_ATTEMPT_GRANTED',
+        recipientUserId: fila.userId,
+        subject: 'Tienes más intentos',
+        body: `Se ampliaron los intentos de ${fila.activityName}: puedes volver a presentar la evaluación.`,
+        referenceType: 'activities',
+        referenceId: fila.activityId,
+        channels: ['IN_APP'],
+      });
+    }
+    return levantadas.length;
+  }
+
 
   /** Version en borrador de una actividad (si existe). */
   async findDraft(activityId: string) {
@@ -479,6 +517,9 @@ export class VersioningService {
     // Era el ultimo paso del ciclo que seguia dependiendo de que alguien se acordara.
     await this.abrirlaSiElTipoLoDice(actor, draft.activityId, versionId);
 
+    // Y si esta version da MAS intentos, quien estaba bloqueado los recibe (2026-10-01).
+    await this.desbloquearPorMaximoNuevo(actor, draft.activityId);
+
     return published.result;
   }
 
@@ -550,9 +591,8 @@ export class VersioningService {
         activityId,
         scope: audienceRuleSchema.parse({}),
         trigger: esInduccionDeIngreso ? 'ON_HIRE' : 'ON_JOIN',
-        // -1 y no 0: D1072 art. 2.2.4.6.11 exige que la induccion sea PREVIA al inicio de
-        // labores. "El mismo dia" no es previa.
-        dueDaysAfterTrigger: esInduccionDeIngreso ? -1 : 30,
+        // 8 dias desde el ingreso (era -1, «antes del ingreso»): ver `PLAZO_INDUCCION_DE_INGRESO`.
+        dueDaysAfterTrigger: esInduccionDeIngreso ? PLAZO_INDUCCION_DE_INGRESO : 30,
         // La campaña anual manda: es una obligacion de calendario, no un aniversario por persona.
         everyMonths: config.data.defaultAnnualDate ? null : (config.data.defaultRecurrenceMonths ?? null),
         fixedDate: config.data.defaultAnnualDate ?? null,

@@ -25,6 +25,8 @@ const KIND_BY_EVENT: Record<string, NotificationKind> = {
   OFFERING_CANCELLED: 'formacion',
   // Tu cola de repaso vencio. Lo haces tu, y es sobre lo tuyo.
   REVIEW_DUE_DIGEST: 'formacion',
+  // Te dieron un intento mas: lo haces tu.
+  EXTRA_ATTEMPT_GRANTED: 'formacion',
   // Lo que tienes que hacer POR OTROS.
   APPROVAL_REQUESTED: 'gestion',
   ATTEMPTS_EXHAUSTED: 'gestion',
@@ -85,8 +87,17 @@ export function notificationHref(item: {
   if (eventType === 'OFFERING_CANCELLED') return '/mi-formacion';
   // Al repaso mismo, no a "mi formacion": es lo unico que este aviso nombra.
   if (eventType === 'REVIEW_DUE_DIGEST') return '/repaso';
+  // Al perfil de quien agoto los intentos, ya en la fila donde se le da uno mas (2026-10-01).
+  if (eventType === 'ATTEMPTS_EXHAUSTED' && referenceType === 'users' && referenceId) {
+    return `/usuarios/${referenceId}#intentos-agotados`;
+  }
+  // Los avisos de antes de ese cambio apuntaban a la formacion: siguen llevando ahi.
   if (eventType === 'ATTEMPTS_EXHAUSTED' && referenceType === 'activities' && referenceId) {
     return `/contenido-formativo/${referenceId}`;
+  }
+  // Te dieron un intento mas: a esa formacion, a presentarlo.
+  if (eventType === 'EXTRA_ATTEMPT_GRANTED' && referenceType === 'activities' && referenceId) {
+    return `/formacion/${referenceId}`;
   }
 
   return null;

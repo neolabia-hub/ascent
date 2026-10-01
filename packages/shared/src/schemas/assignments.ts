@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PLAZO_INDUCCION_DE_INGRESO } from '../constants/plazos.js';
 import { employmentTypeSchema, roadActorSchema } from './users.js';
 import { fixedDateSchema } from './fixed-date.js';
 
@@ -255,11 +256,10 @@ export const toggleJobTitleMatrixSchema = z.object({
   activityId: z.string().uuid(),
   enabled: z.boolean(),
   /**
-   * Solo al activar: dias respecto al ingreso. Por defecto **-1**, no 0: D1072 art. 2.2.4.6.11
-   * exige que la induccion sea PREVIA al inicio de labores, y "el mismo dia" no es previa. Era 0,
-   * asi que la misma casilla vencia distinto segun se creara aqui o en la ficha.
+   * Solo al activar: dias respecto al ingreso. Por defecto `PLAZO_INDUCCION_DE_INGRESO` (8 dias
+   * despues), el mismo que en la ficha: ver `constants/plazos.ts` por que dejo de ser -1.
    */
-  dueDaysAfterTrigger: z.number().int().min(-365).max(0).default(-1),
+  dueDaysAfterTrigger: z.number().int().min(-365).max(365).default(PLAZO_INDUCCION_DE_INGRESO),
   /** La novedad, cuando se cambia una casilla que YA existia. La exige el servidor. */
   reason: z.string().min(10).max(500).nullable().optional(),
 });

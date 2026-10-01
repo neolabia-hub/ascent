@@ -12,6 +12,7 @@ import type {
   WaiveAssignmentInput,
 } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
+import { maximoDeIntentos } from '../learning/maximo-de-intentos.js';
 import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -932,7 +933,10 @@ export class AssignmentsService {
 
   /** Inscripciones BLOQUEADAS por intentos agotados, por persona y formacion. */
   private async resolveBloqueos(userIds: string[], activityIds: string[]) {
-    const mapa = new Map<string, { enrollmentId: string; motivo: string | null }>();
+    const mapa = new Map<
+      string,
+      { enrollmentId: string; motivo: string | null; desde: Date | null; intentosUsados: number; intentosMaximos: number }
+    >();
     if (userIds.length === 0 || activityIds.length === 0) return mapa;
     const filas = await this.prisma.scoped.enrollment.findMany({
       where: {
@@ -940,10 +944,37 @@ export class AssignmentsService {
         userId: { in: [...new Set(userIds)] },
         activityVersion: { activityId: { in: [...new Set(activityIds)] } },
       },
-      select: { id: true, userId: true, blockedReason: true, activityVersion: { select: { activityId: true } } },
+      select: {
+        id: true,
+        userId: true,
+        blockedAt: true,
+        blockedReason: true,
+        extraAttempts: true,
+        activityVersion: { select: { activityId: true, maxAttempts: true } },
+        // Los intentos del examen que la bloqueo: el ultimo presentado dice cual es y su maximo.
+        attempts: {
+          orderBy: { attemptNumber: 'desc' },
+          select: { assessmentId: true, assessment: { select: { maxAttempts: true } } },
+        },
+      },
     });
     for (const fila of filas) {
-      mapa.set(`${fila.userId}|${fila.activityVersion.activityId}`, { enrollmentId: fila.id, motivo: fila.blockedReason });
+      const ultimo = fila.attempts[0];
+      const delExamen = ultimo ? fila.attempts.filter((a) => a.assessmentId === ultimo.assessmentId).length : 0;
+      mapa.set(`${fila.userId}|${fila.activityVersion.activityId}`, {
+        enrollmentId: fila.id,
+        motivo: fila.blockedReason,
+        desde: fila.blockedAt,
+        intentosUsados: delExamen,
+        intentosMaximos: ultimo
+          ? await maximoDeIntentos(this.prisma.scoped, {
+              activityId: fila.activityVersion.activityId,
+              assessmentId: ultimo.assessmentId,
+              maximoDeSuVersion: fila.activityVersion.maxAttempts,
+              extra: fila.extraAttempts,
+            })
+          : fila.activityVersion.maxAttempts + fila.extraAttempts,
+      });
     }
     return mapa;
   }

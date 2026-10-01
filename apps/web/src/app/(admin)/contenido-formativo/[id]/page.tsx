@@ -36,7 +36,6 @@ import {
   devolverRevision,
   removeContent,
   reorderContents,
-  updateVersionSettings,
   type ActivityDetail,
   type ContentType,
   type MigrationPolicy,
@@ -308,16 +307,6 @@ export default function ActividadDetallePage() {
       showToast({ kind: 'success', title: 'Contenido eliminado' });
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo eliminar el contenido', description: motivoDelError(error) });
-    }
-  };
-
-  const saveSettings = async (field: 'passingScore' | 'maxAttempts', value: number) => {
-    if (!version) return;
-    try {
-      await updateVersionSettings(version.id, { [field]: value });
-      await refreshVersion();
-    } catch (error) {
-      showToast({ kind: 'danger', title: 'No se pudo guardar el ajuste', description: motivoDelError(error) });
     }
   };
 
@@ -956,7 +945,7 @@ export default function ActividadDetallePage() {
       ) : null}
 
       {tab === 'versiones' ? (
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div>
           <section>
             <h2 className="mb-3 font-display text-lg font-semibold text-ink-900">Historial de versiones</h2>
             <p className="mb-4 text-sm text-ink-500">
@@ -991,49 +980,13 @@ export default function ActividadDetallePage() {
             </ul>
           </section>
 
-          <aside className="card h-fit p-5">
-            <h3 className="font-display text-sm font-semibold text-ink-900">Reglas de la versión</h3>
-            {/*
-              QUE ES ESTO Y QUE RELACION TIENE CON LA EVALUACION (2026-09-09).
-
-              El cliente vio nota e intentos aqui y otra vez dentro de la evaluacion y pregunto cual
-              manda. Manda esta, salvo que un examen concreto pida mas. Se dice aqui con esas
-              palabras, porque quien abre esta ficha no tiene la otra pantalla delante.
-            */}
-            <p className="mb-4 mt-1 text-xs leading-relaxed text-ink-500">
-              Con esto se aprueba <strong className="font-medium text-ink-700">todo examen de esta formación</strong>,
-              salvo que alguno exija más por su cuenta. Nacen de los valores por defecto de la empresa y se
-              congelan al publicar: cambiar el ajuste de la empresa no reinterpreta evaluaciones ya presentadas.
-            </p>
-            {version ? (
-              <div className="space-y-3">
-                <Field htmlFor="v-score" label="Nota mínima (%)">
-                  <Input
-                    id="v-score"
-                    type="number"
-                    min={1}
-                    max={100}
-                    disabled={!isDraft}
-                    defaultValue={version.passingScore}
-                    onBlur={(event) => void saveSettings('passingScore', Number(event.target.value))}
-                  />
-                </Field>
-                <Field htmlFor="v-attempts" label="Intentos maximos">
-                  <Input
-                    id="v-attempts"
-                    type="number"
-                    min={1}
-                    max={10}
-                    disabled={!isDraft}
-                    defaultValue={version.maxAttempts}
-                    onBlur={(event) => void saveSettings('maxAttempts', Number(event.target.value))}
-                  />
-                </Field>
-              </div>
-            ) : (
-              <Skeleton className="h-32 w-full" />
-            )}
-          </aside>
+          {/*
+            SIN «REGLAS DE LA VERSIÓN» (2026-10-01, pedido del cliente). Aqui se pedian otra vez la nota
+            minima y los intentos, que ya se piden en la evaluacion («Cómo se califica»): dos sitios
+            para lo mismo y la pregunta de siempre, cual manda. Ahora los valores de partida son los de
+            la empresa (Configuración > Preferencias) y el unico sitio para cambiarlos es la evaluacion,
+            como en Moodle. La version conserva su copia congelada de los de la empresa, como respaldo.
+          */}
         </div>
       ) : null}
 

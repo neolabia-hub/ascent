@@ -1179,6 +1179,18 @@ export default function ProgramaDetailPage() {
                                       )}
                                     >
                                       {nombre}
+                                      {/*
+                                        «TODA LA EMPRESA» NO ES «A TODOS» (2026-10-01, pedido del
+                                        cliente). Una induccion de ingreso se le exige a ese grupo,
+                                        pero solo a quien entre a la empresa: sin decirlo, el nombre
+                                        del grupo se leia como que la tenia la plantilla entera.
+                                      */}
+                                      {(() => {
+                                        const regla = programa.obligados.find((o) => o.name === nombre);
+                                        if (regla?.soloNuevos) return <span className="text-ink-500"> · solo a quien ingrese</span>;
+                                        if (regla?.trigger === 'ON_HIRE') return <span className="text-ink-500"> · al ingresar</span>;
+                                        return null;
+                                      })()}
                                     </li>
                                   );
                                 })}
