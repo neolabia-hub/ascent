@@ -206,6 +206,21 @@ export class RequirementEngineService {
     rule: AssignmentRule,
     userIds?: string[],
   ): Promise<{ created: CreatedAssignment[]; cyclesOpened: number }> {
+    /*
+      UNA FORMACION DESACTIVADA O EN LA PAPELERA NO GENERA OBLIGACIONES NUEVAS (2026-09-30).
+
+      Es lo que significa «Desactivar», como el «ocultar» de Moodle: nadie nuevo la recibe —ni quien
+      entra a la empresa ni la ronda siguiente—, y quien ya la tiene la puede terminar. Antes el flag
+      no frenaba nada y el motor seguia repartiendola.
+    */
+    if (rule.targetType === 'ACTIVITY') {
+      const viva = await db.activity.findFirst({
+        where: { id: rule.targetId, active: true, deletedAt: null },
+        select: { id: true },
+      });
+      if (!viva) return { created: [], cyclesOpened: 0 };
+    }
+
     const members = await db.audienceMember.findMany({
       where: {
         audienceId: rule.audienceId,

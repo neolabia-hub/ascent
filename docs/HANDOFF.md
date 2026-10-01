@@ -24,6 +24,38 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-30 (madrugada) — QR DE CONSTANCIAS, PAPELERA, DESACTIVAR y lo que contaba la papelera
+
+**1. El QR de TODAS las constancias decia «no existe» en produccion.** La consulta publica corria sin
+empresa y la app tiene RLS FORZADO. Funcion `tenant_de_constancia` (SECURITY DEFINER, en `rls.sql`)
+que solo responde la empresa del codigo; la constancia se lee con su aislamiento. Lo cubre ahora
+`induccion-general.mjs` (verifica sin sesion). Ninguna prueba lo cubria.
+
+**2. Papelera con restaurar (como Moodle).** Eliminar —normal o de prueba— ANOTA cada fila que toca
+con su estado anterior (`Deshacer`, a la auditoria); restaurar deshace exactamente eso, y solo si nadie
+la toco despues. `GET /activities/papelera` y `POST /activities/:id/restaurar`, pantalla
+Configuracion > Papelera, todo con `catalog:force_delete`. SIN «vaciar»: es evidencia de 20 años.
+Probado: las metricas de Seguimiento vuelven EXACTAMENTE a las de antes al eliminar y a las de despues
+al restaurar; la constancia pasa a ANULADA y vuelve a VIGENTE en el QR.
+
+**3. Nada de la papelera cuenta.** Filtro en estados por formacion, analitica, evolucion,
+vencimientos (con constancias), conocimiento y la lista de obligaciones. Y el borrado normal ya apaga
+reglas y exime lo pendiente: «DGGGD» contaba un «esperando convocatoria» fantasma (migracion
+`20260930120000` arregla lo que quedo).
+
+**4. «Las preguntas que mas se fallan»** incluia preguntas con 100 % de acierto. Solo entran las que
+alguien fallo.
+
+**5. Desactivar** = nadie NUEVO la recibe (motor, asignacion a mano, autoinscripcion); quien la tiene
+la termina. Recorrido `desactivar.mjs`.
+
+**6. Encuesta a mano** en Agregar contenido (estaba bloqueada «Sprint 5»). La del tipo sigue sola.
+
+**7. Ficha de persona:** retiradas plegadas tras «Ver también las retiradas»; las pastillas por tipo
+cuentan solo lo visible. **Perfil:** «certificaciones», sin «Esta semana»; carril como era.
+
+---
+
 ## 2026-09-30 (cierre) — VIDEOS3 FUERA DE PRODUCCIÓN, y una tanda de arreglos de marca y del aprendiz
 
 **Desplegado a produccion: nada nuevo.** Solo se corrio, a mano, la eliminacion de «videos3".

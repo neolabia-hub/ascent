@@ -729,6 +729,14 @@ export class AssignmentsService {
   async createManual(actor: AuthUser, input: CreateAssignmentInput) {
     const tenantId = this.prisma.currentTenantId;
     await this.assertTargetExists(input.targetType, input.targetId);
+    // DESACTIVADA = nadie NUEVO la recibe (2026-09-30), tampoco a mano.
+    const activa = await this.prisma.scoped.activity.findFirst({ where: { id: input.targetId, active: true }, select: { id: true } });
+    if (!activa) {
+      throw new ConflictException({
+        code: 'ACTIVITY_INACTIVE',
+        message: 'Esta formación está desactivada: nadie nuevo puede recibirla. Actívala para asignarla.',
+      });
+    }
 
     // Los CRITERIOS se cruzan (Y), las personas sueltas se SUMAN (O).
     //
@@ -824,7 +832,17 @@ export class AssignmentsService {
   }
 
   async list(query: ListAssignmentsQuery) {
+    /*
+      SIN LA PAPELERA (2026-09-30): lo de una formacion eliminada no aparece en la lista de nadie ni
+      en sus cuentas. Salvo si se pide ESA formacion por su id: su historia sigue consultable.
+    */
+    const papelera = query.targetId
+      ? []
+      : (await this.prisma.scoped.activity.findMany({ where: { deletedAt: { not: null } }, select: { id: true } })).map(
+          (fila) => fila.id,
+        );
     const where: Prisma.AssignmentWhereInput = {
+      ...(papelera.length > 0 ? { NOT: { targetId: { in: papelera } } } : {}),
       ...(query.userId ? { userId: query.userId } : {}),
       ...(query.targetId ? { targetId: query.targetId } : {}),
       ...(query.status ? { status: query.status } : {}),

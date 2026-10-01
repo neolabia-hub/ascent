@@ -20,6 +20,10 @@ const sesion = await admin.entrar('admin@transprensa.com', 'Transprensa2026*');
 const yo = sesion.user.id;
 
 const procesos = (await admin.get('/catalogs/processes')).cuerpo ?? [];
+
+// LAS METRICAS DE SEGUIMIENTO, para comparar: la papelera no puede moverlas.
+const metricas = async () => JSON.stringify((await admin.get('/reportes/analitica')).cuerpo?.resumen ?? null);
+const M0 = await metricas();
 const proceso = procesos.find((p) => p.active) ?? procesos[0];
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -52,6 +56,8 @@ const convocatorias = ((await admin.get(`/offerings?activityId=${id}`)).cuerpo?.
 comprobar(convocatorias >= 1, `tiene ${convocatorias} convocatoria(s)`, 'no se abrio ninguna convocatoria');
 const suelta = await admin.post('/assignments', { targetType: 'ACTIVITY', targetId: id, userIds: [yo] });
 comprobar(suelta.cuerpo?.created === 1, 'y una obligacion pendiente', JSON.stringify(suelta.cuerpo));
+const M1 = await metricas();
+comprobar(M1 !== M0, 'y Seguimiento la cuenta (las metricas se movieron)', M1);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 paso(2, 'EL BORRADO NORMAL SIGUE NEGANDOSE, y sin el permiso individual no hay otro camino');
@@ -101,6 +107,39 @@ const pendientes = ((await admin.get('/me/pending')).cuerpo?.items ?? []).filter
 comprobar(pendientes.length === 0, 'y no sale en los pendientes de nadie', `sigue en ${pendientes.length}`);
 const obligaciones = (await admin.get(`/assignments?targetId=${id}&userId=${yo}`)).cuerpo?.items ?? [];
 comprobar(obligaciones.length === 1 && obligaciones[0].status === 'WAIVED', 'la obligacion sigue en la base, eximida', JSON.stringify(obligaciones.map((o) => o.status)));
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+paso('5 bis', 'EN LA PAPELERA NO CUENTA EN SEGUIMIENTO, y se lista en la papelera');
+const M2 = await metricas();
+comprobar(M2 === M0, 'las metricas vuelven EXACTAMENTE a las de antes de crearla', `antes=${M0} ahora=${M2}`);
+const enPapelera = (await admin.get('/activities/papelera')).cuerpo ?? [];
+const fila = enPapelera.find((f) => f.id === id);
+comprobar(!!fila && fila.motivo === cuerpoBueno.motivo, 'la papelera la lista con su motivo', JSON.stringify(fila));
+const listaAsign = (await admin.get(`/assignments?userId=${yo}`)).cuerpo?.items ?? [];
+comprobar(!listaAsign.some((a) => a.targetId === id), 'y no sale en la lista de obligaciones de la persona');
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+paso('5 ter', 'RESTAURAR: vuelve TAL COMO ESTABA');
+const vuelve = await admin.post(`/activities/${id}/restaurar`, {});
+comprobar(vuelve.ok && vuelve.cuerpo?.obligaciones === 1, 'restaurada, con su obligacion', `${vuelve.estado} ${JSON.stringify(vuelve.cuerpo)}`);
+comprobar(vuelve.cuerpo?.convocatorias >= 1, 'y su convocatoria', JSON.stringify(vuelve.cuerpo));
+const ficha2 = await admin.get(`/activities/${id}`);
+comprobar(ficha2.ok, 'la ficha vuelve a abrir', `${ficha2.estado}`);
+const ob2 = (await admin.get(`/assignments?targetId=${id}&userId=${yo}`)).cuerpo?.items ?? [];
+comprobar(ob2.length === 1 && ob2[0].status === 'PENDING', 'la obligacion vuelve a PENDIENTE', JSON.stringify(ob2.map((o) => o.status)));
+const conv2 = ((await admin.get(`/offerings?activityId=${id}`)).cuerpo?.items ?? []).filter((o) => o.status === 'PUBLISHED');
+comprobar(conv2.length >= 1, 'la convocatoria vuelve a PUBLICADA', `publicadas=${conv2.length}`);
+const pend2 = ((await admin.get('/me/pending')).cuerpo?.items ?? []).filter((p) => p.activityId === id);
+comprobar(pend2.length === 1, 'y la persona la vuelve a ver en sus pendientes', `${pend2.length}`);
+const M3 = await metricas();
+comprobar(M3 === M1, 'y Seguimiento la vuelve a contar igual que antes de borrarla', `antes=${M1} ahora=${M3}`);
+const sale = ((await admin.get('/activities/papelera')).cuerpo ?? []).some((f) => f.id === id);
+comprobar(!sale, 'ya no esta en la papelera');
+const otraVez = await admin.post(`/activities/${id}/restaurar`, {});
+comprobar(otraVez.estado === 404, 'restaurar algo que no esta en la papelera: 404', `${otraVez.estado}`);
+
+// Se vuelve a eliminar al terminar: es una formacion de prueba.
+await admin.post(`/activities/${id}/eliminar-prueba`, cuerpoBueno);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 paso(6, 'LIMPIEZA: se retira el permiso y se desactiva el tipo');

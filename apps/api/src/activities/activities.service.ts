@@ -18,7 +18,7 @@ import {
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { eliminarFormacionDePrueba } from './eliminar-prueba.js';
+import { eliminarFormacionDePrueba, restaurarDeLaPapelera, type Deshacer } from './eliminar-prueba.js';
 import { assertResponsibleChangeAllowed } from './responsible-rules.js';
 import { VersioningService } from './versioning.service.js';
 
@@ -290,19 +290,101 @@ export class ActivitiesService {
       });
     }
 
-    await this.prisma.scoped.activity.update({
-      where: { id },
-      data: { deletedAt: new Date(), active: false, updatedBy: actor.id },
-    });
+    /*
+      LO QUE SE LE EXIGIA SE APAGA CON ELLA (2026-09-30). Sin convocatorias se podia borrar, pero
+      las obligaciones SUELTAS (asignadas a mano) y las reglas quedaban vivas: en produccion «DGGGD»
+      seguia contando una persona «esperando convocatoria» en Seguimiento, y al pulsar no salia nada
+      porque la lista oculta lo borrado.
+    */
+    // La misma papelera que la eliminacion de pruebas: anota lo que toca, y asi se puede restaurar.
+    const tenantId = this.prisma.currentTenantId;
+    const motivo = 'La formación se eliminó';
+    const resultado = await this.prisma.tx((tx) =>
+      eliminarFormacionDePrueba(tx, { tenantId, activityId: id, actorId: actor.id, motivo }),
+    );
     await this.audit.record({
-      tenantId: this.prisma.currentTenantId,
+      tenantId,
       userId: actor.id,
       action: 'ACTIVITY_DELETED',
       resourceType: 'activities',
       resourceId: id,
       oldValues: { code: activity.code, name: activity.name },
+      newValues: { motivo, ...resultado },
     });
     return { ok: true as const };
+  }
+
+  /**
+   * LA PAPELERA (2026-09-30): lo eliminado, con quien, cuando y por que. Solo con el permiso
+   * individual `catalog:force_delete`. El motivo y el autor salen de la auditoria del borrado.
+   */
+  async papelera() {
+    const eliminadas = await this.prisma.scoped.activity.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: 'desc' },
+      select: { id: true, code: true, name: true, deletedAt: true, activityType: { select: { name: true } } },
+    });
+    const borrados = await this.prisma.scoped.auditLog.findMany({
+      where: {
+        resourceType: 'activities',
+        action: { in: ['ACTIVITY_DELETED', 'ACTIVITY_TEST_DELETED'] },
+        resourceId: { in: eliminadas.map((fila) => fila.id) },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { resourceId: true, userId: true, newValues: true },
+    });
+    const ultimo = new Map<string, (typeof borrados)[number]>();
+    for (const fila of borrados) if (fila.resourceId && !ultimo.has(fila.resourceId)) ultimo.set(fila.resourceId, fila);
+    const autores = await this.prisma.scoped.user.findMany({
+      where: { id: { in: [...new Set(borrados.map((fila) => fila.userId).filter((u): u is string => !!u))] } },
+      select: { id: true, fullName: true },
+    });
+    const nombre = new Map(autores.map((fila) => [fila.id, fila.fullName]));
+    return eliminadas.map((fila) => {
+      const borrado = ultimo.get(fila.id);
+      const valores = (borrado?.newValues ?? {}) as { motivo?: string; constanciasAnuladas?: number };
+      return {
+        id: fila.id,
+        code: fila.code,
+        name: fila.name,
+        typeName: fila.activityType.name,
+        deletedAt: fila.deletedAt,
+        motivo: valores.motivo ?? null,
+        constanciasAnuladas: valores.constanciasAnuladas ?? 0,
+        eliminadaPor: borrado?.userId ? (nombre.get(borrado.userId) ?? null) : borrado ? 'Mantenimiento' : null,
+      };
+    });
+  }
+
+  /** SACARLA DE LA PAPELERA tal como estaba. La logica esta en `eliminar-prueba.ts`. */
+  async restaurar(actor: AuthUser, id: string) {
+    const activity = await this.prisma.scoped.activity.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!activity) throw new NotFoundException({ code: 'ACTIVITY_NOT_IN_TRASH' });
+    const borrado = await this.prisma.scoped.auditLog.findFirst({
+      where: { resourceType: 'activities', resourceId: id, action: { in: ['ACTIVITY_DELETED', 'ACTIVITY_TEST_DELETED'] } },
+      orderBy: { createdAt: 'desc' },
+      select: { newValues: true },
+    });
+    const valores = (borrado?.newValues ?? {}) as { motivo?: string; deshacer?: Deshacer };
+    const tenantId = this.prisma.currentTenantId;
+    const cuenta = await this.prisma.tx((tx) =>
+      restaurarDeLaPapelera(tx, {
+        tenantId,
+        activityId: id,
+        deshacer: valores.deshacer ?? null,
+        motivoDelBorrado: valores.motivo ?? null,
+      }),
+    );
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'ACTIVITY_RESTORED',
+      resourceType: 'activities',
+      resourceId: id,
+      oldValues: { code: activity.code, name: activity.name },
+      newValues: cuenta,
+    });
+    return { ok: true as const, ...cuenta };
   }
 
   /**

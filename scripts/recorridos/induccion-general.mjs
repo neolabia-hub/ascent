@@ -264,9 +264,24 @@ paso(9, 'LO QUE SE EMITE AL TERMINAR: constancia y encuesta');
 const constancias = (await aprendiz.get('/me/certificados')).cuerpo;
 const lista = constancias?.items ?? constancias ?? [];
 const mia = lista.find?.((c) => c.activityName?.includes(SUFIJO) || c.activity?.id === creado.activityId);
+const codigoQr = mia?.verificationCode ?? mia?.code;
 if (tipo?.config?.issuesCertificate) {
   comprobar(!!mia, 'el tipo emite constancia y la constancia esta', `el tipo emite constancia pero no aparece ninguna (${lista.length ?? 0} en total)`);
   if (mia) console.log(`   ... constancia ${mia.code ?? mia.verificationCode ?? ''}`);
+  /*
+    EL QR: verificarla SIN SESION, como quien escanea el papel (2026-09-30). En produccion decia
+    «no existe» para todas: la consulta publica corria sin empresa y el RLS forzado no le dejaba ver
+    nada. Ninguna prueba lo cubria.
+  */
+  if (codigoQr) {
+    const anonimo = crearCliente();
+    const verificada = await anonimo.get(`/public/constancias/${codigoQr}`);
+    comprobar(
+      verificada.ok && verificada.cuerpo?.valido === true,
+      'el QR la verifica sin iniciar sesion: VIGENTE',
+      `${verificada.estado} ${JSON.stringify(verificada.cuerpo).slice(0, 200)}`,
+    );
+  }
 } else {
   ok('el tipo no emite constancia: correcto que no haya');
 }
@@ -323,6 +338,35 @@ comprobar(deNuevo?.id === laAutomatica.id, 'es la misma regla de antes', `${deNu
 comprobar(deNuevo?.soloNuevos === true && deNuevo?.trigger === 'ON_HIRE', 'con su corte de solo nuevos intacto', JSON.stringify(deNuevo));
 const abiertasTras = await abiertasDe(nuevaId);
 comprobar(abiertasTras.length === 1, 'y a quien se le habia retirado, le vuelve a nacer la obligacion', `abiertas=${abiertasTras.length}`);
+
+paso(13, 'PAPELERA CON CONSTANCIA: se anula al eliminar y vuelve VIGENTE al restaurar');
+/*
+  La constancia es lo mas delicado de restaurar: al eliminar se anula con el motivo, y al restaurar
+  tiene que recuperar su validez —la del QR impreso— sin tocar ninguna otra. Necesita el permiso
+  individual, que se concede aqui y se retira al terminar.
+*/
+const yoAdmin = (await admin.get('/auth/me')).cuerpo?.id;
+const previosAdmin = ((await admin.get(`/users/${yoAdmin}`)).cuerpo?.overrides ?? []).map((o) => ({ permissionCode: o.permission.code, granted: o.granted }));
+await admin.post(`/users/${yoAdmin}/overrides`, {
+  overrides: [...previosAdmin.filter((o) => o.permissionCode !== 'catalog:force_delete'), { permissionCode: 'catalog:force_delete', granted: true }],
+});
+const nombreFormacion = (await admin.get(`/activities/${creado.activityId}`)).cuerpo?.name;
+const fuera = await admin.post(`/activities/${creado.activityId}/eliminar-prueba`, {
+  confirmacion: nombreFormacion,
+  motivo: 'Prueba del recorrido: papelera con constancia',
+});
+comprobar(fuera.ok && fuera.cuerpo?.constanciasAnuladas >= 1, 'eliminada, con su constancia anulada', `${fuera.estado} ${JSON.stringify(fuera.cuerpo)?.slice(0, 200)}`);
+if (codigoQr) {
+  const anulada = (await crearCliente().get(`/public/constancias/${codigoQr}`)).cuerpo;
+  comprobar(anulada?.estado === 'REVOCADA', 'el QR la dice ANULADA mientras esta en la papelera', JSON.stringify(anulada)?.slice(0, 160));
+}
+const devuelta = await admin.post(`/activities/${creado.activityId}/restaurar`, {});
+comprobar(devuelta.ok && devuelta.cuerpo?.constancias >= 1, 'restaurada, con su constancia', `${devuelta.estado} ${JSON.stringify(devuelta.cuerpo)}`);
+if (codigoQr) {
+  const vigente = (await crearCliente().get(`/public/constancias/${codigoQr}`)).cuerpo;
+  comprobar(vigente?.estado === 'VIGENTE', 'y el QR la vuelve a dar VIGENTE', JSON.stringify(vigente)?.slice(0, 160));
+}
+await admin.post(`/users/${yoAdmin}/overrides`, { overrides: previosAdmin });
 
 console.log(`\nCREADO PARA LIMPIAR: actividad=${creado.activityId} usuario=${creado.userId} sufijo=${SUFIJO}`);
 process.exit(resumen() === 0 ? 0 : 1);

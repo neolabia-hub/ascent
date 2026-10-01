@@ -242,12 +242,26 @@ export class ReportsService {
    *
    * Devuelve `null` cuando no hay ninguna obligacion viva: es distinto de "todas al 0%".
    */
+  /**
+   * LAS FORMACIONES EN LA PAPELERA no cuentan en NINGUN informe (2026-09-30, pedido del cliente).
+   *
+   * La obligacion guarda solo el id de la formacion, sin relacion, asi que el filtro no puede ir en
+   * la consulta: se piden aqui y se excluyen. Una formacion de prueba eliminada que dejo tres
+   * cumplidas seguia sumando cobertura en Seguimiento.
+   */
+  private async enPapelera(cliente: TenantPrisma = this.prisma.scoped): Promise<string[]> {
+    const filas = await cliente.activity.findMany({ where: { deletedAt: { not: null } }, select: { id: true } });
+    return filas.map((fila) => fila.id);
+  }
+
   private async estadosPorActividad(
     activityIds: string[] | null,
   ): Promise<{ porActividad: Map<string, EstadoEjecucion[]>; todos: EstadoEjecucion[] } | null> {
+    const papelera = await this.enPapelera();
     const asignaciones = await this.prisma.scoped.assignment.findMany({
       where: {
         targetType: 'ACTIVITY',
+        NOT: { targetId: { in: papelera } },
         ...(activityIds ? { targetId: { in: activityIds } } : {}),
         // Quien ya no trabaja aqui no cuenta como incumplimiento: su obligacion murio con su
         // salida, y dejarlo infla el denominador con gente que no se va a formar.
@@ -454,9 +468,11 @@ export class ReportsService {
    * mira todo lo vivo, que es la otra pregunta legitima.
    */
   private async hechosDeAnalitica(planId: string | null): Promise<HechoAnalitica[]> {
+    const papelera = await this.enPapelera();
     const asignaciones = await this.prisma.scoped.assignment.findMany({
       where: {
         targetType: 'ACTIVITY',
+        NOT: { targetId: { in: papelera } },
         user: { active: true, deletedAt: null },
         // Lo retirado no cuenta, igual que quien ya no trabaja aqui (ver `ESTADOS_RETIRADOS`).
         status: { notIn: [...ESTADOS_RETIRADOS] },
@@ -594,9 +610,11 @@ export class ReportsService {
     const desde = new Date(Date.UTC(year, 0, 1));
     const hasta = new Date(Date.UTC(year + 1, 0, 1));
 
+    const papelera = await this.enPapelera();
     const asignaciones = await this.prisma.scoped.assignment.findMany({
       where: {
         targetType: 'ACTIVITY',
+        NOT: { targetId: { in: papelera } },
         user: { active: true, deletedAt: null },
         status: { notIn: [...ESTADOS_RETIRADOS] },
         dueAt: { gte: desde, lt: hasta },
@@ -663,7 +681,12 @@ export class ReportsService {
   async conocimiento() {
     const porVersion = await this.prisma.scoped.attemptQuestion.groupBy({
       by: ['questionVersionId'],
-      where: { invalidated: false, pointsAwarded: { not: null } },
+      // Sin las de formaciones en la PAPELERA (2026-09-30): una prueba borrada no dice nada de la gente.
+      where: {
+        invalidated: false,
+        pointsAwarded: { not: null },
+        attempt: { enrollment: { activityVersion: { activity: { deletedAt: null } } } },
+      },
       _sum: { pointsPossible: true, pointsAwarded: true },
       _count: { _all: true },
     });
@@ -717,8 +740,13 @@ export class ReportsService {
       pregunta que falla casi todo el mundo o no se enseño, o esta mal redactada. Las dos cosas hay
       que arreglarlas, en sitios distintos.
     */
+    /*
+      Y SOLO LAS QUE ALGUIEN FALLO (2026-09-30). Se tomaban «las 8 con menos acierto» aunque todas
+      tuvieran el 100 %, y en produccion salia «¿Cuales valores tiene Transprensa?» como la que mas
+      se falla con un 100 % de acierto al lado: una lista de peores que incluye lo que nadie fallo.
+    */
     const peoresPreguntas = filas
-      .filter((fila) => fila.respuestas >= 5 && fila.aciertoPct !== null)
+      .filter((fila) => fila.respuestas >= 5 && fila.aciertoPct !== null && fila.aciertoPct < 100)
       .sort((a, b) => (a.aciertoPct ?? 100) - (b.aciertoPct ?? 100))
       .slice(0, 8)
       .map((fila) => ({
@@ -1040,6 +1068,7 @@ export class ReportsService {
 
   async vencimientos(meses: number, hoy = new Date(), db?: TenantPrisma) {
     const cliente = db ?? this.prisma.scoped;
+    const papelera = await this.enPapelera(cliente);
     const desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
     const hasta = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + meses, 1));
 
@@ -1065,6 +1094,7 @@ export class ReportsService {
       cliente.assignment.findMany({
         where: {
           targetType: 'ACTIVITY',
+          NOT: { targetId: { in: papelera } },
           status: 'COMPLETED',
           validUntilOverride: { not: null, lt: hasta },
           user: { active: true, deletedAt: null },
@@ -1098,6 +1128,7 @@ export class ReportsService {
       cliente.assignment.findMany({
         where: {
           targetType: 'ACTIVITY',
+          NOT: { targetId: { in: papelera } },
           status: { in: ['PENDING', 'OVERDUE'] },
           dueAt: { not: null, lt: hasta },
           user: { active: true, deletedAt: null },
@@ -1141,6 +1172,7 @@ export class ReportsService {
         where: {
           id: { in: [...new Set(porConstancia.map((fila) => fila.enrollmentId as string))] },
           user: { active: true, deletedAt: null },
+          activityVersion: { activity: { deletedAt: null } },
         },
         select: {
           id: true,

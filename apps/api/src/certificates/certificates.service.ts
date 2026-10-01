@@ -380,8 +380,22 @@ export class CertificatesService {
    * Es seguro porque el codigo es aleatorio de 20 caracteres: no se puede enumerar.
    */
   async porCodigo(verificationCode: string) {
-    const certificado = await this.prisma.certificate.findUnique({
-      where: { verificationCode: verificationCode.trim().toUpperCase() },
+    const codigo = verificationCode.trim().toUpperCase();
+    /*
+      PRIMERO DE QUE EMPRESA ES, Y LUEGO SE LEE CON SU AISLAMIENTO (2026-09-30).
+
+      Se leia con el cliente base, sin empresa fijada, y la app corre con un rol sujeto a RLS
+      FORZADO: no veia ninguna fila y el QR de TODAS las constancias decia «no existe» (visto en
+      produccion; ninguna prueba lo cubria). La funcion `tenant_de_constancia` (prisma/sql/rls.sql)
+      solo responde la empresa del codigo.
+    */
+    const fila = await this.prisma.$queryRaw<Array<{ tenant_id: string | null }>>`
+      SELECT public.tenant_de_constancia(${codigo}) AS tenant_id`;
+    const tenantId = fila[0]?.tenant_id ?? null;
+    if (!tenantId) throw new NotFoundException({ code: 'CERTIFICATE_NOT_FOUND' });
+
+    const certificado = await this.prisma.forTenant(tenantId).certificate.findUnique({
+      where: { verificationCode: codigo },
       select: {
         id: true,
         serialNumber: true,

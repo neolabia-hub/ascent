@@ -122,8 +122,7 @@ export function Conocimiento() {
             </h3>
             {datos.peoresPreguntas.length === 0 ? (
               <p className="mt-2 text-sm text-ink-500">
-                Todavía ninguna pregunta la han contestado cinco personas. Con menos, un porcentaje no dice
-                nada.
+                Nada que reforzar todavía: ninguna pregunta contestada por cinco personas o más se ha fallado.
               </p>
             ) : (
               <>

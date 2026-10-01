@@ -58,7 +58,7 @@ import { useProximoPaso } from '@/components/modules/learner/proximo-paso';
  *      cabecera y los numeros perdian peso.
  *   3. AHORA: la cabecera es de la PERSONA y de lo que LLEVA. Los tres numeros son grandes, sin cajas,
  *      separados por un filo —como los marcadores de una retransmision—, porque son lo que se viene a
- *      mirar. La semana dice para que esta: «Esta semana». Y lo que hay que HACER sale de la
+ *      mirar. Lo que hay que HACER sale de la
  *      cabecera y va debajo, en su propia pieza.
  */
 export default function ProfilePage() {
@@ -130,7 +130,6 @@ export default function ProfilePage() {
                 <Marcador icono={Sparkles} valor={progress.points} etiqueta="puntos" />
                 <Marcador icono={Trophy} valor={progress.longestStreak} etiqueta="mejor racha" />
               </div>
-              <SemanaDeRacha progress={progress} />
             </>
           ) : (
             <div className="mt-8 h-24 animate-pulse rounded-2xl bg-white/10" />
@@ -238,78 +237,6 @@ function Marcador({
         {formatNumber(valor)}
       </p>
       <p className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-white/65">{etiqueta}</p>
-    </div>
-  );
-}
-
-/** Fecha civil en Colombia (AAAA-MM-DD): el servidor cuenta la racha en esa zona. */
-const FECHA_BOGOTA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' });
-const INICIAL_DEL_DIA = new Intl.DateTimeFormat('es-CO', { weekday: 'narrow', timeZone: 'America/Bogota' });
-const DIA_LARGO = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', timeZone: 'America/Bogota' });
-
-/**
- * LA SEMANA DE LA RACHA: los ultimos siete dias, con los que cuentan encendidos.
- *
- * Se deduce de dos datos que ya existen —cuantos dias lleva y cual fue el ultimo— porque la racha
- * es exactamente eso: los N dias seguidos que terminan en el ultimo. No hace falta pedir el
- * historial al servidor.
- *
- * HOY se marca aparte cuando todavia no cuenta: es el dia en que la racha se mantiene o se pierde,
- * y el circulo punteado dice «aqui falta algo» sin decirlo en rojo.
- */
-function SemanaDeRacha({ progress }: { progress: MyProgress }) {
-  const hoy = FECHA_BOGOTA.format(new Date());
-  const ultimo = progress.lastActivityDate;
-  const racha = progress.currentStreak;
-  // El primer dia de la racha: el ultimo menos (racha - 1). A mediodia para no cruzar de dia por la zona.
-  const primero =
-    ultimo && racha > 0
-      ? FECHA_BOGOTA.format(new Date(new Date(`${ultimo}T12:00:00-05:00`).getTime() - (racha - 1) * 86_400_000))
-      : null;
-
-  const dias = Array.from({ length: 7 }, (_, i) => {
-    const fecha = new Date(Date.now() - (6 - i) * 86_400_000);
-    const iso = FECHA_BOGOTA.format(fecha);
-    return {
-      iso,
-      inicial: INICIAL_DEL_DIA.format(fecha).toUpperCase(),
-      largo: DIA_LARGO.format(fecha),
-      activo: Boolean(ultimo && primero && iso >= primero && iso <= ultimo),
-      esHoy: iso === hoy,
-    };
-  });
-
-  return (
-    <div className="mt-7 flex flex-col items-center gap-2.5 sm:flex-row sm:gap-5">
-      {/* PARA QUE ESTA: los dias de esta semana en que aprendiste. Sin el rotulo, siete circulos no decian nada. */}
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">Esta semana</p>
-    <ol className="flex items-center justify-center gap-2 sm:justify-start" aria-label="Los días de esta semana en que aprendiste">
-      {dias.map((dia) => (
-        <li key={dia.iso} className="flex flex-col items-center gap-1.5">
-          <span
-            title={`${dia.largo}: ${dia.activo ? 'aprendiste' : dia.esHoy ? 'aún no' : 'sin actividad'}`}
-            className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-200 sm:h-10 sm:w-10',
-              dia.activo && 'bg-white shadow-md',
-              !dia.activo && dia.esHoy && 'border-2 border-dashed border-white/60',
-              !dia.activo && !dia.esHoy && 'bg-white/10',
-            )}
-          >
-            {dia.activo ? (
-              <Flame
-                className={cn('h-4 w-4', dia.esHoy && 'animate-breathe')}
-                fill="currentColor"
-                strokeWidth={1.5}
-                style={{ color: 'var(--brand-accent)' }}
-                aria-hidden="true"
-              />
-            ) : null}
-          </span>
-          <span className={cn('text-[11px] font-semibold', dia.esHoy ? 'text-white' : 'text-white/55')}>{dia.inicial}</span>
-          <span className="sr-only">{`${dia.largo}: ${dia.activo ? 'aprendiste' : 'sin actividad'}`}</span>
-        </li>
-      ))}
-    </ol>
     </div>
   );
 }
@@ -451,7 +378,7 @@ function MisConstancias() {
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
           <h2 id="titulo-constancias" className="font-display text-lg font-bold text-ink-900">
-            Tus constancias
+            Tus certificaciones
           </h2>
           <p className="text-sm text-ink-500">Descárgalas cuando te las pidan.</p>
         </div>
@@ -472,7 +399,7 @@ function MisConstancias() {
             <Award className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
           </span>
           <p className="text-sm text-ink-500">
-            Aún no tienes constancias. Cuando termines una formación que la entregue, aparecerá aquí lista para descargar.
+            Aún no tienes certificaciones. Cuando termines una formación que la entregue, aparecerá aquí lista para descargar.
           </p>
         </div>
       ) : (
@@ -499,7 +426,7 @@ function MisConstancias() {
                 >
                   <Award className="h-10 w-10 text-white/85" strokeWidth={1.5} aria-hidden="true" />
                   <span className="absolute left-2.5 top-2.5 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                    {fila.typeName ?? 'Constancia'}
+                    {fila.typeName ?? 'Certificación'}
                   </span>
                   {/*
                     Vencida y anulada se dicen distinto porque significan cosas distintas: la
@@ -524,7 +451,7 @@ function MisConstancias() {
                     className="mt-auto w-full"
                     loading={bajando === fila.id}
                     onClick={() => void descargar(fila)}
-                    aria-label={`Descargar la constancia de ${fila.activityName}`}
+                    aria-label={`Descargar la certificación de ${fila.activityName}`}
                   >
                     <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                     Descargar

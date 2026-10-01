@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Award, ClipboardCheck, Layers, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Award, ClipboardCheck, Layers, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { me } from '@/lib/api';
 import { CatalogManager, type CatalogManagerProps } from '@/components/config/catalog-manager';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/cn';
@@ -133,6 +134,13 @@ const SECTIONS: Section[] = [
 
 export default function ConfiguracionPage() {
   const [active, setActive] = useState(0);
+  /** La papelera solo se ofrece a quien tiene el permiso individual (2026-09-30). */
+  const [verPapelera, setVerPapelera] = useState(false);
+  useEffect(() => {
+    void me()
+      .then((sesion) => setVerPapelera(sesion.permissions.includes('catalog:force_delete')))
+      .catch(() => undefined);
+  }, []);
   const section = SECTIONS[active] as Section;
 
   return (
@@ -178,6 +186,14 @@ export default function ConfiguracionPage() {
               Encuestas
             </Button>
           </Link>
+          {verPapelera ? (
+            <Link href="/configuracion/papelera">
+              <Button variant="outline">
+                <Trash2 size={16} />
+                Papelera
+              </Button>
+            </Link>
+          ) : null}
         </div>
       </div>
 

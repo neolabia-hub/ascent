@@ -71,6 +71,8 @@ const ESTADO: Record<AssignmentRow['status'], { label: string; kind: 'ok' | 'war
   WITHDRAWN_PLAN_ITEM_CANCELLED: { label: 'RETIRADA', kind: 'neutral' },
 };
 
+/** Dejaron de exigirse sin cumplirse: no son trayectoria (2026-09-30). */
+const RETIRADA: string[] = ['WITHDRAWN_LEFT_AUDIENCE', 'WITHDRAWN_PLAN_ITEM_CANCELLED'];
 const PENDIENTE: AssignmentRow['status'][] = ['OVERDUE', 'EXPIRED_NOT_DONE', 'PENDING', 'IN_PROGRESS'];
 const CAIDO: AssignmentRow['status'][] = ['OVERDUE', 'EXPIRED_NOT_DONE'];
 
@@ -84,6 +86,7 @@ export default function PerfilDePersonaPage() {
   const [persona, setPersona] = useState<UserDetail | null>(null);
   const [noExiste, setNoExiste] = useState(false);
   const [obligaciones, setObligaciones] = useState<AssignmentRow[] | null>(null);
+  const [verRetiradas, setVerRetiradas] = useState(false);
   /** Qué tipo de formación se está mirando, si alguno. `null` = toda su historia. */
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
   /** Qué estado se está mirando dentro de «Lo que le falta». `null` = todos. */
@@ -157,7 +160,12 @@ export default function PerfilDePersonaPage() {
     con el nombre que el tenant les puso. Quien quiera ver sus inducciones pulsa "Inducción general"
     o "Inducción específica" — y si el tenant las llamó de otra forma, ahí saldrá esa otra forma.
   */
-  const tiposDeLaPersona = [...new Set((obligaciones ?? []).map((fila) => fila.tipo).filter((t): t is string => !!t))].sort();
+  /*
+    LO QUE SE VE, Y SOLO ESO, se cuenta en las pastillas (2026-09-30). Con las retiradas plegadas,
+    «Reinducción 2» contaba dos retiradas que la lista no enseñaba: se pulsaba y no salia nada.
+  */
+  const visibles = (obligaciones ?? []).filter((fila) => verRetiradas || !RETIRADA.includes(fila.status));
+  const tiposDeLaPersona = [...new Set(visibles.map((fila) => fila.tipo).filter((t): t is string => !!t))].sort();
   const enElFiltro = (fila: AssignmentRow) => filtroTipo === null || fila.tipo === filtroTipo;
 
   const nombreDeArchivo = (fila: CertificateRow) =>
@@ -206,7 +214,15 @@ export default function PerfilDePersonaPage() {
   const estadosAbiertos = (['OVERDUE', 'EXPIRED_NOT_DONE', 'PENDING', 'IN_PROGRESS'] as const).filter((estado) =>
     abiertasSinFiltrar.some((fila) => fila.status === estado),
   );
-  const cerradas = (obligaciones ?? []).filter((fila) => !PENDIENTE.includes(fila.status) && enElFiltro(fila));
+  const cerradasTodas = (obligaciones ?? []).filter((fila) => !PENDIENTE.includes(fila.status) && enElFiltro(fila));
+  /*
+    LAS RETIRADAS, PLEGADAS (2026-09-30). Una obligacion retirada no la cumplio nadie: dejo de
+    exigirse (cambio de cargo, regla apagada). En la trayectoria se leia como historia de la persona,
+    y no lo es. Como en los LMS: por defecto lo cumplido y lo eximido, y lo retirado a un clic —se
+    conserva, porque explica por que alguien creyo tener esa formacion—.
+  */
+  const retiradasDeLaPersona = cerradasTodas.filter((fila) => RETIRADA.includes(fila.status));
+  const cerradas = verRetiradas ? cerradasTodas : cerradasTodas.filter((fila) => !RETIRADA.includes(fila.status));
   /** Sin filtrar: las cuatro cifras de arriba son sobre la persona entera, no sobre lo que se mira. */
   const abiertasTodas = (obligaciones ?? []).filter((fila) => PENDIENTE.includes(fila.status)).length;
   const caidas = (obligaciones ?? []).filter((fila) => CAIDO.includes(fila.status)).length;
@@ -344,8 +360,8 @@ export default function PerfilDePersonaPage() {
                 const activo = filtroTipo === tipo;
                 const cuantas =
                   tipo === null
-                    ? (obligaciones ?? []).length
-                    : (obligaciones ?? []).filter((fila) => fila.tipo === tipo).length;
+                    ? visibles.length
+                    : visibles.filter((fila) => fila.tipo === tipo).length;
                 return (
                   <button
                     key={tipo ?? '__todas__'}
@@ -421,6 +437,15 @@ export default function PerfilDePersonaPage() {
             {cerradas.map((fila) => (
               <Obligacion key={fila.id} fila={fila} />
             ))}
+            {retiradasDeLaPersona.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setVerRetiradas((actual) => !actual)}
+                className="focus-ring mt-2 rounded text-xs font-medium text-ink-500 hover:text-ink-900 hover:underline"
+              >
+                {verRetiradas ? 'Ocultar las retiradas' : `Ver también las retiradas (${retiradasDeLaPersona.length})`}
+              </button>
+            ) : null}
           </Bloque>
 
           <div className="grid gap-6 lg:grid-cols-2">

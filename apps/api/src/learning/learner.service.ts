@@ -215,12 +215,21 @@ export class LearnerService {
         windowEnd: true,
         activityVersionId: true,
         activityVersion: {
-          select: { activityId: true, versionNumber: true, passingScore: true, activity: { select: { name: true } } },
+          select: {
+            activityId: true,
+            versionNumber: true,
+            passingScore: true,
+            activity: { select: { name: true, active: true, deletedAt: true } },
+          },
         },
         _count: { select: { enrollments: true } },
       },
     });
     if (!offering) throw new NotFoundException({ code: 'OFFERING_NOT_FOUND' });
+    // DESACTIVADA = nadie NUEVO entra (2026-09-30). Quien ya estaba inscrito sigue y termina.
+    if (!offering.activityVersion.activity.active || offering.activityVersion.activity.deletedAt) {
+      throw new ConflictException({ code: 'ACTIVITY_INACTIVE', message: 'Esta formación ya no recibe inscripciones nuevas.' });
+    }
     if (offering.status !== 'PUBLISHED' && offering.status !== 'IN_PROGRESS') {
       throw new ConflictException({ code: 'OFFERING_NOT_OPEN' });
     }

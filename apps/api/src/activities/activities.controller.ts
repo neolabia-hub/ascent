@@ -74,6 +74,13 @@ export class ActivitiesController {
     return this.activities.list(actor, listActivitiesQuerySchema.parse(query));
   }
 
+  /** LA PAPELERA: lo eliminado, para restaurarlo. Mismo permiso individual. */
+  @Get('papelera')
+  @RequirePermissions('catalog:force_delete')
+  papelera() {
+    return this.activities.papelera();
+  }
+
   @Get(':id')
   @RequirePermissions('catalog:read')
   getById(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
@@ -96,6 +103,12 @@ export class ActivitiesController {
    * ELIMINAR UNA FORMACION DE PRUEBA YA USADA (2026-09-30): papelera, convocatorias canceladas y
    * constancias anuladas con motivo. Ver `eliminar-prueba.ts`. El permiso no lo tiene ningun rol.
    */
+  @Post(':id/restaurar')
+  @RequirePermissions('catalog:force_delete')
+  restaurar(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.activities.restaurar(actor, id);
+  }
+
   @Post(':id/eliminar-prueba')
   @RequirePermissions('catalog:force_delete')
   eliminarPrueba(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {

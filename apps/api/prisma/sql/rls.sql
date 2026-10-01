@@ -53,3 +53,16 @@ CREATE POLICY tenant_isolation ON public.activity_templates
 -- NOTA: `permissions` es catalogo GLOBAL (sin tenant_id) -> no lleva RLS (legible por todos).
 -- `tenants` tampoco tiene tenant_id como FK de aislamiento: el bootstrap de login (resolver slug)
 -- corre via owner; el resto de accesos a tenants pasa por la capa ORM.
+
+-- 4) VERIFICAR UNA CONSTANCIA SIN SESION (2026-09-30). La pantalla publica /verificar/<codigo> no
+--    tiene empresa: llega desde un QR impreso, a menudo al dominio raiz. Con FORCE RLS la app no veia
+--    ninguna fila y respondia «la constancia no existe» con un codigo valido (visto en produccion).
+--    Esta funcion SOLO dice de que empresa es un codigo —nada mas sale de aqui— y la lectura de la
+--    constancia se hace despues CON el aislamiento de esa empresa. SECURITY DEFINER: corre como su
+--    dueño, que no esta sujeto a las policies.
+CREATE OR REPLACE FUNCTION public.tenant_de_constancia(codigo text) RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT tenant_id FROM certificates WHERE verification_code = upper(btrim(codigo)) LIMIT 1
+$$;
+REVOKE ALL ON FUNCTION public.tenant_de_constancia(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.tenant_de_constancia(text) TO neopulse_app;

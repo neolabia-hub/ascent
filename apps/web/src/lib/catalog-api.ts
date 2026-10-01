@@ -217,7 +217,7 @@ export function discardDraft(versionId: string) {
 
 export function addContent(
   versionId: string,
-  body: { type: ContentType; title: string; description?: string | null; isRequired?: boolean; config?: Record<string, unknown>; lessonId?: string | null; contentPackageId?: string | null; assessmentId?: string | null },
+  body: { type: ContentType; title: string; description?: string | null; isRequired?: boolean; config?: Record<string, unknown>; lessonId?: string | null; contentPackageId?: string | null; assessmentId?: string | null; surveyTemplateId?: string | null },
 ) {
   return apiFetch<VersionContent>(`/activities/versions/${versionId}/contents`, { method: 'POST', body });
 }
@@ -696,4 +696,31 @@ export function eliminarFormacionDePrueba(
   constanciasAnuladas: number;
 }> {
   return apiFetch(`/activities/${id}/eliminar-prueba`, { method: 'POST', body });
+}
+
+/** Una formacion en la papelera, con quien la elimino y por que (2026-09-30). */
+export interface FormacionEnPapelera {
+  id: string;
+  code: string;
+  name: string;
+  typeName: string;
+  deletedAt: string;
+  motivo: string | null;
+  constanciasAnuladas: number;
+  eliminadaPor: string | null;
+}
+
+export function listarPapelera(): Promise<FormacionEnPapelera[]> {
+  return apiFetch('/activities/papelera', { method: 'GET' });
+}
+
+export function restaurarFormacion(id: string): Promise<{
+  ok: true;
+  reglas: number;
+  obligaciones: number;
+  convocatorias: number;
+  inscripciones: number;
+  constancias: number;
+}> {
+  return apiFetch(`/activities/${id}/restaurar`, { method: 'POST' });
 }

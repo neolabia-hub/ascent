@@ -23,6 +23,7 @@ import { Field } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { listSurveys, type SurveyTemplate } from '@/lib/surveys-api';
 import { useToast } from '@/components/ui/toast';
 
 /**
@@ -77,9 +78,10 @@ const TYPES: TypeMeta[] = [
   {
     type: 'SURVEY',
     label: 'Encuesta',
-    description: 'Satisfacción o eficacia diferida.',
+    // A MANO TAMBIEN (2026-09-30): la del tipo se engancha sola al publicar, pero una formacion
+    // creada antes de configurarla, o de un tipo que no la pide, tiene que poder llevarla.
+    description: 'Satisfacción: va al final y no es obligatoria.',
     icon: ClipboardCheck,
-    disabled: 'Llega en el Sprint 5, con el motor de encuestas.',
   },
   {
     type: 'SCORM',
@@ -115,6 +117,8 @@ export function AddContentDrawer({
 
   const [lessonId, setLessonId] = useState('');
   const [assessmentId, setAssessmentId] = useState('');
+  const [surveyId, setSurveyId] = useState('');
+  const [surveys, setSurveys] = useState<SurveyTemplate[]>([]);
   const [externalUrl, setExternalUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -141,6 +145,8 @@ export function AddContentDrawer({
       .then((value) => setOfficeReady(value.office))
       .catch(() => setOfficeReady(null));
     void listAssessments().then(setAssessments).catch(() => undefined);
+    setSurveyId('');
+    void listSurveys().then(setSurveys).catch(() => undefined);
   }, [open]);
 
   const submit = async () => {
@@ -194,6 +200,12 @@ export function AddContentDrawer({
         body.contentPackageId = uploaded.id;
       }
 
+      // La encuesta nunca es requerida: quien no opina no se queda sin constancia (Decision #116).
+      if (type === 'SURVEY') {
+        body.surveyTemplateId = surveyId;
+        body.isRequired = false;
+      }
+
       if (type === 'VIDEO' && !file) body.config = { externalUrl: externalUrl.trim() };
       if (type === 'LINK') body.config = { href: externalUrl.trim() };
 
@@ -236,6 +248,7 @@ export function AddContentDrawer({
     if (type === 'DOCUMENT' || type === 'PRESENTATION') return Boolean(file);
     if (type === 'VIDEO') return Boolean(file) || externalUrl.trim().startsWith('http');
     if (type === 'LINK') return externalUrl.trim().startsWith('http');
+    if (type === 'SURVEY') return Boolean(surveyId);
     return true;
   })();
 
@@ -312,6 +325,27 @@ export function AddContentDrawer({
                 maxLength={2000}
                 onChange={(event) => setDescription(event.target.value)}
               />
+            </Field>
+          ) : null}
+
+          {type === 'SURVEY' ? (
+            <Field htmlFor="c-survey" label="Encuesta" required hint="Se crean en Configuración > Encuestas.">
+              <Select
+                id="c-survey"
+                value={surveyId}
+                onChange={(event) => {
+                  setSurveyId(event.target.value);
+                  const elegida = surveys.find((row) => row.id === event.target.value);
+                  if (elegida && !title.trim()) setTitle(elegida.name);
+                }}
+              >
+                <option value="">Elegir encuesta...</option>
+                {surveys.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+              </Select>
             </Field>
           ) : null}
 
