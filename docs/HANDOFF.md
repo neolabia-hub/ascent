@@ -24,6 +24,26 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-10-01 — CLAVE = CEDULA PARA NUEVOS, Y LA REGLA DE SST QUE ALCANZO A TODA LA EMPRESA
+
+**1. Clave inicial de una persona NUEVA = su cedula, sin nada mas** (pedido del cliente).
+ (crear y cargar por archivo). Restablecer conserva cedula + caracteres
+(): esa persona ya existe. Los usuarios actuales no se tocaron.
+
+**2. «Induccion Corporativa SST» alcanzo a 1001 personas.** Su regla ON_HIRE se creo el 23-sep SIN
+; las otras 7 del programa si lo tienen. Ojo: el corte compara ,
+y la carga masiva (23-24 sep) cuenta como «entrada al grupo», asi que el corte tiene que ser POSTERIOR a
+la carga. Arreglo en produccion (con copia neopulse-20261001-161533, autorizado por el cliente, borrar
+y no retirar «solo esta vez»):  (el de Calidad y Sostenibilidad) y
+DELETE de 986 PENDING de quien ya estaba. Se dejaron 2 que ya tenian inscripcion, las eximidas y la
+retirada. Quedan 14 pendientes. El programa no tenia reglas propias: dejarlo en borrador no cambiaba nada.
+
+**Abierto:** el plazo «1 dia antes del ingreso» hace nacer VENCIDO a quien se registra el mismo dia de
+su ingreso (las 12 de prueba). Recomendado: X dias DESPUES del ingreso en el tipo; espera decision.
+Y «Dar un intento mas» por persona (permiso , sin pantalla hoy): espera decision.
+
+---
+
 ## 2026-09-30 (tarde) — LA PAPELERA NO SE VE, PERMISO POR ROL, DESACTIVAR VISIBLE Y CAMBIAR ENCUESTA
 
 **1. Lo que esta en la papelera ya no sale en el historial ni en las certificaciones de la persona.**
