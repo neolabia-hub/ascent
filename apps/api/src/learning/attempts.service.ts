@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { Prisma } from '@prisma/client';
 import type { SubmitAttemptInput } from '@neo-pulse/shared';
 import { toLearnerView } from '../assessments/question-payload.js';
+import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { EngagementService } from '../engagement/engagement.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -30,7 +31,71 @@ export class AttemptsService {
     private readonly completion: CompletionService,
     private readonly engagement: EngagementService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
+
+  /**
+   * DAR UN INTENTO MAS A UNA PERSONA (2026-10-01, pedido del cliente), como las «excepciones por
+   * usuario» de Moodle.
+   *
+   * El maximo de intentos es de la formacion y vale igual para todos: subirlo de 3 a 4 se lo daba a
+   * la empresa entera y obligaba a publicar otra version. Esto suma UNO solo a esa persona, en esa
+   * formacion, y la desbloquea: el bloqueo por intentos agotados («tu analista debe habilitarte un
+   * refuerzo») existia desde el principio y no habia como levantarlo.
+   *
+   * Exige motivo —«reforzo con su jefe el 3 de octubre»— y queda en la auditoria con quien lo dio.
+   * Si la inscripcion habia quedado REPROBADA por el bloqueo, vuelve a EN CURSO: puede presentarlo.
+   */
+  async darIntentoExtra(actor: AuthUser, enrollmentId: string, motivo: string) {
+    const enrollment = await this.prisma.scoped.enrollment.findUnique({
+      where: { id: enrollmentId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        blockedAt: true,
+        extraAttempts: true,
+        activityVersion: { select: { activityId: true, activity: { select: { name: true } } } },
+      },
+    });
+    if (!enrollment) throw new NotFoundException({ code: 'ENROLLMENT_NOT_FOUND' });
+    if (enrollment.status === 'PASSED' || enrollment.status === 'COMPLETED') {
+      throw new ConflictException({ code: 'ALREADY_PASSED', message: 'Ya aprobó: no necesita otro intento.' });
+    }
+
+    const actualizada = await this.prisma.scoped.enrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        extraAttempts: { increment: 1 },
+        blockedAt: null,
+        blockedReason: null,
+        unblockedBy: actor.id,
+        ...(enrollment.status === 'FAILED' ? { status: 'IN_PROGRESS' as const } : {}),
+      },
+      select: { extraAttempts: true },
+    });
+    const tenantId = this.prisma.currentTenantId;
+    await this.audit.record({
+      tenantId,
+      userId: actor.id,
+      action: 'ENROLLMENT_EXTRA_ATTEMPT',
+      resourceType: 'enrollments',
+      resourceId: enrollmentId,
+      oldValues: { extraAttempts: enrollment.extraAttempts, blockedAt: enrollment.blockedAt, status: enrollment.status },
+      newValues: { extraAttempts: actualizada.extraAttempts, motivo },
+    });
+    // Se le avisa: sin esto seguiria creyendo que esta bloqueada y no volveria a entrar.
+    await this.notifications.notify(tenantId, {
+      eventType: 'EXTRA_ATTEMPT_GRANTED',
+      recipientUserId: enrollment.userId,
+      subject: 'Tienes un intento más',
+      body: `Puedes volver a presentar la evaluación de ${enrollment.activityVersion.activity.name}.`,
+      referenceType: 'activities',
+      referenceId: enrollment.activityVersion.activityId,
+      channels: ['IN_APP'],
+    });
+    return { ok: true as const, extraAttempts: actualizada.extraAttempts };
+  }
 
   /**
    * Abre un intento. Antes valida lo que protege la seriedad de la evaluacion: que no este
@@ -75,7 +140,7 @@ export class AttemptsService {
       throw new ConflictException({ code: 'ALREADY_PASSED', message: 'Ya aprobaste esta evaluación.' });
     }
 
-    const maxAttempts = version.maxAttempts ?? enrollment.activityVersion.maxAttempts;
+    const maxAttempts = (version.maxAttempts ?? enrollment.activityVersion.maxAttempts) + enrollment.extraAttempts;
     if (previous.length >= maxAttempts) {
       throw new ConflictException({ code: 'NO_ATTEMPTS_LEFT', maxAttempts });
     }
@@ -311,7 +376,8 @@ export class AttemptsService {
     const attemptsUsed = await this.prisma.scoped.attempt.count({
       where: { enrollmentId: attempt.enrollmentId, assessmentId: attempt.assessmentId },
     });
-    const maxAttempts = attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts;
+    const maxAttempts =
+      (attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts) + attempt.enrollment.extraAttempts;
     const isLast = attempt.passed === true || attemptsUsed >= maxAttempts;
     const detailAllowed = !(policy.onlyAfterLastAttempt ?? true) || isLast;
 
@@ -378,10 +444,11 @@ export class AttemptsService {
    */
   private async blockIfExhausted(
     actor: AuthUser,
-    attempt: { id: string; enrollmentId: string; assessmentId: string; assessment: { maxAttempts: number | null }; enrollment: { activityVersion: { maxAttempts: number; activityId: string } } },
+    attempt: { id: string; enrollmentId: string; assessmentId: string; assessment: { maxAttempts: number | null }; enrollment: { extraAttempts: number; activityVersion: { maxAttempts: number; activityId: string } } },
   ): Promise<boolean> {
     const tenantId = this.prisma.currentTenantId;
-    const maxAttempts = attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts;
+    const maxAttempts =
+      (attempt.assessment.maxAttempts ?? attempt.enrollment.activityVersion.maxAttempts) + attempt.enrollment.extraAttempts;
     const used = await this.prisma.scoped.attempt.count({
       where: { enrollmentId: attempt.enrollmentId, assessmentId: attempt.assessmentId },
     });
@@ -512,6 +579,7 @@ export class AttemptsService {
         id: true,
         userId: true,
         blockedAt: true,
+        extraAttempts: true,
         activityVersion: { select: { maxAttempts: true, passingScore: true, retryWaitHours: true, activityId: true } },
       },
     });
@@ -552,7 +620,7 @@ export class AttemptsService {
           },
         },
         enrollment: {
-          select: { activityVersion: { select: { passingScore: true, maxAttempts: true, activityId: true } } },
+          select: { extraAttempts: true, activityVersion: { select: { passingScore: true, maxAttempts: true, activityId: true } } },
         },
       },
     });

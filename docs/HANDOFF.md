@@ -40,7 +40,12 @@ retirada. Quedan 14 pendientes. El programa no tenia reglas propias: dejarlo en 
 
 **Abierto:** el plazo «1 dia antes del ingreso» hace nacer VENCIDO a quien se registra el mismo dia de
 su ingreso (las 12 de prueba). Recomendado: X dias DESPUES del ingreso en el tipo; espera decision.
-Y «Dar un intento mas» por persona (permiso `enrollments:unblock`, sin pantalla hoy): espera decision.
+**3. «Dar un intento mas» por persona** (pedido del cliente, como las excepciones por usuario de
+Moodle). `enrollments.extra_attempts` (migracion `20261001120000_intentos_extra`) se suma al maximo
+solo de esa inscripcion. `POST /enrollments/:id/intento-extra` {motivo >= 10}, permiso
+`enrollments:unblock`: desbloquea, FAILED -> IN_PROGRESS, aviso IN_APP y auditoria
+ENROLLMENT_EXTRA_ATTEMPT. La lista de obligaciones trae `bloqueada` y la ficha de la persona pinta
+INTENTOS AGOTADOS con el boton. Recorrido `intento-extra.mjs`. En dev; falta desplegar.
 
 ---
 

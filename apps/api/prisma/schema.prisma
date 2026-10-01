@@ -1219,6 +1219,10 @@ model Enrollment {
   blockedAt     DateTime? @map("blocked_at") // intentos agotados -> refuerzo
   blockedReason String?   @map("blocked_reason")
   unblockedBy   String?   @map("unblocked_by") @db.Uuid
+  /// INTENTOS DE MAS PARA ESTA PERSONA (2026-10-01), como las «excepciones por usuario» de Moodle.
+  /// El maximo de la formacion es igual para todos; esto se suma solo a quien se le concede, con
+  /// motivo y en la auditoria. Ver `AttemptsService.darIntentoExtra`.
+  extraAttempts Int       @default(0) @map("extra_attempts")
 
   /// LA SEGUNDA VIA DE EVIDENCIA —la asistencia— NO vive aqui: vive en `AttendanceRecord`, que
   /// ya estaba en el esquema desde el Sprint 5 con los tres estados, el metodo, la justificacion y

@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { CertificatesModule } from '../certificates/certificates.module.js';
+import { AuditService } from '../common/audit.service.js';
 import { EngagementService } from '../engagement/engagement.service.js';
 import { ProgramsModule } from '../programs/programs.module.js';
 import { AttemptsService } from './attempts.service.js';
 import { CompletionService } from './completion.service.js';
 import { LearnerService } from './learner.service.js';
+import { IntentosController } from './intentos.controller.js';
 import { LearningController } from './learning.controller.js';
 import { PlayerService } from './player.service.js';
 
@@ -19,8 +21,8 @@ import { PlayerService } from './player.service.js';
  */
 @Module({
   imports: [CertificatesModule, ProgramsModule],
-  controllers: [LearningController],
-  providers: [LearnerService, PlayerService, AttemptsService, CompletionService, EngagementService],
+  controllers: [LearningController, IntentosController],
+  providers: [LearnerService, PlayerService, AttemptsService, CompletionService, EngagementService, AuditService],
   exports: [CompletionService, EngagementService],
 })
 export class LearningModule {}

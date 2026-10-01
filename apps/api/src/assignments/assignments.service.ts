@@ -902,10 +902,11 @@ export class AssignmentsService {
     ]);
 
     const ids = items.map((i) => i.targetId);
-    const [titles, tipos, programas] = await Promise.all([
+    const [titles, tipos, programas, bloqueos] = await Promise.all([
       this.resolveActivityTitles(ids),
       this.resolveActivityTypes(ids),
       this.resolveProgramasDeActividad(ids),
+      this.resolveBloqueos(items.map((i) => i.user.id), ids),
     ]);
     return {
       total,
@@ -919,8 +920,32 @@ export class AssignmentsService {
         tipo: tipos.get(item.targetId) ?? null,
         // Y de que programa es modulo, si lo es: explica por que esa formacion no tiene papel propio.
         programas: programas.get(item.targetId) ?? [],
+        /*
+          ¿AGOTO LOS INTENTOS? (2026-10-01). Si es asi, la ficha ofrece «Dar un intento mas» sobre
+          esta fila: es donde quien gestiona mira a la persona, y la inscripcion bloqueada no tenia
+          pantalla propia.
+        */
+        bloqueada: bloqueos.get(`${item.user.id}|${item.targetId}`) ?? null,
       })),
     };
+  }
+
+  /** Inscripciones BLOQUEADAS por intentos agotados, por persona y formacion. */
+  private async resolveBloqueos(userIds: string[], activityIds: string[]) {
+    const mapa = new Map<string, { enrollmentId: string; motivo: string | null }>();
+    if (userIds.length === 0 || activityIds.length === 0) return mapa;
+    const filas = await this.prisma.scoped.enrollment.findMany({
+      where: {
+        blockedAt: { not: null },
+        userId: { in: [...new Set(userIds)] },
+        activityVersion: { activityId: { in: [...new Set(activityIds)] } },
+      },
+      select: { id: true, userId: true, blockedReason: true, activityVersion: { select: { activityId: true } } },
+    });
+    for (const fila of filas) {
+      mapa.set(`${fila.userId}|${fila.activityVersion.activityId}`, { enrollmentId: fila.id, motivo: fila.blockedReason });
+    }
+    return mapa;
   }
 
   /** Eximir: la obligacion deja de contar, pero queda con motivo y autor para el auditor. */

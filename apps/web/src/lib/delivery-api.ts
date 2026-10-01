@@ -547,6 +547,13 @@ export interface AssignmentRow {
   completedAt: string | null;
   waivedReason: string | null;
   user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string }; area: { name: string } };
+  /** Si agoto los intentos de la evaluacion: su inscripcion bloqueada (2026-10-01). */
+  bloqueada?: { enrollmentId: string; motivo: string | null } | null;
+}
+
+/** Un intento mas para UNA persona en una formacion, con motivo (2026-10-01). */
+export function darIntentoExtra(enrollmentId: string, motivo: string): Promise<{ ok: true; extraAttempts: number }> {
+  return apiFetch(`/enrollments/${enrollmentId}/intento-extra`, { method: 'POST', body: { motivo } });
 }
 
 export interface AssignmentsPage {
