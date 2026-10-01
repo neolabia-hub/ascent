@@ -52,13 +52,23 @@ test.describe('El expediente de una persona', () => {
       tener ninguna: lo que NO se acepta es que habiendo constancias no haya forma de bajarlas.
       Una revocada no ofrece botones a propósito: es evidencia anulada.
     */
-    await expect(page.getByRole('heading', { name: 'Constancias de la empresa' })).toBeVisible();
+    // Desde el 2026-09-30, una sola seccion con las de la empresa y las de terceros.
+    await expect(page.getByRole('heading', { name: 'Certificaciones' })).toBeVisible();
     const descargas = page.getByRole('button', { name: /^Descargar la constancia de / });
     const abrir = page.getByRole('button', { name: /^Abrir la constancia de / });
     expect(await descargas.count()).toBe(await abrir.count());
 
+    // ─────────────── Las cifras filtran (2026-09-30) ───────────────
+    const cumplidas = page.getByRole('button', { name: /Cumplidas/ });
+    await cumplidas.click();
+    await expect(cumplidas).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('heading', { name: 'Lo que le falta' })).toHaveCount(0);
+    await cumplidas.click();
+    await expect(cumplidas).toHaveAttribute('aria-pressed', 'false');
+
     // ─────────────── La segunda puerta del papel de un tercero ───────────────
-    const registrar = page.getByRole('button', { name: 'Registrar el papel de un tercero' });
+    // Arriba, junto a Imprimir (2026-09-30).
+    const registrar = page.getByRole('button', { name: 'Registrar certificado externo' });
     await expect(registrar).toBeVisible();
     await registrar.click();
     // El cajón que se abre es EL MISMO de la fila —mismo componente, mismo título—: si esto falla,

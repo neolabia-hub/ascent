@@ -15,6 +15,7 @@ import {
   Mail,
   Phone,
   Printer,
+  Search,
   ShieldCheck,
 } from 'lucide-react';
 import { getUser, type UserDetail } from '@/lib/admin-api';
@@ -87,6 +88,10 @@ export default function PerfilDePersonaPage() {
   const [noExiste, setNoExiste] = useState(false);
   const [obligaciones, setObligaciones] = useState<AssignmentRow[] | null>(null);
   const [verRetiradas, setVerRetiradas] = useState(false);
+  /** Pulsar una cifra la convierte en filtro (2026-09-30): vencidas, pendientes o cumplidas. */
+  const [vista, setVista] = useState<'vencidas' | 'pendientes' | 'cumplidas' | null>(null);
+  /** Buscador rapido de la trayectoria, para cuando sean muchas. */
+  const [busca, setBusca] = useState('');
   /** Qué tipo de formación se está mirando, si alguno. `null` = toda su historia. */
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
   /** Qué estado se está mirando dentro de «Lo que le falta». `null` = todos. */
@@ -223,6 +228,23 @@ export default function PerfilDePersonaPage() {
   */
   const retiradasDeLaPersona = cerradasTodas.filter((fila) => RETIRADA.includes(fila.status));
   const cerradas = verRetiradas ? cerradasTodas : cerradasTodas.filter((fila) => !RETIRADA.includes(fila.status));
+  const normal = (texto: string) => texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const abiertasVistas =
+    vista === 'cumplidas'
+      ? []
+      : vista === 'vencidas'
+        ? abiertas.filter((fila) => CAIDO.includes(fila.status))
+        : vista === 'pendientes'
+          ? abiertas.filter((fila) => !CAIDO.includes(fila.status))
+          : abiertas;
+  const cerradasVistas = (
+    vista === 'vencidas' || vista === 'pendientes'
+      ? []
+      : vista === 'cumplidas'
+        ? cerradas.filter((fila) => fila.status === 'COMPLETED')
+        : cerradas
+  ).filter((fila) => !busca.trim() || normal(fila.targetName ?? '').includes(normal(busca.trim())));
+  const alternarVista = (nueva: typeof vista) => setVista((actual) => (actual === nueva ? null : nueva));
   /** Sin filtrar: las cuatro cifras de arriba son sobre la persona entera, no sobre lo que se mira. */
   const abiertasTodas = (obligaciones ?? []).filter((fila) => PENDIENTE.includes(fila.status)).length;
   const caidas = (obligaciones ?? []).filter((fila) => CAIDO.includes(fila.status)).length;
@@ -312,22 +334,49 @@ export default function PerfilDePersonaPage() {
               IMPRIMIR: lo que pide un auditor que quiere llevarselo. El navegador ya sabe hacerlo y
               la pagina cabe entera — que es media razon para que esto sea una pagina y no una ventana.
             */}
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Printer size={15} />
-              Imprimir
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {/*
+                REGISTRAR UN CERTIFICADO EXTERNO, ARRIBA (2026-09-30, pedido del cliente). Vivia al pie,
+                debajo de la lista de papeles, y es una ACCION sobre la persona: se busca donde estan
+                las acciones, junto a imprimir.
+              */}
+              <Button variant="outline" size="sm" onClick={() => setRegistrandoPapel(true)}>
+                <BadgeCheck size={15} />
+                Registrar certificado externo
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
+                <Printer size={15} />
+                Imprimir
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* ─────────────── COMO ESTA ─────────────── */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Cifra valor={obligaciones === null ? null : caidas} etiqueta="Vencidas" alarmante={caidas > 0} />
+        <Cifra
+          valor={obligaciones === null ? null : caidas}
+          etiqueta="Vencidas"
+          alarmante={caidas > 0}
+          activa={vista === 'vencidas'}
+          onClick={() => alternarVista('vencidas')}
+        />
         {/* Las cuatro cifras NO se filtran: contestan "¿esta persona está al día?", y esa pregunta
             es sobre ella entera. Si cambiaran al pulsar una pestaña, el mismo número diría dos
             cosas distintas en la misma pantalla. */}
-        <Cifra valor={obligaciones === null ? null : abiertasTodas - caidas} etiqueta="Pendientes" />
-        <Cifra valor={obligaciones === null ? null : cumplidas} etiqueta="Cumplidas" />
+        <Cifra
+          valor={obligaciones === null ? null : abiertasTodas - caidas}
+          etiqueta="Pendientes"
+          activa={vista === 'pendientes'}
+          onClick={() => alternarVista('pendientes')}
+        />
+        <Cifra
+          valor={obligaciones === null ? null : cumplidas}
+          etiqueta="Cumplidas"
+          activa={vista === 'cumplidas'}
+          onClick={() => alternarVista('cumplidas')}
+        />
         <Cifra
           valor={obligaciones === null ? null : alDia}
           sufijo="%"
@@ -369,14 +418,13 @@ export default function PerfilDePersonaPage() {
                     aria-pressed={activo}
                     onClick={() => setFiltroTipo(tipo)}
                     className={cn(
-                      'focus-ring rounded-full border px-3 py-1.5 text-xs transition-colors duration-150',
-                      activo
-                        ? 'border-transparent bg-primary-soft font-semibold text-primary'
-                        : 'border-line bg-surface text-ink-700 hover:bg-paper',
+                      'focus-ring rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-150',
+                      activo ? 'border-transparent font-semibold text-white shadow-btn' : 'border-line bg-surface text-ink-700 hover:bg-paper',
                     )}
+                    style={activo ? { backgroundColor: 'var(--brand-primary)' } : undefined}
                   >
                     {tipo ?? 'Todo'}{' '}
-                    <span className={cn('tabular-nums', activo ? 'text-primary' : 'text-ink-500')}>{cuantas}</span>
+                    <span className={cn('tabular-nums', activo ? 'text-white/80' : 'text-ink-500')}>{cuantas}</span>
                   </button>
                 );
               })}
@@ -406,23 +454,22 @@ export default function PerfilDePersonaPage() {
                     aria-pressed={activo}
                     onClick={() => setFiltroEstado(estado)}
                     className={cn(
-                      'focus-ring rounded-full border px-3 py-1.5 text-xs transition-colors duration-150',
-                      activo
-                        ? 'border-transparent bg-primary-soft font-semibold text-primary'
-                        : 'border-line bg-surface text-ink-700 hover:bg-paper',
+                      'focus-ring rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-150',
+                      activo ? 'border-transparent font-semibold text-white shadow-btn' : 'border-line bg-surface text-ink-700 hover:bg-paper',
                     )}
+                    style={activo ? { backgroundColor: 'var(--brand-primary)' } : undefined}
                   >
                     {estado === null ? 'Todo lo que falta' : ESTADO[estado].label}{' '}
-                    <span className={cn('tabular-nums', activo ? 'text-primary' : 'text-ink-500')}>{cuantas}</span>
+                    <span className={cn('tabular-nums', activo ? 'text-white/80' : 'text-ink-500')}>{cuantas}</span>
                   </button>
                 );
               })}
             </div>
           ) : null}
 
-          {abiertas.length > 0 ? (
-            <Bloque titulo="Lo que le falta" cuantos={abiertas.length} resaltado>
-              {abiertas.map((fila) => (
+          {abiertasVistas.length > 0 ? (
+            <Bloque titulo="Lo que le falta" cuantos={abiertasVistas.length} resaltado>
+              {abiertasVistas.map((fila) => (
                 <Obligacion key={fila.id} fila={fila} />
               ))}
             </Bloque>
@@ -433,8 +480,27 @@ export default function PerfilDePersonaPage() {
             un auditor —«enseñeme que ha hecho esta persona»— y por eso va en orden de tiempo y no
             agrupado por tipo: lo que se comprueba es una historia, no un catalogo.
           */}
-          <Bloque titulo="Su trayectoria" cuantos={cerradas.length} vacio="Todavía no ha cumplido ninguna.">
-            {cerradas.map((fila) => (
+          {/* BUSCADOR RAPIDO, cuando la historia ya es larga: con cinco se lee de un vistazo. */}
+          {cerradas.length > 5 && vista !== 'vencidas' && vista !== 'pendientes' ? (
+            <div className="relative max-w-sm">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
+              <input
+                type="search"
+                value={busca}
+                onChange={(event) => setBusca(event.target.value)}
+                placeholder="Buscar en su trayectoria"
+                aria-label="Buscar en su trayectoria"
+                className="focus-ring h-10 w-full rounded-lg border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-300"
+              />
+            </div>
+          ) : null}
+
+          <Bloque
+            titulo="Su trayectoria"
+            cuantos={cerradasVistas.length}
+            vacio={busca.trim() ? 'Nada coincide con esa búsqueda.' : 'Todavía no ha cumplido ninguna.'}
+          >
+            {cerradasVistas.map((fila) => (
               <Obligacion key={fila.id} fila={fila} />
             ))}
             {retiradasDeLaPersona.length > 0 ? (
@@ -448,101 +514,96 @@ export default function PerfilDePersonaPage() {
             ) : null}
           </Bloque>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Bloque
-              titulo="Constancias de la empresa"
-              cuantos={constancias?.length ?? 0}
-              cargando={constancias === null}
-              vacio="Ninguna todavía."
-            >
-              {(constancias ?? []).map((fila) => (
-                <Fila
-                  key={fila.id}
-                  icono={Award}
-                  titulo={fila.activityName}
-                  tachado={fila.revoked}
-                  /* EL TIPO VA DELANTE, y sobre todo para una palabra: «Programa». Es lo que explica
-                     por qué las formaciones que lo componen no tienen papel propio. */
-                  detalle={`${fila.typeName ? `${fila.typeName} · ` : ''}Nº ${fila.serialNumber} · ${formatDate(
-                    fila.issuedAt,
-                  )}${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ''}${
-                    fila.hours ? ` · ${fila.hours} h` : ''
-                  }`}
-                  pastilla={fila.revoked ? <StatusPill kind="danger" label="REVOCADA" /> : null}
-                  /*
-                    ABRIR Y DESCARGAR, AQUÍ MISMO (2026-09-17, pedido del cliente).
+          {/*
+            CERTIFICACIONES: UNA SOLA SECCION, DOS ORIGENES BIEN DISTINTOS (2026-09-30, pedido del
+            cliente). Eran dos bloques —«Constancias de la empresa» y «Papeles de un tercero»— y para
+            quien pregunta «¿que certificados tiene?» son la misma respuesta. Dentro se separan, porque
+            no valen igual: la de la empresa se verifica con su codigo; la de un tercero la respalda
+            la ARL o el SENA.
+          */}
+          <Bloque
+            titulo="Certificaciones"
+            cuantos={(constancias?.length ?? 0) + (papeles?.length ?? 0)}
+            cargando={constancias === null || papeles === null}
+            vacio="Ninguna todavía. Las de un tercero se registran con «Registrar certificado externo»."
+          >
+            {(constancias?.length ?? 0) > 0 ? (
+              <OrigenDeCertificacion
+                titulo="De la empresa"
+                detalle="Emitidas por la plataforma, con código de verificación"
+                color="var(--brand-primary)"
+              />
+            ) : null}
+            {(constancias ?? []).map((fila) => (
+              <Fila
+                key={fila.id}
+                icono={Award}
+                titulo={fila.activityName}
+                tachado={fila.revoked}
+                /* EL TIPO VA DELANTE, y sobre todo para una palabra: «Programa». Es lo que explica
+                   por qué las formaciones que lo componen no tienen papel propio. */
+                detalle={`${fila.typeName ? `${fila.typeName} · ` : ''}Nº ${fila.serialNumber} · ${formatDate(
+                  fila.issuedAt,
+                )}${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ''}${
+                  fila.hours ? ` · ${fila.hours} h` : ''
+                }`}
+                pastilla={fila.revoked ? <StatusPill kind="danger" label="REVOCADA" /> : null}
+                /*
+                  ABRIR Y DESCARGAR, AQUÍ MISMO (2026-09-17, pedido del cliente).
 
-                    El papel se busca para llevárselo —«mándame el certificado de alturas»— y hasta
-                    ahora había que salir a Usuarios y abrir un cajón aparte. Una constancia REVOCADA
-                    no se ofrece: es evidencia anulada, y bajarla como si valiera es justo lo que la
-                    revocación existe para impedir.
-                  */
-                  acciones={
-                    fila.revoked ? null : (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Abrir la constancia de ${fila.activityName}`}
-                          title="Abrir en una pestaña"
-                          onClick={() => void abrirConstancia(fila)}
-                          loading={abriendo === fila.id}
-                        >
-                          <ExternalLink size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Descargar la constancia de ${fila.activityName}`}
-                          title="Descargar el PDF"
-                          onClick={() => void bajarConstancia(fila)}
-                          loading={bajando === fila.id}
-                        >
-                          <Download size={14} />
-                        </Button>
-                      </>
-                    )
-                  }
-                />
-              ))}
-            </Bloque>
-
-            {/*
-              EL BOTÓN VA FUERA DEL `Bloque`, Y NO ES UN DETALLE (2026-09-17).
-
-              Dentro no funcionaba: `Bloque` pinta sus hijos SOLO cuando tiene filas —con cero enseña
-              su frase de vacío—, así que el botón desaparecía justo en el caso en que más se
-              necesita: la persona que **todavía no tiene ningún papel** registrado. Lo cazó la
-              prueba nueva del expediente, y el cliente lo vio a la vez.
-            */}
-            <div className="space-y-3">
-              <Bloque
-                titulo="Papeles de un tercero"
-                cuantos={papeles?.length ?? 0}
-                cargando={papeles === null}
-                vacio="Ninguno registrado."
-              >
-                {(papeles ?? []).map((fila) => (
-                  <Fila
-                    key={fila.enrollmentId}
-                    icono={fila.fileKey ? FileCheck2 : Archive}
-                    titulo={fila.actividad}
-                    detalle={`${fila.number ? `Nº ${fila.number}` : 'sin número'}${
-                      fila.issuer ? ` · ${fila.issuer}` : ''
-                    }${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ''}${
-                      fila.fileKey ? '' : ' · sin archivo'
-                    }`}
-                  />
-                ))}
-              </Bloque>
-              {/* Convalidar el papel de una ARL o del SENA. Se mudó aquí desde el menú de la fila de
-                  Usuarios: es una ACCIÓN, y vive al lado de la lista que modifica. */}
-              <Button variant="outline" size="sm" onClick={() => setRegistrandoPapel(true)}>
-                <BadgeCheck size={15} />
-                Registrar el papel de un tercero
-              </Button>
-            </div>
-          </div>
+                  El papel se busca para llevárselo —«mándame el certificado de alturas»— y hasta
+                  ahora había que salir a Usuarios y abrir un cajón aparte. Una constancia REVOCADA
+                  no se ofrece: es evidencia anulada, y bajarla como si valiera es justo lo que la
+                  revocación existe para impedir.
+                */
+                acciones={
+                  fila.revoked ? null : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Abrir la constancia de ${fila.activityName}`}
+                        title="Abrir en una pestaña"
+                        onClick={() => void abrirConstancia(fila)}
+                        loading={abriendo === fila.id}
+                      >
+                        <ExternalLink size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Descargar la constancia de ${fila.activityName}`}
+                        title="Descargar el PDF"
+                        onClick={() => void bajarConstancia(fila)}
+                        loading={bajando === fila.id}
+                      >
+                        <Download size={14} />
+                      </Button>
+                    </>
+                  )
+                }
+              />
+            ))}
+            {(papeles?.length ?? 0) > 0 ? (
+              <OrigenDeCertificacion
+                titulo="De un tercero"
+                detalle="ARL, SENA u otra entidad: la respalda quien la emitió"
+                color="var(--brand-accent)"
+              />
+            ) : null}
+            {(papeles ?? []).map((fila) => (
+              <Fila
+                key={fila.enrollmentId}
+                icono={fila.fileKey ? FileCheck2 : Archive}
+                titulo={fila.actividad}
+                detalle={`${fila.number ? `Nº ${fila.number}` : 'sin número'}${
+                  fila.issuer ? ` · ${fila.issuer}` : ''
+                }${fila.validUntil ? ` · vence ${formatDate(fila.validUntil)}` : ''}${
+                  fila.fileKey ? '' : ' · sin archivo'
+                }`}
+              />
+            ))}
+          </Bloque>
         </div>
       )}
 
@@ -567,6 +628,17 @@ export default function PerfilDePersonaPage() {
   );
 }
 
+/** El rotulo que separa los dos origenes de una certificacion: una barra de color y su explicacion. */
+function OrigenDeCertificacion({ titulo, detalle, color }: { titulo: string; detalle: string; color: string }) {
+  return (
+    <div className="flex items-center gap-2.5 pb-1 pt-3 first:pt-0">
+      <span aria-hidden="true" className="h-4 w-1 rounded-full" style={{ backgroundColor: color }} />
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-900">{titulo}</p>
+      <p className="text-xs text-ink-500">{detalle}</p>
+    </div>
+  );
+}
+
 function Volver({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -587,15 +659,31 @@ function Cifra({
   sufijo = '',
   alarmante = false,
   ayuda,
+  activa = false,
+  onClick,
 }: {
   valor: number | null;
   etiqueta: string;
   sufijo?: string;
   alarmante?: boolean;
   ayuda?: string;
+  /** Si es la vista elegida: se marca con el color de la empresa. */
+  activa?: boolean;
+  /** Con onClick, la cifra es un filtro (2026-09-30): se pulsa y deja ver solo eso. */
+  onClick?: () => void;
 }) {
+  const Caja = onClick ? 'button' : 'div';
   return (
-    <div className={cn('card p-4', alarmante && 'border-danger/30 bg-danger-soft')} title={ayuda}>
+    <Caja
+      {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': activa } : {})}
+      className={cn(
+        'card p-4 text-left',
+        onClick && 'focus-ring transition-transform duration-150 hover:-translate-y-px',
+        alarmante && 'border-danger/30 bg-danger-soft',
+      )}
+      style={activa ? { boxShadow: '0 0 0 2px var(--brand-primary)' } : undefined}
+      title={ayuda ?? (onClick ? (activa ? 'Quitar el filtro' : `Ver solo las ${etiqueta.toLowerCase()}`) : undefined)}
+    >
       {valor === null ? (
         <Skeleton className="h-8 w-12" />
       ) : (
@@ -610,7 +698,7 @@ function Cifra({
         </p>
       )}
       <p className={cn('mt-1.5 text-xs', alarmante ? 'font-medium text-danger' : 'text-ink-500')}>{etiqueta}</p>
-    </div>
+    </Caja>
   );
 }
 
