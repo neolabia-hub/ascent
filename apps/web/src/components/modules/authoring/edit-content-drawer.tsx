@@ -297,24 +297,23 @@ export function EditContentDrawer({
             </span>
           </label>
         ) : null}
-        {/* Una encuesta nunca es obligatoria: se pide y se agradece, no se cobra (sin constancia por no opinar). */}
-        {isSurvey ? null : (
-          <label className="flex items-start gap-2 text-sm text-ink-700">
-            <input
-              type="checkbox"
-              checked={isRequired}
-              onChange={(event) => setIsRequired(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-line-strong"
-            />
-            <span>
-              Obligatorio para terminar la formacion
-              <span className="block text-xs text-ink-500">
-                Si lo quitas, la persona puede completar la formacion sin pasar
-                por aqui.
-              </span>
+        {/* En la encuesta, desmarcada de entrada; si un caso especial la necesita, se marca (2026-09-30). */}
+        <label className="flex items-start gap-2 text-sm text-ink-700">
+          <input
+            type="checkbox"
+            checked={isRequired}
+            onChange={(event) => setIsRequired(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-line-strong"
+          />
+          <span>
+            Obligatorio para terminar la formacion
+            <span className="block text-xs text-ink-500">
+              {isSurvey
+                ? "La encuesta va desmarcada de entrada: si fuera obligatoria, quien no la responde se queda sin terminar y sin constancia. Márcala solo en un caso especial."
+                : "Si lo quitas, la persona puede completar la formacion sin pasar por aqui."}
             </span>
-          </label>
-        )}
+          </span>
+        </label>
 
         {isVideo ? (
           <>

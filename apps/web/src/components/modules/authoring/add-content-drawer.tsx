@@ -1,8 +1,18 @@
-'use client';
+"use client";
 
-import { ArrowLeft, ClipboardCheck, FileText, Layers, Link2, Package, Presentation, Upload, Video } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState, type ChangeEvent } from 'react';
+import {
+  ArrowLeft,
+  ClipboardCheck,
+  FileText,
+  Layers,
+  Link2,
+  Package,
+  Presentation,
+  Upload,
+  Video,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type ChangeEvent } from "react";
 import {
   addContent,
   createAssessment,
@@ -15,16 +25,16 @@ import {
   type AssessmentListItem,
   type ContentType,
   type LessonListItem,
-} from '@/lib/catalog-api';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/components/ui/cn';
-import { Drawer } from '@/components/ui/drawer';
-import { Field } from '@/components/ui/field';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { listSurveys, type SurveyTemplate } from '@/lib/surveys-api';
-import { useToast } from '@/components/ui/toast';
+} from "@/lib/catalog-api";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/components/ui/cn";
+import { Drawer } from "@/components/ui/drawer";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { listSurveys, type SurveyTemplate } from "@/lib/surveys-api";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * AGREGAR CONTENIDO — sin salir de la formacion.
@@ -41,7 +51,7 @@ import { useToast } from '@/components/ui/toast';
  * querer hacer despues, y el editor sabe volver aqui.
  */
 
-type Mode = 'new' | 'library';
+type Mode = "new" | "library";
 
 interface TypeMeta {
   type: ContentType;
@@ -52,43 +62,60 @@ interface TypeMeta {
 }
 
 const TYPES: TypeMeta[] = [
-  { type: 'LESSON', label: 'Lección en tarjetas', description: 'El formato principal. De 5 a 15 tarjetas de menos de 5 minutos.', icon: Layers },
   {
-    type: 'PRESENTATION',
-    label: 'Presentacion',
+    type: "LESSON",
+    label: "Lección en tarjetas",
     description:
-      'PowerPoint o PDF. Se convierte en diapositivas y se reproduce dentro de la plataforma: se registra cual vio y cuanto tiempo.',
+      "El formato principal. De 5 a 15 tarjetas de menos de 5 minutos.",
+    icon: Layers,
+  },
+  {
+    type: "PRESENTATION",
+    label: "Presentacion",
+    description:
+      "PowerPoint o PDF. Se convierte en diapositivas y se reproduce dentro de la plataforma: se registra cual vio y cuanto tiempo.",
     icon: Presentation,
   },
   {
-    type: 'VIDEO',
-    label: 'Video',
-    description: 'Archivo subido o enlace de YouTube: se mide lo que la persona ve de verdad. Otros enlaces quedan como declaracion suya.',
+    type: "VIDEO",
+    label: "Video",
+    description:
+      "Archivo subido o enlace de YouTube: se mide lo que la persona ve de verdad. Otros enlaces quedan como declaracion suya.",
     icon: Video,
   },
-  { type: 'ASSESSMENT', label: 'Evaluación', description: 'Examen con nota, intentos y bloqueo al agotarlos.', icon: ClipboardCheck },
   {
-    type: 'DOCUMENT',
-    label: 'Documento de apoyo',
-    description:
-      'Manual, politica o instructivo para consultar. No es una lección: se lee en visor y solo queda la confirmacion de la persona.',
-    icon: FileText,
-  },
-  { type: 'LINK', label: 'Enlace externo', description: 'Un recurso que vive fuera de la plataforma.', icon: Link2 },
-  {
-    type: 'SURVEY',
-    label: 'Encuesta',
-    // A MANO TAMBIEN (2026-09-30): la del tipo se engancha sola al publicar, pero una formacion
-    // creada antes de configurarla, o de un tipo que no la pide, tiene que poder llevarla.
-    description: 'Satisfacción: va al final y no es obligatoria.',
+    type: "ASSESSMENT",
+    label: "Evaluación",
+    description: "Examen con nota, intentos y bloqueo al agotarlos.",
     icon: ClipboardCheck,
   },
   {
-    type: 'SCORM',
-    label: 'Paquete SCORM',
-    description: 'Contenido comprado a un tercero.',
+    type: "DOCUMENT",
+    label: "Documento de apoyo",
+    description:
+      "Manual, politica o instructivo para consultar. No es una lección: se lee en visor y solo queda la confirmacion de la persona.",
+    icon: FileText,
+  },
+  {
+    type: "LINK",
+    label: "Enlace externo",
+    description: "Un recurso que vive fuera de la plataforma.",
+    icon: Link2,
+  },
+  {
+    type: "SURVEY",
+    label: "Encuesta",
+    // A MANO TAMBIEN (2026-09-30): la del tipo se engancha sola al publicar, pero una formacion
+    // creada antes de configurarla, o de un tipo que no la pide, tiene que poder llevarla.
+    description: "Satisfacción: va al final y no es obligatoria.",
+    icon: ClipboardCheck,
+  },
+  {
+    type: "SCORM",
+    label: "Paquete SCORM",
+    description: "Contenido comprado a un tercero.",
     icon: Package,
-    disabled: 'Fase 2, y solo si el cliente tiene contenido en ese formato.',
+    disabled: "Fase 2, y solo si el cliente tiene contenido en ese formato.",
   },
 ];
 
@@ -109,17 +136,17 @@ export function AddContentDrawer({
   const { showToast } = useToast();
 
   const [type, setType] = useState<ContentType | null>(null);
-  const [mode, setMode] = useState<Mode>('new');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [mode, setMode] = useState<Mode>("new");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [isRequired, setIsRequired] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [lessonId, setLessonId] = useState('');
-  const [assessmentId, setAssessmentId] = useState('');
-  const [surveyId, setSurveyId] = useState('');
+  const [lessonId, setLessonId] = useState("");
+  const [assessmentId, setAssessmentId] = useState("");
+  const [surveyId, setSurveyId] = useState("");
   const [surveys, setSurveys] = useState<SurveyTemplate[]>([]);
-  const [externalUrl, setExternalUrl] = useState('');
+  const [externalUrl, setExternalUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
   const [lessons, setLessons] = useState<LessonListItem[]>([]);
@@ -130,23 +157,29 @@ export function AddContentDrawer({
   useEffect(() => {
     if (!open) return;
     setType(null);
-    setMode('new');
-    setTitle('');
-    setDescription('');
-    setLessonId('');
-    setAssessmentId('');
-    setExternalUrl('');
+    setMode("new");
+    setTitle("");
+    setDescription("");
+    setLessonId("");
+    setAssessmentId("");
+    setExternalUrl("");
     setFile(null);
     setIsRequired(true);
-    void listLessons('DRAFT').then(setLessons).catch(() => undefined);
+    void listLessons("DRAFT")
+      .then(setLessons)
+      .catch(() => undefined);
     // Se pregunta al abrir: el campo tiene que decir la verdad ANTES de que alguien elija un
     // .pptx que este servidor no va a poder convertir.
     void presentationCapabilities()
       .then((value) => setOfficeReady(value.office))
       .catch(() => setOfficeReady(null));
-    void listAssessments().then(setAssessments).catch(() => undefined);
-    setSurveyId('');
-    void listSurveys().then(setSurveys).catch(() => undefined);
+    void listAssessments()
+      .then(setAssessments)
+      .catch(() => undefined);
+    setSurveyId("");
+    void listSurveys()
+      .then(setSurveys)
+      .catch(() => undefined);
   }, [open]);
 
   const submit = async () => {
@@ -157,7 +190,7 @@ export function AddContentDrawer({
       let newLessonId: string | null = null;
       let newAssessmentId: string | null = null;
 
-    const body: Parameters<typeof addContent>[1] = {
+      const body: Parameters<typeof addContent>[1] = {
         type,
         title: finalTitle,
         description: description.trim() || null,
@@ -165,8 +198,8 @@ export function AddContentDrawer({
         config: {},
       };
 
-      if (type === 'LESSON') {
-        if (mode === 'new') {
+      if (type === "LESSON") {
+        if (mode === "new") {
           const lesson = await createLesson({ title: finalTitle });
           newLessonId = lesson.id;
           body.lessonId = lesson.id;
@@ -175,8 +208,8 @@ export function AddContentDrawer({
         }
       }
 
-      if (type === 'ASSESSMENT') {
-        if (mode === 'new') {
+      if (type === "ASSESSMENT") {
+        if (mode === "new") {
           // Nace VACIA y con su titulo. Lo que decide como se arma —una pregunta escrita, una traida
           // del banco o un bloque al azar— se decide en su editor, mirando el examen.
           const created = await createAssessment(finalTitle);
@@ -188,26 +221,31 @@ export function AddContentDrawer({
       }
 
       // La presentacion no se sube: se CONVIERTE. Tarda, y por eso la pantalla lo avisa antes.
-      if (type === 'PRESENTATION') {
-        if (!file) throw new Error('Falta el archivo');
+      if (type === "PRESENTATION") {
+        if (!file) throw new Error("Falta el archivo");
         const uploaded = await uploadPresentation(file);
         body.contentPackageId = uploaded.id;
       }
 
-      if (type === 'DOCUMENT' || (type === 'VIDEO' && file)) {
-        if (!file) throw new Error('Falta el archivo');
-        const uploaded = await uploadMedia(file, type === 'DOCUMENT' ? 'document' : 'video');
+      if (type === "DOCUMENT" || (type === "VIDEO" && file)) {
+        if (!file) throw new Error("Falta el archivo");
+        const uploaded = await uploadMedia(
+          file,
+          type === "DOCUMENT" ? "document" : "video",
+        );
         body.contentPackageId = uploaded.id;
       }
 
-      // La encuesta nunca es requerida: quien no opina no se queda sin constancia (Decision #116).
-      if (type === 'SURVEY') {
-        body.surveyTemplateId = surveyId;
-        body.isRequired = false;
-      }
+      /*
+        LA ENCUESTA, NO OBLIGATORIA POR DEFECTO (Decision #116): quien no opina no se queda sin
+        constancia. Pero la casilla queda a la vista y DESMARCADA (2026-09-30, pedido del cliente):
+        si un caso especial la necesita obligatoria, lo decide quien la monta.
+      */
+      if (type === "SURVEY") body.surveyTemplateId = surveyId;
 
-      if (type === 'VIDEO' && !file) body.config = { externalUrl: externalUrl.trim() };
-      if (type === 'LINK') body.config = { href: externalUrl.trim() };
+      if (type === "VIDEO" && !file)
+        body.config = { externalUrl: externalUrl.trim() };
+      if (type === "LINK") body.config = { href: externalUrl.trim() };
 
       await addContent(versionId, body);
       await onAdded();
@@ -215,7 +253,11 @@ export function AddContentDrawer({
 
       if (newLessonId) {
         // Crear una leccion vacia no sirve de nada: lo siguiente es escribir sus tarjetas.
-        showToast({ kind: 'success', title: 'Lección creada', description: 'Ahora escribe sus tarjetas.' });
+        showToast({
+          kind: "success",
+          title: "Lección creada",
+          description: "Ahora escribe sus tarjetas.",
+        });
         router.push(
           `/lecciones/${newLessonId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}&formacion=${activityId}`,
         );
@@ -224,17 +266,24 @@ export function AddContentDrawer({
 
       if (newAssessmentId) {
         // Igual que la leccion: una evaluacion vacia no sirve de nada, y lo siguiente es armarla.
-        showToast({ kind: 'success', title: 'Evaluación creada', description: 'Ahora arma sus preguntas.' });
+        showToast({
+          kind: "success",
+          title: "Evaluación creada",
+          description: "Ahora arma sus preguntas.",
+        });
         router.push(
           `/evaluaciones/${newAssessmentId}?volverA=${encodeURIComponent(`/contenido-formativo/${activityId}?tab=contenido`)}`,
         );
         return;
       }
-      showToast({ kind: 'success', title: 'Contenido agregado' });
+      showToast({ kind: "success", title: "Contenido agregado" });
     } catch (error) {
       showToast({
-        kind: 'danger',
-        title: error instanceof Error && error.message.includes('archivo') ? error.message : 'No se pudo agregar el contenido',
+        kind: "danger",
+        title:
+          error instanceof Error && error.message.includes("archivo")
+            ? error.message
+            : "No se pudo agregar el contenido",
       });
     } finally {
       setBusy(false);
@@ -243,31 +292,45 @@ export function AddContentDrawer({
 
   const canSubmit = (() => {
     if (!type || title.trim().length < 2) return false;
-    if (type === 'LESSON') return mode === 'new' || Boolean(lessonId);
-    if (type === 'ASSESSMENT') return mode === 'new' || Boolean(assessmentId);
-    if (type === 'DOCUMENT' || type === 'PRESENTATION') return Boolean(file);
-    if (type === 'VIDEO') return Boolean(file) || externalUrl.trim().startsWith('http');
-    if (type === 'LINK') return externalUrl.trim().startsWith('http');
-    if (type === 'SURVEY') return Boolean(surveyId);
+    if (type === "LESSON") return mode === "new" || Boolean(lessonId);
+    if (type === "ASSESSMENT") return mode === "new" || Boolean(assessmentId);
+    if (type === "DOCUMENT" || type === "PRESENTATION") return Boolean(file);
+    if (type === "VIDEO")
+      return Boolean(file) || externalUrl.trim().startsWith("http");
+    if (type === "LINK") return externalUrl.trim().startsWith("http");
+    if (type === "SURVEY") return Boolean(surveyId);
     return true;
   })();
 
-  const onFile = (event: ChangeEvent<HTMLInputElement>) => setFile(event.target.files?.[0] ?? null);
+  const onFile = (event: ChangeEvent<HTMLInputElement>) =>
+    setFile(event.target.files?.[0] ?? null);
 
   return (
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title={type ? 'Agregar contenido' : 'Que quieres agregar'}
-      description={type ? undefined : 'Todo se crea aquí mismo. No hace falta salir a otra pantalla.'}
+      title={type ? "Agregar contenido" : "Que quieres agregar"}
+      description={
+        type
+          ? undefined
+          : "Todo se crea aquí mismo. No hace falta salir a otra pantalla."
+      }
       footer={
         type ? (
           <div className="flex justify-between gap-2">
-            <Button variant="ghost" onClick={() => setType(null)} disabled={busy}>
+            <Button
+              variant="ghost"
+              onClick={() => setType(null)}
+              disabled={busy}
+            >
               <ArrowLeft size={16} />
               Cambiar tipo
             </Button>
-            <Button onClick={() => void submit()} loading={busy} disabled={!canSubmit}>
+            <Button
+              onClick={() => void submit()}
+              loading={busy}
+              disabled={!canSubmit}
+            >
               Agregar
             </Button>
           </div>
@@ -283,16 +346,29 @@ export function AddContentDrawer({
                 <button
                   type="button"
                   disabled={Boolean(meta.disabled)}
-                  onClick={() => setType(meta.type)}
+                  onClick={() => {
+                    setType(meta.type);
+                    setIsRequired(meta.type !== "SURVEY");
+                  }}
                   className={cn(
-                    'focus-ring flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors duration-150',
-                    meta.disabled ? 'cursor-not-allowed border-line bg-paper opacity-70' : 'border-line-strong bg-surface hover:border-primary',
+                    "focus-ring flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-colors duration-150",
+                    meta.disabled
+                      ? "cursor-not-allowed border-line bg-paper opacity-70"
+                      : "border-line-strong bg-surface hover:border-primary",
                   )}
                 >
-                  <Icon size={20} className="mt-0.5 shrink-0 text-ink-500" strokeWidth={1.75} />
+                  <Icon
+                    size={20}
+                    className="mt-0.5 shrink-0 text-ink-500"
+                    strokeWidth={1.75}
+                  />
                   <span className="min-w-0">
-                    <span className="block font-medium text-ink-900">{meta.label}</span>
-                    <span className="block text-sm text-ink-500">{meta.disabled ?? meta.description}</span>
+                    <span className="block font-medium text-ink-900">
+                      {meta.label}
+                    </span>
+                    <span className="block text-sm text-ink-500">
+                      {meta.disabled ?? meta.description}
+                    </span>
                   </span>
                 </button>
               </li>
@@ -301,8 +377,18 @@ export function AddContentDrawer({
         </ul>
       ) : (
         <div className="space-y-4">
-          <Field htmlFor="c-title" label="Titulo" required hint="Es lo que vera el colaborador en la lista.">
-            <Input id="c-title" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} />
+          <Field
+            htmlFor="c-title"
+            label="Titulo"
+            required
+            hint="Es lo que vera el colaborador en la lista."
+          >
+            <Input
+              id="c-title"
+              value={title}
+              maxLength={200}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </Field>
           {/*
             LA DESCRIPCION NO VA EN TODOS (2026-09-09, `PENDIENTES` 7.2, decidido con el cliente).
@@ -312,7 +398,7 @@ export function AddContentDrawer({
             ENCUESTA nadie la ve —lo que se abre es el examen— asi que ahi era un campo que solo
             servia para alargar el formulario. Se pide donde se lee, y no donde no.
           */}
-          {type !== 'ASSESSMENT' && type !== 'SURVEY' ? (
+          {type !== "ASSESSMENT" && type !== "SURVEY" ? (
             <Field
               htmlFor="c-description"
               label="Descripción"
@@ -328,14 +414,21 @@ export function AddContentDrawer({
             </Field>
           ) : null}
 
-          {type === 'SURVEY' ? (
-            <Field htmlFor="c-survey" label="Encuesta" required hint="Se crean en Configuración > Encuestas.">
+          {type === "SURVEY" ? (
+            <Field
+              htmlFor="c-survey"
+              label="Encuesta"
+              required
+              hint="Se crean en Configuración > Encuestas."
+            >
               <Select
                 id="c-survey"
                 value={surveyId}
                 onChange={(event) => {
                   setSurveyId(event.target.value);
-                  const elegida = surveys.find((row) => row.id === event.target.value);
+                  const elegida = surveys.find(
+                    (row) => row.id === event.target.value,
+                  );
                   if (elegida && !title.trim()) setTitle(elegida.name);
                 }}
               >
@@ -349,8 +442,12 @@ export function AddContentDrawer({
             </Field>
           ) : null}
 
-          {(type === 'LESSON' || type === 'ASSESSMENT') && (
-            <div role="radiogroup" aria-label="Origen" className="flex gap-1 rounded-md bg-paper p-1">
+          {(type === "LESSON" || type === "ASSESSMENT") && (
+            <div
+              role="radiogroup"
+              aria-label="Origen"
+              className="flex gap-1 rounded-md bg-paper p-1"
+            >
               {(
                 [
                   /*
@@ -359,8 +456,13 @@ export function AddContentDrawer({
                     existen en la empresa, que se pueden poner en varias formaciones sin volver a
                     escribirlas. Se dice con esas palabras y se acabo la pregunta.
                   */
-                  ['new', 'Crear una nueva'],
-                  ['library', type === 'LESSON' ? 'Traer una leccion ya creada' : 'Traer una evaluacion ya creada'],
+                  ["new", "Crear una nueva"],
+                  [
+                    "library",
+                    type === "LESSON"
+                      ? "Traer una leccion ya creada"
+                      : "Traer una evaluacion ya creada",
+                  ],
                 ] as Array<[Mode, string]>
               ).map(([value, label]) => (
                 <button
@@ -370,8 +472,10 @@ export function AddContentDrawer({
                   aria-checked={mode === value}
                   onClick={() => setMode(value)}
                   className={cn(
-                    'focus-ring h-9 flex-1 rounded-md text-sm transition-colors duration-150',
-                    mode === value ? 'bg-surface font-medium text-ink-900 shadow-card' : 'text-ink-500',
+                    "focus-ring h-9 flex-1 rounded-md text-sm transition-colors duration-150",
+                    mode === value
+                      ? "bg-surface font-medium text-ink-900 shadow-card"
+                      : "text-ink-500",
                   )}
                 >
                   {label}
@@ -380,15 +484,24 @@ export function AddContentDrawer({
             </div>
           )}
 
-          {type === 'LESSON' && mode === 'new' ? (
+          {type === "LESSON" && mode === "new" ? (
             <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
-              Al agregarla se abre el editor de tarjetas, y desde ahi se vuelve a esta formacion.
+              Al agregarla se abre el editor de tarjetas, y desde ahi se vuelve
+              a esta formacion.
             </p>
           ) : null}
 
-          {type === 'LESSON' && mode === 'library' ? (
-            <Field htmlFor="c-lesson" label="Lección" hint="Solo las que estan en borrador se pueden reutilizar.">
-              <Select id="c-lesson" value={lessonId} onChange={(event) => setLessonId(event.target.value)}>
+          {type === "LESSON" && mode === "library" ? (
+            <Field
+              htmlFor="c-lesson"
+              label="Lección"
+              hint="Solo las que estan en borrador se pueden reutilizar."
+            >
+              <Select
+                id="c-lesson"
+                value={lessonId}
+                onChange={(event) => setLessonId(event.target.value)}
+              >
                 <option value="">Seleccionar...</option>
                 {lessons.map((lesson) => (
                   <option key={lesson.id} value={lesson.id}>
@@ -398,7 +511,6 @@ export function AddContentDrawer({
               </Select>
             </Field>
           ) : null}
-
 
           {/*
             AL CREAR NO SE PIDE NADA MAS QUE EL TITULO (2026-09-09, decidido con el cliente).
@@ -412,12 +524,13 @@ export function AddContentDrawer({
             armando: escribir una pregunta, traer una ya escrita o poner el bloque al azar. Lo mismo
             que hace una leccion al crearse, y lo mismo que pide «Nueva evaluacion» desde su lista.
           */}
-          {type === 'ASSESSMENT' && mode === 'new' ? (
+          {type === "ASSESSMENT" && mode === "new" ? (
             <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
-              Al agregarla se abre su editor, y desde ahi se vuelve a esta formacion.
+              Al agregarla se abre su editor, y desde ahi se vuelve a esta
+              formacion.
             </p>
           ) : null}
-          {type === 'ASSESSMENT' && mode === 'library' ? (
+          {type === "ASSESSMENT" && mode === "library" ? (
             <Field htmlFor="c-assessment" label="Evaluación">
               <Select
                 id="c-assessment"
@@ -433,14 +546,16 @@ export function AddContentDrawer({
                 {assessments.map((assessment) => (
                   <option key={assessment.id} value={assessment.id}>
                     {assessment.title}
-                    {assessment._count.sections === 0 ? ' — sin preguntas todavia' : ''}
+                    {assessment._count.sections === 0
+                      ? " — sin preguntas todavia"
+                      : ""}
                   </option>
                 ))}
               </Select>
             </Field>
           ) : null}
 
-          {type === 'PRESENTATION' ? (
+          {type === "PRESENTATION" ? (
             <>
               <Field
                 htmlFor="c-slides"
@@ -448,8 +563,8 @@ export function AddContentDrawer({
                 required
                 hint={
                   officeReady === false
-                    ? 'Este servidor solo acepta PDF. Exportala desde PowerPoint (Archivo, Guardar como, PDF): el resultado es identico.'
-                    : 'PowerPoint (.pptx, .ppt), OpenDocument (.odp) o PDF.'
+                    ? "Este servidor solo acepta PDF. Exportala desde PowerPoint (Archivo, Guardar como, PDF): el resultado es identico."
+                    : "PowerPoint (.pptx, .ppt), OpenDocument (.odp) o PDF."
                 }
               >
                 <label
@@ -457,13 +572,19 @@ export function AddContentDrawer({
                   className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-6 text-sm text-ink-500 hover:border-primary"
                 >
                   <Upload size={18} strokeWidth={1.75} />
-                  {file ? <span className="text-ink-900">{file.name}</span> : <span>Elegir la presentacion</span>}
+                  {file ? (
+                    <span className="text-ink-900">{file.name}</span>
+                  ) : (
+                    <span>Elegir la presentacion</span>
+                  )}
                 </label>
                 <input
                   id="c-slides"
                   type="file"
                   className="sr-only"
-                  accept={officeReady === false ? '.pdf' : '.pdf,.ppt,.pptx,.odp'}
+                  accept={
+                    officeReady === false ? ".pdf" : ".pdf,.ppt,.pptx,.odp"
+                  }
                   onChange={onFile}
                 />
               </Field>
@@ -472,14 +593,16 @@ export function AddContentDrawer({
                 que pierde, y que a cambio la plataforma puede registrar que se vio.
               */}
               <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
-                Cada diapositiva se convierte en una imagen y se reproduce dentro de la plataforma, asi que queda registrado
-                cual vio cada persona y cuanto tiempo. Se pierden las animaciones, los videos incrustados y los
-                hipervinculos. La conversion tarda unos segundos.
+                Cada diapositiva se convierte en una imagen y se reproduce
+                dentro de la plataforma, asi que queda registrado cual vio cada
+                persona y cuanto tiempo. Se pierden las animaciones, los videos
+                incrustados y los hipervinculos. La conversion tarda unos
+                segundos.
               </p>
             </>
           ) : null}
 
-          {type === 'DOCUMENT' ? (
+          {type === "DOCUMENT" ? (
             <Field
               htmlFor="c-file"
               label="Archivo"
@@ -491,23 +614,47 @@ export function AddContentDrawer({
                 className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-6 text-sm text-ink-500 hover:border-primary"
               >
                 <Upload size={18} strokeWidth={1.75} />
-                {file ? <span className="text-ink-900">{file.name}</span> : <span>Elegir archivo del computador</span>}
+                {file ? (
+                  <span className="text-ink-900">{file.name}</span>
+                ) : (
+                  <span>Elegir archivo del computador</span>
+                )}
               </label>
-              <input id="c-file" type="file" className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onChange={onFile} />
+              <input
+                id="c-file"
+                type="file"
+                className="sr-only"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                onChange={onFile}
+              />
             </Field>
           ) : null}
 
-          {type === 'VIDEO' ? (
+          {type === "VIDEO" ? (
             <>
-              <Field htmlFor="c-video" label="Archivo de video" hint="O deja vacio y pega un enlace abajo.">
+              <Field
+                htmlFor="c-video"
+                label="Archivo de video"
+                hint="O deja vacio y pega un enlace abajo."
+              >
                 <label
                   htmlFor="c-video"
                   className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-6 text-sm text-ink-500 hover:border-primary"
                 >
                   <Upload size={18} strokeWidth={1.75} />
-                  {file ? <span className="text-ink-900">{file.name}</span> : <span>Subir un video</span>}
+                  {file ? (
+                    <span className="text-ink-900">{file.name}</span>
+                  ) : (
+                    <span>Subir un video</span>
+                  )}
                 </label>
-                <input id="c-video" type="file" className="sr-only" accept="video/*" onChange={onFile} />
+                <input
+                  id="c-video"
+                  type="file"
+                  className="sr-only"
+                  accept="video/*"
+                  onChange={onFile}
+                />
               </Field>
               <Field
                 htmlFor="c-url"
@@ -525,9 +672,14 @@ export function AddContentDrawer({
             </>
           ) : null}
 
-          {type === 'LINK' ? (
+          {type === "LINK" ? (
             <Field htmlFor="c-href" label="Enlace" required>
-              <Input id="c-href" value={externalUrl} placeholder="https://" onChange={(event) => setExternalUrl(event.target.value)} />
+              <Input
+                id="c-href"
+                value={externalUrl}
+                placeholder="https://"
+                onChange={(event) => setExternalUrl(event.target.value)}
+              />
             </Field>
           ) : null}
 
@@ -540,6 +692,13 @@ export function AddContentDrawer({
             />
             Obligatorio para completar la formacion
           </label>
+          {type === "SURVEY" ? (
+            <p className="-mt-2 text-xs text-ink-500">
+              La encuesta va desmarcada de entrada: si fuera obligatoria, quien
+              no la responde se queda sin terminar y sin constancia. Márcala
+              solo en un caso especial.
+            </p>
+          ) : null}
         </div>
       )}
     </Drawer>

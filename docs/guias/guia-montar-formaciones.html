@@ -193,6 +193,7 @@
     <li><a href="#extraordinaria" style="--tono:#b45309"><span class="punto"></span>Extraordinaria</a></li>
     <li><a href="#pildora" style="--tono:#be185d"><span class="punto"></span>Píldora</a></li>
     <li><a href="#recertificacion" style="--tono:#65a30d"><span class="punto"></span>Recertificación</a></li>
+    <li><a href="#retirar" style="--tono:#9f1239"><span class="punto"></span>Desactivar o eliminar</a></li>
     <li><a href="#estados" style="--tono:#5b6572"><span class="punto"></span>Los estados</a></li>
   </ol>
 </nav>
@@ -219,9 +220,13 @@
   <ol class="pasos">
     <li><b>Los catálogos, primero.</b> Cargos, áreas, regionales y procesos. Todo lo demás cuelga de
       ellos, y cambiar un cargo después mueve a quién se le exige qué.</li>
-    <li><b>La encuesta de satisfacción.</b> Es una sola para toda la empresa, en
-      <em>Configuración → Encuestas</em>. Si el tipo pide encuesta y no hay ninguna elegida, la
-      formación se publica sin ella.</li>
+    <li><b>La encuesta de satisfacción.</b> Se crean en <em>Configuración → Encuestas</em> y el tipo
+      de formación trae una por defecto. Si el tipo pide encuesta y no hay ninguna elegida, la
+      formación se publica sin ella. Una formación puede llevar <strong>otra</strong>: en su pestaña
+      <em>Contenido</em>, <em>Editar</em> sobre la encuesta y se elige la que corresponda. La que se
+      elige ahí <strong>gana sobre la del tipo</strong>. La encuesta va <strong>no obligatoria</strong> de entrada: quien no la
+      responde termina igual la formación y recibe su constancia. Si un caso especial la necesita, se
+      marca <em>Obligatorio</em> al agregarla o al editarla.</li>
     <li><b>Las formaciones y sus reglas, antes que las personas.</b> Así, al cargar la plantilla, a
       cada quien le nacen sus obligaciones solas. Al revés hay que forzar una pasada.</li>
     <li><b>La plantilla, por archivo.</b> 180 ms por persona: 600 personas en uno o dos minutos.
@@ -671,6 +676,35 @@
 <hr class="sep">
 
 <!-- ══ Estados ═══════════════════════════════════════════════════════════════════════════════ -->
+<section class="tipo" id="retirar" style="--tono:#9f1239">
+  <div class="titulo-tipo"><div class="barra"></div><h2>Desactivar o eliminar una formación</h2></div>
+  <p class="subtitulo">Dos botones en la ficha de la formación, arriba a la derecha, que se parecen y
+    no hacen lo mismo.</p>
+
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th></th><th>Desactivar</th><th>Eliminar</th></tr></thead>
+    <tbody>
+      <tr><td>Para qué</td><td>Una formación que <strong>ya no se dicta</strong></td><td>Una formación <strong>creada por error</strong>, que nunca se usó</td></tr>
+      <tr><td>Cuándo se puede</td><td>Siempre</td><td>Solo si no tiene convocatorias. Si ya tiene, el sistema lo niega y propone desactivarla</td></tr>
+      <tr><td>Qué pasa con la gente nueva</td><td>No le llega a nadie más: ni a mano, ni por regla, ni inscribiéndose por su cuenta</td><td>Deja de existir para todos</td></tr>
+      <tr><td>Qué pasa con quien ya la tiene</td><td>Puede terminarla. Su historial y sus constancias no cambian</td><td>No hay nadie: por eso se puede eliminar</td></tr>
+      <tr><td>Cómo se ve</td><td>Etiqueta <strong>DESACTIVADA</strong> en la ficha y en la lista de Contenido formativo</td><td>Desaparece de la lista</td></tr>
+      <tr><td>Se deshace</td><td>Con el mismo botón, que pasa a decir <em>Reactivar</em></td><td>Quien tenga el permiso <em>Papelera</em> la recupera desde <em>Configuración → Papelera</em></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="aviso bien">
+    <span class="etiqueta">Un caso real</span>
+    <p>La empresa cambia su curso de manejo defensivo por uno nuevo. El viejo tiene a 40 personas a
+      mitad de camino. Se <strong>desactiva</strong>: esas 40 lo terminan y conservan su constancia, y
+      a quien entre la semana próxima ya no se le asigna. No se elimina: tiene convocatorias, y su
+      historia es evidencia.</p>
+  </div>
+  <p>Al reactivar, las reglas vuelven a asignarla a quien le corresponda.</p>
+</section>
+
+<hr class="sep">
+
 <section class="tipo" id="estados" style="--tono:#5b6572">
   <div class="titulo-tipo"><div class="barra"></div><h2>Los estados, y cuáles cuentan</h2></div>
   <p class="subtitulo">Lo que ve quien administra en Seguimiento, y lo que significa cada palabra

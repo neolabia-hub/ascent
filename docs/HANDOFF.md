@@ -43,7 +43,10 @@ lista de Contenido formativo.
 
 **4. Editar una pieza ENCUESTA permite cambiar la encuesta**, y gana sobre la del tipo (la del tipo
 solo se anade al publicar si la version no tiene ya una pieza SURVEY). Sin campo Descripcion para
-encuesta ni evaluacion (nadie la ve), y sin «obligatorio» en la encuesta.
+encuesta ni evaluacion (nadie la ve). «Obligatorio» se ve en la encuesta pero DESMARCADO de entrada
+(pedido del cliente: un caso especial puede necesitarla). Perfil de la persona: se quitan los botones
+de estado («Todo lo que falta · Vencida · Pendiente»), redundantes con las cifras que ya filtran.
+Guias actualizadas: montar formaciones (Desactivar o eliminar, encuesta), formaciones, usuarios.
 
 ---
 

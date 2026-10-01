@@ -104,8 +104,6 @@ export default function PerfilDePersonaPage() {
   const [busca, setBusca] = useState('');
   /** Qué tipo de formación se está mirando, si alguno. `null` = toda su historia. */
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null);
-  /** Qué estado se está mirando dentro de «Lo que le falta». `null` = todos. */
-  const [filtroEstado, setFiltroEstado] = useState<AssignmentRow['status'] | null>(null);
   /** Qué constancia se está bajando o abriendo, para que el botón diga que está trabajando. */
   const [bajando, setBajando] = useState<string | null>(null);
   const [abriendo, setAbriendo] = useState<string | null>(null);
@@ -215,20 +213,12 @@ export default function PerfilDePersonaPage() {
   };
 
   /*
-    Y UN SEGUNDO FILTRO, POR ESTADO (2026-09-17, pedido del cliente).
-
-    "Lo que le falta" mete en el mismo saco cosas que piden acciones distintas: una **vencida** hay
-    que perseguirla hoy, una **que no se hizo** ya es incumplimiento de un periodo cerrado y se
-    arrastra, y una **pendiente** solo está en plazo. Quien repasa a una persona antes de una
-    auditoría busca las dos primeras y no quiere leer las terceras.
-
-    Solo filtra ESE bloque: la trayectoria es historia cumplida y ahí el estado no separa nada.
+    EL FILTRO POR ESTADO SON LAS TARJETAS DE ARRIBA (2026-09-30, pedido del cliente). Hubo ademas una
+    fila de botones —«Todo lo que falta · Vencida · Pendiente»— que hacia lo mismo que pulsar las
+    cifras Vencidas o Pendientes: dos controles para una sola cosa. Quedan las tarjetas, que ademas
+    filtran Cumplidas.
   */
-  const abiertasSinFiltrar = (obligaciones ?? []).filter((fila) => PENDIENTE.includes(fila.status) && enElFiltro(fila));
-  const abiertas = abiertasSinFiltrar.filter((fila) => filtroEstado === null || fila.status === filtroEstado);
-  const estadosAbiertos = (['OVERDUE', 'EXPIRED_NOT_DONE', 'PENDING', 'IN_PROGRESS'] as const).filter((estado) =>
-    abiertasSinFiltrar.some((fila) => fila.status === estado),
-  );
+  const abiertas = (obligaciones ?? []).filter((fila) => PENDIENTE.includes(fila.status) && enElFiltro(fila));
   const cerradasTodas = (obligaciones ?? []).filter((fila) => !PENDIENTE.includes(fila.status) && enElFiltro(fila));
   /*
     LAS RETIRADAS, PLEGADAS (2026-09-30). Una obligacion retirada no la cumplio nadie: dejo de
@@ -447,34 +437,6 @@ export default function PerfilDePersonaPage() {
             <p className="rounded-md bg-paper px-3 py-2 text-sm text-ink-500">
               No tiene ninguna formación de tipo <strong className="font-medium">{filtroTipo}</strong>.
             </p>
-          ) : null}
-
-          {/* El filtro por estado vive pegado al bloque que filtra, y solo si hay más de un estado
-              que separar: con todo pendiente no hay nada que elegir. */}
-          {estadosAbiertos.length > 1 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[null, ...estadosAbiertos].map((estado) => {
-                const activo = filtroEstado === estado;
-                const cuantas =
-                  estado === null ? abiertasSinFiltrar.length : abiertasSinFiltrar.filter((f) => f.status === estado).length;
-                return (
-                  <button
-                    key={estado ?? '__todo__'}
-                    type="button"
-                    aria-pressed={activo}
-                    onClick={() => setFiltroEstado(estado)}
-                    className={cn(
-                      'focus-ring rounded-full border px-3.5 py-1.5 text-xs transition-colors duration-150',
-                      activo ? 'border-transparent font-semibold text-white shadow-btn' : 'border-line bg-surface text-ink-700 hover:bg-paper',
-                    )}
-                    style={activo ? { backgroundColor: 'var(--brand-primary)' } : undefined}
-                  >
-                    {estado === null ? 'Todo lo que falta' : ESTADO[estado].label}{' '}
-                    <span className={cn('tabular-nums', activo ? 'text-white/80' : 'text-ink-500')}>{cuantas}</span>
-                  </button>
-                );
-              })}
-            </div>
           ) : null}
 
           {abiertasVistas.length > 0 ? (
