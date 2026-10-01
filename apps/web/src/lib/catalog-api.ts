@@ -685,7 +685,7 @@ export function deleteAssessment(assessmentId: string) {
 
 /**
  * Eliminar una formacion de PRUEBA que ya se uso (2026-09-30): papelera, convocatorias canceladas y
- * constancias anuladas con el motivo. Solo con el permiso individual `catalog:force_delete`.
+ * constancias anuladas con el motivo. Solo con el permiso `catalog:force_delete` (Papelera).
  */
 export function eliminarFormacionDePrueba(
   id: string,

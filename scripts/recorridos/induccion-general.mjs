@@ -360,11 +360,28 @@ if (codigoQr) {
   const anulada = (await crearCliente().get(`/public/constancias/${codigoQr}`)).cuerpo;
   comprobar(anulada?.estado === 'REVOCADA', 'el QR la dice ANULADA mientras esta en la papelera', JSON.stringify(anulada)?.slice(0, 160));
 }
+/*
+  Y LA PERSONA YA NO LA VE (2026-09-30, pedido del cliente): ni en su historial ni en sus
+  certificaciones. Una formacion de prueba eliminada no es historia de nadie; una constancia
+  anulada de verdad (revocada a mano) si sigue saliendo, con su ANULADA.
+*/
+const enSuHistoria = async () =>
+  ((await aprendiz.get('/me/history')).cuerpo?.items ?? []).some((e) => e.offering?.activityVersion?.activity?.id === creado.activityId);
+const enSusCertificados = async () =>
+  ((await aprendiz.get('/me/certificados')).cuerpo ?? []).some((cert) => cert.verificationCode === codigoQr);
+if (entro) {
+  comprobar(!(await enSuHistoria()), 'y la persona ya no la ve en su historial');
+  if (codigoQr) comprobar(!(await enSusCertificados()), 'ni en sus certificaciones');
+}
 const devuelta = await admin.post(`/activities/${creado.activityId}/restaurar`, {});
 comprobar(devuelta.ok && devuelta.cuerpo?.constancias >= 1, 'restaurada, con su constancia', `${devuelta.estado} ${JSON.stringify(devuelta.cuerpo)}`);
 if (codigoQr) {
   const vigente = (await crearCliente().get(`/public/constancias/${codigoQr}`)).cuerpo;
   comprobar(vigente?.estado === 'VIGENTE', 'y el QR la vuelve a dar VIGENTE', JSON.stringify(vigente)?.slice(0, 160));
+}
+if (entro) {
+  comprobar(await enSuHistoria(), 'restaurada, vuelve a su historial');
+  if (codigoQr) comprobar(await enSusCertificados(), 'y a sus certificaciones');
 }
 await admin.post(`/users/${yoAdmin}/overrides`, { overrides: previosAdmin });
 

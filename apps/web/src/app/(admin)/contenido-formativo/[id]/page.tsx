@@ -16,6 +16,7 @@ import {
   Package,
   Pencil,
   Plus,
+  Power,
   Presentation,
   Trash2,
   Users,
@@ -191,7 +192,7 @@ export default function ActividadDetallePage() {
   const [canPublish, setCanPublish] = useState(true);
   /**
    * ELIMINAR UNA FORMACION DE PRUEBA YA USADA (2026-09-30). Solo con el permiso individual
-   * `catalog:force_delete`, que ningun rol tiene. `modoPrueba` se enciende cuando el borrado normal
+   * `catalog:force_delete` (Papelera), por rol o por persona. `modoPrueba` se enciende cuando el borrado normal
    * se niega por estar en uso: ahi, y solo ahi, se ofrece el camino de la papelera con motivo.
    */
   const [puedeEliminarPrueba, setPuedeEliminarPrueba] = useState(false);
@@ -520,6 +521,34 @@ export default function ActividadDetallePage() {
     }
   };
 
+  /**
+   * DESACTIVAR / REACTIVAR (2026-09-30), como el «ocultar» de Moodle. La API ya lo aceptaba y
+   * ninguna pantalla lo ofrecia: el cliente preguntaba «¿donde se desactiva?» y no habia donde.
+   * Desactivada = nadie NUEVO la recibe (ni a mano ni por regla) y no se puede inscribir uno solo;
+   * quien ya la tiene la termina. Se deshace con el mismo boton. Para lo creado por error esta
+   * Eliminar, que es otra cosa.
+   */
+  const alternarActiva = async () => {
+    if (!activity) return;
+    const activa = !activity.active;
+    setBusy(true);
+    try {
+      await updateActivity(activity.id, { active: activa });
+      setActivity((previa) => (previa ? { ...previa, active: activa } : previa));
+      showToast({
+        kind: 'success',
+        title: activa ? 'Formación reactivada' : 'Formación desactivada',
+        description: activa
+          ? 'Vuelve a asignarse a quien le corresponda.'
+          : 'Nadie nuevo la recibe. Quien ya la tiene puede terminarla.',
+      });
+    } catch (error) {
+      showToast({ kind: 'danger', title: 'No se pudo cambiar', description: motivoDelError(error) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doDiscardDraft = async () => {
     if (!version) return;
     try {
@@ -607,6 +636,7 @@ export default function ActividadDetallePage() {
               enviar» es el estado normal de un borrador y anunciarlo seria ruido en la unica linea
               que se lee entera.
             */}
+            {!activity.active ? <StatusPill kind="neutral" label="DESACTIVADA" /> : null}
             {isDraft && revision !== 'SIN_ENVIAR' ? (
               <StatusPill
                 kind={revision === 'EN_REVISION' ? 'info' : revision === 'APROBADA' ? 'ok' : 'warn'}
@@ -622,7 +652,9 @@ export default function ActividadDetallePage() {
             que todavia no lo ve nadie y que no se puede convocar.
           */}
           <p className="mt-1 text-xs text-ink-500">
-            {publishedVersion
+            {!activity.active
+              ? 'Desactivada: nadie nuevo la recibe y no se puede inscribir. Quien ya la tiene puede terminarla.'
+              : publishedVersion
               ? hasDraft
                 ? 'La gente cursa la versión publicada. Los cambios en curso no la afectan hasta publicarlos.'
                 : 'La gente ya puede cursarla y se puede programar en convocatorias.'
@@ -696,6 +728,19 @@ export default function ActividadDetallePage() {
               </Button>
             )
           ) : null}
+          <Button
+            variant="ghost"
+            onClick={() => void alternarActiva()}
+            disabled={busy}
+            title={
+              activity.active
+                ? 'Nadie nuevo la recibe; quien ya la tiene la termina'
+                : 'Vuelve a asignarse a quien le corresponda'
+            }
+          >
+            <Power size={16} />
+            {activity.active ? 'Desactivar' : 'Reactivar'}
+          </Button>
           <Button variant="ghost" className="text-danger" onClick={() => setBorrarOpen(true)} disabled={busy}>
             <Trash2 size={16} />
             Eliminar

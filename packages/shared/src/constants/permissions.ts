@@ -18,8 +18,9 @@ export const PERMISSIONS = [
     induccion de prueba con convocatoria, 998 obligaciones retiradas y 3 constancias de cuentas de
     administrador, y no habia forma de quitarla de en medio.
 
-    Este permiso NO lo tiene ningun rol, tampoco ADMIN (ver `SOLO_POR_PERSONA`): se concede a una
-    persona concreta desde su ficha. Y no borra nada: manda la formacion a la papelera, cierra su
+    Es el permiso de la PAPELERA. Ningun rol lo trae de entrada, tampoco ADMIN (ver
+    `FUERA_DE_LA_SEMILLA`); se concede a mano: marcandolo en un rol, en Roles, o a una persona desde
+    su ficha (2026-09-30, pedido del cliente: las dos vias). Y no borra nada: manda la formacion a la papelera, cierra su
     convocatoria, retira lo pendiente y ANULA sus constancias con el motivo escrito. Todo queda en
     la base y en la auditoria.
   */
@@ -151,17 +152,16 @@ export const LEARNER_ONLY_PERMISSIONS: readonly PermissionCode[] = PERMISSIONS.f
 );
 
 /**
- * LOS PERMISOS QUE NO VAN CON NINGUN ROL, ni siquiera con ADMIN: se conceden a una persona desde su
- * ficha. Son los que pueden hacer desaparecer evidencia de la vista de todos, y eso no puede venir
- * de pertenecer a un grupo —el dia que alguien nuevo entra como administrador, lo heredaria sin que
- * nadie lo decidiera—.
+ * LOS PERMISOS QUE NINGUN ROL TRAE DE ENTRADA, ni siquiera ADMIN. Pueden hacer desaparecer evidencia
+ * de la vista de todos, asi que alguien tiene que DECIDIR darlos: marcandolos en un rol o a una
+ * persona. Lo que no puede pasar es que lleguen solos con la semilla.
  */
-export const SOLO_POR_PERSONA: ReadonlySet<PermissionCode> = new Set<PermissionCode>(['catalog:force_delete']);
+export const FUERA_DE_LA_SEMILLA: ReadonlySet<PermissionCode> = new Set<PermissionCode>(['catalog:force_delete']);
 
 /** Roles semilla del tenant y sus permisos por defecto (el admin puede ajustarlos por UI). */
 export const SEED_ROLE_PERMISSIONS: Record<string, readonly PermissionCode[]> = {
-  // Control total del tenant, menos lo que solo se concede persona a persona.
-  ADMIN: PERMISSIONS.filter((permission) => !SOLO_POR_PERSONA.has(permission)),
+  // Control total del tenant, menos lo que hay que conceder a mano.
+  ADMIN: PERMISSIONS.filter((permission) => !FUERA_DE_LA_SEMILLA.has(permission)),
   // Gestiona la formacion de su area/proceso; publicar y editar lo publicado pasa por aprobacion.
   ANALISTA: [
     'catalog:read',

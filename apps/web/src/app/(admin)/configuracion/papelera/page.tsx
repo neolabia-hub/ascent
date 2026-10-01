@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/toast';
 /**
  * LA PAPELERA (2026-09-30). Como la papelera de reciclaje de Moodle: lo eliminado no se borra, se
  * guarda aqui, y se puede devolver tal como estaba. Solo con el permiso individual
- * `catalog:force_delete`, que ningun rol tiene.
+ * `catalog:force_delete` (Papelera), por rol o por persona.
  *
  * NO HAY «VACIAR LA PAPELERA», y es deliberado. Lo que hay aqui es evidencia del SG-SST —quien la
  * hizo, que constancia se emitio— y la ley pide guardarla 20 años. Un boton que la destruya seria el

@@ -285,7 +285,12 @@ export default function ContenidoFormativoPage() {
                       <h3 className="line-clamp-2 font-display text-base font-semibold leading-snug text-ink-900">
                         {activity.name}
                       </h3>
-                      <StatusPill kind={state.kind} label={state.label} />
+                      {/* Desactivada pesa mas que publicada o borrador: es lo que explica por que nadie la recibe. */}
+                      {activity.active ? (
+                        <StatusPill kind={state.kind} label={state.label} />
+                      ) : (
+                        <StatusPill kind="neutral" label="DESACTIVADA" />
+                      )}
                     </div>
                     <p className="mt-2 truncate text-sm text-ink-500">
                       {activity.process.name} · {MODALITY_LABEL[activity.modality]}

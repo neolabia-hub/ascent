@@ -24,6 +24,29 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-09-30 (tarde) — LA PAPELERA NO SE VE, PERMISO POR ROL, DESACTIVAR VISIBLE Y CAMBIAR ENCUESTA
+
+**1. Lo que esta en la papelera ya no sale en el historial ni en las certificaciones de la persona.**
+El cliente probo «videos3» y luego la elimino: le seguia saliendo en su historial y la constancia
+como ANULADA. `learner.service.history` filtra `activity.deletedAt: null`; `certificates.mias`
+excluye las constancias de inscripciones de formaciones en la papelera. Una constancia revocada a
+mano sigue saliendo como ANULADA (eso si es historia). Restaurar las devuelve. Recorrido:
+`induccion-general.mjs` paso 13.
+
+**2. Papelera (`catalog:force_delete`) se concede por ROL o por PERSONA** (pedido del cliente). Ningun
+rol la trae de entrada (`FUERA_DE_LA_SEMILLA`, antes `SOLO_POR_PERSONA`): hay que marcarla. Descripcion
+nueva «Papelera: ...» con migracion `20260930180000_permiso_papelera` (solo UPDATE de la descripcion).
+
+**3. Desactivar/Reactivar, por fin con boton** en la cabecera de la ficha de la formacion, junto a
+Eliminar. La API lo aceptaba y ninguna pantalla lo ofrecia. Pastilla DESACTIVADA en la ficha y en la
+lista de Contenido formativo.
+
+**4. Editar una pieza ENCUESTA permite cambiar la encuesta**, y gana sobre la del tipo (la del tipo
+solo se anade al publicar si la version no tiene ya una pieza SURVEY). Sin campo Descripcion para
+encuesta ni evaluacion (nadie la ve), y sin «obligatorio» en la encuesta.
+
+---
+
 ## 2026-09-30 (madrugada) — QR DE CONSTANCIAS, PAPELERA, DESACTIVAR y lo que contaba la papelera
 
 **1. El QR de TODAS las constancias decia «no existe» en produccion.** La consulta publica corria sin

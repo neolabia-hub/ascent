@@ -1,15 +1,21 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Upload } from 'lucide-react';
-import { ApiError } from '@/lib/api';
-import { updateContent, uploadMedia, type VersionContent } from '@/lib/catalog-api';
-import { Button } from '@/components/ui/button';
-import { Drawer } from '@/components/ui/drawer';
-import { Field } from '@/components/ui/field';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/components/ui/toast';
+import { useEffect, useState } from "react";
+import { Upload } from "lucide-react";
+import { ApiError } from "@/lib/api";
+import {
+  updateContent,
+  uploadMedia,
+  type VersionContent,
+} from "@/lib/catalog-api";
+import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { listSurveys, type SurveyTemplate } from "@/lib/surveys-api";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * EDITAR UNA PARTE DE LA FORMACION.
@@ -38,57 +44,105 @@ export function EditContentDrawer({
   onSaved: () => Promise<void> | void;
 }) {
   const { showToast } = useToast();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [isRequired, setIsRequired] = useState(true);
   const [allowDownload, setAllowDownload] = useState(false);
   const [minWatchPct, setMinWatchPct] = useState(String(MIN_WATCH_DEFAULT));
-  const [minSeconds, setMinSeconds] = useState('');
-  const [externalUrl, setExternalUrl] = useState('');
-  const [href, setHref] = useState('');
+  const [minSeconds, setMinSeconds] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
+  const [href, setHref] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  /** La encuesta de una pieza ENCUESTA: se puede cambiar por otra (2026-09-30). */
+  const [surveyId, setSurveyId] = useState("");
+  const [surveys, setSurveys] = useState<SurveyTemplate[]>([]);
 
   // Al abrir se parte SIEMPRE de lo que hay guardado: un formulario que conserva lo tecleado la
   // vez anterior haria creer que el cambio se guardo cuando no fue asi.
   useEffect(() => {
     if (!content || !open) return;
-    const config = content.config as { minWatchPct?: unknown; minSeconds?: unknown; externalUrl?: unknown; href?: unknown };
+    const config = content.config as {
+      minWatchPct?: unknown;
+      minSeconds?: unknown;
+      externalUrl?: unknown;
+      href?: unknown;
+    };
     setTitle(content.title);
     setAllowDownload(
-      (content.config as { allowDownload?: unknown } | null)?.allowDownload === true ||
-        (content.type === 'DOCUMENT' &&
-          (content.config as { allowDownload?: unknown } | null)?.allowDownload !== false),
+      (content.config as { allowDownload?: unknown } | null)?.allowDownload ===
+        true ||
+        (content.type === "DOCUMENT" &&
+          (content.config as { allowDownload?: unknown } | null)
+            ?.allowDownload !== false),
     );
-    setDescription(content.description ?? '');
+    setDescription(content.description ?? "");
     setIsRequired(content.isRequired);
-    setMinWatchPct(String(typeof config.minWatchPct === 'number' ? config.minWatchPct : MIN_WATCH_DEFAULT));
-    setMinSeconds(typeof config.minSeconds === 'number' ? String(config.minSeconds) : '');
-    setExternalUrl(typeof config.externalUrl === 'string' ? config.externalUrl : '');
-    setHref(typeof config.href === 'string' ? config.href : '');
+    setMinWatchPct(
+      String(
+        typeof config.minWatchPct === "number"
+          ? config.minWatchPct
+          : MIN_WATCH_DEFAULT,
+      ),
+    );
+    setMinSeconds(
+      typeof config.minSeconds === "number" ? String(config.minSeconds) : "",
+    );
+    setExternalUrl(
+      typeof config.externalUrl === "string" ? config.externalUrl : "",
+    );
+    setHref(typeof config.href === "string" ? config.href : "");
     setFile(null);
+    setSurveyId(content.surveyTemplateId ?? "");
   }, [content, open]);
+
+  // Las encuestas solo se piden si la pieza es una encuesta: las demas no las necesitan.
+  useEffect(() => {
+    if (!open || content?.type !== "SURVEY") return;
+    void listSurveys()
+      .then(setSurveys)
+      .catch(() => undefined);
+  }, [open, content?.type]);
 
   if (!content) return null;
 
-  const isVideo = content.type === 'VIDEO';
-  const isDocument = content.type === 'DOCUMENT';
-  const isLink = content.type === 'LINK';
-  const isLesson = content.type === 'LESSON';
+  const isVideo = content.type === "VIDEO";
+  const isDocument = content.type === "DOCUMENT";
+  const isLink = content.type === "LINK";
+  const isLesson = content.type === "LESSON";
+  const isSurvey = content.type === "SURVEY";
+  /*
+    DESCRIPCION, solo donde se lee (la misma regla que al agregar, 2026-09-09): en una evaluacion y
+    en una encuesta lo que se abre es el formulario y nadie la ve. Si ya tenia una, se conserva tal
+    cual —no se borra en silencio—, solo deja de pedirse.
+  */
+  const pideDescripcion = content.type !== "ASSESSMENT" && !isSurvey;
 
   const titleValid = title.trim().length >= 2 && title.length <= 200;
   // Un video ENLAZADO no puede quedarse sin enlace ni sin archivo: seria una parte que no muestra
   // nada, y publicar la rechazaria mas adelante con un error que aqui todavia se puede evitar.
-  const videoHasSource = !isVideo || Boolean(file) || Boolean(content.contentPackageId) || externalUrl.trim().length > 0;
-  const linkValid = !isLink || href.trim().startsWith('http');
-  const canSave = titleValid && videoHasSource && linkValid && !busy;
+  const videoHasSource =
+    !isVideo ||
+    Boolean(file) ||
+    Boolean(content.contentPackageId) ||
+    externalUrl.trim().length > 0;
+  const linkValid = !isLink || href.trim().startsWith("http");
+  const canSave =
+    titleValid &&
+    videoHasSource &&
+    linkValid &&
+    (!isSurvey || Boolean(surveyId)) &&
+    !busy;
 
   const save = async () => {
     setBusy(true);
     try {
       let contentPackageId: string | undefined;
       if (file) {
-        const uploaded = await uploadMedia(file, isVideo ? 'video' : 'document');
+        const uploaded = await uploadMedia(
+          file,
+          isVideo ? "video" : "document",
+        );
         contentPackageId = uploaded.id;
       }
 
@@ -97,32 +151,39 @@ export function EditContentDrawer({
       const config: Record<string, unknown> = {};
       // Se manda SIEMPRE, tambien en false: es lo que distingue "el admin dijo que no" de "nadie lo
       // ha decidido", y de eso depende que se ofrezca o no el archivo original.
-      if (content.type === 'PRESENTATION' || content.type === 'DOCUMENT') config.allowDownload = allowDownload;
+      if (content.type === "PRESENTATION" || content.type === "DOCUMENT")
+        config.allowDownload = allowDownload;
       if (isVideo) {
         config.minWatchPct = clampPct(minWatchPct);
         // Si se subio un archivo ahora, el enlace externo sobra: la parte pasa a ser medible.
-        if (!file && !contentPackageId && externalUrl.trim()) config.externalUrl = externalUrl.trim();
+        if (!file && !contentPackageId && externalUrl.trim())
+          config.externalUrl = externalUrl.trim();
       }
       if ((isDocument || isLesson) && minSeconds.trim()) {
         const seconds = Number(minSeconds);
-        if (Number.isFinite(seconds) && seconds > 0) config.minSeconds = Math.round(seconds);
+        if (Number.isFinite(seconds) && seconds > 0)
+          config.minSeconds = Math.round(seconds);
       }
       if (isLink) config.href = href.trim();
 
       await updateContent(content.id, {
         title: title.trim(),
-        description: description.trim() || null,
+        ...(pideDescripcion ? { description: description.trim() || null } : {}),
         isRequired,
+        ...(isSurvey ? { surveyTemplateId: surveyId } : {}),
         config,
         ...(contentPackageId ? { contentPackageId } : {}),
       });
-      showToast({ kind: 'success', title: 'Contenido actualizado' });
+      showToast({ kind: "success", title: "Contenido actualizado" });
       onOpenChange(false);
       await onSaved();
     } catch (error) {
       showToast({
-        kind: 'danger',
-        title: error instanceof ApiError ? error.message : 'No se pudo actualizar el contenido',
+        kind: "danger",
+        title:
+          error instanceof ApiError
+            ? error.message
+            : "No se pudo actualizar el contenido",
       });
     } finally {
       setBusy(false);
@@ -140,32 +201,86 @@ export function EditContentDrawer({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={() => void save()} disabled={!canSave} loading={busy}>
+          <Button
+            onClick={() => void save()}
+            disabled={!canSave}
+            loading={busy}
+          >
             Guardar cambios
           </Button>
         </div>
       }
     >
       <div className="space-y-4">
-        <Field htmlFor="ec-title" label="Titulo" required hint="Es lo que ve la persona en el indice de la formación.">
-          <Input id="ec-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} />
-        </Field>
-
         <Field
-          htmlFor="ec-description"
-          label="Descripción"
-          hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
+          htmlFor="ec-title"
+          label="Titulo"
+          required
+          hint="Es lo que ve la persona en el indice de la formación."
         >
-          <Textarea
-            id="ec-description"
-            rows={3}
-            value={description}
-            maxLength={2000}
-            onChange={(event) => setDescription(event.target.value)}
+          <Input
+            id="ec-title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            maxLength={200}
           />
         </Field>
 
-        {(content.type === 'PRESENTATION' || content.type === 'DOCUMENT') ? (
+        {/*
+          CAMBIAR LA ENCUESTA (2026-09-30, pedido del cliente). El tipo de formacion trae una por
+          defecto y la pone al publicar SOLO si la formacion no tiene ya una pieza de encuesta: por
+          eso lo que se elija aqui gana sobre la del tipo.
+        */}
+        {isSurvey ? (
+          <Field
+            htmlFor="ec-survey"
+            label="Encuesta"
+            required
+            hint="Gana sobre la que trae el tipo de formación. Se crean en Configuración > Encuestas."
+          >
+            <Select
+              id="ec-survey"
+              value={surveyId}
+              onChange={(event) => {
+                const anterior = surveys.find((row) => row.id === surveyId);
+                const elegida = surveys.find(
+                  (row) => row.id === event.target.value,
+                );
+                setSurveyId(event.target.value);
+                // Si el titulo era el nombre de la encuesta anterior, sigue al de la nueva.
+                if (elegida && (!title.trim() || title === anterior?.name))
+                  setTitle(elegida.name);
+              }}
+            >
+              <option value="">Elegir encuesta...</option>
+              {surveys
+                .filter((row) => row.active || row.id === surveyId)
+                .map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        ) : null}
+
+        {pideDescripcion ? (
+          <Field
+            htmlFor="ec-description"
+            label="Descripción"
+            hint="De que va esta parte. La lee el colaborador junto al contenido; puedes dejarla vacia."
+          >
+            <Textarea
+              id="ec-description"
+              rows={3}
+              value={description}
+              maxLength={2000}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </Field>
+        ) : null}
+
+        {content.type === "PRESENTATION" || content.type === "DOCUMENT" ? (
           <label className="flex items-start gap-2 text-sm text-ink-700">
             <input
               type="checkbox"
@@ -175,24 +290,31 @@ export function EditContentDrawer({
             />
             <span>
               Se puede descargar el archivo original
-              <span className="mt-0.5 block text-xs text-ink-500">Una presentacion se reproduce convertida en diapositivas. Marca esto solo si además quieres entregar el archivo tal como llego.</span>
+              <span className="mt-0.5 block text-xs text-ink-500">
+                Una presentacion se reproduce convertida en diapositivas. Marca
+                esto solo si además quieres entregar el archivo tal como llego.
+              </span>
             </span>
           </label>
         ) : null}
-        <label className="flex items-start gap-2 text-sm text-ink-700">
-          <input
-            type="checkbox"
-            checked={isRequired}
-            onChange={(event) => setIsRequired(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-line-strong"
-          />
-          <span>
-            Obligatorio para terminar la formacion
-            <span className="block text-xs text-ink-500">
-              Si lo quitas, la persona puede completar la formacion sin pasar por aqui.
+        {/* Una encuesta nunca es obligatoria: se pide y se agradece, no se cobra (sin constancia por no opinar). */}
+        {isSurvey ? null : (
+          <label className="flex items-start gap-2 text-sm text-ink-700">
+            <input
+              type="checkbox"
+              checked={isRequired}
+              onChange={(event) => setIsRequired(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-line-strong"
+            />
+            <span>
+              Obligatorio para terminar la formacion
+              <span className="block text-xs text-ink-500">
+                Si lo quitas, la persona puede completar la formacion sin pasar
+                por aqui.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        )}
 
         {isVideo ? (
           <>
@@ -213,17 +335,28 @@ export function EditContentDrawer({
 
             {content.contentPackage ? (
               <p className="text-sm text-ink-500">
-                Archivo actual: <span className="text-ink-900">{content.contentPackage.originalName}</span>
+                Archivo actual:{" "}
+                <span className="text-ink-900">
+                  {content.contentPackage.originalName}
+                </span>
               </p>
             ) : null}
 
-            <Field htmlFor="ec-file" label="Reemplazar el archivo" hint="Opcional. Al subir otro, el anterior deja de usarse aquí.">
+            <Field
+              htmlFor="ec-file"
+              label="Reemplazar el archivo"
+              hint="Opcional. Al subir otro, el anterior deja de usarse aquí."
+            >
               <label
                 htmlFor="ec-file"
                 className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-5 text-sm text-ink-500 hover:border-primary"
               >
                 <Upload size={18} strokeWidth={1.75} />
-                {file ? <span className="text-ink-900">{file.name}</span> : <span>Subir otro video</span>}
+                {file ? (
+                  <span className="text-ink-900">{file.name}</span>
+                ) : (
+                  <span>Subir otro video</span>
+                )}
               </label>
               <input
                 id="ec-file"
@@ -235,8 +368,17 @@ export function EditContentDrawer({
             </Field>
 
             {!content.contentPackageId && !file ? (
-              <Field htmlFor="ec-url" label="Enlace de YouTube o Vimeo" hint="De YouTube se mide lo reproducido; del resto no.">
-                <Input id="ec-url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} placeholder="https://" />
+              <Field
+                htmlFor="ec-url"
+                label="Enlace de YouTube o Vimeo"
+                hint="De YouTube se mide lo reproducido; del resto no."
+              >
+                <Input
+                  id="ec-url"
+                  value={externalUrl}
+                  onChange={(event) => setExternalUrl(event.target.value)}
+                  placeholder="https://"
+                />
               </Field>
             ) : null}
           </>
@@ -246,16 +388,27 @@ export function EditContentDrawer({
           <>
             {content.contentPackage ? (
               <p className="text-sm text-ink-500">
-                Archivo actual: <span className="text-ink-900">{content.contentPackage.originalName}</span>
+                Archivo actual:{" "}
+                <span className="text-ink-900">
+                  {content.contentPackage.originalName}
+                </span>
               </p>
             ) : null}
-            <Field htmlFor="ec-doc" label="Reemplazar el archivo" hint="Opcional.">
+            <Field
+              htmlFor="ec-doc"
+              label="Reemplazar el archivo"
+              hint="Opcional."
+            >
               <label
                 htmlFor="ec-doc"
                 className="focus-ring flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-5 text-sm text-ink-500 hover:border-primary"
               >
                 <Upload size={18} strokeWidth={1.75} />
-                {file ? <span className="text-ink-900">{file.name}</span> : <span>Subir otro documento</span>}
+                {file ? (
+                  <span className="text-ink-900">{file.name}</span>
+                ) : (
+                  <span>Subir otro documento</span>
+                )}
               </label>
               <input
                 id="ec-doc"
@@ -270,7 +423,12 @@ export function EditContentDrawer({
 
         {isLink ? (
           <Field htmlFor="ec-href" label="Destino" required>
-            <Input id="ec-href" value={href} onChange={(event) => setHref(event.target.value)} placeholder="https://" />
+            <Input
+              id="ec-href"
+              value={href}
+              onChange={(event) => setHref(event.target.value)}
+              placeholder="https://"
+            />
           </Field>
         ) : null}
 
@@ -290,10 +448,11 @@ export function EditContentDrawer({
           </Field>
         ) : null}
 
-        {content.type === 'ASSESSMENT' ? (
+        {content.type === "ASSESSMENT" ? (
           <p className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
-            Las preguntas y la nota minima de la evaluacion se editan desde la evaluacion. Aqui solo cambian su titulo en el
-            indice y si es obligatoria.
+            Las preguntas y la nota minima de la evaluacion se editan desde la
+            evaluacion. Aqui solo cambian su titulo en el indice y si es
+            obligatoria.
           </p>
         ) : null}
       </div>

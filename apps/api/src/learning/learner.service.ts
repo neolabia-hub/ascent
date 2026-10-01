@@ -162,7 +162,12 @@ export class LearnerService {
   /** Mi historial: lo que ya hice, con su nota. Es la hoja de vida formativa de la persona. */
   async history(actor: AuthUser) {
     const enrollments = await this.prisma.scoped.enrollment.findMany({
-      where: { userId: actor.id, status: { in: ['COMPLETED', 'PASSED', 'FAILED'] } },
+      // Sin lo de la papelera (2026-09-30): una formacion de prueba eliminada no es historia de nadie.
+      where: {
+        userId: actor.id,
+        status: { in: ['COMPLETED', 'PASSED', 'FAILED'] },
+        activityVersion: { activity: { deletedAt: null } },
+      },
       orderBy: { completedAt: 'desc' },
       take: 100,
       select: {

@@ -442,8 +442,26 @@ export class CertificatesService {
 
   /** Las constancias de una persona, para su propio expediente. */
   async mias(tenantId: string, userId: string) {
-    const filas = await this.prisma.forTenant(tenantId).certificate.findMany({
-      where: { userId },
+    /*
+      SIN LO DE LA PAPELERA (2026-09-30), como en Moodle: una formacion de prueba eliminada no deja
+      rastro en el expediente de nadie. Si se restaura, vuelve. La certificacion ANULADA de una
+      formacion real si sigue: eso es historia de verdad.
+
+      La constancia guarda la inscripcion y no la formacion, asi que se excluye por inscripcion; y
+      con un OR que respeta las de PROGRAMA (enrollmentId nulo), que un NOT IN se llevaria por delante.
+    */
+    const db = this.prisma.forTenant(tenantId);
+    const enPapelera = (
+      await db.enrollment.findMany({
+        where: { userId, activityVersion: { activity: { deletedAt: { not: null } } } },
+        select: { id: true },
+      })
+    ).map((fila) => fila.id);
+    const filas = await db.certificate.findMany({
+      where: {
+        userId,
+        ...(enPapelera.length ? { OR: [{ enrollmentId: null }, { enrollmentId: { notIn: enPapelera } }] } : {}),
+      },
       orderBy: { issuedAt: 'desc' },
       select: {
         id: true,
