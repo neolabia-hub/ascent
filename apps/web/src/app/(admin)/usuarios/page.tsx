@@ -544,7 +544,7 @@ export default function UsuariosPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         title={editing ? 'Editar persona' : 'Nueva persona'}
-        description={editing ? `Documento: ${editing.documentNumber}` : 'La contraseña inicial se genera automaticamente (cedula + caracteres).'}
+        description={editing ? `Documento: ${editing.documentNumber}` : 'La contraseña inicial es su cédula. Al entrar por primera vez, el sistema le pide cambiarla.'}
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setDrawerOpen(false)}>Cancelar</Button>

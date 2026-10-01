@@ -12,7 +12,7 @@ import { RequirementEngineService } from '../assignments/requirement-engine.serv
 import { AuditService } from '../common/audit.service.js';
 import type { AuthUser } from '../common/types.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { generateInitialPassword } from './password.util.js';
+import { generateInitialPassword, generateResetPassword } from './password.util.js';
 
 /** Proyeccion estandar de usuario hacia la UI (nunca expone hashes ni tokens). */
 const USER_SELECT = {
@@ -120,8 +120,8 @@ export class UsersService {
   }
 
   /**
-   * Crea un usuario. Si no llega contrasena, GENERA una segura (patron cedula + caracteres,
-   * Decision de negocio 3.3) y la devuelve UNA sola vez. Siempre mustChangePassword=true.
+   * Crea un usuario. Si no llega contrasena, su clave inicial es SU CEDULA (2026-10-01, antes
+   * cedula + caracteres) y se devuelve UNA sola vez. Siempre mustChangePassword=true.
    */
   async create(actor: AuthUser, input: CreateUserInput) {
     const tenantId = this.prisma.currentTenantId;
@@ -275,7 +275,7 @@ export class UsersService {
       });
     }
 
-    const generatedPassword = generateInitialPassword(user.documentNumber);
+    const generatedPassword = generateResetPassword(user.documentNumber);
     await this.prisma.scoped.user.update({
       where: { id },
       data: {

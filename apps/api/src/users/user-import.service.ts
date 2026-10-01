@@ -57,7 +57,7 @@ export interface ImportResult {
 /**
  * Carga masiva de usuarios desde CSV o XLSX (negocio 3.3): plantilla con encabezados en
  * español, validacion POR FILA (las filas buenas entran aunque otras fallen), reporte de
- * errores fila a fila y contrasena inicial generada (cedula + caracteres) devuelta UNA vez
+ * errores fila a fila y contrasena inicial = la cedula (2026-10-01) devuelta UNA vez
  * para que el admin la distribuya. Todo queda en user_import_batches/rows para auditoria.
  */
 /**

@@ -76,11 +76,11 @@ test.describe('Sprint 1 — administracion del tenant', () => {
     await page.locator('#u-area').selectOption({ label: 'Logistica' });
     await page.getByRole('button', { name: 'Crear persona' }).click();
 
-    // La credencial se muestra UNA vez, con el patron cedula + caracteres.
+    // La credencial se muestra UNA vez. A una persona NUEVA su clave es su cedula, sin mas (2026-10-01).
     const credential = page.getByRole('dialog').filter({ hasText: 'Contraseña generada' });
     await expect(credential).toBeVisible();
     await expect(credential).toContainText(document);
-    await expect(credential.locator('p.font-mono').last()).toContainText(new RegExp(`^${document}.{5,}$`));
+    await expect(credential.locator('p.font-mono').last()).toHaveText(document);
     await credential.getByRole('button', { name: 'Entendido' }).click();
 
     // Y la persona aparece en el listado al buscarla.

@@ -188,6 +188,8 @@ comprobar(alta.ok, `persona creada (${alta.estado})`, `alta: ${alta.estado} ${JS
 creado.userId = alta.cuerpo?.id ?? alta.cuerpo?.user?.id;
 const clave = alta.cuerpo?.generatedPassword ?? alta.cuerpo?.password;
 comprobar(!!clave, 'la contrasena se entrega UNA vez, al crearla', 'no vino ninguna contrasena generada');
+// Persona NUEVA: su clave inicial es su cedula, sin nada mas (2026-10-01, pedido del cliente).
+comprobar(clave === documento, 'y es SU CEDULA, sin nada mas', `vino ${clave}`);
 
 const trasElAlta = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? []).find((r) => r.reachesEveryone);
 comprobar(
