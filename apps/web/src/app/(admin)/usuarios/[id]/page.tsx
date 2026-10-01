@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { getUser, type UserDetail } from '@/lib/admin-api';
 import { abrirPdfEnPestana, descargarPdf, getCertificatesOf, type CertificateRow } from '@/lib/certificates-api';
-import { listAssignments, papelesDePersona, type AssignmentRow, type PapelDeTercero } from '@/lib/delivery-api';
+import { papelesDePersona, todasLasObligacionesDe, type AssignmentRow, type PapelDeTercero } from '@/lib/delivery-api';
 import { motivoDelError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { PapelesDePersona } from '@/components/modules/admin/papeles-de-persona';
@@ -113,8 +113,8 @@ export default function PerfilDePersonaPage() {
     void getUser(id)
       .then(setPersona)
       .catch(() => setNoExiste(true));
-    void listAssignments({ userId: id, page: 1 })
-      .then((pagina) => setObligaciones(pagina.items))
+    void todasLasObligacionesDe(id)
+      .then(setObligaciones)
       .catch(() => setObligaciones([]));
     void getCertificatesOf(id)
       .then(setConstancias)
@@ -619,8 +619,8 @@ export default function PerfilDePersonaPage() {
           void papelesDePersona(id)
             .then((filas) => setPapeles(filas.filter((papel) => papel.number || papel.fileKey)))
             .catch(() => undefined);
-          void listAssignments({ userId: id, page: 1 })
-            .then((pagina) => setObligaciones(pagina.items))
+          void todasLasObligacionesDe(id)
+            .then(setObligaciones)
             .catch(() => undefined);
         }}
       />

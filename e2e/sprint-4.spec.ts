@@ -188,13 +188,13 @@ test('quien administra llega a su propia formacion y vuelve al panel', async ({ 
     (Decision #92): el rotulo visible es "Mi formacion" pero lo que un lector de pantalla —y esta
     prueba— leen es "Ir a mi formacion", que es lo que pasa al pulsarlo.
   */
-  const aFormacion = page.getByRole('link', { name: /Ir a mi formacion/i });
+  const aFormacion = page.getByRole('link', { name: /Ir a mi formación/i });
   await expect(aFormacion).toBeVisible();
   await aFormacion.click();
   await page.waitForURL('**/hoy', { timeout: 20_000 });
 
   // Vuelta: solo aparece para quien administra algo, y este usuario lo hace.
-  const alPanel = page.getByRole('link', { name: /Ir al panel de administracion/i });
+  const alPanel = page.getByRole('link', { name: /Ir al panel de administración/i });
   await expect(alPanel).toBeVisible();
   await alPanel.click();
   await page.waitForURL('**/inicio', { timeout: 20_000 });

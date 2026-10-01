@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
+  getAccessToken,
   getPublicTenant,
   iniciarRenovacionAutomatica,
   me,
@@ -82,6 +83,19 @@ export function LearnerSession({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function resolveProfile(): Promise<MeResponse | null> {
+      /*
+        SIN TOKEN EN MEMORIA, SE RENUEVA PRIMERO (2026-09-30). Al cargar cualquier pagina el token no
+        esta —vive en memoria, no en el navegador—, asi que pedir el perfil antes era un 401 seguro
+        en cada carga (se veia en la consola de produccion) y un viaje de ida y vuelta perdido.
+      */
+      if (!getAccessToken()) {
+        try {
+          const refreshed = await refresh();
+          setAccessToken(refreshed.accessToken, refreshed.expiresIn);
+        } catch {
+          return null;
+        }
+      }
       try {
         return await me();
       } catch {
@@ -96,6 +110,9 @@ export function LearnerSession({ children }: { children: ReactNode }) {
     }
 
     async function bootstrap() {
+      // El tenant no depende del perfil: se pide a la vez, y la carga deja de ser tres viajes en fila.
+      const slugTemprano = resolveTenantSlug(window.location.host, new URLSearchParams(window.location.search));
+      const tenantEnCamino = getPublicTenant(slugTemprano).catch(() => null);
       const profile = await resolveProfile();
       if (cancelled) return;
 
@@ -115,7 +132,7 @@ export function LearnerSession({ children }: { children: ReactNode }) {
 
       const slug = resolveTenantSlug(window.location.host, new URLSearchParams(window.location.search));
       try {
-        const publicTenant = await getPublicTenant(slug);
+        const publicTenant = (await tenantEnCamino) ?? (await getPublicTenant(slug));
         if (cancelled) return;
         applyTenantBranding(publicTenant.branding);
         setSession({

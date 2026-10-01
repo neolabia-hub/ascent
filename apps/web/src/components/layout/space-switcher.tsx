@@ -75,7 +75,7 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
 
   // `to` es el DESTINO, asi que el espacio actual es el otro.
   const IconoActual = to === 'learner' ? LayoutGrid : GraduationCap;
-  const nombreActual = to === 'learner' ? 'Administracion' : 'Mi aprendizaje';
+  const nombreActual = to === 'learner' ? 'Administración' : 'Mi aprendizaje';
   const href = to === 'learner' ? LEARNER_HOME : ADMIN_HOME;
 
   const total = pending?.total ?? 0;
@@ -87,7 +87,7 @@ export function SpaceSwitcher({ to }: { to: 'learner' | 'admin' }) {
     pantalla oye "enlace: ir al panel de administracion" y con eso sabe que pasa al pulsarlo. El
     "estas en X" es contexto y va en el tooltip, que es donde el contexto ayuda sin estorbar.
   */
-  const accion = to === 'admin' ? 'Ir al panel de administracion' : 'Ir a mi formacion';
+  const accion = to === 'admin' ? 'Ir al panel de administración' : 'Ir a mi formación';
   const detalle =
     to === 'admin'
       ? ''

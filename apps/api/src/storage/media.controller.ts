@@ -339,6 +339,12 @@ export class MediaController {
       reproductor para saltar en un video.
     */
     if (!this.storage.isLocal) {
+      /*
+        LA REDIRECCION SE PUEDE GUARDAR (2026-09-30). Sin cabecera, el navegador volvia a preguntar
+        en cada pantalla y el bucket le daba otra URL firmada: el logo de 6 MB se bajaba entero cada
+        vez. Privada (es de quien tiene sesion) y por menos tiempo del que vive la firma del bucket.
+      */
+      res.setHeader('Cache-Control', 'private, max-age=3000');
       res.redirect(302, await this.storage.getSignedUrl(storageKey, 3600));
       return;
     }

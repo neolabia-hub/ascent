@@ -565,12 +565,29 @@ export function listAssignments(params: {
   targetId?: string;
   areaId?: string;
   page?: number;
+  pageSize?: number;
 }): Promise<AssignmentsPage> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== '') search.set(key, String(value));
   });
   return apiFetch(`/assignments?${search.toString()}`, { method: 'GET' });
+}
+
+/**
+ * TODAS LAS OBLIGACIONES DE UNA PERSONA, pagina a pagina (2026-09-30).
+ *
+ * La ficha pedia solo la primera pagina (20). Con alguien que tiene 141 —132 retiradas por pruebas y
+ * cambios de cargo— lo pendiente quedaba fuera y las cifras no cuadraban con lo que se veia.
+ */
+export async function todasLasObligacionesDe(userId: string): Promise<AssignmentRow[]> {
+  const filas: AssignmentRow[] = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const pagina = await listAssignments({ userId, page, pageSize: 100 });
+    filas.push(...pagina.items);
+    if (filas.length >= pagina.total || pagina.items.length === 0) break;
+  }
+  return filas;
 }
 
 export function createAssignments(body: {

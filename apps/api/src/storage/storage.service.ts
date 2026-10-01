@@ -270,7 +270,13 @@ export class StorageService {
    * una firma para otro archivo ni estirarle la vida.
    */
   signPath(key: string, expiresInSeconds = 3600): string {
-    const expiresAt = Date.now() + expiresInSeconds * 1000;
+    /*
+      REDONDEADA A LA HORA (2026-09-30). Con el milisegundo exacto, la URL de cada imagen era distinta
+      en cada carga y el navegador no podia reutilizar nada. Redondeando hacia arriba, la misma imagen
+      tiene la misma URL durante una hora —y nunca caduca ANTES de lo pedido—.
+    */
+    const HORA = 3_600_000;
+    const expiresAt = Math.ceil((Date.now() + expiresInSeconds * 1000) / HORA) * HORA;
     const signature = this.sign(key, String(expiresAt));
     return `/v1/media/file/${encodeURIComponent(key)}?e=${expiresAt}&t=${signature}`;
   }

@@ -1,3 +1,4 @@
+import { reducirImagen } from './reducir-imagen';
 /**
  * Cliente tipado del CATALOGO FORMATIVO (Sprint 2): actividades, versiones, contenidos,
  * lecciones en tarjetas, banco de preguntas y evaluaciones.
@@ -587,8 +588,10 @@ export interface UploadedPackage {
   sizeBytes: number;
 }
 
-export async function uploadMedia(file: File, kind = 'media'): Promise<UploadedPackage> {
+export async function uploadMedia(original: File, kind = 'media'): Promise<UploadedPackage> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3002';
+  // Logos, fotos y portadas se reducen antes de viajar (ver `reducir-imagen.ts`).
+  const file = await reducirImagen(original, kind);
   const form = new FormData();
   form.append('file', file);
   const token = getAccessToken();
