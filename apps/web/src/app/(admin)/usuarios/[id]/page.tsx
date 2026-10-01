@@ -72,6 +72,16 @@ const ESTADO: Record<AssignmentRow['status'], { label: string; kind: 'ok' | 'war
   WITHDRAWN_PLAN_ITEM_CANCELLED: { label: 'RETIRADA', kind: 'neutral' },
 };
 
+/**
+ * POR QUE SE RETIRO, en palabras (2026-09-30). La fila no guarda un motivo escrito —lo retira el
+ * sistema, no una persona—, pero el estado dice cual de los dos casos fue, y es lo que pregunta un
+ * auditor delante de una obligacion que no se cumplio y no cuenta.
+ */
+const POR_QUE_RETIRADA: Partial<Record<AssignmentRow['status'], string>> = {
+  WITHDRAWN_LEFT_AUDIENCE: 'dejó de exigírsele: cambió de cargo o área, o se retiró la regla',
+  WITHDRAWN_PLAN_ITEM_CANCELLED: 'se canceló el renglón del plan que la creó',
+};
+
 /** Dejaron de exigirse sin cumplirse: no son trayectoria (2026-09-30). */
 const RETIRADA: string[] = ['WITHDRAWN_LEFT_AUDIENCE', 'WITHDRAWN_PLAN_ITEM_CANCELLED'];
 const PENDIENTE: AssignmentRow['status'][] = ['OVERDUE', 'EXPIRED_NOT_DONE', 'PENDING', 'IN_PROGRESS'];
@@ -714,7 +724,9 @@ function Obligacion({ fila }: { fila: AssignmentRow }) {
           : fila.dueAt
             ? `vence el ${formatDate(fila.dueAt)}`
             : 'sin plazo'
-      }${fila.cycleNumber > 1 ? ` · ronda ${fila.cycleNumber}` : ''}${fila.waivedReason ? ` · ${fila.waivedReason}` : ''}`}
+      }${fila.cycleNumber > 1 ? ` · ronda ${fila.cycleNumber}` : ''}${fila.waivedReason ? ` · ${fila.waivedReason}` : ''}${
+        POR_QUE_RETIRADA[fila.status] ? ` · ${POR_QUE_RETIRADA[fila.status]}` : ''
+      }`}
       pastilla={<StatusPill kind={estado.kind} label={estado.label} />}
     />
   );
