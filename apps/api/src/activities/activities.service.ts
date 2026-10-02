@@ -26,6 +26,9 @@ const ACTIVITY_LIST_SELECT = {
   id: true,
   code: true,
   name: true,
+  // La portada subida (2026-10-01): sin esto la lista de Contenido formativo pintaba siempre la
+  // generada, aunque la formacion tuviera la suya.
+  coverKey: true,
   modality: true,
   active: true,
   updatedAt: true,

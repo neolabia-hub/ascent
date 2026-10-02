@@ -204,12 +204,31 @@ comprobar(
   `se retiraron ${retiradas} de ${aRetirar.length}`,
 );
 
+/*
+  ACTUALIZADO EL 2026-10-01. Antes se esperaba CERO abiertas aqui, y era el sintoma del fallo del
+  motor: generaba antes de retirar, asi que la regla del area —que sigue viva y se la exige— veia la
+  obligacion vieja todavia abierta y no creaba la suya, y la persona quedaba sin nada hasta otra
+  pasada. Ahora se retira primero: la vieja queda RETIRADA y la del area nace en el acto.
+*/
+/*
+  Cual de las dos reglas «es duena» de la obligacion depende de cual llego primero, y eso varia.
+  Si era la del area, sigue abierta tal cual; si era una de las retiradas, esa queda RETIRADA y la
+  del area le abre la suya en el acto. En los dos casos: UNA abierta, nunca cero.
+*/
 const traRetirar = await abiertasDe(otra.id);
 comprobar(
-  traRetirar.length === 0,
-  'su obligacion queda retirada con motivo, no borrada',
-  `siguen abiertas ${traRetirar.length}: ${JSON.stringify(traRetirar.map((a) => a.status))}`,
+  traRetirar.length === 1,
+  'la regla que sigue viva se la exige en el acto: nunca queda sin obligacion',
+  `abiertas ${traRetirar.length}: ${JSON.stringify(traRetirar.map((a) => a.status))}`,
 );
+if (traRetirar[0]?.id !== antesDeRetirar[0]?.id) {
+  const laVieja = (await suyas(otra.id)).find((a) => a.id === antesDeRetirar[0]?.id);
+  comprobar(
+    laVieja && !ABIERTAS.includes(laVieja.status),
+    'y la de la regla retirada queda RETIRADA, no borrada',
+    `la vieja quedo ${laVieja?.status ?? 'borrada'}`,
+  );
+}
 
 // Y el motor vuelve a pasar por la regla que SIGUE viva.
 await admin.patch(`/assignment-rules/${reglaArea.cuerpo?.ruleId}`, { active: true });

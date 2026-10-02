@@ -399,6 +399,8 @@ export interface ProjectedPreview {
   total: number;
   source: 'OBLIGATIONS' | 'RULES' | 'NONE';
   detail: string;
+  /** De los que atiende, cuantos vencen antes del ultimo dia de la convocatoria (2026-10-01). */
+  vencimientos: { antes: number; yaVencidas: number } | null;
   facets: {
     jobTitles: FacetCount[];
     areas: FacetCount[];
@@ -416,6 +418,8 @@ export function previewProjected(body: {
   activityVersionId: string;
   scope: AudienceRule;
   regionalId: string | null;
+  /** El ultimo dia en que se puede hacer: la sesion o el «disponible hasta». */
+  hasta?: string | null;
 }): Promise<ProjectedPreview> {
   return apiFetch('/offerings/proyectados', { method: 'POST', body });
 }
@@ -870,6 +874,8 @@ export interface PendingInvites {
   detalle: string;
   convocados: number;
   enEstaJornada: number;
+  /** Personas con la obligacion abierta: las que se quedan sin puerta si se cierra (2026-10-01). */
+  laDeben: number;
   faltan: Array<{
     id: string;
     fullName: string;

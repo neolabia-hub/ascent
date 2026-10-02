@@ -29,6 +29,14 @@ const KIND_BY_EVENT: Record<string, NotificationKind> = {
   EXTRA_ATTEMPT_GRANTED: 'formacion',
   // Lo que tienes que hacer POR OTROS.
   APPROVAL_REQUESTED: 'gestion',
+  // Lo que pediste o escribiste tu, de vuelta (2026-10-01).
+  APPROVAL_APPROVED: 'gestion',
+  APPROVAL_REJECTED: 'gestion',
+  FORMACION_EN_REVISION: 'gestion',
+  FORMACION_REVISADA: 'gestion',
+  PASSWORD_HELP_REQUESTED: 'gestion',
+  PERFORMANCE_CYCLE_OPENED: 'gestion',
+  PERFORMANCE_REVIEW_SUBMITTED: 'formacion',
   ATTEMPTS_EXHAUSTED: 'gestion',
   // El instructor no se esta formando: le encargan dictar.
   OFFERING_PUBLISHED: 'gestion',
@@ -75,6 +83,25 @@ export function notificationHref(item: {
 
   // Lo que tienes que resolver tu.
   if (eventType === 'APPROVAL_REQUESTED') return '/aprobaciones';
+
+  /*
+    DIRECTO A LO QUE NOMBRA (2026-10-01, pedido del cliente). «Formación lista para revisar» no
+    llevaba a ninguna parte: habia que buscarla a mano en el catalogo.
+  */
+  if ((eventType === 'FORMACION_EN_REVISION' || eventType === 'FORMACION_REVISADA') && referenceType === 'activities' && referenceId) {
+    return `/contenido-formativo/${referenceId}`;
+  }
+  if (eventType === 'APPROVAL_APPROVED' || eventType === 'APPROVAL_REJECTED') {
+    if (referenceType === 'activities' && referenceId) return `/contenido-formativo/${referenceId}`;
+    if (referenceType === 'offerings' && referenceId) return `/convocatorias/${referenceId}`;
+    return '/aprobaciones';
+  }
+  // Alguien no puede entrar: a su perfil, donde esta «Restablecer contraseña».
+  if (eventType === 'PASSWORD_HELP_REQUESTED' && referenceType === 'user' && referenceId) {
+    return `/usuarios/${referenceId}`;
+  }
+  // Las evaluaciones de desempeño que te tocan responder, y la tuya cuando esta lista.
+  if (eventType === 'PERFORMANCE_CYCLE_OPENED' || eventType === 'PERFORMANCE_REVIEW_SUBMITTED') return '/mi-desempeno';
   if (eventType === 'OFFERING_PUBLISHED' && referenceType === 'offerings' && referenceId) {
     return `/convocatorias/${referenceId}`;
   }

@@ -342,5 +342,10 @@ export const previewProjectedSchema = z.object({
   scope: audienceRuleSchema,
   /** La sede, que acota solo cuando no hay tajada declarada. */
   regionalId: z.string().uuid().nullable().default(null),
+  /**
+   * EL ULTIMO DIA EN QUE SE PUEDE HACER (2026-10-01): la fecha de la sesion o el «disponible
+   * hasta». Con ella se cuenta cuantos de los que atiende VENCEN ANTES, para avisarlo.
+   */
+  hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
 });
 export type PreviewProjectedInput = z.infer<typeof previewProjectedSchema>;

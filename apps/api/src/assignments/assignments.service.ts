@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { activityTypeConfigSchema, audienceRuleSchema } from '@neo-pulse/shared';
+import { activityTypeConfigSchema, audienceRuleSchema, MENSAJE_PLAZO_DE_INGRESO, PLAZO_MINIMO_DE_INGRESO } from '@neo-pulse/shared';
 import type {
   AudienceRule,
   CreateAssignmentInput,
@@ -135,6 +135,13 @@ export class AssignmentsService {
   async updateRule(actor: AuthUser, id: string, input: UpdateAssignmentRuleInput) {
     const tenantId = this.prisma.currentTenantId;
     const before = await this.prisma.scoped.assignmentRule.findUnique({ where: { id } });
+    if (
+      before?.trigger === 'ON_HIRE' &&
+      input.dueDaysAfterTrigger !== undefined &&
+      input.dueDaysAfterTrigger < PLAZO_MINIMO_DE_INGRESO
+    ) {
+      throw new BadRequestException({ code: 'PLAZO_DE_INGRESO', message: MENSAJE_PLAZO_DE_INGRESO });
+    }
     if (!before) throw new NotFoundException({ code: 'RULE_NOT_FOUND' });
 
     const rule = await this.prisma.scoped.assignmentRule.update({
@@ -148,7 +155,22 @@ export class AssignmentsService {
 
     // Retirar el requisito retira lo PENDIENTE (queda con motivo, no se borra).
     if (input.active === false) {
+      /*
+        Y QUIEN SIGUE OBLIGADO POR OTRA REGLA LO RECIBE EN EL ACTO (2026-10-01). Dos reglas sobre la
+        misma formacion dejan UNA obligacion, de la que llego primero. Si se retiraba justo esa, la
+        persona quedaba sin nada hasta la siguiente pasada aunque la otra regla se la siguiera
+        exigiendo. Lo destapo el recorrido dos-reglas-una-obligacion, que fallaba segun que regla ganara.
+      */
+      const afectados = await this.prisma.scoped.assignment.findMany({
+        where: { ruleId: id, status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] } },
+        select: { userId: true },
+      });
       await this.engine.withdrawLeavers(this.prisma.scoped);
+      if (afectados.length > 0) {
+        await this.engine.generate(this.prisma.scoped, this.prisma.currentTenantId, {
+          userIds: [...new Set(afectados.map((fila) => fila.userId))],
+        });
+      }
     }
     if (input.active === true) {
       /*
@@ -842,26 +864,45 @@ export class AssignmentsService {
       : (await this.prisma.scoped.activity.findMany({ where: { deletedAt: { not: null } }, select: { id: true } })).map(
           (fila) => fila.id,
         );
+    /*
+      BUSCAR TAMBIEN POR FORMACION (2026-10-01). El buscador solo miraba nombre y documento de la
+      persona: con «Inducción Corporativa SST» escrito no salia nada. La obligacion no tiene relacion
+      con la actividad (`targetId` suelto), asi que se buscan antes las formaciones que coinciden.
+    */
+    const formacionesQueCoinciden = query.q
+      ? (
+          await this.prisma.scoped.activity.findMany({
+            where: { name: { contains: query.q, mode: 'insensitive' } },
+            select: { id: true },
+            take: 200,
+          })
+        ).map((fila) => fila.id)
+      : [];
+    const porPersona: Prisma.AssignmentWhereInput = query.q
+      ? {
+          user: {
+            OR: [
+              { fullName: { contains: query.q, mode: 'insensitive' as const } },
+              { documentNumber: { contains: query.q } },
+            ],
+          },
+        }
+      : {};
     const where: Prisma.AssignmentWhereInput = {
       ...(papelera.length > 0 ? { NOT: { targetId: { in: papelera } } } : {}),
+      ...(query.q
+        ? { OR: [porPersona, ...(formacionesQueCoinciden.length ? [{ targetId: { in: formacionesQueCoinciden } }] : [])] }
+        : {}),
       ...(query.userId ? { userId: query.userId } : {}),
       ...(query.targetId ? { targetId: query.targetId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.source ? { source: query.source } : {}),
       ...(query.overdueOnly === 'true' ? { status: 'OVERDUE' } : {}),
-      ...(query.areaId || query.jobTitleId || query.q
+      ...(query.areaId || query.jobTitleId
         ? {
             user: {
               ...(query.areaId ? { areaId: query.areaId } : {}),
               ...(query.jobTitleId ? { jobTitleId: query.jobTitleId } : {}),
-              ...(query.q
-                ? {
-                    OR: [
-                      { fullName: { contains: query.q, mode: 'insensitive' as const } },
-                      { documentNumber: { contains: query.q } },
-                    ],
-                  }
-                : {}),
             },
           }
         : {}),

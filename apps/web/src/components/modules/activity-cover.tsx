@@ -109,6 +109,9 @@ export function ActivityCover({
         <img
           src={foto}
           alt=""
+          // Las que no estan en pantalla no se bajan hasta que se llega a ellas (2026-10-01).
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 h-full w-full animate-[ex-in-fade_400ms_ease-out] object-cover"
         />
       ) : null}

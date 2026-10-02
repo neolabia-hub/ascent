@@ -117,6 +117,9 @@ const fila = enPapelera.find((f) => f.id === id);
 comprobar(!!fila && fila.motivo === cuerpoBueno.motivo, 'la papelera la lista con su motivo', JSON.stringify(fila));
 const listaAsign = (await admin.get(`/assignments?userId=${yo}`)).cuerpo?.items ?? [];
 comprobar(!listaAsign.some((a) => a.targetId === id), 'y no sale en la lista de obligaciones de la persona');
+// Ni en la lista de convocatorias (2026-10-01: «videos3» seguia saliendo ahi, cancelada).
+const enConvocatorias = ((await admin.get('/offerings?pageSize=100')).cuerpo?.items ?? []).filter((o) => o.activityVersion?.activity?.id === id || o.activityVersion?.activityId === id);
+comprobar(enConvocatorias.length === 0, 'ni en la lista de convocatorias', `sale ${enConvocatorias.length} vez/veces`);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 paso('5 ter', 'RESTAURAR: vuelve TAL COMO ESTABA');

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { LIMITES, ThrottlerPorPersonaGuard } from './common/throttler-por-persona.guard.js';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClsModule } from 'nestjs-cls';
@@ -66,7 +67,8 @@ import { WorkersModule } from './workers/workers.module.js';
       (Redis ya esta en el compose), y ademas leer la IP REAL de la cabecera del proxy: sin eso,
       todas las peticiones parecen venir del proxy y el limite se aplicaria a todo el mundo junto.
     */
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
+    // Dos capas, por IP y por persona (2026-10-01): ver `common/throttler-por-persona.guard.ts`.
+    ThrottlerModule.forRoot(LIMITES),
     // Contexto por request (AsyncLocalStorage) para el tenant ambiental.
     ClsModule.forRoot({ global: true, middleware: { mount: true } }),
     // Crons del sistema (dispatcher de email; futuros workers de requisitos/vencimientos).
@@ -109,6 +111,8 @@ import { WorkersModule } from './workers/workers.module.js';
     AuditService,
     // Orden: primero autentica (JWT), luego autoriza (permisos); el interceptor fija el tenant CLS.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // La capa por PERSONA va aqui, despues de autenticar: ya se sabe quien es.
+    { provide: APP_GUARD, useClass: ThrottlerPorPersonaGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
   ],

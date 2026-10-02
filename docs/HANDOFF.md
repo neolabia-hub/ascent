@@ -24,6 +24,41 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-10-02 — AVISOS DIRECTOS, CONVOCATORIAS QUE NO SE QUEDAN SIN PUERTA Y LIMITE POR PERSONA
+
+**Produccion (con copia):** 7 asignaciones MANUALES que vencian el 1-oct pasaron a 8 dias desde que se
+asignaron (8-oct). La causa: una persona administradora escribio esa fecha al asignarlas.
+
+**Arreglos:** «Inducción Corporativa SST» quedo sin convocatoria porque la cerraron a mano y la
+reapertura automatica contaba las CERRADAS (`abrirlaSiEsDisponible`: ahora solo DRAFT/PUBLISHED/
+IN_PROGRESS). Cerrar una convocatoria pide confirmacion y avisa cuantos la deben. Lo de la Papelera no
+sale en Convocatorias. Portadas: la lista de Contenido formativo no pasaba `coverKey` (salia siempre la
+generada); carga diferida; portada nueva en WebP SIN PERDIDA a 1600 px; avatar 0,95; logo PNG.
+«Al día» sin nada vencido = 100 % (quedaba en esqueleto). El perfil distingue «no se pudo cargar» de
+«no tiene ninguna». Avisos: nombre y no correo, y enlace directo (formacion en revision, aprobaciones,
+alguien no puede entrar, desempeño, intentos agotados -> perfil #intentos-agotados). Aviso de
+vencimientos al crear convocatoria. Buscador de Obligaciones tambien por formacion. «Nuevo requisito»
+propone 8 y no -1. Intentos agotados: verde secundario del tenant; cajon solo con motivo.
+
+**Motor:** retirar una regla regenera en el acto para quien otra regla le sigue exigiendo lo mismo
+(`dos-reglas-una-obligacion` fallaba segun que regla «ganara»).
+
+**Limite de peticiones en dos capas** (`common/throttler-por-persona.guard.ts`): por IP antes de todo
+(1.500/min, los endpoints sensibles conservan su @Throttle) y por PERSONA despues de autenticar
+(300/min). Antes 300/min por IP: una sede detras de la misma IP compartia el tope. Prod: 0 rechazos en 72 h.
+Recorrido `limites.mjs`.
+
+**Pruebas:** 1015 unitarias, 42 recorridos, 33 e2e. Las e2e ya pueden correr contra dev sin levantar otra
+API/web (E2E_BASE_URL=http://localhost:3200 E2E_API_URL=http://localhost:3012/v1). El cliente de los
+recorridos vuelve a entrar si vence la sesion y espera ante un 429 (anotado). OJO memoria: con Chrome
+(~4 GB) y Docker (~3,8 GB) la herramienta corta los trabajos en segundo plano; correr por partes.
+Dev se ensucia: `pnpm dev:limpiar-pruebas -- --si` (con 402 reglas de prueba vivas el alta tardaba 5,4 s).
+
+**Apartado sin desplegar** (scratchpad `nuevo/`): plazo elegible en el tipo, «Cómo se convoca» en el tipo y
+quitar el codigo de las tarjetas. Se revisa con el cliente en dev.
+
+---
+
 ## 2026-10-01 — CLAVE = CEDULA PARA NUEVOS, Y LA REGLA DE SST QUE ALCANZO A TODA LA EMPRESA
 
 **1. Clave inicial de una persona NUEVA = su cedula, sin nada mas** (pedido del cliente).

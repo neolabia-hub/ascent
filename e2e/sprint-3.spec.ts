@@ -112,13 +112,14 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await page.locator('#r-audience').selectOption(audienceValue as string);
     await page.locator('#r-target').selectOption({ label: activityName });
     await page.locator('#r-trigger').selectOption('ON_HIRE');
-    await page.locator('#r-due').fill('-1');
+    // 8 dias DESPUES del ingreso: desde el 2026-10-01 una regla de ingreso no admite antes ni el mismo dia.
+    await page.locator('#r-due').fill('8');
     await page.getByRole('button', { name: 'Crear requisito' }).click();
     // 30 s y no los 10 por defecto: crear un requisito de TODA la empresa inserta una obligacion
     // y un aviso por persona en la misma peticion, y la base de desarrollo ya tiene 459. Es la
     // deuda de "el motor recorre persona por persona" asomando; con 116 reales va sobrado.
     await expect(page.getByText('Requisito creado')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('row').filter({ hasText: activityName }).getByText('1 día antes')).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: activityName }).getByText('8 días después')).toBeVisible();
 
     // 3. Alta de una persona con fecha de ingreso futura.
     await page.goto('/usuarios');
@@ -133,24 +134,31 @@ test.describe('Sprint 3 — convocatorias, asignaciones y plan', () => {
     await expect(page.getByRole('button', { name: 'Entendido' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: 'Entendido' }).click();
 
-    // 4. La obligacion existe sin que nadie la asignara, y vence ANTES del ingreso.
-    await page.goto('/asignaciones');
-    await page.getByRole('tab', { name: 'Obligaciones' }).click();
-    await page.getByPlaceholder('Buscar por nombre o documento').fill(`Persona S3 ${suffix}`);
-    // Por persona Y FORMACION: una persona nueva recibe TODAS las obligaciones de reglas vivas
-    // de la empresa, asi que `.first()` a secas cogia la fila de otra capacitacion y leia su
-    // fecha. Con la base de desarrollo llena, ese error aparece solo cuando ya hay ruido.
-    const row = page
-      .getByRole('row')
-      .filter({ hasText: `Persona S3 ${suffix}` })
-      .filter({ hasText: activityName })
-      .first();
-    await expect(row).toBeVisible({ timeout: 20_000 });
-    await expect(row.getByText('Requisito')).toBeVisible();
-    await expect(row.getByText('PENDIENTE')).toBeVisible();
-    // Ingreso el 1 de diciembre, requisito a un dia antes: vence el 30 de noviembre. La fecha
-    // exacta importa: es la evidencia de que la induccion es PREVIA al inicio de labores.
-    await expect(row).toContainText('30 de nov');
+    // 4. La obligacion existe sin que nadie la asignara, y vence 8 dias DESPUES del ingreso.
+    /*
+      EN SU PERFIL, y no en la lista de Asignaciones (2026-10-01). Una persona nueva recibe TODAS las
+      obligaciones de las reglas vivas, y la lista va de 15 en 15: con las reglas que dejan otras
+      pruebas, la de esta quedaba en la pagina 2 y la prueba fallaba sin que nada estuviera mal. El
+      perfil las trae todas.
+    */
+    await page.goto('/usuarios');
+    await page.getByPlaceholder('Buscar por nombre, documento o correo').fill(`77${suffix}`);
+    const fila = page.getByRole('row').filter({ hasText: `77${suffix}` }).first();
+    await expect(fila).toBeVisible({ timeout: 20_000 });
+    await fila.getByRole('button', { name: /^Perfil de / }).click();
+    await page.waitForURL('**/usuarios/**', { timeout: 20_000 });
+    // La FILA entera: la que contiene a la vez la formacion, su vencimiento y su estado. `.last()` es
+    // la mas interna de las que cumplen las tres, que es la fila y no la pagina.
+    const obligacion = page
+      .locator('div')
+      .filter({ has: page.getByText(activityName, { exact: true }) })
+      .filter({ hasText: /vence el/ })
+      .filter({ hasText: 'PENDIENTE' })
+      .last();
+    await expect(obligacion).toBeVisible({ timeout: 20_000 });
+    // Ingreso el 1 de diciembre, 8 dias despues: vence el 9 de diciembre (2026-10-01; con el -1 de
+    // antes era el 30 de noviembre y a quien se creaba la vispera le nacia vencida).
+    await expect(obligacion).toContainText('09 de dic');
 
     // 5. SE RETIRA EL REQUISITO. No es limpieza cosmetica: la audiencia es "toda la empresa", asi
     //    que mientras siga vigente obliga a CADA persona que se cree despues, tambien a las de

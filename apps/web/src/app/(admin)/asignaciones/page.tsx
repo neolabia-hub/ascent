@@ -106,7 +106,7 @@ export default function AsignacionesPage() {
 
   const [busy, setBusy] = useState(false);
   const [ruleOpen, setRuleOpen] = useState(false);
-  const [ruleForm, setRuleForm] = useState({ audienceId: '', targetId: '', trigger: 'ON_HIRE' as RuleTrigger, dueDays: '-1', everyMonths: '' });
+  const [ruleForm, setRuleForm] = useState({ audienceId: '', targetId: '', trigger: 'ON_HIRE' as RuleTrigger, dueDays: '8', everyMonths: '' });
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [audienceForm, setAudienceForm] = useState({
     name: '',
@@ -560,7 +560,7 @@ export default function AsignacionesPage() {
           <ListFilter
             value={assignmentQuery.q}
             onChange={(q) => setAssignmentQuery({ ...assignmentQuery, q })}
-            placeholder="Buscar por nombre o documento"
+            placeholder="Buscar por nombre, documento o formación"
           >
             <FilterPill
               active={assignmentQuery.status === ''}
@@ -721,7 +721,7 @@ export default function AsignacionesPage() {
           <Field
             htmlFor="r-due"
             label="Días respecto a ese momento"
-            hint="Negativo = antes. La inducción de ingreso debe vencer ANTES del primer día de labores."
+            hint="Negativo = antes. En la inducción de ingreso, 8 = ocho días después de su fecha de ingreso."
           >
             <Input id="r-due" type="number" value={ruleForm.dueDays} onChange={(event) => setRuleForm({ ...ruleForm, dueDays: event.target.value })} />
           </Field>

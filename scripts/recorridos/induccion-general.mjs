@@ -125,7 +125,26 @@ if (req) {
   comprobar(req.soloNuevos === true, 'es "solo a quien entre desde ahora" (correcto para una induccion de ingreso)', 'deberia ser solo para nuevos y no lo es');
   comprobar(req.trigger === 'ON_HIRE', 'se dispara con el INGRESO', `disparador inesperado: ${req.trigger}`);
   // Desde el 2026-10-01 son 8 dias DESPUES del ingreso: con -1 nacia vencida a quien se creaba el mismo dia.
-comprobar(req.dueDaysAfterTrigger === 8, 'vence 8 dias despues del ingreso', `vence a los ${req.dueDaysAfterTrigger} dias`);
+  comprobar(req.dueDaysAfterTrigger === 8, 'vence 8 dias despues del ingreso', `vence a los ${req.dueDaysAfterTrigger} dias`);
+  // Y se puede AJUSTAR a mano a dias positivos: el esquema lo rechazaba con un 422 («usa 0 o
+  // negativo») aunque el valor por defecto ya fuera 8. Lo encontro el cliente en produccion (2026-10-01).
+  const ajustar = (dias) =>
+    admin.post(`/activities/${creado.activityId}/requirements`, {
+      scope: { match: 'ALL' }, trigger: 'ON_HIRE', dueDaysAfterTrigger: dias, soloNuevos: true,
+      reason: `Recorrido: ajustar el plazo de ingreso a ${dias} dias.`,
+    });
+  const aMano = await ajustar(10);
+  comprobar(aMano.ok, 'ajustar a mano el plazo de ingreso a 10 dias se acepta', `${aMano.estado} ${JSON.stringify(aMano.cuerpo).slice(0, 200)}`);
+  const reqTras = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? []).find((r) => r.reachesEveryone);
+  comprobar(reqTras?.dueDaysAfterTrigger === 10, 'y queda guardado en 10', `quedo en ${reqTras?.dueDaysAfterTrigger}`);
+  // Y ANTES o EL MISMO DIA del ingreso se rechaza: es justo lo que hacia nacer vencida a quien se
+  // creaba la vispera (decision del cliente, 2026-10-01: «que no haya forma de que falle»).
+  const antes = await ajustar(-1);
+  comprobar(!antes.ok && /DESPUÉS/.test(JSON.stringify(antes.cuerpo)), '-1 se rechaza y dice por que', `${antes.estado} ${JSON.stringify(antes.cuerpo).slice(0, 160)}`);
+  const mismoDia = await ajustar(0);
+  comprobar(!mismoDia.ok, 'y 0 (el mismo dia) tambien', `${mismoDia.estado}`);
+  // Se devuelve a 8 para que lo de abajo pruebe el valor por defecto.
+  await ajustar(8);
   comprobar(req.assignmentCount === 0, 'hoy no obliga a nadie: la gente ya estaba', `obliga a ${req.assignmentCount} y no deberia`);
 }
 
@@ -333,7 +352,7 @@ comprobar(!trasRetiro.some((r) => r.reachesEveryone), 'la automatica ya no se li
 const vuelve = await admin.post(`/activities/${creado.activityId}/requirements`, {
   scope: vacio,
   trigger: 'ON_HIRE',
-  dueDaysAfterTrigger: -1,
+  dueDaysAfterTrigger: 8,
 });
 comprobar(vuelve.ok && vuelve.cuerpo?.updated === true, 'volver a exigirla REACTIVA la misma regla, no crea otra', `${vuelve.estado} ${JSON.stringify(vuelve.cuerpo)}`);
 const deNuevo = ((await admin.get(`/activities/${creado.activityId}/requirements`)).cuerpo ?? []).find((r) => r.reachesEveryone);

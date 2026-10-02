@@ -311,6 +311,14 @@ export function OfferingForm({
    * Es una CONSULTA, no una decision: no crea ninguna obligacion ni toca nada.
    */
   const [proyectados, setProyectados] = useState<ProjectedPreview | null>(null);
+  /*
+    EL ULTIMO DIA EN QUE SE PUEDE HACER (2026-10-01): la sesion, el «disponible hasta» o, en una
+    hibrida, el mas tardio de los dos. Sin cierre no hay nada que comparar.
+  */
+  const hasta = [value.kind !== 'PERMANENT' ? value.scheduledDate : '', value.kind !== 'EVENT' ? value.windowEnd : '']
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
   useEffect(() => {
     if (!activityVersionId) {
       setProyectados(null);
@@ -323,6 +331,7 @@ export function OfferingForm({
         activityVersionId,
         scope: value.scope,
         regionalId: value.regionalId || null,
+        hasta,
       })
         .then((preview) => {
           if (!cancelado) setProyectados(preview);
@@ -335,7 +344,7 @@ export function OfferingForm({
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [value.scope, value.regionalId, activityVersionId]);
+  }, [value.scope, value.regionalId, activityVersionId, hasta]);
 
   /**
    * LOS SELECTORES, ACOTADOS A LO QUE HAY DENTRO.
@@ -654,6 +663,32 @@ export function OfferingForm({
               onChange={(event) => set({ windowEnd: event.target.value })}
             />
           </Field>
+        </div>
+      ) : null}
+
+      {/*
+        VENCEN ANTES DE QUE SE PUEDA HACER (2026-10-01, pedido del cliente). El vencimiento es de
+        cada persona —sale de su ingreso, de su cargo o de su ronda— y la convocatoria es logistica.
+        Cuando la convocatoria termina despues, esa gente sale VENCIDA aunque todavia pueda hacerla.
+        Se avisa aqui, mientras se eligen las fechas, que es cuando se puede corregir.
+      */}
+      {proyectados?.vencimientos && proyectados.vencimientos.antes > 0 && hasta ? (
+        <div role="status" className="rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-3 text-sm text-ink-700">
+          <p>
+            <strong className="font-medium text-warn">
+              {proyectados.vencimientos.antes === 1
+                ? '1 persona vence'
+                : `${proyectados.vencimientos.antes} personas vencen`}{' '}
+              antes del {hasta.split('-').reverse().join('/')}
+            </strong>
+            {proyectados.vencimientos.yaVencidas > 0
+              ? ` (${proyectados.vencimientos.yaVencidas} ya están vencidas)`
+              : ''}
+            . Saldrán VENCIDAS aunque esta convocatoria siga abierta.
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            Adelanta la fecha, abre otra convocatoria antes para ellas, o ajusta su plazo en «Quiénes».
+          </p>
         </div>
       ) : null}
 

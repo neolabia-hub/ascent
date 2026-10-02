@@ -20,13 +20,29 @@ const MAXIMO_POR_TIPO: Record<string, number> = {
   cover: 1600,
 };
 
+/**
+ * CALIDAD: NINGUNA IMAGEN PIERDE CALIDAD VISIBLE (2026-10-01, pedido del cliente: «menos el logo, la
+ * portada y el usuario»). La portada va en WebP SIN PERDIDA (1.0): identica pixel a pixel, solo mas
+ * compacta que el PNG. La foto de usuario, en WebP a 0,95, que a la vista no se distingue. El logo
+ * se queda en PNG, que ya es sin perdida.
+ */
+const CALIDAD: Record<string, number> = { cover: 1, avatar: 0.95, logo: 1 };
+
+/**
+ * LA PORTADA SIEMPRE EN WEBP, aunque llegue PNG y aunque ya sea pequeña (2026-10-01). Es una
+ * ilustracion o una foto que se pinta en tarjetas: en WebP sin perdida pesa menos que el PNG con la
+ * misma nitidez exacta, y conserva la transparencia. El logo si se queda en PNG: va en el membrete y en
+ * documentos.
+ */
+const SIEMPRE_WEBP = new Set(['cover']);
+
 export async function reducirImagen(file: File, kind: string): Promise<File> {
   const maximo = MAXIMO_POR_TIPO[kind];
   if (!maximo || !/^image\/(png|jpeg|webp)$/.test(file.type)) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const escala = Math.min(1, maximo / Math.max(bitmap.width, bitmap.height));
-    if (escala === 1) {
+    if (escala === 1 && !SIEMPRE_WEBP.has(kind)) {
       bitmap.close();
       return file;
     }
@@ -40,8 +56,8 @@ export async function reducirImagen(file: File, kind: string): Promise<File> {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, 0, 0, ancho, alto);
     bitmap.close();
-    const tipo = file.type === 'image/png' ? 'image/png' : 'image/webp';
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, tipo, 0.88));
+    const tipo = file.type === 'image/png' && !SIEMPRE_WEBP.has(kind) ? 'image/png' : 'image/webp';
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, tipo, CALIDAD[kind] ?? 0.95));
     if (!blob || blob.size >= file.size) return file;
     const extension = tipo === 'image/png' ? 'png' : 'webp';
     const nombre = file.name.replace(/\.[^.]+$/, '') + `.${extension}`;

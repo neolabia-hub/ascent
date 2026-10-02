@@ -40,6 +40,8 @@ export interface ActivityListItem {
   id: string;
   code: string;
   name: string;
+  /** La portada subida, si la hay. */
+  coverKey?: string | null;
   modality: Modality;
   active: boolean;
   updatedAt: string;

@@ -113,10 +113,12 @@ export class RevisionService {
       revisa; el nombre del rol no (Decision #19): mañana un cliente llama al suyo «Coordinador
       HSE» y un `rol === 'ADMIN'` deja de funcionar sin que nadie se entere.
     */
+    // Con su NOMBRE, no su correo (2026-10-01): «Ana Perez terminó...», no «ana@empresa.com».
+    const autor = await this.prisma.scoped.user.findUnique({ where: { id: actor.id }, select: { fullName: true } });
     await this.notifications.notifyByPermission(tenantId, 'catalog:publish', {
       eventType: 'FORMACION_EN_REVISION',
       subject: `Formación lista para revisar: ${version.activity.name}`,
-      body: `${actor.email ?? 'Un analista'} terminó la versión ${version.versionNumber} de «${version.activity.name}» y la envió a revisión.`,
+      body: `${autor?.fullName ?? 'Un analista'} terminó la versión ${version.versionNumber} de «${version.activity.name}» y la envió a revisión.`,
       referenceType: 'activities',
       referenceId: version.activity.id,
       channels: ['IN_APP'],

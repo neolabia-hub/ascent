@@ -23,7 +23,8 @@ import { E2E_DOCUMENT, E2E_PASSWORD, TENANT_SLUG, loginAsAdmin, unique } from '.
  * traves de la interfaz costaria dos minutos de prueba para llegar a ellos.
  */
 
-const API = 'http://localhost:3002/v1';
+// La API de las pruebas: la propia (3002) o la de dev si se corre contra ella (E2E_API_URL).
+const API = process.env.E2E_API_URL ?? 'http://localhost:3002/v1';
 
 /** Un PNG de un pixel: aqui lo que importa es que haya un archivo, no que se parezca a un papel. */
 const PNG = Buffer.from(

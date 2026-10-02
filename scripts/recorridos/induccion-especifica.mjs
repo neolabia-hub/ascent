@@ -157,7 +157,7 @@ paso(7, 'EXIGIRLA A UN CARGO: el boton que la general no necesita');
 const exigir = await admin.post(`/activities/${creado.activityId}/requirements`, {
   scope: { match: 'ALL', jobTitleIds: [cargoA.id] },
   trigger: 'ON_HIRE',
-  dueDaysAfterTrigger: -1,
+  dueDaysAfterTrigger: 8,
   // Vacio a proposito: TRANSPRENSA quiere que la induccion la deban nuevos Y antiguos.
   soloNuevos: false,
   reason: 'Recorrido automatico de punta a punta de la induccion especifica.',
@@ -181,7 +181,7 @@ if (req) {
     `el alcance guardado no es el cargo elegido: ${JSON.stringify(req.scope?.jobTitleIds)}`,
   );
   comprobar(req.trigger === 'ON_HIRE', 'se dispara con el INGRESO', `disparador inesperado: ${req.trigger}`);
-  comprobar(req.dueDaysAfterTrigger === -1, 'vence ANTES del ingreso (D1072)', `vence a los ${req.dueDaysAfterTrigger} dias`);
+  comprobar(req.dueDaysAfterTrigger === 8, 'vence 8 dias DESPUES del ingreso (2026-10-01)', `vence a los ${req.dueDaysAfterTrigger} dias`);
   comprobar(req.soloNuevos === false, 'sin corte: tambien la deben los que ya estaban', 'quedo puesto el corte de "solo nuevos"');
 }
 
@@ -303,7 +303,7 @@ const encender = await admin.post('/assignment-rules/job-title-matrix', {
   jobTitleId: cargoB.id,
   activityId: creado.activityId,
   enabled: true,
-  dueDaysAfterTrigger: -1,
+  dueDaysAfterTrigger: 8,
 });
 comprobar(encender.ok && encender.cuerpo?.enabled === true, `casilla encendida para "${cargoB.name}"`, `encender: ${encender.estado} ${JSON.stringify(encender.cuerpo).slice(0, 200)}`);
 

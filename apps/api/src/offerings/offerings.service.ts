@@ -467,6 +467,9 @@ export class OfferingsService {
     // Una sola clausula sobre la actividad: si se escribieran por separado, la ultima pisaria a
     // la anterior y filtrar por capacitacion anularia el alcance del analista.
     const activityWhere: Prisma.ActivityWhereInput = {
+      // SIN LA PAPELERA (2026-10-01): «videos3», eliminada como prueba, seguia en la lista con su
+      // convocatoria cancelada. Lo que esta en la papelera no aparece en ninguna parte.
+      deletedAt: null,
       ...(query.activityId ? { id: query.activityId } : {}),
       ...processScopeWhere(actor.scopeProcessIds, query.processId),
     };
@@ -784,11 +787,11 @@ export class OfferingsService {
       select: { activityId: true },
     });
     if (!version) throw new NotFoundException({ code: 'ACTIVITY_VERSION_NOT_FOUND' });
-    return this.projected.preview(version.activityId, {
-      audienceId: null,
-      regionalId: input.regionalId,
-      rule: input.scope,
-    });
+    return this.projected.preview(
+      version.activityId,
+      { audienceId: null, regionalId: input.regionalId, rule: input.scope },
+      input.hasta,
+    );
   }
 
   /**
@@ -1371,8 +1374,14 @@ export class OfferingsService {
     versionId: string,
     modality: Modality,
   ): Promise<boolean> {
+    /*
+      SOLO CUENTA UNA CONVOCATORIA QUE SIGA VIVA (2026-10-01). Contaba tambien las CERRADAS: en
+      produccion cerraron a mano la permanente de «Inducción Corporativa SST» y las seis versiones que
+      se publicaron despues no abrieron otra, asi que todos salian «Esperando convocatoria» casi un
+      dia, hasta que alguien la creo a mano. Una cerrada ya no es puerta para nadie.
+    */
     const yaHay = await this.prisma.scoped.offering.count({
-      where: { activityVersion: { activityId }, status: { notIn: ['CANCELLED'] } },
+      where: { activityVersion: { activityId }, status: { in: ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'] } },
     });
     if (yaHay > 0) return false;
 
@@ -1451,6 +1460,23 @@ export class OfferingsService {
       convocados: proyectados.userIds.length - faltanIds.length,
       /** Cuantos estan inscritos en ESTA. */
       enEstaJornada: yaCitados.filter((row) => row.offeringId === id).length,
+      /**
+       * CUANTOS LA DEBEN TODAVIA (obligacion abierta), y con eso se avisa al CERRAR (2026-10-01).
+       * En produccion cerraron la permanente de una induccion con gente pendiente y todos quedaron
+       * «Esperando convocatoria»: la pantalla lo dice antes, no despues.
+       */
+      laDeben: (
+        await this.prisma.scoped.assignment.findMany({
+          where: {
+            targetType: 'ACTIVITY',
+            targetId: version.activityId,
+            status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
+            user: { active: true },
+          },
+          distinct: ['userId'],
+          select: { userId: true },
+        })
+      ).length,
       faltan,
     };
   }

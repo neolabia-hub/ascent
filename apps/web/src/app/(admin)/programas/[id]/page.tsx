@@ -1659,7 +1659,7 @@ export default function ProgramaDetailPage() {
                     <option value="ON_HIRE">Al ingresar a la empresa</option>
                   </Select>
                 </Field>
-                <Field htmlFor="a-dias" label="Vence a los" hint="Días. Negativo = antes.">
+                <Field htmlFor="a-dias" label="Vence a los" hint="Días después del disparador (al ingresar: después de la fecha de ingreso). Negativo = antes.">
                   <Input id="a-dias" type="number" value={plazo.dias} onChange={(e) => setPlazo({ ...plazo, dias: e.target.value })} />
                 </Field>
               </div>

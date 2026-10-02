@@ -127,6 +127,19 @@ export default function PerfilDePersonaPage() {
   const [aDesbloquear, setADesbloquear] = useState<AssignmentRow | null>(null);
   const [motivoIntento, setMotivoIntento] = useState('');
   const [dandoIntento, setDandoIntento] = useState(false);
+  /*
+    NO SE PUDIERON CARGAR, que NO es «no tiene ninguna» (2026-10-01). Si una sola pagina fallaba,
+    la lista quedaba vacia y la pantalla decia «Todavía no tiene ninguna formación asignada»: falso,
+    y es justo lo que un auditor no puede leer mal. Ahora se dice que fallo y se ofrece reintentar.
+  */
+  const [errorObligaciones, setErrorObligaciones] = useState(false);
+  const cargarObligaciones = () => {
+    setErrorObligaciones(false);
+    setObligaciones(null);
+    void todasLasObligacionesDe(id)
+      .then(setObligaciones)
+      .catch(() => setErrorObligaciones(true));
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -138,9 +151,7 @@ export default function PerfilDePersonaPage() {
     void getUser(id)
       .then(setPersona)
       .catch(() => setNoExiste(true));
-    void todasLasObligacionesDe(id)
-      .then(setObligaciones)
-      .catch(() => setObligaciones([]));
+    cargarObligaciones();
     void getCertificatesOf(id)
       .then(setConstancias)
       .catch(() => setConstancias([]));
@@ -162,8 +173,8 @@ export default function PerfilDePersonaPage() {
     const fila = document.querySelector<HTMLElement>('[data-intentos-agotados]');
     if (!fila) return;
     fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    fila.classList.add('ring-2', 'ring-danger/50');
-    const quitar = window.setTimeout(() => fila.classList.remove('ring-2', 'ring-danger/50'), 2600);
+    fila.classList.add('ring-2', 'ring-ink-300');
+    const quitar = window.setTimeout(() => fila.classList.remove('ring-2', 'ring-ink-300'), 2600);
     return () => window.clearTimeout(quitar);
   }, [obligaciones]);
 
@@ -328,7 +339,9 @@ export default function PerfilDePersonaPage() {
     persona con tres formaciones abiertas y en plazo no esta «al 40 %», esta al dia.
   */
   const exigidas = cumplidas + caidas;
-  const alDia = exigidas === 0 ? null : Math.round((cumplidas / exigidas) * 100);
+  // Sin nada vencido todavia, esta al dia: 100 %. Era `null`, y la cifra lo leia como «cargando» y
+  // dejaba el esqueleto para siempre (2026-10-01, lo vio el cliente: «Al día no sale nada»).
+  const alDia = exigidas === 0 ? 100 : Math.round((cumplidas / exigidas) * 100);
 
   return (
     <div className="pb-4">
@@ -463,7 +476,15 @@ export default function PerfilDePersonaPage() {
         />
       </div>
 
-      {obligaciones === null ? (
+      {errorObligaciones ? (
+        <div role="alert" className="mt-6 rounded-xl border border-line-strong bg-paper px-4 py-4 text-sm text-ink-700">
+          <p className="font-medium text-ink-900">No se pudieron cargar sus formaciones.</p>
+          <p className="mt-1 text-ink-500">No es que no tenga ninguna: la consulta falló. Inténtalo de nuevo.</p>
+          <Button className="mt-3" size="sm" variant="outline" onClick={cargarObligaciones}>
+            Reintentar
+          </Button>
+        </div>
+      ) : obligaciones === null ? (
         <div className="mt-6 space-y-2">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
@@ -711,58 +732,15 @@ export default function PerfilDePersonaPage() {
       >
         {aDesbloquear?.bloqueada ? (
           <div className="space-y-5 text-sm text-ink-700">
-            {/* De cuanto a cuanto: lo que cambia, en una linea que se lee sin pensar. */}
-            <div className="rounded-xl border border-line bg-paper p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Formación</p>
-              <p className="mt-1 font-medium text-ink-900">{aDesbloquear.targetName ?? '—'}</p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="flex-1 rounded-lg bg-danger-soft px-3 py-2 text-center">
-                  <p className="font-display text-xl font-semibold tabular-nums text-danger">
-                    {aDesbloquear.bloqueada.intentosUsados} de {aDesbloquear.bloqueada.intentosMaximos}
-                  </p>
-                  <p className="text-xs text-ink-500">intentos usados hoy</p>
-                </div>
-                <span aria-hidden className="text-ink-300">
-                  →
-                </span>
-                <div className="flex-1 rounded-lg bg-ok-soft px-3 py-2 text-center">
-                  <p className="font-display text-xl font-semibold tabular-nums text-ok">
-                    {aDesbloquear.bloqueada.intentosUsados} de {aDesbloquear.bloqueada.intentosMaximos + 1}
-                  </p>
-                  <p className="text-xs text-ink-500">le queda 1 intento</p>
-                </div>
-              </div>
-            </div>
-
-            <ul className="space-y-2">
-              <li className="flex gap-2">
-                <span
-                  aria-hidden
-                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: 'var(--brand-primary)' }}
-                />
-                <span>
-                  <strong className="font-medium text-ink-900">Solo a esta persona.</strong> El máximo de la formación
-                  no cambia para nadie más.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <span
-                  aria-hidden
-                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: 'var(--brand-primary)' }}
-                />
-                <span>Queda desbloqueada y le llega un aviso de que puede volver a presentar.</span>
-              </li>
-              <li className="flex gap-2">
-                <span
-                  aria-hidden
-                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: 'var(--brand-primary)' }}
-                />
-                <span>Queda en la auditoría con tu nombre y el motivo.</span>
-              </li>
-            </ul>
+            {/*
+              SOLO EL MOTIVO (2026-10-01, pedido del cliente). Hubo un recuadro con la formacion y las
+              cifras «3 de 3 -> 3 de 4» y tres viñetas: sobraba. Una linea dice que pasa; lo demas
+              ya esta en la fila de la que se viene.
+            */}
+            <p>
+              Se le suma <strong className="font-medium text-ink-900">un intento solo a esta persona</strong> en «
+              {aDesbloquear.targetName ?? ''}». Queda en la auditoría con tu nombre.
+            </p>
 
             <Field
               htmlFor="ie-motivo"
@@ -839,7 +817,8 @@ function Cifra({
       className={cn(
         'card p-4 text-left',
         onClick && 'focus-ring transition-transform duration-150 hover:-translate-y-px',
-        alarmante && 'border-danger/30 bg-danger-soft',
+        // «Alarmante» ya no pinta de rojo (2026-10-01, pedido del cliente): borde mas marcado, y nada mas.
+        alarmante && 'border-line-strong',
       )}
       style={activa ? { boxShadow: '0 0 0 2px var(--brand-primary)' } : undefined}
       title={ayuda ?? (onClick ? (activa ? 'Quitar el filtro' : `Ver solo las ${etiqueta.toLowerCase()}`) : undefined)}
@@ -847,17 +826,12 @@ function Cifra({
       {valor === null ? (
         <Skeleton className="h-8 w-12" />
       ) : (
-        <p
-          className={cn(
-            'font-display text-[30px] font-bold leading-none tabular-nums',
-            alarmante ? 'text-danger' : 'text-ink-900',
-          )}
-        >
+        <p className={cn('font-display text-[30px] font-bold leading-none tabular-nums', 'text-ink-900')}>
           {valor}
           {sufijo}
         </p>
       )}
-      <p className={cn('mt-1.5 text-xs', alarmante ? 'font-medium text-danger' : 'text-ink-500')}>{etiqueta}</p>
+      <p className={cn('mt-1.5 text-xs', alarmante ? 'font-medium text-ink-900' : 'text-ink-500')}>{etiqueta}</p>
     </Caja>
   );
 }
@@ -905,15 +879,32 @@ function IntentosAgotados({
   return (
     <div
       data-intentos-agotados=""
-      className="flex scroll-mt-24 flex-wrap items-center gap-3 rounded-xl border border-danger/25 bg-danger-soft px-3.5 py-3 transition-shadow duration-300"
+      className="flex scroll-mt-24 flex-wrap items-center gap-3 rounded-xl border px-3.5 py-3 transition-shadow duration-300"
+      /*
+        EL SECUNDARIO DE LA EMPRESA (2026-10-01, decidido con el cliente). Fue rojo de alerta, luego
+        se probo neutro, y el cliente lo quiso con su color secundario: fondo suave, borde, candado,
+        etiqueta y puntos. El resto del perfil es neutro y el boton lleva el color principal.
+      */
+      style={{
+        backgroundColor: 'var(--brand-accent-soft)',
+        borderColor: 'color-mix(in srgb, var(--brand-accent) 35%, transparent)',
+      }}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-danger shadow-sm">
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface shadow-sm"
+        style={{ color: 'var(--brand-accent)' }}
+      >
         <Lock size={16} strokeWidth={2} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-ink-900">{fila.targetName ?? '—'}</p>
-          <StatusPill kind="danger" label="INTENTOS AGOTADOS" />
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-white"
+            style={{ backgroundColor: 'var(--brand-accent)' }}
+          >
+            Intentos agotados
+          </span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-700">
           <span className="flex items-center gap-1.5">
@@ -921,10 +912,11 @@ function IntentosAgotados({
               {Array.from({ length: Math.min(bloqueo.intentosMaximos, 10) }, (_, i) => (
                 <span
                   key={i}
-                  className={cn(
-                    'h-2 w-2 rounded-full',
-                    i < bloqueo.intentosUsados ? 'bg-danger' : 'border border-danger/40',
-                  )}
+                  className="h-2 w-2 rounded-full border"
+                  style={{
+                    borderColor: 'var(--brand-accent)',
+                    backgroundColor: i < bloqueo.intentosUsados ? 'var(--brand-accent)' : 'transparent',
+                  }}
                 />
               ))}
             </span>
@@ -998,7 +990,8 @@ function Bloque({
       <h2
         className={cn(
           'text-[11px] font-semibold uppercase tracking-[0.12em]',
-          resaltado && cuantos > 0 ? 'text-danger' : 'text-ink-500',
+          // Sin rojo (2026-10-01): el titulo se oscurece cuando hay algo, sin alarma de color.
+          resaltado && cuantos > 0 ? 'text-ink-900' : 'text-ink-500',
         )}
       >
         {titulo}

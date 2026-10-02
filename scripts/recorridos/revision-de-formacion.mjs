@@ -108,6 +108,14 @@ comprobar(
   'y al administrador le llega el aviso a su bandeja',
   `no hay aviso con el sufijo ${SUFIJO} entre los ${bandeja.length} de la bandeja`,
 );
+// Directo a la formacion y con el NOMBRE de quien la envio, nunca su correo (2026-10-01).
+const elAviso = bandeja.find((n) => (n.subject ?? '').includes(SUFIJO));
+comprobar(
+  elAviso?.referenceType === 'activities' && !!elAviso?.referenceId,
+  'el aviso apunta a la formacion: un clic y se abre',
+  `referencia: ${elAviso?.referenceType} ${elAviso?.referenceId}`,
+);
+comprobar(!/@/.test(elAviso?.body ?? ''), 'y nombra a quien la envio, sin su correo', elAviso?.body);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 paso(5, 'MIENTRAS ESTA EN REVISION, NO SE TOCA');

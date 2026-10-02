@@ -6,6 +6,18 @@ import type { AuthUser } from '../common/types.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
+/*
+  LOS AVISOS DE APROBACION SE LEEN COMO FRASES (2026-10-01, pedido del cliente). Decian
+  «ana@empresa.com solicita aprobacion (PUBLISH) sobre activity_version»: un correo en vez de un
+  nombre y dos codigos internos. Ahora: «Ana Perez pide aprobacion para publicar «Manejo defensivo»».
+*/
+const QUE_PIDE: Record<string, string> = {
+  PUBLISH: 'publicar',
+  EDIT_PUBLISHED: 'cambiar lo publicado de',
+  CANCEL_OFFERING: 'cancelar',
+  OTHER: 'un cambio en',
+};
+
 /**
  * Aplicador de un cambio aprobado. Cada modulo de dominio registra el suyo (Sprint 2+: publicar
  * actividad, editar publicado, cancelar convocatoria). El cambio se APLICA solo al aprobar; el
@@ -72,10 +84,12 @@ export class ApprovalsService {
       resourceId: approval.id,
       newValues: { entityType: input.entityType, action: input.action, justification: input.justification },
     });
+    const quien = await this.nombreDe(actor.id);
+    const sobre = await this.queEs(input.entityType, input.entityId);
     await this.notifications.notifyByPermission(tenantId, 'approvals:decide', {
       eventType: 'APPROVAL_REQUESTED',
-      subject: 'Nueva solicitud de aprobacion',
-      body: `${actor.email} solicita aprobacion (${input.action}) sobre ${input.entityType}. Justificacion: ${input.justification}`,
+      subject: `Aprobación pendiente: ${sobre.nombre}`,
+      body: `${quien} pide aprobación para ${QUE_PIDE[input.action] ?? 'un cambio en'} ${sobre.nombre}. Motivo: ${input.justification}`,
       referenceType: 'approval_requests',
       referenceId: approval.id,
     });
@@ -127,6 +141,40 @@ export class ApprovalsService {
     return { total, page, pageSize, items };
   }
 
+  /** El nombre de una persona para un aviso. Nunca el correo: no todos tienen, y no es un nombre. */
+  private async nombreDe(userId: string): Promise<string> {
+    const persona = await this.prisma.scoped.user.findUnique({ where: { id: userId }, select: { fullName: true } });
+    return persona?.fullName ?? 'Alguien';
+  }
+
+  /** Sobre que es una solicitud, dicho con nombre, y a donde lleva el aviso. */
+  private async queEs(
+    entityType: string,
+    entityId: string,
+  ): Promise<{ nombre: string; referenceType: string; referenceId: string }> {
+    if (entityType === 'activity_version') {
+      const version = await this.prisma.scoped.activityVersion.findUnique({
+        where: { id: entityId },
+        select: { activity: { select: { id: true, name: true } } },
+      });
+      if (version) return { nombre: `«${version.activity.name}»`, referenceType: 'activities', referenceId: version.activity.id };
+    }
+    if (entityType === 'offering') {
+      const convocatoria = await this.prisma.scoped.offering.findUnique({
+        where: { id: entityId },
+        select: { code: true, activityVersion: { select: { activity: { select: { name: true } } } } },
+      });
+      if (convocatoria) {
+        return {
+          nombre: `la convocatoria ${convocatoria.code} de «${convocatoria.activityVersion.activity.name}»`,
+          referenceType: 'offerings',
+          referenceId: entityId,
+        };
+      }
+    }
+    return { nombre: 'un registro', referenceType: 'approval_requests', referenceId: entityId };
+  }
+
   async decide(approver: AuthUser, id: string, input: DecideApprovalInput) {
     const tenantId = this.prisma.currentTenantId;
     const approval = await this.prisma.scoped.approvalRequest.findUnique({ where: { id } });
@@ -162,14 +210,17 @@ export class ApprovalsService {
       select: { id: true, email: true },
     });
     if (requester) {
+      const sobre = await this.queEs(approval.entityType, approval.entityId);
+      const aprobada = input.decision === 'APPROVED';
       await this.notifications.notify(tenantId, {
         eventType: input.decision === 'APPROVED' ? 'APPROVAL_APPROVED' : 'APPROVAL_REJECTED',
         recipientUserId: requester.id,
         recipientEmail: requester.email,
-        subject: input.decision === 'APPROVED' ? 'Tu solicitud fue aprobada' : 'Tu solicitud fue rechazada',
-        body: `Solicitud sobre ${approval.entityType} (${approval.action}): ${input.decision === 'APPROVED' ? 'APROBADA' : 'RECHAZADA'}.${input.decisionNote ? ` Nota: ${input.decisionNote}` : ''}`,
-        referenceType: 'approval_requests',
-        referenceId: id,
+        subject: `${aprobada ? 'Aprobada' : 'Rechazada'}: ${sobre.nombre}`,
+        body: `Tu solicitud para ${QUE_PIDE[approval.action] ?? 'un cambio en'} ${sobre.nombre} fue ${aprobada ? 'aprobada' : 'rechazada'}.${input.decisionNote ? ` Nota: ${input.decisionNote}` : ''}`,
+        // A lo que se pidio, no a la cola de aprobaciones: quien la pidio quiere ver como quedo.
+        referenceType: sobre.referenceType,
+        referenceId: sobre.referenceId,
       });
     }
     return updated;

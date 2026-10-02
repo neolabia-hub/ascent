@@ -304,7 +304,15 @@ export default function ConvocatoriaDetallePage() {
     }
   };
 
+  /*
+    CERRAR PIDE CONFIRMACION (2026-10-01). Era un clic directo y no decia que pasaba despues. En
+    produccion cerraron la permanente de «Inducción Corporativa SST» con gente pendiente y todos
+    quedaron «Esperando convocatoria» casi un dia. Ahora el cajon dice cuantos la deben y, si lo
+    que se quiere es que nadie mas la reciba, manda a Desactivar la formacion, que es lo correcto.
+  */
+  const [cerrarOpen, setCerrarOpen] = useState(false);
   const complete = async () => {
+    setCerrarOpen(false);
     setBusy(true);
     try {
       await completeOffering(id);
@@ -452,7 +460,7 @@ export default function ConvocatoriaDetallePage() {
             </Button>
           ) : null}
           {isOpen ? (
-            <Button onClick={complete} loading={busy}>
+            <Button onClick={() => setCerrarOpen(true)} loading={busy}>
               <CheckCircle2 size={16} />
               Cerrar convocatoria
             </Button>
@@ -1145,6 +1153,51 @@ export default function ConvocatoriaDetallePage() {
         <Field htmlFor="c-reason" label="Motivo" required hint="Mínimo 10 caracteres. Queda registrado.">
           <Input id="c-reason" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} maxLength={500} />
         </Field>
+      </Drawer>
+
+      {/* CERRAR, con lo que pasa despues dicho antes (2026-10-01). */}
+      <Drawer
+        open={cerrarOpen}
+        onOpenChange={setCerrarOpen}
+        title="Cerrar convocatoria"
+        description="Cuenta como ejecutada en el plan anual. Nadie más puede inscribirse en ella."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setCerrarOpen(false)}>
+              Volver
+            </Button>
+            <Button onClick={() => void complete()} loading={busy}>
+              Cerrar convocatoria
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-sm text-ink-700">
+          {esAutoservicio && pendientes && pendientes.laDeben > 0 ? (
+            <div role="status" className="rounded-lg border border-warn/30 bg-warn-soft px-3.5 py-3">
+              <p>
+                <strong className="font-medium text-warn">
+                  {pendientes.laDeben === 1 ? '1 persona la debe' : `${pendientes.laDeben} personas la deben`} y no la
+                  {pendientes.laDeben === 1 ? ' ha' : 'n'} terminado.
+                </strong>{' '}
+                Si es la única convocatoria abierta, quedarán como «Esperando convocatoria» y no podrán hacerla hasta
+                que se abra otra.
+              </p>
+            </div>
+          ) : null}
+          {esAutoservicio ? (
+            <p>
+              Si lo que quieres es que <strong className="font-medium text-ink-900">nadie más reciba esta formación</strong>,
+              no cierres la convocatoria:{' '}
+              <Link href={`/contenido-formativo/${activity.id}`} className="font-medium text-ink-900 underline">
+                desactiva la formación
+              </Link>
+              . Quien ya la tiene puede terminarla.
+            </p>
+          ) : (
+            <p>Quien no asistió sigue debiendo la formación y podrá citarse a otra jornada.</p>
+          )}
+        </div>
       </Drawer>
     </div>
   );

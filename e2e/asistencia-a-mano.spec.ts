@@ -20,7 +20,8 @@ import { E2E_DOCUMENT, E2E_PASSWORD, TENANT_SLUG, loginAsAdmin, unique } from '.
  *   5. Y que la lista, ya cerrada, diga **cómo** se marcó cada quien.
  */
 
-const API = 'http://localhost:3002/v1';
+// La API de las pruebas: la propia (3002) o la de dev si se corre contra ella (E2E_API_URL).
+const API = process.env.E2E_API_URL ?? 'http://localhost:3002/v1';
 
 async function montarJornadaSinMarcar(request: APIRequestContext, suffix: string) {
   const login = await request.post(`${API}/auth/login`, {

@@ -1,5 +1,5 @@
 export { POINTS } from './constants/points.js';
-export { PLAZO_INDUCCION_DE_INGRESO } from './constants/plazos.js';
+export { PLAZO_INDUCCION_DE_INGRESO, PLAZO_MINIMO_DE_INGRESO, MENSAJE_PLAZO_DE_INGRESO } from './constants/plazos.js';
 export { PERMISSIONS, SEED_ROLE_PERMISSIONS, LEARNER_ONLY_PERMISSIONS } from './constants/permissions.js';
 export type { PermissionCode } from './constants/permissions.js';
 

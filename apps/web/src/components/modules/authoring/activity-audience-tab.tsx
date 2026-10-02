@@ -711,7 +711,7 @@ export function ActivityAudienceTab({
                     <option value="ON_HIRE">Al ingresar a la empresa</option>
                   </Select>
                 </Field>
-                <Field htmlFor="q-dias" label="Vence a los" hint="Días. Negativo = antes.">
+                <Field htmlFor="q-dias" label="Vence a los" hint="Días después del disparador (al ingresar: después de la fecha de ingreso). Negativo = antes.">
                   <Input
                     id="q-dias"
                     type="number"

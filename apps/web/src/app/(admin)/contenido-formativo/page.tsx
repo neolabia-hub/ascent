@@ -279,6 +279,7 @@ export default function ContenidoFormativoPage() {
                     seed={activity.id}
                     colorHex={activity.activityType.colorHex}
                     label={activity.activityType.name}
+                    coverKey={activity.coverKey}
                   />
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">

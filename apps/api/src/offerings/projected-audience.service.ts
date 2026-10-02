@@ -29,6 +29,13 @@ export interface FacetCount {
  * cuantos caen dentro, sobre cuantos, y que facetas hay de verdad entre los obligados.
  */
 export interface ProjectedPreview extends ProjectedAudience {
+  /**
+   * DE LOS QUE ATIENDE, CUANTOS VENCEN ANTES DEL ULTIMO DIA DE LA CONVOCATORIA (2026-10-01).
+   * El vencimiento es de cada persona y la convocatoria es logistica: son dos fechas distintas, y
+   * cuando la segunda cae despues de la primera, esa gente sale VENCIDA aunque la convocatoria siga
+   * abierta. `null` si no se paso fecha (convocatoria sin cierre).
+   */
+  vencimientos: { antes: number; yaVencidas: number } | null;
   /** Todos los obligados de la formacion, sin tajada: el denominador de "N de M". */
   total: number;
   facets: {
@@ -195,10 +202,35 @@ export class ProjectedAudienceService {
    * obligada por una asignacion suelta hecha en "Quienes", y filtrar por las reglas la borraria
    * de la lista.
    */
-  async preview(activityId: string, scope: OfferingScope): Promise<ProjectedPreview> {
+  async preview(activityId: string, scope: OfferingScope, hasta: string | null = null): Promise<ProjectedPreview> {
     const universo = await this.resolve(activityId, { audienceId: null, regionalId: null });
     const conTajada = await this.resolve(activityId, scope);
+    let vencimientos: ProjectedPreview['vencimientos'] = null;
+    if (hasta && conTajada.userIds.length > 0) {
+      // Fin de ese dia en Bogota: «vence el 20» quiere decir que el 20 a las 23:59 todavia acredita.
+      const finDelDia = new Date(`${hasta}T23:59:59.999-05:00`);
+      const ahora = new Date();
+      const abiertas = await this.prisma.scoped.assignment.findMany({
+        where: {
+          targetType: 'ACTIVITY',
+          targetId: activityId,
+          userId: { in: conTajada.userIds },
+          status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
+          dueAt: { lt: finDelDia },
+        },
+        select: { userId: true, dueAt: true },
+      });
+      // Una persona cuenta una vez, aunque tenga dos rondas abiertas.
+      const porPersona = new Map<string, Date>();
+      for (const fila of abiertas) {
+        const previa = porPersona.get(fila.userId);
+        if (fila.dueAt && (!previa || fila.dueAt < previa)) porPersona.set(fila.userId, fila.dueAt);
+      }
+      const fechas = [...porPersona.values()];
+      vencimientos = { antes: fechas.length, yaVencidas: fechas.filter((fecha) => fecha < ahora).length };
+    }
     return {
+      vencimientos,
       count: conTajada.count,
       total: universo.count,
       source: universo.source,

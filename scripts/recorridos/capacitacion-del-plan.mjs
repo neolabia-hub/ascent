@@ -108,7 +108,7 @@ const exigir = await admin.post(`/activities/${creado.activityId}/requirements`,
   scope: { ...VACIO, jobTitleIds: [elegido.c.id] },
   // Se pide ON_HIRE a proposito, para comprobar que el servidor lo IGNORA.
   trigger: 'ON_HIRE',
-  dueDaysAfterTrigger: -1,
+  dueDaysAfterTrigger: 8,
   everyMonths: 12,
   soloNuevos: false,
 });
@@ -582,10 +582,12 @@ const vivasDespues = (trasCancelar?.items ?? []).filter((a) => ['PENDING', 'IN_P
 const canceladas = (trasCancelar?.items ?? []).filter((a) => a.status === 'WITHDRAWN_PLAN_ITEM_CANCELLED').length;
 console.log(`   ... despues quedan ${vivasDespues} vivas y ${canceladas} con el renglon cancelado`);
 comprobar(vivasDespues === 0, 'no queda ninguna obligacion viva: cancelar llega hasta las personas', `quedan ${vivasDespues} vivas`);
+// Todas las que estaban abiertas, y solo si habia alguna: con 0 abiertas no hay nada que marcar
+// (2026-10-01: fallaba cuando la unica obligada ya habia aprobado, segun los datos de dev).
 comprobar(
-  canceladas > 0,
-  'y quedan con RENGLON CANCELADO, no borradas: quien recibio el aviso puede saber que paso',
-  'ninguna quedo marcada como renglon cancelado',
+  canceladas === vivasAntes,
+  `las ${vivasAntes} que estaban abiertas quedan con RENGLON CANCELADO, no borradas: quien recibio el aviso puede saber que paso`,
+  `habia ${vivasAntes} abiertas y quedaron ${canceladas} marcadas como renglon cancelado`,
 );
 const planFinal = (await admin.get(`/plans/${creado.planId}`)).cuerpo;
 const renglonFinal = (planFinal?.items ?? []).find((i) => i.id === creado.itemId);

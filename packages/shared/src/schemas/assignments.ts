@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { PLAZO_INDUCCION_DE_INGRESO } from '../constants/plazos.js';
+import { MENSAJE_PLAZO_DE_INGRESO, PLAZO_INDUCCION_DE_INGRESO, PLAZO_MINIMO_DE_INGRESO } from '../constants/plazos.js';
+
+/** Una regla «al ingresar» vence 1 dia o mas DESPUES del ingreso. Ver `PLAZO_MINIMO_DE_INGRESO`. */
+function plazoDeIngreso(value: { trigger: string; dueDaysAfterTrigger: number }, ctx: z.RefinementCtx) {
+  if (value.trigger === 'ON_HIRE' && value.dueDaysAfterTrigger < PLAZO_MINIMO_DE_INGRESO) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['dueDaysAfterTrigger'], message: MENSAJE_PLAZO_DE_INGRESO });
+  }
+}
 import { employmentTypeSchema, roadActorSchema } from './users.js';
 import { fixedDateSchema } from './fixed-date.js';
 
@@ -120,20 +127,15 @@ export const createAssignmentRuleSchema = z
     targetId: z.string().uuid(),
     trigger: ruleTriggerSchema,
     /**
-     * Dias respecto al disparador. NEGATIVO = antes. En ON_HIRE debe ser <= 0 porque la
-     * induccion es PREVIA al inicio de labores (D1072 art. 2.2.4.6.11).
+     * Dias respecto al disparador. NEGATIVO = antes. En ON_HIRE se exigia <= 0 (induccion PREVIA,
+     * D1072); desde el 2026-10-01 se permite despues del ingreso —8 por defecto, ver
+     * `PLAZO_INDUCCION_DE_INGRESO`—: con -1 nacia vencida a quien se creaba la vispera de su ingreso.
      */
     dueDaysAfterTrigger: z.number().int().min(-365).max(3650).default(0),
     recurrence: recurrenceSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.trigger === 'ON_HIRE' && value.dueDaysAfterTrigger > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['dueDaysAfterTrigger'],
-        message: 'La induccion de ingreso vence ANTES de la fecha de ingreso (usa 0 o negativo).',
-      });
-    }
+    plazoDeIngreso(value, ctx);
     if (value.trigger === 'SCHEDULED' && !value.recurrence) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -209,15 +211,7 @@ export const setActivityRequirementSchema = z
      */
     reason: z.string().min(10).max(500).nullable().optional(),
   })
-  .superRefine((value, ctx) => {
-    if (value.trigger === 'ON_HIRE' && value.dueDaysAfterTrigger > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['dueDaysAfterTrigger'],
-        message: 'La induccion de ingreso vence ANTES de la fecha de ingreso (usa 0 o negativo).',
-      });
-    }
-  });
+  .superRefine(plazoDeIngreso);
 export type SetActivityRequirementInput = z.infer<typeof setActivityRequirementSchema>;
 
 /**
@@ -239,15 +233,7 @@ export const assignProgramSchema = z
     soloNuevos: z.boolean().default(false),
     reason: z.string().min(10).max(500).nullable().optional(),
   })
-  .superRefine((value, ctx) => {
-    if (value.trigger === 'ON_HIRE' && value.dueDaysAfterTrigger > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['dueDaysAfterTrigger'],
-        message: 'La induccion de ingreso vence ANTES de la fecha de ingreso (usa 0 o negativo).',
-      });
-    }
-  });
+  .superRefine(plazoDeIngreso);
 export type AssignProgramInput = z.infer<typeof assignProgramSchema>;
 
 /** Matriz cargo -> actividad: la forma corta de declarar las inducciones especificas. */
@@ -259,7 +245,12 @@ export const toggleJobTitleMatrixSchema = z.object({
    * Solo al activar: dias respecto al ingreso. Por defecto `PLAZO_INDUCCION_DE_INGRESO` (8 dias
    * despues), el mismo que en la ficha: ver `constants/plazos.ts` por que dejo de ser -1.
    */
-  dueDaysAfterTrigger: z.number().int().min(-365).max(365).default(PLAZO_INDUCCION_DE_INGRESO),
+  dueDaysAfterTrigger: z
+    .number()
+    .int()
+    .min(PLAZO_MINIMO_DE_INGRESO, MENSAJE_PLAZO_DE_INGRESO)
+    .max(365)
+    .default(PLAZO_INDUCCION_DE_INGRESO),
   /** La novedad, cuando se cambia una casilla que YA existia. La exige el servidor. */
   reason: z.string().min(10).max(500).nullable().optional(),
 });

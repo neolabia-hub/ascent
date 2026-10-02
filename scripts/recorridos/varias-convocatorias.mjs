@@ -86,7 +86,7 @@ if (segunda.ok) {
 paso(3, 'EXIGIRLA, y comprobar que la obligacion es UNA aunque haya dos convocatorias');
 const exigir = await admin.post(`/activities/${creado.activityId}/requirements`, {
   scope: { ...VACIO, jobTitleIds: [elegido.c.id] },
-  trigger: 'ON_HIRE', dueDaysAfterTrigger: -1, soloNuevos: false,
+  trigger: 'ON_HIRE', dueDaysAfterTrigger: 8, soloNuevos: false,
 });
 comprobar(exigir.ok, `exigida al cargo (${exigir.estado})`, `exigir: ${exigir.estado} ${JSON.stringify(exigir.cuerpo).slice(0, 200)}`);
 creado.ruleId = exigir.cuerpo?.ruleId;
@@ -106,6 +106,21 @@ comprobar(
   'tiene UNA sola obligacion: la obligacion es de la FORMACION, no de la convocatoria',
   `tiene ${suyas?.total} obligaciones con dos convocatorias abiertas`,
 );
+
+paso('3 bis', 'EL AVISO: cuantos vencen antes del ultimo dia de la convocatoria (2026-10-01)');
+/*
+  La persona vence a los 8 dias. Si la convocatoria cierra HOY, nadie vence antes; si cierra dentro
+  de 30 dias, ella vence antes de que cierre y el formulario tiene que avisarlo.
+*/
+const fechaEn = (dias) => new Date(Date.now() + dias * 86400000 - 5 * 3600000).toISOString().slice(0, 10);
+const avisoCon = async (hasta) =>
+  (await admin.post('/offerings/proyectados', { activityVersionId: creado.versionId, scope: { match: 'ALL' }, regionalId: null, hasta })).cuerpo;
+const cierraHoy = await avisoCon(fechaEn(0));
+comprobar(cierraHoy?.vencimientos?.antes === 0, 'si cierra hoy, nadie vence antes', JSON.stringify(cierraHoy?.vencimientos));
+const cierraEnUnMes = await avisoCon(fechaEn(30));
+comprobar((cierraEnUnMes?.vencimientos?.antes ?? 0) >= 1, `si cierra en 30 dias, avisa: ${cierraEnUnMes?.vencimientos?.antes} vencen antes`, JSON.stringify(cierraEnUnMes?.vencimientos));
+const sinCierre = await avisoCon(null);
+comprobar(sinCierre?.vencimientos === null, 'sin fecha de cierre no hay nada que avisar', JSON.stringify(sinCierre?.vencimientos));
 
 paso(4, 'LOS PROYECTADOS no se suman dos veces');
 const proyPrimera = (await admin.get(`/offerings/${creado.primera}/projected`)).cuerpo;

@@ -24,6 +24,12 @@ const ACTION_LABELS: Record<string, string> = {
   OTHER: 'Otro cambio',
 };
 
+/** Sobre que es, en palabras: la tabla enseñaba el codigo interno (`activity_version`). 2026-10-01. */
+const ENTITY_LABELS: Record<string, string> = {
+  activity_version: 'Formación',
+  offering: 'Convocatoria',
+};
+
 const STATUS_PILL: Record<ApprovalRow['status'], { kind: StatusPillKind; label: string }> = {
   PENDING: { kind: 'warn', label: 'PENDIENTE' },
   APPROVED: { kind: 'ok', label: 'APROBADA' },
@@ -155,7 +161,7 @@ export default function AprobacionesPage() {
                   <Tr key={row.id}>
                     <Td>
                       <div className="font-medium text-ink-900">{ACTION_LABELS[row.action] ?? row.action}</div>
-                      <div className="text-xs text-ink-500">{row.entityType}</div>
+                      <div className="text-xs text-ink-500">{ENTITY_LABELS[row.entityType] ?? row.entityType}</div>
                     </Td>
                     <Td className="text-ink-700">{row.requestedByName ?? '—'}</Td>
                     <Td className="text-ink-500">{formatDate(row.createdAt)}</Td>
@@ -188,7 +194,7 @@ export default function AprobacionesPage() {
         open={selected !== null}
         onOpenChange={(open) => { if (!open) { setSelected(null); setNote(''); } }}
         title="Detalle de la solicitud"
-        description={selected ? `${ACTION_LABELS[selected.action] ?? selected.action} sobre ${selected.entityType}` : undefined}
+        description={selected ? `${ACTION_LABELS[selected.action] ?? selected.action} · ${ENTITY_LABELS[selected.entityType] ?? selected.entityType}` : undefined}
         footer={
           selected && selected.status === 'PENDING' && canDecide && tab !== 'MINE' ? (
             <div className="flex justify-end gap-2">

@@ -20,14 +20,20 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: 'http://localhost:3100',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
     locale: 'es-CO',
     timezoneId: 'America/Bogota',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: [
+  /*
+    CONTRA DEV, SIN LEVANTAR NADA MAS (2026-10-02, pedido del cliente: «usa solo dev»). Con
+    E2E_BASE_URL=http://localhost:3200 y E2E_API_URL=http://localhost:3012/v1 la suite corre contra
+    el stack de `scripts/mirar.ps1`, ya compilado: no levanta una segunda API ni una segunda web, que
+    era lo que dejaba al equipo sin memoria, y no hace falta `pnpm build` aparte.
+  */
+  webServer: process.env.E2E_BASE_URL ? undefined : [
     {
       command: 'pnpm --filter @neo-pulse/api start',
       url: 'http://localhost:3002/v1/health',
