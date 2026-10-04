@@ -73,6 +73,14 @@ interface TipoConfig {
   defaultOnExpiry?: 'CIERRA' | 'ACUMULA' | 'ESPERA';
   /** No se le exige a quien entro hace menos de N meses. 0 = no se excluye a nadie. */
   exemptRecentHiresMonths?: number;
+  /**
+   * COMO SE CONVOCA por defecto (2026-10-01: se ve y se cambia aqui; antes solo existia en la semilla).
+   * PERMANENT = disponible siempre: al publicar se abre sola una convocatoria permanente, y se vuelve
+   * a abrir si la cierran. EVENT = sesion con fecha: la convocatoria la crea una persona.
+   */
+  defaultOfferingKind?: 'PERMANENT' | 'EVENT' | 'HYBRID';
+  /** El plazo de la regla automatica, en dias. `null` = 8 al ingresar, 30 a la plantilla. */
+  defaultDueDays?: number | null;
   /** Quien decide a quien se le exige (2026-09-30: se puede cambiar aqui). Ver `aQuienSeExige`. */
   defaultAssignmentMode?: 'ON_HIRE' | 'BY_JOB_TITLE' | 'MANUAL';
   /** Con ON_HIRE: si alcanza solo a quien ingresa (8 dias desde el ingreso) o a toda la plantilla. */
@@ -766,6 +774,40 @@ function Tarjeta({
         Rige para lo que se publique DESDE AHORA: la regla de una formacion ya publicada se creo con la
         politica de entonces y no se reescribe por la espalda. Para cambiarla, esta Quiénes -> Ajustar.
       */}
+      {/*
+        COMO SE CONVOCA (2026-10-01). Existia en la configuracion y decidia algo importante —si al
+        publicar se abre sola una convocatoria— pero no se veia en ninguna pantalla. El cliente
+        preguntaba «¿donde dice que es disponible siempre?» y no habia donde.
+      */}
+      <div className="mt-6 border-t border-line pt-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Cómo se convoca</p>
+        <div className="mt-3">
+          <Field
+            htmlFor={`t-convoca-${tipo.id}`}
+            label="Por defecto"
+            hint={
+              (tipo.config.defaultOfferingKind ?? 'PERMANENT') !== 'EVENT'
+                ? 'Al publicar se abre sola una convocatoria permanente, y se vuelve a abrir si la cierran. La gente entra cuando pueda.'
+                : 'La convocatoria la crea una persona: fecha, hora, lugar, quién la dicta y cupo.'
+            }
+          >
+            <Select
+              id={`t-convoca-${tipo.id}`}
+              value={tipo.config.defaultOfferingKind ?? 'PERMANENT'}
+              onChange={(e) =>
+                onGuardar({
+                  config: { ...tipo.config, defaultOfferingKind: e.target.value as 'PERMANENT' | 'EVENT' | 'HYBRID' },
+                })
+              }
+            >
+              <option value="PERMANENT">Disponible siempre: se abre sola al publicar</option>
+              <option value="EVENT">Sesión con fecha: la crea una persona</option>
+              <option value="HYBRID">Sesión + disponible: la crea una persona</option>
+            </Select>
+          </Field>
+        </div>
+      </div>
+
       <div className="mt-6 border-t border-line pt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">A quién se le exige</p>
         <p className="mb-3 mt-1 text-sm text-ink-700">{aQuienSeExige(tipo.config)}</p>
@@ -776,7 +818,7 @@ function Tarjeta({
             hint={
               tipo.config.participatesInPlan === true
                 ? 'En un tipo del plan la obligación la dispara el plan aprobado: aquí solo se elige a quiénes.'
-                : 'Rige para lo que se publique desde ahora. Lo ya publicado conserva su regla.'
+                : 'Es lo que propone el tipo: en cada formación manda lo que se ajuste en Quiénes. Rige para lo que se publique desde ahora.'
             }
           >
             <Select
@@ -792,7 +834,7 @@ function Tarjeta({
                 })
               }
             >
-              <option value="ON_HIRE">Se exige sola al publicar, a toda la empresa</option>
+              <option value="ON_HIRE">Se exige sola al publicar (a quién, abajo)</option>
               <option value="BY_JOB_TITLE">La matriz de cargos: los cargos que la tengan</option>
               <option value="MANUAL">Quien la crea, en la pestaña Quiénes</option>
             </Select>
@@ -815,9 +857,39 @@ function Tarjeta({
                   onGuardar({ config: { ...tipo.config, requiresBeforeHire: e.target.value === 'INGRESO' } })
                 }
               >
-                <option value="INGRESO">Solo a quien ingrese: vence 8 días después de su fecha de ingreso</option>
-                <option value="PLANTILLA">A toda la plantilla, con un mes de plazo</option>
+                <option value="INGRESO">Solo a quien ingrese, con plazo desde su fecha de ingreso</option>
+                <option value="PLANTILLA">A toda la plantilla, con plazo desde que se publica</option>
               </Select>
+            </Field>
+          ) : null}
+          {/*
+            EL PLAZO, ELEGIBLE AQUI (2026-10-01, pedido del cliente). Era fijo: 8 al ingresar, 30 a
+            la plantilla. Al ingresar el minimo es 1 dia: antes o el mismo dia, a quien se crea la
+            vispera de su ingreso le nace vencida.
+          */}
+          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' ? (
+            <Field
+              htmlFor={`t-plazo-${tipo.id}`}
+              label={tipo.config.requiresBeforeHire ? 'Días después de su fecha de ingreso' : 'Días de plazo desde que se publica'}
+              hint={
+                tipo.config.requiresBeforeHire
+                  ? 'Mínimo 1. Por defecto 8. Rige para lo que se publique desde ahora.'
+                  : 'Por defecto 30. Rige para lo que se publique desde ahora.'
+              }
+            >
+              <Input
+                id={`t-plazo-${tipo.id}`}
+                type="number"
+                min={1}
+                max={365}
+                defaultValue={plazoDelTipo(tipo.config)}
+                key={`${tipo.id}-${plazoDelTipo(tipo.config)}-${tipo.config.requiresBeforeHire ? 'i' : 'p'}`}
+                onBlur={(e) => {
+                  const dias = Math.round(Number(e.target.value));
+                  if (!Number.isFinite(dias) || dias < 1 || dias > 365 || dias === plazoDelTipo(tipo.config)) return;
+                  onGuardar({ config: { ...tipo.config, defaultDueDays: dias } });
+                }}
+              />
             </Field>
           ) : null}
         </div>
@@ -1001,12 +1073,17 @@ function comoSeRepite(config: TipoConfig): string {
   return 'No se repite: se hace una vez.';
 }
 
+/** El plazo de la regla automatica: el elegido, o 8 al ingresar / 30 a la plantilla. */
+function plazoDelTipo(config: TipoConfig): number {
+  return config.defaultDueDays ?? (config.requiresBeforeHire ? 8 : 30);
+}
+
 /** A quien se le exige, en una linea: lo que la tarjeta dice sin abrir el cajon. */
 function aQuienSeExige(config: TipoConfig): string {
   const modo = config.defaultAssignmentMode ?? 'MANUAL';
   if (modo === 'ON_HIRE') {
     return config.requiresBeforeHire
-      ? 'Se exige sola a quien ingrese, con 8 días desde su ingreso'
+      ? `Se exige sola a quien ingrese, con ${plazoDelTipo(config)} días desde su ingreso`
       : 'Se exige sola a toda la plantilla al publicar';
   }
   if (modo === 'BY_JOB_TITLE') return 'Se exige a los cargos que la tengan en su matriz';

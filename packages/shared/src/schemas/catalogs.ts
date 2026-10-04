@@ -76,6 +76,13 @@ export const activityTypeConfigSchema = z
      * plan si, y donde esta la frontera la decide cada empresa, no nosotros.
      */
     defaultOfferingKind: z.enum(['EVENT', 'PERMANENT', 'HYBRID']).default('PERMANENT'),
+    /**
+     * EL PLAZO CON EL QUE NACE LA REGLA AUTOMATICA (2026-10-01, pedido del cliente: «que se pueda
+     * elegir desde aqui, no solo 8»). Con «solo a quien ingrese» son dias DESPUES de su ingreso
+     * (minimo 1, ver `PLAZO_MINIMO_DE_INGRESO`); con «toda la plantilla», dias desde que se publica.
+     * `null` = lo de siempre: 8 al ingresar, 30 a la plantilla.
+     */
+    defaultDueDays: z.number().int().min(1).max(365).nullable().default(null),
     defaultRecurrenceMonths: z.number().int().min(1).max(120).nullable().default(null),
     /**
      * "Cada año antes del 31 de marzo" (MM-DD). Es la CAMPANA anual, y es como funciona de verdad

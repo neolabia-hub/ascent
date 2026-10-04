@@ -422,7 +422,10 @@ export function ActivityAudienceTab({
       await setActivityRequirement(activityId, {
         scope: EMPTY_RULE,
         trigger: typeConfig.requiresBeforeHire ? 'ON_HIRE' : 'ON_JOIN',
-        dueDaysAfterTrigger: typeConfig.requiresBeforeHire ? PLAZO_INDUCCION_DE_INGRESO : 30,
+        // El plazo del TIPO, el mismo con el que la crea la publicacion (2026-10-01).
+        dueDaysAfterTrigger:
+          (typeConfig as { defaultDueDays?: number | null }).defaultDueDays ??
+          (typeConfig.requiresBeforeHire ? PLAZO_INDUCCION_DE_INGRESO : 30),
         everyMonths: typeConfig.defaultAnnualDate ? null : typeConfig.defaultRecurrenceMonths,
         fixedDate: typeConfig.defaultAnnualDate,
         reason: null,

@@ -54,8 +54,11 @@ recorridos vuelve a entrar si vence la sesion y espera ante un 429 (anotado). OJ
 (~4 GB) y Docker (~3,8 GB) la herramienta corta los trabajos en segundo plano; correr por partes.
 Dev se ensucia: `pnpm dev:limpiar-pruebas -- --si` (con 402 reglas de prueba vivas el alta tardaba 5,4 s).
 
-**Apartado sin desplegar** (scratchpad `nuevo/`): plazo elegible en el tipo, «Cómo se convoca» en el tipo y
-quitar el codigo de las tarjetas. Se revisa con el cliente en dev.
+**Desplegado despues (2026-10-04):** plazo elegible en el tipo (`defaultDueDays`, minimo 1 al ingresar), «Cómo
+se convoca» visible y editable en el tipo, sin codigo en las tarjetas de Contenido formativo, y «Quién decide»
+ya no dice «a toda la empresa» (a quien alcanza lo dice la pregunta siguiente). Todo lo del tipo es lo que
+se PROPONE: en cada formacion manda Quiénes y en cada convocatoria, su forma. Probado con 7 recorridos y 12
+e2e; la bateria completa NO se repitio para este lote, por decision del cliente.
 
 ---
 

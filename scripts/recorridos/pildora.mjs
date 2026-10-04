@@ -40,7 +40,9 @@ const area = areas.find((a) => a.active);
 let elegido = null;
 for (const c of cargos) {
   const n = (await admin.post('/audiences/preview', { ...VACIO, jobTitleIds: [c.id] })).cuerpo?.count ?? 0;
-  if (elegido === null || n < elegido.n) elegido = { c, n };
+  // Con al menos UNA persona (2026-10-02): tras limpiar los datos de prueba quedan cargos vacios, y
+  // en uno vacio la pildora no puede obligar a nadie y el paso 4 fallaba sin que nada estuviera mal.
+  if (n > 0 && (elegido === null || n < elegido.n)) elegido = { c, n };
 }
 console.log(`   ... se le exigira al cargo "${elegido.c.name}" (${elegido.n} personas)`);
 

@@ -4,6 +4,7 @@ import {
   activityTypeConfigSchema,
   audienceRuleSchema,
   PLAZO_INDUCCION_DE_INGRESO,
+  PLAZO_MINIMO_DE_INGRESO,
   tenantSettingsSchema,
   type PublishVersionInput,
   type UpdateVersionSettingsInput,
@@ -591,8 +592,11 @@ export class VersioningService {
         activityId,
         scope: audienceRuleSchema.parse({}),
         trigger: esInduccionDeIngreso ? 'ON_HIRE' : 'ON_JOIN',
-        // 8 dias desde el ingreso (era -1, «antes del ingreso»): ver `PLAZO_INDUCCION_DE_INGRESO`.
-        dueDaysAfterTrigger: esInduccionDeIngreso ? PLAZO_INDUCCION_DE_INGRESO : 30,
+        // El plazo lo decide el TIPO (2026-10-01); sin decidir, 8 dias desde el ingreso o 30 desde
+        // ahora. Al ingresar nunca menos de 1 dia: ver `PLAZO_MINIMO_DE_INGRESO`.
+        dueDaysAfterTrigger: esInduccionDeIngreso
+          ? Math.max(PLAZO_MINIMO_DE_INGRESO, config.data.defaultDueDays ?? PLAZO_INDUCCION_DE_INGRESO)
+          : (config.data.defaultDueDays ?? 30),
         // La campaña anual manda: es una obligacion de calendario, no un aniversario por persona.
         everyMonths: config.data.defaultAnnualDate ? null : (config.data.defaultRecurrenceMonths ?? null),
         fixedDate: config.data.defaultAnnualDate ?? null,

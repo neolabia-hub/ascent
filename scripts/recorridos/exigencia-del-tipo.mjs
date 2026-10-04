@@ -78,7 +78,8 @@ comprobar(reglas1.length === 0, 'no nace ninguna regla: la decide quien la crea'
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 paso(3, 'CAMBIAR EL TIPO en Configuracion: sola, solo a quien ingrese');
 const cambio = await admin.patch(`/catalogs/activity-types/${tipoId}`, {
-  config: { ...configBase, defaultAssignmentMode: 'ON_HIRE', requiresBeforeHire: true },
+  // Con su PLAZO elegido en el tipo (2026-10-01): 12 dias despues del ingreso, no los 8 de siempre.
+  config: { ...configBase, defaultAssignmentMode: 'ON_HIRE', requiresBeforeHire: true, defaultDueDays: 12 },
 });
 comprobar(cambio.ok, 'se guarda desde la API de Configuracion', `${cambio.estado} ${JSON.stringify(cambio.cuerpo)}`);
 const releido = ((await admin.get('/catalogs/activity-types')).cuerpo ?? []).find((t) => t.id === tipoId);
@@ -96,6 +97,9 @@ comprobar(reglas2.length === 1, 'nace UNA regla sola, sin pulsar nada', `naciero
 comprobar(reglas2[0]?.reachesEveryone === true, 'alcanza a toda la empresa', JSON.stringify(reglas2[0]));
 comprobar(reglas2[0]?.trigger === 'ON_HIRE' && reglas2[0]?.soloNuevos === true, 'al ingresar, y solo a los nuevos', JSON.stringify(reglas2[0]));
 comprobar(reglas2[0]?.assignmentCount === 0, 'hoy no obliga a nadie: la gente ya estaba', `obliga a ${reglas2[0]?.assignmentCount}`);
+comprobar(reglas2[0]?.dueDaysAfterTrigger === 12, 'con el plazo que dice el TIPO: 12 dias despues del ingreso', `vence a los ${reglas2[0]?.dueDaysAfterTrigger}`);
+const menosDeUno = await admin.patch(`/catalogs/activity-types/${tipoId}`, { config: { ...configBase, defaultAssignmentMode: 'ON_HIRE', requiresBeforeHire: true, defaultDueDays: 0 } });
+comprobar(!menosDeUno.ok, 'y el tipo no acepta un plazo menor de 1 dia', `${menosDeUno.estado}`);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 paso(5, 'LO YA PUBLICADO NO SE REESCRIBE');

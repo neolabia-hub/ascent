@@ -296,7 +296,8 @@ export default function ContenidoFormativoPage() {
                     <p className="mt-2 truncate text-sm text-ink-500">
                       {activity.process.name} · {MODALITY_LABEL[activity.modality]}
                     </p>
-                    <p className="mt-0.5 font-mono text-[11px] text-ink-300">{activity.code}</p>
+                    {/* Sin el codigo (2026-10-01, pedido del cliente): no le decia nada a nadie en la
+                        tarjeta. Sigue sirviendo para buscar y esta en la ficha. */}
                   </div>
                 </Link>
               );
