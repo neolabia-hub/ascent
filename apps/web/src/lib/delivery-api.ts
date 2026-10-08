@@ -551,6 +551,11 @@ export interface AssignmentRow {
   completedAt: string | null;
   waivedReason: string | null;
   user: { id: string; fullName: string; documentNumber: string; jobTitle: { name: string }; area: { name: string } };
+  /**
+   * Que paso en ESA vuelta: en que convocatoria se curso y con que resultado. Solo viaja en el
+   * expediente de una persona (`userId`); `null` si todavia no se inscribio.
+   */
+  ejecucion?: { convocatoria: string | null; convocatoriaId: string; intentos: number; mejorNota: number | null } | null;
   /** Si agoto los intentos de la evaluacion: su inscripcion bloqueada (2026-10-01). */
   bloqueada?: {
     enrollmentId: string;
@@ -607,6 +612,29 @@ export async function todasLasObligacionesDe(userId: string): Promise<Assignment
     if (filas.length >= pagina.total || pagina.items.length === 0) break;
   }
   return filas;
+}
+
+/**
+ * TODAS LAS OBLIGACIONES DE UNA FORMACION, pagina a pagina (2026-10-06).
+ *
+ * La pestaña Quiénes pedia solo la primera pagina (20) y decia «431 en total»: a los demas no se
+ * los podia ver ni eximir desde ahi. Y tras retirar una regla, las 20 eran retiradas y lo vivo
+ * quedaba fuera. Lo vivo va PRIMERO: es lo unico sobre lo que se puede hacer algo.
+ */
+export async function todasLasObligacionesDeLaFormacion(
+  targetId: string,
+): Promise<{ items: AssignmentRow[]; total: number }> {
+  const filas: AssignmentRow[] = [];
+  let total = 0;
+  for (let page = 1; page <= 50; page += 1) {
+    const pagina = await listAssignments({ targetId, page, pageSize: 100 });
+    filas.push(...pagina.items);
+    total = pagina.total;
+    if (filas.length >= pagina.total || pagina.items.length === 0) break;
+  }
+  const viva = (fila: AssignmentRow) => (['PENDING', 'OVERDUE', 'IN_PROGRESS'].includes(fila.status) ? 0 : 1);
+  // `sort` es estable: dentro de cada grupo se conserva el orden del servidor (por vencimiento).
+  return { items: filas.sort((a, b) => viva(a) - viva(b)), total };
 }
 
 export function createAssignments(body: {
@@ -833,6 +861,8 @@ export interface ActivityRequirement {
   everyMonths: number | null;
   /** "Cada año antes del 31 de marzo" (MM-DD). Alternativa a `everyMonths`. */
   fixedDate: string | null;
+  /** Con `everyMonths`: HIRE = se cuenta desde la fecha de ingreso de cada persona. */
+  recurrenceAnchor: 'COMPLETED' | 'HIRE' | 'INDUCTION';
   assignmentCount: number;
   /** Si solo obliga a quien entre desde que se creo. Cambia como se lee `reach`. */
   soloNuevos: boolean;
@@ -852,6 +882,7 @@ export function setActivityRequirement(
     dueDaysAfterTrigger: number;
     everyMonths?: number | null;
     fixedDate?: string | null;
+    recurrenceAnchor?: 'COMPLETED' | 'HIRE' | 'INDUCTION';
     reason?: string | null;
   },
 ): Promise<{ ruleId: string; audienceId: string; audienceName: string; created: number; updated: boolean }> {

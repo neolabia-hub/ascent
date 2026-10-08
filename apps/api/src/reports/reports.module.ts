@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ReviewDigestService } from '../engagement/review-digest.service.js';
+import { PermissionService } from '../common/permission.service.js';
 import { ComplianceStreakService } from './compliance-streak.service.js';
 import { ExpirationDigestService } from './expiration-digest.service.js';
 import { ReportsController } from './reports.controller.js';
@@ -14,7 +15,8 @@ import { ReportsService } from './reports.service.js';
  */
 @Module({
   controllers: [ReportsController],
-  providers: [ReportsService, ExpirationDigestService, ReviewDigestService, ComplianceStreakService],
+  // `PermissionService`: el aviso semanal resuelve el alcance de cada destinatario fuera de una peticion.
+  providers: [ReportsService, ExpirationDigestService, ReviewDigestService, ComplianceStreakService, PermissionService],
   exports: [ReportsService, ExpirationDigestService, ReviewDigestService, ComplianceStreakService],
 })
 export class ReportsModule {}

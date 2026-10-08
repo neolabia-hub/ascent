@@ -24,6 +24,196 @@ abierto estaba repartido en siete documentos y saber que faltaba obligaba a leer
 
 ---
 
+## 2026-10-06 — REINDUCCION: GRUPO Y PERSONAS EN QUIENES, Y AUTOMATICA POR ANIVERSARIO DE INGRESO
+
+**NO desplegado, sin confirmar en git.** UNA migracion, solo de estructura (`20261006120000_inscripcion_por_ronda`:
+columna `enrollments.round` con valor 1 y la unicidad pasa a convocatoria + persona + ronda). Sin permisos
+nuevos. Lo de la reinduccion es configuracion del tipo y nace apagado: ningun tipo ni regla existente cambia
+hasta que alguien lo elija.
+
+**1. Quiénes de la reinduccion, igual que la induccion general** (pedido del cliente): publicada, ofrece
+«Exigirla además a un grupo» y «O a personas concretas». Antes se ocultaban con «ya alcanza a todos».
+
+**2. Tres fallos que destapo probarlo «cambiando de reglas»:**
+- La lista «Quiénes la tienen que hacer» cargaba SOLO las 20 primeras (decia «431 en total»): al resto no
+  se le podia ver ni eximir. Ahora trae todas (`todasLasObligacionesDeLaFormacion`) y lo vivo va primero.
+- Retirar la automatica -> exigir a un grupo -> «Volver a exigirla a toda la empresa» dejaba DOS
+  obligaciones vivas a quien estaba en el grupo (`updateRule`: al devolver lo retirado no miraba si ya la
+  debia por otro lado).
+- Y el camino contrario: tras eso, retirar la regla del grupo dejaba a la persona con CERO aunque la de
+  toda la empresa siguiera viva (el motor ve la fila retirada como historia). Al retirar una regla se
+  devuelve la fila retirada de la otra regla activa, si la persona sigue en su grupo.
+- De paso: el motor ya no le crea obligaciones a personas DESACTIVADAS que siguen en un grupo (el
+  limpiador de dev desactiva sin sacar del grupo: `reinduccion.mjs` daba «obliga a 444 de 428»).
+
+**3. Reinduccion AUTOMATICA: «cada N meses desde la fecha de ingreso»** (pedido del cliente: *"si alguien
+termino su induccion general, a los 12 meses le pide la reinduccion"*, *"no debe pedirla automatico a
+todos"*). Tercera forma de volver, en Tipos de formación > «Como vuelve» y en el «Se repite» de Quiénes;
+la fecha fija para todos sigue como alternativa.
+- `recurrence.anchor: 'HIRE'` (opcional; sin el, lo de siempre) y `defaultRecurrenceAnchor` en el tipo.
+- Vencimientos de cada persona: ingreso + N, + 2N... (`aniversarioDeIngreso`). La primera ronda NO nace al
+  publicar: aparece `windowDays` antes de SU aniversario (`primeraRondaPorIngreso`); si cae encima, 30
+  dias de gracia. La siguiente es el aniversario POSTERIOR al periodo cumplido, la haga cuando la haga.
+- El ancla es el INGRESO y no la fecha de terminar la induccion general: distan dias, el ingreso lo tiene
+  todo el mundo (tambien quien hizo la induccion en papel) y no obliga a enlazar dos formaciones. Sin
+  fecha de ingreso se cuenta desde que TERMINO su induccion de ingreso (la primera completada de un tipo
+  `requiresBeforeHire`, `terminoDeLaInduccion`), y si tampoco, desde que entro al grupo. **Ojo en
+  produccion: revisar cuantos no tienen `hired_at` antes de encenderlo.**
+- Las novedades, a mano desde Quiénes; la regla no duplica.
+- La gracia por ingreso reciente no se pregunta en este modo (a nadie le toca antes de sus N meses).
+
+**4. La antelacion, a la vista:** eran 60 dias fijos en `assignments.service`; ahora `defaultWindowDays` en
+el tipo («Le aparece a la persona, días antes de vencer»). Rige para reglas que se creen o ajusten.
+
+**5. «Se le exige» y «Vence a los» ya no salen en Quiénes** cuando la fecha la pone el calendario (campaña
+o ingreso): ahi no deciden nada. El disparador guardado no se toca. Y en el TIPO, lo mismo: por ingreso
+no se pregunta «a quién alcanza» ni el plazo en dias (alcanza a todos, a cada quien cuando le toca), y en
+la campaña a toda la plantilla tampoco el plazo. «Cómo se convoca» avisa si no es «Disponible siempre».
+
+**6. La constancia, en el modo por ingreso, vale hasta el aniversario SIGUIENTE** (`vencePorIngreso` en
+`certificates.service`, la misma cuenta del motor). Antes N meses desde que se completo: a quien la hacia
+40 dias antes de su aniversario le caducaba 40 dias antes de que se le pidiera la siguiente. Tambien la
+constancia del PROGRAMA, que era siempre sin fecha: si sus modulos vuelven por ingreso, lleva esa fecha.
+El ancla (ingreso -> fin de la induccion -> entrada al grupo) vive en `assignments/ancla-de-ingreso.ts`,
+que usan el motor y las constancias.
+
+**7. Programas:** «O a personas concretas» en la ficha del programa (`POST /programas/:id/asignar-personas`,
+`assignments:manage`: una obligacion suelta por modulo, sin duplicar), y «Cada N meses desde su fecha de
+ingreso» tambien en «Asignar a una audiencia». Un programa no tiene tipo: es «de reinduccion» por el tipo
+de sus modulos, y con eso sale el aviso de abajo.
+
+**8. Quien no tiene fecha de ingreso, dicho con nombres** (`SinFechaDeIngreso`): en Quiénes y en el
+programa cuando se cuenta desde el ingreso; enlaza a Usuarios con el filtro nuevo «Sin fecha de ingreso»
+(`?sinIngreso=1`, `sinFechaDeIngreso` en `GET /users`). De paso, en Usuarios solo vale la ULTIMA
+busqueda: una respuesta lenta pisaba la lista y el buscador decia una cedula que la tabla no mostraba.
+
+**9. Decidido por el cliente la misma tarde, y hecho:**
+- **Quien YA cumplio sus meses la recibe AL PUBLICAR**, con los dias de gracia; no espera a su proximo
+  aniversario (*"se le debe asignar a todos, no solo los nuevos"*). Quien no los cumple, cuando se
+  acerquen. Para que tras ponerse al dia no vuelva a deberla a los dos meses, la siguiente es el primer
+  aniversario a MAS DE MEDIO PERIODO del vencimiento anterior (`computeNextCycleDueAt`). **OJO al
+  encenderlo en produccion: la primera vez obliga a casi toda la plantilla de golpe.**
+- **Dias de gracia por TIPO** (`defaultGraceDays` -> `recurrence.graceDays`; sin el, 30). Campo «Días de
+  gracia» en el tipo. Las formaciones que NO se repiten siguen con los 30 del codigo.
+- **Tercera forma: «desde que terminó su inducción de ingreso»** (`anchor: 'INDUCTION'`): manda la
+  primera induccion completada y, si no la tiene, el ingreso. «Desde que hizo esta misma formación» se
+  queda para las recertificaciones: en una reinduccion no hay primera vez de la que contar.
+- **Programa:** «O a personas concretas» va DENTRO de «Asignar a una audiencia», bajo «A un servicio», con
+  un solo boton. El grupo crea REGLA en cada modulo (con «Se le exige», «Vence a los», «Se repite»); las
+  personas, obligacion SUELTA con el plazo en dias desde hoy, sin segunda fecha. Solo con personas no se
+  pregunta ni disparador ni repeticion.
+- **Aviso de sin fecha de ingreso:** una linea, neutro, icono con el color secundario de la empresa; nombres
+  y porque detras del icono de informacion. El filtro de Usuarios son los ACTIVOS (la cifra del aviso).
+- `reinduccion.mjs` crea su tipo PROPIO en fecha fija: ya no depende de como este el de la empresa.
+
+**10. UNA INSCRIPCION POR RONDA (el fallo de fondo, encontrado y ARREGLADO el mismo dia).** La SEGUNDA vez
+no se podia cursar con convocatoria permanente: `enrollments` tenia `UNIQUE(offering_id, user_id)` y
+`selfEnroll` devolvia la inscripcion del año anterior, ya terminada («Ya aprobaste esta evaluación»). Lo
+destapo `programa-reinduccion-completo.mjs`. Venia salvandolo, sin que nadie lo supiera, que cada campaña
+se estrenaba publicando una version nueva (version nueva = convocatoria nueva).
+- «Ronda» = cada vez que una persona debe la misma formacion. Lo que no se repite tiene una sola y no cambia.
+- Columna `enrollments.round`; la regla, pura y con pruebas, en `learning/ronda-de-inscripcion.ts`: con una
+  inscripcion viva se sigue en esa; si la termino y hay OTRA obligacion abierta, abre la ronda siguiente en
+  la MISMA convocatoria; sin obligacion nueva, volver a entrar es repasar. La usan el autoservicio y quien
+  convoca (`offerings.service.enroll`). No hace falta convocatoria ni version nueva por ronda.
+- Es el patron que ya tenia el producto («una fila por ronda, inmutable»: `CertificationGrant`, la
+  inscripcion de un programa). La del año anterior queda intacta: avance, intentos, nota y constancia.
+- Probado de punta a punta: segunda ronda entera (contenido, examen, encuesta, otra jornada con lista), dos
+  constancias de programa, cada una con su vigencia, y la primera sin tocar.
+
+**11. Seguimiento y Vencimientos, por la segunda ronda:**
+- El detalle de una formacion sumaba intentos, nota, encuesta y constancia por PERSONA: la fila «sin empezar»
+  de este año enseñaba el 100 % y la constancia del año pasado. Ahora salen de la inscripcion de ESA ronda
+  (el estado ya se resolvia asi desde el 2026-09-05). Toca el trabajo sin confirmar del 2026-10-05.
+- Cada fila dice de que CONVOCATORIA sale («Permanente», «Jornada del AAAA-MM-DD»), en pantalla y en el Excel:
+  con varias convocatorias por formacion no habia como saberlo.
+- Vencimientos: de dos constancias de la MISMA formacion cuenta la mas reciente (`gana`); antes ganaba la
+  que caduca antes, o sea la del año pasado. Entre clases distintas (propia / de un tercero) sigue igual.
+- La constancia de un PROGRAMA ya entra en Vencimientos («Programa: …», por reprogramar), con la ultima de cada
+  persona y programa; y se quita en cuanto le nace la ronda siguiente, porque ese trabajo ya sale modulo por
+  modulo. Ademas, una constancia de formacion que ya tiene SUCESORA no sale: la consulta solo miraba el
+  horizonte y la nueva, que caduca despues, quedaba fuera de la comparacion.
+- Inicio no cambia.
+
+**11 bis. La trazabilidad, a la vista (pedido del cliente: «que se vea claro», «¿y si el auditor quiere ver
+las rondas?»):**
+- **Seguimiento > una formacion:** el «2×» que nadie entendia es ahora el boton «Ciclo 2 de 2». Al pulsarlo,
+  cada ciclo sale como una FILA mas de la tabla, bajo las mismas columnas: estado, convocatoria, vencimiento,
+  intentos, nota, encuesta y su constancia descargable. La API manda `historial` en cada fila.
+- La **convocatoria** va BAJO EL ESTADO, con su nombre (el codigo, «CONV-2026-0012»; clase y fecha al pasar el
+  cursor), y abre la convocatoria; sin columna propia, que la tabla ya tenia ocho. El nombre de la persona abre
+  su ficha. Filtro por convocatoria junto al buscador:
+  con una elegida, la lista son quienes estuvieron EN ESA y lo que sacaron alli, aunque hoy vayan por otro
+  ciclo. Ciclo y convocatoria no son lo mismo: el ciclo es la vuelta de la persona; la convocatoria, donde la
+  curso.
+- **Excel:** columna «Convocatoria» y hoja nueva «Ciclos», una fila por cada vuelta de quien tuvo mas de una.
+- **Ficha de la persona > Su trayectoria:** cada renglon dice ahora que paso esa vez —convocatoria, intentos y
+  nota— (`ejecucion` en `GET /assignments?userId=`, con la misma regla que Seguimiento). «ronda N» pasa a
+  «ciclo N», la palabra que usa el resto de la pantalla.
+- Vencimientos no lleva convocatoria, a proposito: habla de fechas de papeles y obligaciones, no de donde
+  se curso.
+
+**11 ter. QUIEN VE QUE (2026-10-07, pedido del cliente: «a los analistas les sale todo; solo debe salir lo que
+tengan asignado, y solo por permiso pueden ver todo»).** Era cierto y mas ancho de lo que parecia:
+- Las rutas de Seguimiento pedian `reports:read_scope` y NINGUNA aplicaba alcance; `reports:read_all` existia
+  desde el Sprint 1 y no cambiaba nada. Un analista veia a toda la empresa en Seguimiento e Inicio.
+- La regla, en `common/formaciones-visibles.ts`: con el permiso de «ver todo» (por rol o concedido a la
+  persona), todo; sin el, las formaciones de SU ALCANCE (procesos y tipos, lo que ve en Formaciones) mas las
+  que creo o de las que es responsable. Aqui NO vale el «sin alcance se ve todo» del catalogo: son personas con
+  su resultado. Se acota por formacion, no por persona.
+- Aplicada en: ejecucion general y por formacion (fuera de alcance = 404), analitica, evolucion, conocimiento,
+  programas (le toca si le tocan TODOS sus modulos), vencimientos, ejecucion del plan y las dos descargas. La
+  racha de Inicio es de la empresa entera: a quien ve una parte no se le da.
+- **Asignaciones** (`GET /assignments`): la abria cualquiera con permiso de asignar y traia las obligaciones de
+  toda la empresa. Misma regla; el «ver todo» ahi es `enrollments:read_all`.
+- **Aviso semanal de vencimientos:** se redactaba una vez con las cifras de toda la empresa. Ahora cada
+  destinatario recibe las de lo que ve, y si en lo suyo no hay nada, no recibe aviso.
+- Recorrido `alcance-en-informes.mjs`. **Al desplegar:** quien tenga `reports:read_scope` sin alcance ni
+  `reports:read_all` pasa a ver solo lo que creo o dirige; revisar antes que roles lo necesitan entero.
+- **Sin acotar todavia** (lo ve cualquiera con el permiso de asignar): el selector de personas
+  (`/users/pickable`, nombres y cedulas de todos) y las listas de audiencias, reglas y matriz de cargos.
+- OJO en dev: el 2026-10-07 la cuenta 999999999 movio el area «Gestion Humana» debajo de «Grupo recorrido
+  E2E138614». Desde entonces `sprint-4.spec.ts` («la pildora desde el telefono») falla al elegirla por su
+  nombre, que ahora lleva la rama delante. No es del codigo: devolver el area a la raiz lo arregla.
+
+**11 quater. SEDE, QUIEN ASIGNA Y EL AVISO (2026-10-08).**
+- **La sede de la convocatoria ya NO acota.** Una jornada sin alcance marcado se recortaba sola a la
+  regional de su sede (`projected-audience.service.ts` y `offerings.service.ts`), mientras la pantalla
+  decia «Solo logistica» y «Atiende a todos los obligados». Afectaba a los proyectados (el denominador
+  de la cobertura) y a «citar a todos los obligados». Ahora solo acota «Regionales a las que atiende».
+  **Al desplegar:** lo ya publicado conserva su proyectado congelado; las convocatorias en borrador con
+  sede y sin alcance pasan a proyectar a todos. Quien contaba con el recorte debe marcar la regional.
+- **Quien asigna, con alcance.** Requisitos (`/assignment-rules`), matriz, «Quienes» de una formacion y
+  las escrituras (asignar, exigir, retirar, eximir) usan la regla de `formaciones-visibles.ts` con
+  `enrollments:read_all`; fuera de alcance = 404. Se comprueba en el CONTROLADOR (`exigirAlcance`):
+  Programas entra a los mismos metodos con su permiso propio.
+- **Aviso semanal:** los destinatarios se elegian solo por rol. Ahora cuenta tambien el permiso
+  concedido o quitado a la persona, y vale `reports:read_all`.
+- **Sin acotar, a proposito:** `/users/pickable` y la lista de audiencias (son el selector para asignar).
+- **«Ver todo» incluye «ver lo de mi alcance»** (`permission.service.ts`): `reports:read_all` trae
+  `reports:read_scope` y `enrollments:read_all` trae `enrollments:read_scope`. Antes, dar solo «ver
+  todos los informes» dejaba a la persona con 403 en Seguimiento.
+- **La sede OFRECE acotar.** Al elegirla sale debajo «Atiende a todas las regionales» con el boton
+  «Atender solo a <sede>», que la pasa a «Regionales a las que atiende». Se decide a la vista.
+- `sprint-4.spec.ts` elige el area por el final del rotulo: ya no depende de donde cuelgue en dev.
+
+**12. Textos:** «Vence a los» ya no dice «Negativo = antes» —dejo de ser cierto el 2026-10-01: al ingresar el
+minimo es 1— y el detalle va detras del icono, en Quiénes y en el programa.
+
+**Abierto:** el trabajo del 2026-10-05 en Seguimiento (`intentos-vigentes.ts`) sigue sin confirmar y sin
+entrada propia en este diario. Guia actualizada: `docs/guias/reinduccion.html`.
+
+**Pruebas:** 1040 unitarias (12 nuevas en `due-date.spec.ts`, 7 en `ronda-de-inscripcion.spec.ts`), **35/35 e2e** contra dev (2 nuevas en
+`exigencia-de-la-induccion.spec.ts`), y recorridos en verde, entre ellos los nuevos
+`reinduccion-por-ingreso.mjs` (publicar obligo a 3 de 434) y `programa-induccion-y-reinduccion.mjs`
+(los dos programas de punta a punta, con sus constancias) y `programa-reinduccion-completo.mjs`
+(contenido, evaluacion, encuesta, asistencia y la SEGUNDA ronda entera; en verde).
+
+> **Al desplegar:** la migracion corre sola con `migrate deploy`. Es solo estructura y no toca datos de
+> parametrizacion; las inscripciones existentes quedan en la ronda 1. Copia antes, como siempre.
+
+---
+
 ## 2026-10-02 — AVISOS DIRECTOS, CONVOCATORIAS QUE NO SE QUEDAN SIN PUERTA Y LIMITE POR PERSONA
 
 **Produccion (con copia):** 7 asignaciones MANUALES que vencian el 1-oct pasaron a 8 dias desde que se

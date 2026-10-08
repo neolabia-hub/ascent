@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { elegirEnCombo, loginAsAdmin, unique } from './helpers';
+import { E2E_DOCUMENT, elegirEnCombo, loginAsAdmin, unique } from './helpers';
 
 /**
  * PROGRAMAS (2026-09-14, PENDIENTES 11.3/11.4): varias formaciones agrupadas bajo un solo
@@ -116,6 +116,21 @@ test.describe('Programas', () => {
     // "2 módulos" y no un requisito unico de tipo PATH: la asignacion delega en el motor de
     // requisitos de siempre, una vez por modulo.
     await expect(page.getByText(/2 módulos, \d+ obligacion(es)? nueva/)).toBeVisible({ timeout: 20_000 });
+
+    // ─────────────────────────── A una persona concreta (2026-10-06) ───────────────────────────
+    // En el MISMO formulario, bajo «A un servicio». Solo con personas no hay regla: no se pregunta
+    // «Se le exige» ni «Se repite», solo el plazo en dias. A quien ya lo debe no se le duplica.
+    await page.getByRole('button', { name: /Quitar Director de Gestion Humana/ }).click();
+    await page.locator('#a-people').click();
+    await page.getByLabel('Buscar en la lista').fill(E2E_DOCUMENT);
+    await page.getByRole('option').filter({ visible: true }).first().click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#a-trigger')).toHaveCount(0);
+    await expect(page.locator('#a-repite-modo')).toHaveCount(0);
+    await expect(page.locator('#a-dias')).toBeVisible();
+    await page.getByRole('button', { name: 'Asignar programa' }).click();
+    await expect(page.getByText('Programa asignado a 1 persona', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/2 ya estaban pendientes/)).toBeVisible({ timeout: 20_000 });
 
     // ─────────────────────────── La ficha de un módulo, en la propia lista ───────────────────────────
     /*

@@ -122,6 +122,16 @@ export interface FirstDueContext {
  */
 export const DIAS_DE_GRACIA = 30;
 
+/** Los dias de gracia de ESTA regla: los que puso su tipo, o los 30 de siempre. */
+export function diasDeGracia(recurrence: Recurrence | null | undefined): number {
+  return recurrence?.graceDays ?? DIAS_DE_GRACIA;
+}
+
+/** Vuelve por ANIVERSARIO de la persona: de su ingreso o de su induccion. Una campaña personal. */
+export function esPorAniversario(recurrence: Recurrence | null | undefined): boolean {
+  return recurrence?.anchor === 'HIRE' || recurrence?.anchor === 'INDUCTION';
+}
+
 /**
  * Vencimiento de la PRIMERA ronda de una obligacion.
  *
@@ -190,12 +200,12 @@ export function computeFirstDueAt(trigger: Trigger, dueDays: number, ctx: FirstD
     const enLaCampana = nextFixedDate(recurrencia.fixedDate, desde);
     const diasQueFaltan = Math.round((endOfDay(enLaCampana).getTime() - endOfDay(desde).getTime()) / 86_400_000);
     if (diasQueFaltan >= recurrencia.windowDays) return endOfDay(enLaCampana);
-    return endOfDay(addDays(desde, DIAS_DE_GRACIA));
+    return endOfDay(addDays(desde, diasDeGracia(recurrencia)));
   }
 
   const anchor = trigger === 'ON_HIRE' && ctx.hiredAt ? fromDateOnly(ctx.hiredAt) : desde;
   const calculada = addDays(anchor, dueDays);
-  const nace = endOfDay(calculada) < endOfDay(desde) ? addDays(desde, DIAS_DE_GRACIA) : calculada;
+  const nace = endOfDay(calculada) < endOfDay(desde) ? addDays(desde, diasDeGracia(ctx.recurrence)) : calculada;
   return endOfDay(nace);
 }
 
@@ -230,17 +240,98 @@ export function cycleAnchor(
   ronda: { completedAt?: Date | null; dueAt?: Date | null },
   fallback: Date,
 ): Date {
-  if (recurrence.fixedDate !== undefined) return ronda.dueAt ?? ronda.completedAt ?? fallback;
+  // El aniversario de INGRESO es una campaña personal: se satisface el PERIODO, no el dia en que
+  // se hizo, igual que con la fecha fija.
+  if (recurrence.fixedDate !== undefined || esPorAniversario(recurrence)) {
+    return ronda.dueAt ?? ronda.completedAt ?? fallback;
+  }
   return ronda.completedAt ?? ronda.dueAt ?? fallback;
+}
+
+/**
+ * ─── LA REINDUCCION AUTOMATICA: CADA N MESES DESDE EL INGRESO (2026-10-06) ───
+ *
+ * Pedido del cliente: *"si alguien termino su induccion general, a los 12 meses le pide la
+ * reinduccion"*, y *"no debe pedirla automatico a todos"*. La campaña de fecha fija obliga a la
+ * plantilla entera el mismo dia; «cada N meses desde que la hizo» cuenta desde la reinduccion
+ * anterior y no tiene de donde contar la primera.
+ *
+ * El ancla es la FECHA DE INGRESO y no la de terminar la induccion general: la induccion vence a
+ * los pocos dias de ingresar, asi que las dos fechas distan dias; el ingreso lo tiene todo el
+ * mundo —tambien quien hizo su induccion en papel antes de que existiera el sistema—, y no obliga
+ * a enlazar dos formaciones distintas. Sin fecha de ingreso se cuenta desde que TERMINO su
+ * induccion de ingreso (la primera que completo), y si tampoco la tiene, desde que entro al grupo.
+ *
+ * Los vencimientos de una persona son ingreso + N, + 2N, + 3N... y cada ronda aparece
+ * `windowDays` antes: a nadie le nace hasta que le toca.
+ */
+export function ingresoCivil(
+  hiredAt: Date | null,
+  joinedAt: Date,
+  terminoInduccion?: Date | null,
+  /** `anchor: INDUCTION`: manda la induccion, y el ingreso es lo que queda si no la tiene. */
+  primeroLaInduccion = false,
+): CalendarDate {
+  if (primeroLaInduccion && terminoInduccion) return toBogotaDate(terminoInduccion);
+  return hiredAt ? fromDateOnly(hiredAt) : toBogotaDate(terminoInduccion ?? joinedAt);
+}
+
+/** El primer aniversario (ingreso + k·N meses, k >= 1) en o despues de `desde`. */
+export function aniversarioDeIngreso(ingreso: CalendarDate, everyMonths: number, desde: CalendarDate): CalendarDate {
+  const orden = (fecha: CalendarDate) => fecha.year * 10_000 + fecha.month * 100 + fecha.day;
+  // Se suma siempre sobre el ingreso ORIGINAL: asi un 31 no se queda pegado al 28 tras febrero.
+  for (let k = 1; k <= 1200; k += 1) {
+    const candidato = addMonths(ingreso, k * everyMonths);
+    if (orden(candidato) >= orden(desde)) return candidato;
+  }
+  return addMonths(ingreso, 1200 * everyMonths);
+}
+
+/**
+ * La PRIMERA ronda de alguien en una regla anclada al ingreso: `null` = todavia no le toca.
+ *
+ * Tres casos:
+ *   - su proximo aniversario esta DENTRO de la antelacion: nace y vence ese dia (o con los dias de
+ *     gracia, si cae encima);
+ *   - YA CUMPLIO sus N meses y nunca la ha hecho: nace YA, con los dias de gracia. Lo decidio el
+ *     cliente el 2026-10-06 —*"se le debe asignar a todos, no solo los nuevos"*—: quien lleva tres
+ *     años no puede quedarse sin ella hasta su proximo aniversario, que puede faltar once meses;
+ *   - todavia NO cumple sus N meses: nada. Le aparecera cuando se acerquen.
+ */
+export function primeraRondaPorIngreso(recurrence: Recurrence, ingreso: CalendarDate, ahora: Date): Date | null {
+  if (recurrence.everyMonths === undefined) return null;
+  const hoy = toBogotaDate(ahora);
+  const conGracia = endOfDay(addDays(hoy, diasDeGracia(recurrence)));
+  const aniversario = endOfDay(aniversarioDeIngreso(ingreso, recurrence.everyMonths, hoy));
+  if (ahora >= cycleOpensAt(aniversario, recurrence)) return aniversario < conGracia ? conGracia : aniversario;
+  const primerAniversario = endOfDay(addMonths(ingreso, recurrence.everyMonths));
+  return primerAniversario < ahora ? conGracia : null;
 }
 
 /**
  * Vencimiento de la ronda SIGUIENTE (Decision #12: la obligacion es viva en el tiempo).
  * El ancla la elige `cycleAnchor`: no es la misma para una campaña que para un aniversario.
+ *
+ * `ingreso` solo cuenta con `anchor: HIRE`: el siguiente aniversario de ingreso DESPUES del
+ * periodo cumplido. Sin el (no deberia faltar) se cuenta N meses desde ese periodo.
  */
-export function computeNextCycleDueAt(recurrence: Recurrence, anchorInstant: Date): Date {
+export function computeNextCycleDueAt(
+  recurrence: Recurrence,
+  anchorInstant: Date,
+  ingreso?: CalendarDate | null,
+): Date {
   const anchor = toBogotaDate(anchorInstant);
   if (recurrence.everyMonths !== undefined) {
+    if (esPorAniversario(recurrence) && ingreso) {
+      /*
+        AL MENOS MEDIO PERIODO DESPUES. En una ronda normal no cambia nada: tras el aniversario de
+        este año, el primero que queda a mas de seis meses es el del año que viene. Importa tras
+        «ponerse al dia»: quien la recibio al publicar y tiene el aniversario en dos meses no puede
+        volver a deberla dos meses despues de hacerla; le toca en el siguiente.
+      */
+      const medio = Math.max(1, Math.floor(recurrence.everyMonths / 2));
+      return endOfDay(aniversarioDeIngreso(ingreso, recurrence.everyMonths, addMonths(anchor, medio)));
+    }
     return endOfDay(addMonths(anchor, recurrence.everyMonths));
   }
   // Fecha fija anual: la siguiente ocurrencia DESPUES del ancla (nunca el mismo dia).
@@ -271,9 +362,14 @@ export interface RondaCumplida {
  * vencimiento mismo. Tratarlo como ancla daria "tres años despues de que caduque", que es justo
  * al reves de lo que dice el documento.
  */
-export function proximoVencimiento(recurrence: Recurrence, ronda: RondaCumplida, fallback: Date): Date {
+export function proximoVencimiento(
+  recurrence: Recurrence,
+  ronda: RondaCumplida,
+  fallback: Date,
+  ingreso?: CalendarDate | null,
+): Date {
   if (ronda.validUntilOverride) return ronda.validUntilOverride;
-  return computeNextCycleDueAt(recurrence, cycleAnchor(recurrence, ronda, fallback));
+  return computeNextCycleDueAt(recurrence, cycleAnchor(recurrence, ronda, fallback), ingreso);
 }
 
 /**

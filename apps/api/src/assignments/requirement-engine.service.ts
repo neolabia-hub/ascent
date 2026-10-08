@@ -4,10 +4,14 @@ import { recurrenceSchema, type Recurrence } from '@neo-pulse/shared';
 import { AuditService } from '../common/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
+import { terminoDeLaInduccion } from './ancla-de-ingreso.js';
 import { AudiencesService } from './audiences.service.js';
 import {
   computeFirstDueAt,
   cycleOpensAt,
+  esPorAniversario,
+  ingresoCivil,
+  primeraRondaPorIngreso,
   proximoVencimiento,
   type RondaCumplida,
   type Trigger,
@@ -247,6 +251,10 @@ export class RequirementEngineService {
         // inducciones pendientes a gente que ya las hizo en papel hace años.
         ...(rule.appliesFrom ? { joinedAt: { gte: rule.appliesFrom } } : {}),
         ...(userIds ? { userId: { in: userIds } } : {}),
+        // A una persona DESACTIVADA no le nace nada aunque su fila del grupo siga abierta
+        // (2026-10-06: el limpiador de dev desactiva sin sacar del grupo, y la reinduccion
+        // obligaba a 444 de 428).
+        user: { active: true, deletedAt: null },
       },
       select: { userId: true, joinedAt: true, user: { select: { hiredAt: true } } },
     });
@@ -283,6 +291,17 @@ export class RequirementEngineService {
       this.completadaPorOtraRegla(db, rule, sinHistoria),
       this.abiertaPorOtraRegla(db, rule, sinHistoria),
     ]);
+    // Solo en las reglas por aniversario. Contando desde el INGRESO, la induccion solo hace falta
+    // de quien no tiene fecha de ingreso; contando desde la INDUCCION, de todos.
+    const desdeLaInduccion = recurrence?.anchor === 'INDUCTION';
+    const terminoInduccion = esPorAniversario(recurrence)
+      ? await terminoDeLaInduccion(
+          db,
+          members.filter((m) => desdeLaInduccion || !m.user.hiredAt).map((m) => m.userId),
+        )
+      : new Map<string, Date>();
+    const ingresoDe = (member: (typeof members)[number]) =>
+      ingresoCivil(member.user.hiredAt, member.joinedAt, terminoInduccion.get(member.userId), desdeLaInduccion);
     const rows: Prisma.AssignmentCreateManyInput[] = [];
     const created: CreatedAssignment[] = [];
     /** Rondas que cerraron sin hacerse y hay que marcar antes de abrir la siguiente. */
@@ -360,6 +379,18 @@ export class RequirementEngineService {
           continue;
         }
 
+        /*
+          ANCLADA AL INGRESO (2026-10-06): no nace para todos al publicar. A cada quien le aparece
+          cuando se acerca SU aniversario de ingreso; hasta entonces, nada. Ver `primeraRondaPorIngreso`.
+        */
+        if (recurrence && esPorAniversario(recurrence)) {
+          const venceEl = primeraRondaPorIngreso(recurrence, ingresoDe(member), now);
+          if (!venceEl) continue;
+          rows.push(this.newRow(tenantId, rule, member.userId, 1, venceEl));
+          created.push({ userId: member.userId, targetId: rule.targetId, dueAt: venceEl });
+          continue;
+        }
+
         const dueAt = computeFirstDueAt(rule.trigger as Trigger, rule.dueDaysAfterTrigger ?? 0, {
           hiredAt: member.user.hiredAt,
           joinedAt: member.joinedAt,
@@ -399,7 +430,12 @@ export class RequirementEngineService {
       //   - si hay PAPEL de un tercero, manda el papel;
       //   - si no, una CAMPANA se cuenta desde el vencimiento del periodo que se cumplio;
       //   - y un ANIVERSARIO desde la fecha en que cada quien la completo.
-      const nextDueAt = proximoVencimiento(recurrence, last, now);
+      const nextDueAt = proximoVencimiento(
+        recurrence,
+        last,
+        now,
+        ingresoDe(member),
+      );
       const decision = decidirRondaSiguiente({
         estadoAnterior: last.status,
         politica: recurrence.onExpiry ?? 'ESPERA',

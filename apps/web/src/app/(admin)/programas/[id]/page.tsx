@@ -19,11 +19,13 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ApiError, motivoDelError } from '@/lib/api';
 import { listActivities, type ActivityListItem } from '@/lib/catalog-api';
-import { listCatalog, nombreConRama, type CatalogRow } from '@/lib/admin-api';
+import { listCatalog, listPickableUsers, nombreConRama, type CatalogRow, type PickableUser } from '@/lib/admin-api';
+import { SinFechaDeIngreso } from '@/components/modules/admin/sin-fecha-de-ingreso';
 import { EMPTY_RULE, previewAudience, type AudienceRule } from '@/lib/delivery-api';
 import {
   addModule,
   assignProgram,
+  assignProgramToPeople,
   getProgram,
   publishProgram,
   removeModule,
@@ -281,7 +283,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 
 /** Igual que en la ficha de una formación: la palabra que nombra como se repite. */
-const COMO_SE_REPITE: Record<'NO' | 'MESES' | 'ANUAL', string> = {
+type ModoRepite = 'NO' | 'MESES' | 'ANUAL' | 'INGRESO' | 'INDUCCION';
+
+const COMO_SE_REPITE: Record<ModoRepite, string> = {
+  INGRESO: 'AUTOMÁTICA: quien ya cumplió los meses desde su ingreso lo debe ya; los demás, al cumplirlos.',
+  INDUCCION: 'AUTOMÁTICA: igual, pero los meses se cuentan desde que terminó su inducción de ingreso.',
   NO: 'Se hace una vez y no vuelve.',
   ANUAL: 'CAMPAÑA: todos vencen el mismo día, sea cuando sea que lo completaran.',
   MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que lo completó.',
@@ -567,9 +573,18 @@ export default function ProgramaDetailPage() {
     trigger: 'ON_JOIN' as 'ON_HIRE' | 'ON_JOIN',
     dias: '30',
     everyMonths: '',
-    modoRepite: 'NO' as 'NO' | 'MESES' | 'ANUAL',
+    modoRepite: 'NO' as ModoRepite,
     fixedDate: '',
   });
+  /*
+    A PERSONAS CONCRETAS (2026-10-06, pedido del cliente): el programa entero a quien no cubre ninguna
+    regla —una novedad, un reintegro, una prueba—. Una obligacion suelta por modulo.
+  */
+  const [people, setPeople] = useState<PickableUser[]>([]);
+  const [manual, setManual] = useState<{ userIds: string[] }>({ userIds: [] });
+  useEffect(() => {
+    void listPickableUsers().then(setPeople).catch(() => setPeople([]));
+  }, []);
   const [reason, setReason] = useState('');
   const [asignando, setAsignando] = useState(false);
   const [resultado, setResultado] = useState<AssignProgramResult | null>(null);
@@ -588,31 +603,60 @@ export default function ProgramaDetailPage() {
       .catch(() => setReach(null));
   }, [scope]);
 
+  /*
+    UN SOLO BOTON, DOS COSAS DISTINTAS (2026-10-06).
+
+    Lo marcado por cargo, area, regional o servicio crea una REGLA en cada modulo —lo mismo que
+    «Exigirla» en Quiénes de cada formacion—, y a esa regla le aplican «Se le exige», «Vence a los» y
+    «Se repite». Las personas concretas reciben una obligacion SUELTA por modulo: una sola vez, con
+    el plazo en dias contado desde hoy; ni se repite ni alcanza a quien entre despues.
+
+    Antes las personas iban en una tarjeta aparte al final, con su propia fecha limite. El cliente
+    las pidio aqui, bajo «A un servicio», y sin una segunda fecha que duplicara «Vence a los».
+  */
   const asignar = async () => {
     setAsignando(true);
     setResultado(null);
+    const hayGrupoMarcado = !sinMarcar(scope);
     try {
-      const result = await assignProgram(id, {
-        scope,
-        trigger: plazo.trigger,
-        dueDaysAfterTrigger: Number(plazo.dias || 0),
-        everyMonths: plazo.modoRepite === 'MESES' && plazo.everyMonths ? Number(plazo.everyMonths) : null,
-        fixedDate: plazo.modoRepite === 'ANUAL' && plazo.fixedDate ? plazo.fixedDate : null,
-        reason: reason.trim() || null,
-      });
-      setResultado(result);
-      /*
-        Y SE RECARGA (2026-09-16). Asignar crea la regla de cada módulo, así que cambia justo lo que
-        la lista de arriba está enseñando: a quién alcanza cada uno, y con ello el bloque de estado.
-        Sin esto, se asignaba el programa y la pantalla seguía diciendo "no se le exige a nadie"
-        hasta recargar a mano — se lee como que no funcionó.
-      */
+      let titulo = 'Programa asignado';
+      const detalle: string[] = [];
+      if (hayGrupoMarcado) {
+        const result = await assignProgram(id, {
+          scope,
+          trigger: plazo.trigger,
+          dueDaysAfterTrigger: Number(plazo.dias || 0),
+          everyMonths:
+            (plazo.modoRepite === 'MESES' || plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION') &&
+            plazo.everyMonths
+              ? Number(plazo.everyMonths)
+              : null,
+          fixedDate: plazo.modoRepite === 'ANUAL' && plazo.fixedDate ? plazo.fixedDate : null,
+          recurrenceAnchor:
+            plazo.modoRepite === 'INGRESO' ? 'HIRE' : plazo.modoRepite === 'INDUCCION' ? 'INDUCTION' : 'COMPLETED',
+          reason: reason.trim() || null,
+        });
+        setResultado(result);
+        titulo = `Programa exigido a ${result.reach} personas`;
+        detalle.push(`${result.modulos} módulos, ${result.obligacionesCreadas} obligaciones nuevas.`);
+      }
+      if (manual.userIds.length > 0) {
+        const dias = Math.max(1, Math.round(Number(plazo.dias || 30)) || 30);
+        // El dia de hoy en Colombia, mas el plazo: la fecha limite de las personas concretas.
+        const vence = new Date(Date.now() - 5 * 60 * 60 * 1000 + dias * 86_400_000).toISOString().slice(0, 10);
+        const sueltas = await assignProgramToPeople(id, { userIds: manual.userIds, dueAt: vence });
+        if (!hayGrupoMarcado) {
+          titulo = `Programa asignado a ${sueltas.personas} persona${sueltas.personas === 1 ? '' : 's'}`;
+        }
+        detalle.push(
+          `${hayGrupoMarcado ? 'A personas concretas: ' : `${sueltas.modulos} módulos, `}${sueltas.obligacionesCreadas} obligaciones nuevas` +
+            (sueltas.yaLaTenian > 0 ? `; ${sueltas.yaLaTenian} ya estaban pendientes.` : '.'),
+        );
+        setManual({ userIds: [] });
+      }
+      // Asignar cambia justo lo que la lista de arriba enseña: se recarga para que se vea.
       await load();
-      showToast({
-        kind: 'success',
-        title: `Programa exigido a ${result.reach} personas`,
-        description: `${result.modulos} módulos, ${result.obligacionesCreadas} obligaciones nuevas.`,
-      });
+      showToast({ kind: 'success', title: titulo, description: detalle.join(' ') });
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo asignar el programa', description: motivoDelError(error) });
     } finally {
@@ -646,13 +690,27 @@ export default function ProgramaDetailPage() {
     // El grupo casi siempre viene puesto solo; solo falta cuando alguien separa en grupos y deja el
     // nombre en blanco. Cero es una respuesta válida al cupo ("hay que aprobarlos todos").
     (moduloForm.isRequired || (grupoEfectivo.length > 0 && Number(moduloForm.maxFallos) >= 0));
-  const puedeAsignar = !asignando && !sinMarcar(scope);
+  const hayGrupo = !sinMarcar(scope);
+  const hayPersonas = manual.userIds.length > 0;
+  /** Solo personas concretas: no hay regla, asi que «Se le exige» y «Se repite» no aplican. */
+  const soloPersonas = hayPersonas && !hayGrupo;
+  const porCalendario =
+    plazo.modoRepite === 'ANUAL' || plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION';
+  const puedeAsignar = !asignando && (hayGrupo || hayPersonas);
 
   // Modulos que su propio tipo ya exige a toda la empresa al publicarse (PENDIENTES 11.7).
   const automaticos = programa.items.filter((item) => item.exigenciaAutomatica);
   const todosAutomaticos = programa.items.length > 0 && automaticos.length === programa.items.length;
   const automaticosYaExigidos = automaticos.filter((item) => item.yaExigido).length;
   const algunoSoloAlIngresar = automaticos.some((item) => item.soloAlIngresar);
+  /*
+    UN PROGRAMA NO TIENE TIPO: es «de reinduccion» porque sus MODULOS lo son (2026-10-06). Si alguno
+    vuelve por fecha de ingreso, el aviso de quien no la tiene sale aqui, en el programa.
+  */
+  const algunModuloPorIngreso = programa.items.some((item) => {
+    const config = actividades.find((actividad) => actividad.id === item.actividad?.id)?.activityType.config ?? {};
+    return config.defaultRecurrenceAnchor === 'HIRE' && !config.defaultAnnualDate && !!config.defaultRecurrenceMonths;
+  });
   /** Módulos en borrador: nadie puede hacerlos, así que el programa no puede completarse. */
   const sinPublicar = programa.items.filter((item) => !item.publicada).length;
 
@@ -1522,6 +1580,10 @@ export default function ProgramaDetailPage() {
             ) : null}
           </div>
 
+          {programa.status === 'PUBLISHED' && algunModuloPorIngreso && plazo.modoRepite !== 'INGRESO' ? (
+            <SinFechaDeIngreso />
+          ) : null}
+
           {/* A quién se le exige vive arriba, en el bloque de estado: es parte de "cómo está este
               programa", no una sección aparte. Tenerlo en dos sitios obligaba a mirar los dos. */}
 
@@ -1604,7 +1666,7 @@ export default function ProgramaDetailPage() {
                   onClick={() => setAsignarDeTodasFormas(true)}
                   className="focus-ring rounded text-left text-xs text-ink-500 underline-offset-2 hover:text-ink-700 hover:underline"
                 >
-                  Asignarlo igualmente a un grupo concreto
+                  Asignarlo a un grupo o a personas concretas
                 </button>
               ) : null}
               {todosAutomaticos && !asignarDeTodasFormas ? null : (
@@ -1650,8 +1712,35 @@ export default function ProgramaDetailPage() {
                   onChange={(serviceIds) => setScope({ ...scope, serviceIds })}
                 />
               </Field>
+              <Field
+                htmlFor="a-people"
+                label="O a personas concretas"
+                ayuda="Reciben el programa entero una sola vez, con el plazo de «Vence a los» contado desde hoy. No les crea una regla: no se repite ni alcanza a quien entre después. A quien ya tiene un módulo pendiente no se le duplica."
+              >
+                <MultiSelect
+                  id="a-people"
+                  placeholder="Nadie en particular"
+                  options={people.map((person) => ({
+                    id: person.id,
+                    label: person.fullName,
+                    hint: [person.documentNumber, person.jobTitle?.name].filter(Boolean).join(' · '),
+                    keywords: person.documentNumber,
+                  }))}
+                  value={manual.userIds}
+                  onChange={(userIds) => setManual({ userIds })}
+                />
+              </Field>
               {contarFacetas(scope) > 1 ? <p className="text-xs text-ink-500">Se cruzan: hay que cumplir todo lo marcado a la vez.</p> : null}
 
+              {/*
+                SOLO LO QUE DECIDE ALGO. Con personas concretas, el plazo en dias desde hoy. Con una
+                regla de calendario (campaña o aniversario), nada: la fecha la pone el calendario.
+              */}
+              {soloPersonas || (porCalendario && hayPersonas) ? (
+                <Field htmlFor="a-dias" label="Vence a los" hint="Días desde hoy, para las personas concretas.">
+                  <Input id="a-dias" type="number" min={1} value={plazo.dias} onChange={(e) => setPlazo({ ...plazo, dias: e.target.value })} />
+                </Field>
+              ) : porCalendario ? null : (
               <div className="grid grid-cols-2 gap-3">
                 <Field htmlFor="a-trigger" label="Se le exige">
                   <Select id="a-trigger" value={plazo.trigger} onChange={(e) => setPlazo({ ...plazo, trigger: e.target.value as 'ON_HIRE' | 'ON_JOIN' })}>
@@ -1659,11 +1748,19 @@ export default function ProgramaDetailPage() {
                     <option value="ON_HIRE">Al ingresar a la empresa</option>
                   </Select>
                 </Field>
-                <Field htmlFor="a-dias" label="Vence a los" hint="Días después del disparador (al ingresar: después de la fecha de ingreso). Negativo = antes.">
-                  <Input id="a-dias" type="number" value={plazo.dias} onChange={(e) => setPlazo({ ...plazo, dias: e.target.value })} />
+                <Field
+                  htmlFor="a-dias"
+                  label="Vence a los"
+                  hint="Días."
+                  ayuda="Se cuentan desde hoy con «Desde ahora», o desde la fecha de ingreso de cada persona con «Al ingresar a la empresa». Mínimo 1."
+                >
+                  <Input id="a-dias" type="number" min={1} value={plazo.dias} onChange={(e) => setPlazo({ ...plazo, dias: e.target.value })} />
                 </Field>
               </div>
+              )}
 
+              {soloPersonas ? null : (
+                <>
               <Field htmlFor="a-repite-modo" label="Se repite" hint={COMO_SE_REPITE[plazo.modoRepite]}>
                 <Select
                   id="a-repite-modo"
@@ -1671,19 +1768,23 @@ export default function ProgramaDetailPage() {
                   onChange={(e) =>
                     setPlazo({
                       ...plazo,
-                      modoRepite: e.target.value as 'NO' | 'MESES' | 'ANUAL',
-                      everyMonths: e.target.value === 'MESES' ? plazo.everyMonths || '12' : '',
+                      modoRepite: e.target.value as ModoRepite,
+                      everyMonths:
+                        e.target.value === 'MESES' || e.target.value === 'INGRESO' || e.target.value === 'INDUCCION' ? plazo.everyMonths || '12' : '',
                       fixedDate: e.target.value === 'ANUAL' ? plazo.fixedDate || '03-31' : '',
                     })
                   }
                 >
                   <option value="NO">No se repite</option>
+                  <option value="INGRESO">Cada N meses desde su fecha de ingreso</option>
+                  <option value="INDUCCION">Cada N meses desde que terminó su inducción</option>
                   <option value="ANUAL">Cada año, en una fecha fija</option>
                   <option value="MESES">Cada N meses desde que lo completó</option>
                 </Select>
               </Field>
 
-              {plazo.modoRepite === 'MESES' ? (
+              {plazo.modoRepite === 'INGRESO' ? <SinFechaDeIngreso /> : null}
+              {plazo.modoRepite === 'MESES' || plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION' ? (
                 <Field htmlFor="a-repite" label="Cada cuántos meses">
                   <Input id="a-repite" type="number" min={1} value={plazo.everyMonths} onChange={(e) => setPlazo({ ...plazo, everyMonths: e.target.value })} />
                 </Field>
@@ -1697,14 +1798,16 @@ export default function ProgramaDetailPage() {
               <Field htmlFor="a-reason" label="Motivo (opcional)" hint="Queda en el registro si se pregunta por qué.">
                 <Textarea id="a-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
               </Field>
+                </>
+              )}
 
               <Button className="w-full" onClick={() => void asignar()} loading={asignando} disabled={!puedeAsignar}>
                 <ShieldCheck size={16} />
                 Asignar programa
               </Button>
-              {sinMarcar(scope) ? (
-                <p className="text-center text-xs text-ink-500">Marca al menos un cargo, área, regional o servicio.</p>
-              ) : reach !== null ? (
+              {!hayGrupo && !hayPersonas ? (
+                <p className="text-center text-xs text-ink-500">Marca un cargo, área, regional, servicio o personas concretas.</p>
+              ) : hayGrupo && reach !== null ? (
                 <p className="text-center text-xs text-ink-500">Alcanza a {reach} personas hoy.</p>
               ) : null}
 
@@ -1722,6 +1825,7 @@ export default function ProgramaDetailPage() {
             </div>
           )}
         </section>
+
       </div>
     </div>
   );

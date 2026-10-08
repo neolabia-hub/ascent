@@ -62,6 +62,12 @@ const areas = ((await admin.get('/catalogs/areas')).cuerpo ?? []).filter((a) => 
 const cargo = cargos[0];
 const area = areas[0];
 
+/** AAAA-MM-DD de hace `meses` meses, en el calendario de Colombia. */
+function haceMeses(meses) {
+  const hoy = new Date(Date.now() - 5 * 60 * 60 * 1000);
+  return new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - meses, hoy.getUTCDate())).toISOString().slice(0, 10);
+}
+
 /** Lo que el tipo PROMETE, leido de su configuracion. Ni una expectativa escrita a mano. */
 function contratoDe(tipo) {
   const c = tipo.config ?? {};
@@ -75,6 +81,15 @@ function contratoDe(tipo) {
     permanente: (c.defaultOfferingKind ?? 'EVENT') === 'PERMANENT',
     entraAlPlan: c.participatesInPlan === true,
     seRepite: Boolean(c.defaultAnnualDate || c.defaultRecurrenceMonths),
+    /*
+      VUELVE POR ANIVERSARIO de la persona —de su ingreso o de su induccion— (2026-10-06). Ahi
+      «obliga al publicar» no es a todos: es a quien YA cumplio sus meses. A la persona del recorrido
+      se le pone una fecha de ingreso con esa antiguedad; sin ella no le nace nada, y no es un fallo.
+    */
+    mesesPorAniversario:
+      !c.defaultAnnualDate && c.defaultRecurrenceMonths && ['HIRE', 'INDUCTION'].includes(c.defaultRecurrenceAnchor)
+        ? c.defaultRecurrenceMonths
+        : null,
   };
 }
 
@@ -232,6 +247,7 @@ for (const tipo of tiposAProbar) {
     const alta = await admin.post('/users', {
       documentNumber: doc, fullName: `Aprendiz Estandar ${n} ${SUFIJO}`,
       email: `${doc.toLowerCase()}@recorrido.test`, jobTitleId: cargo.id, areaId: area.id,
+      ...(contrato.mesesPorAniversario ? { hiredAt: haceMeses(contrato.mesesPorAniversario + 1) } : {}),
     });
     if (!alta.ok) { mal(`${etiqueta}: no se pudo crear el aprendiz (${alta.estado})`); }
     else {

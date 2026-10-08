@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { encabezadoDeTabla, escribirCabecera as escribirCabeceraComun } from '../common/xlsx.js';
 import { ESTADO_LABEL, type EstadoEjecucion, type ResumenEjecucion } from './execution-state.js';
+import type { ReinicioPorVersion } from './intentos-vigentes.js';
 
 /**
  * EL SEGUIMIENTO, EN UN ARCHIVO QUE SE LLEVA EL AUDITOR (Decision #124).
@@ -55,6 +56,39 @@ export interface FilaPersonaExport {
   encuesta: string | null;
   respondioEncuesta: boolean;
   certificadoId: string | null;
+  /** De que convocatoria sale lo de la fila: su codigo y «Permanente» o «Jornada del AAAA-MM-DD». */
+  convocatoria?: string | null;
+  /** Todos los ciclos de la persona, si tuvo mas de uno. Va a la hoja «Ciclos». */
+  historial?: Array<{
+    cycleNumber: number;
+    estado: EstadoEjecucion;
+    dueAt: Date | null;
+    completedAt: Date | null;
+    convocatoria: string | null;
+    intentos: number;
+    mejorNota: number | null;
+    encuesta: string | null;
+    respondioEncuesta: boolean;
+    certificadoId: string | null;
+  }>;
+  /** Lo que hizo en la version anterior, si la reiniciaron al publicar una nueva. */
+  reinicio?: ReinicioPorVersion | null;
+}
+
+/**
+ * El reinicio, por escrito. En la pantalla va detras de un icono; en el archivo no hay icono que
+ * pulsar, y sin esta celda una fila con cero intentos esconderia que la persona ya presento.
+ */
+function observacionDeReinicio(reinicio: ReinicioPorVersion | null | undefined): string {
+  if (!reinicio) return '';
+  const partes = [`Reiniciada por version nueva el ${new Date(reinicio.fecha).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}`];
+  if (reinicio.intentosAnteriores > 0) {
+    const nota = reinicio.mejorNotaAnterior === null ? '' : `, mejor nota ${Math.round(reinicio.mejorNotaAnterior)} %`;
+    const version = reinicio.desdeVersion === null ? 'la version anterior' : `la version ${reinicio.desdeVersion}`;
+    partes.push(`en ${version}: ${reinicio.intentosAnteriores} intento(s)${nota}`);
+  }
+  if (reinicio.respondioEncuestaAnterior) partes.push('encuesta respondida');
+  return `${partes.join('; ')}. No cuentan para la version vigente.`;
 }
 
 const ENCUESTA_LABEL: Record<string, string> = {
@@ -157,7 +191,7 @@ export async function libroDeEjecucionDeActividad(
   libro.created = cabecera.generadoEn;
 
   const hoja = libro.addWorksheet('Personas');
-  escribirCabecera(hoja, cabecera, 'Seguimiento persona por persona', 12);
+  escribirCabecera(hoja, cabecera, 'Seguimiento persona por persona', 14);
   encabezadoDeTabla(
     hoja,
     [
@@ -173,8 +207,10 @@ export async function libroDeEjecucionDeActividad(
       'Mejor nota',
       'Encuesta',
       'Constancia',
+      'Convocatoria',
+      'Observaciones',
     ],
-    [16, 34, 22, 26, 22, 13, 9, 13, 10, 12, 13, 12],
+    [16, 34, 22, 26, 22, 13, 9, 13, 10, 12, 13, 12, 26, 60],
   );
 
   for (const item of items) {
@@ -196,11 +232,51 @@ export async function libroDeEjecucionDeActividad(
       item.mejorNota === null ? '' : Math.round(item.mejorNota) / 100,
       item.respondioEncuesta ? (ENCUESTA_LABEL[item.encuesta ?? ''] ?? 'Respondida') : 'Sin responder',
       item.certificadoId ? 'Si' : 'No',
+      item.convocatoria ?? '',
+      observacionDeReinicio(item.reinicio),
     ]);
     fila.getCell(1).numFmt = '@';
     fila.getCell(6).numFmt = 'yyyy-mm-dd';
     fila.getCell(8).numFmt = 'yyyy-mm-dd';
     if (item.mejorNota !== null) fila.getCell(10).numFmt = '0%';
+  }
+
+  /*
+    LA TRAZABILIDAD, EN SU HOJA (2026-10-06). «Personas» dice como esta cada quien HOY; esta dice que
+    paso en cada vuelta de quien ha tenido mas de una —la reinduccion de cada año, una
+    recertificacion—. Es lo que pide un auditor cuando pregunta «¿y el año pasado?», y en la hoja de
+    arriba no cabe sin partir a la persona en varias filas y descuadrar los totales.
+  */
+  const conCiclos = items.filter((item) => (item.historial?.length ?? 0) > 1);
+  if (conCiclos.length > 0) {
+    const ciclos = libro.addWorksheet('Ciclos');
+    escribirCabecera(ciclos, cabecera, 'Historial por ciclo: lo que paso cada vez', 11);
+    encabezadoDeTabla(
+      ciclos,
+      ['Documento', 'Persona', 'Ciclo', 'Estado', 'Vencia', 'Terminada', 'Convocatoria', 'Intentos', 'Mejor nota', 'Encuesta', 'Constancia'],
+      [16, 34, 8, 22, 13, 13, 34, 10, 12, 13, 12],
+    );
+    for (const item of conCiclos) {
+      for (const ciclo of item.historial ?? []) {
+        const fila = ciclos.addRow([
+          item.documentNumber,
+          item.fullName,
+          ciclo.cycleNumber,
+          ESTADO_LABEL[ciclo.estado],
+          comoFecha(ciclo.dueAt),
+          comoFecha(ciclo.completedAt),
+          ciclo.convocatoria ?? '',
+          ciclo.intentos,
+          ciclo.mejorNota === null ? '' : Math.round(ciclo.mejorNota) / 100,
+          ciclo.respondioEncuesta ? (ENCUESTA_LABEL[ciclo.encuesta ?? ''] ?? 'Respondida') : 'Sin responder',
+          ciclo.certificadoId ? 'Si' : 'No',
+        ]);
+        fila.getCell(1).numFmt = '@';
+        fila.getCell(5).numFmt = 'yyyy-mm-dd';
+        fila.getCell(6).numFmt = 'yyyy-mm-dd';
+        if (ciclo.mejorNota !== null) fila.getCell(9).numFmt = '0%';
+      }
+    }
   }
 
   return Buffer.from(await libro.xlsx.writeBuffer());

@@ -90,6 +90,16 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     await page.goto('/convocatorias');
     await page.getByRole('button', { name: 'Nueva convocatoria' }).click();
     await elegirEnCombo(page, 'o-version', pillName);
+    // LA SEDE NO ACOTA SOLA, PERO LO OFRECE (2026-10-08): al elegirla sigue atendiendo a todos, y
+    // un toque la pasa a «Regionales a las que atiende». Se comprueba y se vuelve a empezar limpio.
+    await page.locator('#o-regional').selectOption({ index: 1 });
+    await expect(page.getByText('Atiende a todos los obligados de esta formacion.')).toBeVisible();
+    await page.locator('#o-regional-acotar').click();
+    await expect(page.getByText(/^Solo a /)).toBeVisible();
+    await expect(page.locator('#o-regional-acotar')).toHaveCount(0);
+    await page.reload();
+    await page.getByRole('button', { name: 'Nueva convocatoria' }).click();
+    await elegirEnCombo(page, 'o-version', pillName);
     await page.locator('#o-kind').selectOption('PERMANENT');
     await page.locator('#o-modality').selectOption('VIRTUAL');
     await page.getByRole('button', { name: 'Crear convocatoria' }).click();
@@ -103,7 +113,10 @@ test.describe('Sprint 4 — experiencia del aprendiz', () => {
     await page.getByRole('tab', { name: 'Obligaciones' }).click();
     await page.getByRole('button', { name: 'Asignar formación' }).click();
     await page.locator('#m-target').selectOption({ label: pillName });
-    await page.locator('#m-area').selectOption({ label: 'Gestion Humana' });
+    // Por el FINAL del rotulo y no por el rotulo entero (2026-10-08): si el area cuelga de otra, la
+    // lista la nombra con su rama delante («Grupo › Gestion Humana») y el nombre a secas no existe.
+    const areaDePruebas = await page.locator('#m-area option').filter({ hasText: /Gestion Humana$/ }).first().getAttribute('value');
+    await page.locator('#m-area').selectOption(areaDePruebas ?? '');
     await page.locator('#m-due').fill('2026-12-31');
     await page.getByRole('button', { name: 'Asignar', exact: true }).click();
     await expect(page.getByText(/obligaciones creadas/)).toBeVisible({ timeout: 20_000 });

@@ -77,6 +77,8 @@ export const listUsersQuerySchema = z.object({
   areaId: z.string().uuid().optional(),
   roleCode: z.string().max(40).optional(),
   active: z.enum(['true', 'false']).optional(),
+  /** Solo quien NO tiene fecha de ingreso: lo que hay que completar para la reinduccion automatica. */
+  sinFechaDeIngreso: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

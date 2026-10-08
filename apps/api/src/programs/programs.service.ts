@@ -1,5 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { activityTypeConfigSchema, type AssignProgramInput } from '@neo-pulse/shared';
+import {
+  activityTypeConfigSchema,
+  type AssignProgramInput,
+  type AssignProgramToPeopleInput,
+} from '@neo-pulse/shared';
 import { AssignmentsService } from '../assignments/assignments.service.js';
 import { AudiencesService } from '../assignments/audiences.service.js';
 import type { AuthUser } from '../common/types.js';
@@ -344,6 +348,42 @@ export class ProgramsService {
    *
    * Asignar un borrador obligaria a gente a algo que todavia puede cambiar de forma.
    */
+  /**
+   * EL PROGRAMA A PERSONAS CONCRETAS (2026-10-06, pedido del cliente). Una obligacion suelta por
+   * modulo y por persona, igual que «O a personas concretas» en la ficha de una formacion: no
+   * alcanza a quien entre despues ni vuelve sola. A quien ya debe un modulo no se le duplica.
+   */
+  async asignarPersonas(actor: AuthUser, programId: string, input: AssignProgramToPeopleInput) {
+    const programa = await this.existeOFalla(programId);
+    if (programa.status !== 'PUBLISHED') {
+      throw new BadRequestException({
+        code: 'PROGRAM_NOT_PUBLISHED',
+        message: 'Solo se puede asignar un programa publicado',
+      });
+    }
+    const idsDeActividad = programa.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId);
+    if (idsDeActividad.length === 0) {
+      throw new BadRequestException({ code: 'PROGRAM_EMPTY', message: 'Este programa no tiene modulos' });
+    }
+    let obligacionesCreadas = 0;
+    let yaLaTenian = 0;
+    for (const activityId of idsDeActividad) {
+      const outcome = await this.assignments.createManual(actor, {
+        targetType: 'ACTIVITY',
+        targetId: activityId,
+        userIds: input.userIds,
+        jobTitleIds: [],
+        areaIds: [],
+        regionalIds: [],
+        serviceIds: [],
+        dueAt: input.dueAt ?? null,
+      });
+      obligacionesCreadas += outcome.created;
+      yaLaTenian += outcome.skipped;
+    }
+    return { modulos: idsDeActividad.length, personas: input.userIds.length, obligacionesCreadas, yaLaTenian };
+  }
+
   async asignarAudiencia(actor: AuthUser, programId: string, input: AssignProgramInput) {
     const programa = await this.existeOFalla(programId);
     if (programa.status !== 'PUBLISHED') {
@@ -368,6 +408,7 @@ export class ProgramsService {
           dueDaysAfterTrigger: input.dueDaysAfterTrigger,
           everyMonths: input.everyMonths,
           fixedDate: input.fixedDate,
+          recurrenceAnchor: input.recurrenceAnchor,
           soloNuevos: input.soloNuevos,
           reason: input.reason ?? null,
         },

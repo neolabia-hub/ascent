@@ -9,6 +9,7 @@ import {
   EMPTY_RULE,
   listActivityRequirements,
   listAssignments,
+  todasLasObligacionesDeLaFormacion,
   previewAudience,
   retireActivityRequirement,
   setActivityRequirement,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/delivery-api';
 import { formatDate } from '@/lib/format';
 import { EximirObligacion } from '@/components/modules/admin/eximir-obligacion';
+import { SinFechaDeIngreso } from '@/components/modules/admin/sin-fecha-de-ingreso';
 import { cn } from '@/components/ui/cn';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -64,7 +66,11 @@ import { usePaginacion } from '@/components/ui/use-paginacion';
  * la opcion —"cada año" y "cada N meses" se leen igual de bien— sino en si todos vencen el mismo
  * dia o cada quien tiene el suyo. Eso es lo que hay que poder ver de un vistazo.
  */
-const COMO_SE_REPITE: Record<'NO' | 'MESES' | 'ANUAL', string> = {
+type ModoRepite = 'NO' | 'MESES' | 'ANUAL' | 'INGRESO' | 'INDUCCION';
+
+const COMO_SE_REPITE: Record<ModoRepite, string> = {
+  INGRESO: 'AUTOMÁTICA: quien ya cumplió los meses desde su ingreso la debe al publicar; los demás, al cumplirlos.',
+  INDUCCION: 'AUTOMÁTICA: igual, pero los meses se cuentan desde que terminó su inducción de ingreso.',
   NO: 'Se hace una vez y no vuelve.',
   ANUAL: 'CAMPANA: todos vencen el mismo día, sea cuando sea que la hicieran.',
   MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que la completo.',
@@ -130,10 +136,11 @@ export function ActivityAudienceTab({
     dias: typeConfig.requiresBeforeHire ? '0' : '30',
     everyMonths: typeConfig.defaultRecurrenceMonths ? String(typeConfig.defaultRecurrenceMonths) : '',
     /** Como se repite: no, cada N meses, o cada año en una fecha fija (campaña anual). */
-    modoRepite: (typeConfig.defaultAnnualDate ? 'ANUAL' : typeConfig.defaultRecurrenceMonths ? 'MESES' : 'NO') as
-      | 'NO'
-      | 'MESES'
-      | 'ANUAL',
+    modoRepite: (typeConfig.defaultAnnualDate
+      ? 'ANUAL'
+      : typeConfig.defaultRecurrenceMonths
+        ? typeConfig.defaultRecurrenceAnchor === 'HIRE' ? 'INGRESO' : typeConfig.defaultRecurrenceAnchor === 'INDUCTION' ? 'INDUCCION' : 'MESES'
+        : 'NO') as ModoRepite,
     fixedDate: typeConfig.defaultAnnualDate ?? '',
   });
   const [novedad, setNovedad] = useState('');
@@ -149,6 +156,14 @@ export function ActivityAudienceTab({
 
     `porGrupo` vale tambien al AJUSTAR una de esas reglas de grupo: su alcance tiene facetas, y hay
     que enseñarlas para poder cambiarlas. La automatica no tiene ninguna, y por eso no las enseña.
+
+    ─── TAMBIEN EN LA REINDUCCION (2026-10-06) ───
+
+    Se dejo fuera con el argumento de que «ya alcanza a todos», y no siempre es cierto: la gracia
+    por ingreso reciente deja fuera a quien entro hace poco, y si la automatica se retira no queda
+    forma de exigirla solo a una parte. El cliente pidio que se comporte igual que la induccion
+    general. El motor no duplica: a quien ya la debe por la regla de toda la empresa, la del grupo
+    no le crea otra.
   */
   const [grupoAbierto, setGrupoAbierto] = useState(false);
   /**
@@ -165,7 +180,8 @@ export function ActivityAudienceTab({
   const load = useCallback(async () => {
     try {
       const [page, reqs, aMano] = await Promise.all([
-        listAssignments({ targetId: activityId }),
+        // Todas, no la primera pagina: con mas de 20 obligados el resto no se podia ver ni eximir.
+        todasLasObligacionesDeLaFormacion(activityId),
         listActivityRequirements(activityId),
         /*
           LAS SUELTAS, CONTADAS APARTE (2026-09-04).
@@ -268,8 +284,13 @@ export function ActivityAudienceTab({
         scope: decide === 'TODOS' && !porGrupo ? EMPTY_RULE : scope,
         trigger: plazo.trigger,
         dueDaysAfterTrigger: Number(plazo.dias || 0),
-        everyMonths: plazo.modoRepite === "MESES" && plazo.everyMonths ? Number(plazo.everyMonths) : null,
+        everyMonths:
+          (plazo.modoRepite === 'MESES' || plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION') && plazo.everyMonths
+            ? Number(plazo.everyMonths)
+            : null,
         fixedDate: plazo.modoRepite === "ANUAL" && plazo.fixedDate ? plazo.fixedDate : null,
+        recurrenceAnchor:
+          plazo.modoRepite === 'INGRESO' ? 'HIRE' : plazo.modoRepite === 'INDUCCION' ? 'INDUCTION' : 'COMPLETED',
         reason: novedad.trim() || null,
       });
       setNovedad('');
@@ -294,7 +315,9 @@ export function ActivityAudienceTab({
             : 'Sus obligaciones nacen al aprobar el plan.'
           : result.created > 0
             ? `Nacieron ${result.created} obligaciones para quienes ya estan.`
-            : 'Nadie nuevo quedo obligado: los que estan ya la tenian.',
+            : plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION'
+              ? 'Nadie cumple todavía los meses: le aparecerá a cada persona cuando los cumpla.'
+              : 'Nadie nuevo quedo obligado: los que estan ya la tenian.',
       });
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo guardar a quien se le exige', description: motivoDelError(error) });
@@ -316,7 +339,11 @@ export function ActivityAudienceTab({
     setPlazo({
       trigger: requirement.trigger === 'ON_HIRE' ? 'ON_HIRE' : 'ON_JOIN',
       dias: String(requirement.dueDaysAfterTrigger),
-      modoRepite: requirement.fixedDate ? 'ANUAL' : requirement.everyMonths ? 'MESES' : 'NO',
+      modoRepite: requirement.fixedDate
+        ? 'ANUAL'
+        : requirement.everyMonths
+          ? requirement.recurrenceAnchor === 'HIRE' ? 'INGRESO' : requirement.recurrenceAnchor === 'INDUCTION' ? 'INDUCCION' : 'MESES'
+          : 'NO',
       everyMonths: requirement.everyMonths ? String(requirement.everyMonths) : '',
       fixedDate: requirement.fixedDate ?? '',
     });
@@ -403,6 +430,18 @@ export function ActivityAudienceTab({
   };
 
   const yaEsDeTodos = (requirements ?? []).some((requirement) => requirement.reachesEveryone);
+  /** El tipo vuelve por aniversario de INGRESO: la reinduccion automatica (2026-10-06). */
+  const porIngreso =
+    !typeConfig.defaultAnnualDate &&
+    typeConfig.defaultRecurrenceMonths !== null &&
+    (typeConfig.defaultRecurrenceAnchor === 'HIRE' || typeConfig.defaultRecurrenceAnchor === 'INDUCTION');
+  /*
+    «SE LE EXIGE» Y «VENCE A LOS» NO SE PREGUNTAN CUANDO LA FECHA LA PONE EL CALENDARIO (2026-10-06).
+    En una campaña vence en la fecha de la campaña, y por ingreso en el aniversario de cada quien:
+    los dos campos no deciden nada ahi. Lo pregunto el cliente viendo la reinduccion.
+  */
+  const fechaDeCalendario =
+    plazo.modoRepite === 'ANUAL' || plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION';
   /**
    * LA AUTOMATICA SE RETIRO (2026-09-30): publicada, del tipo que se exige solo, y sin regla de toda
    * la empresa viva. La lista de «Lo que se exige hoy» solo trae las activas, asi que una retirada
@@ -428,6 +467,7 @@ export function ActivityAudienceTab({
           (typeConfig.requiresBeforeHire ? PLAZO_INDUCCION_DE_INGRESO : 30),
         everyMonths: typeConfig.defaultAnnualDate ? null : typeConfig.defaultRecurrenceMonths,
         fixedDate: typeConfig.defaultAnnualDate,
+        recurrenceAnchor: typeConfig.defaultRecurrenceAnchor,
         reason: null,
       });
       await load();
@@ -511,7 +551,9 @@ export function ActivityAudienceTab({
                               : 'Hoy no se le exige a nadie por esta regla. Vuelve a exigirla a toda la empresa.'
                             : typeConfig.requiresBeforeHire
                             ? 'Es una inducción de INGRESO: al publicar se exigira a quien entre desde ahora. A quien ya lleva tiempo no se le exige, porque no esta ingresando: su inducción se hizo cuando entró. Lo que le toca cada año es la reinducción, que es otra formación.'
-                            : `Al publicar quedara exigida a ${reach ?? '...'} personas, y a quien entre despues. No hay que marcar a nadie.`}
+                            : porIngreso
+                              ? 'Al publicar queda exigida a quien ya cumplió los meses, y a los demás cuando los cumplan. No hay que marcar a nadie.'
+                              : `Al publicar quedara exigida a ${reach ?? '...'} personas, y a quien entre despues. No hay que marcar a nadie.`}
                       </p>
                       {/*
                         LO QUE VA A PASAR AL PUBLICAR, DICHO ANTES (2026-09-03).
@@ -522,7 +564,16 @@ export function ActivityAudienceTab({
                         una campaña anual que el usuario no vio en ninguna parte. No tener que
                         rellenar un campo no es lo mismo que no tener derecho a saberlo.
                       */}
-                      {!yaEsDeTodos && !typeConfig.requiresBeforeHire ? (
+                      {!yaEsDeTodos && porIngreso ? (
+                        <p className="mt-1 text-sm text-ink-500">
+                          Vuelve cada {typeConfig.defaultRecurrenceMonths} meses, contados desde{' '}
+                          <strong className="font-medium text-ink-700">
+                            {typeConfig.defaultRecurrenceAnchor === 'INDUCTION' ? 'su inducción de ingreso' : 'su fecha de ingreso'}
+                          </strong>
+                          .
+                        </p>
+                      ) : null}
+                      {!yaEsDeTodos && !typeConfig.requiresBeforeHire && !porIngreso ? (
                         <p className="mt-1 text-sm text-ink-500">
                           Vencera <strong className="font-medium text-ink-700">al mes</strong> de publicarla
                           {typeConfig.defaultAnnualDate
@@ -544,7 +595,7 @@ export function ActivityAudienceTab({
                         y la salvaguarda de "mira dos veces antes de obligar a la empresa entera"
                         no tiene nada que vigilar cuando no obliga a nadie.
                       */}
-                      {!yaEsDeTodos && !typeConfig.requiresBeforeHire && reach !== null ? (
+                      {!yaEsDeTodos && !typeConfig.requiresBeforeHire && !porIngreso && reach !== null ? (
                         <button
                           type="button"
                           onClick={() => setVerAlcance((visible) => !visible)}
@@ -604,10 +655,12 @@ export function ActivityAudienceTab({
                 hay contenido que hacer). Plegado detras de un boton: lo normal es que la regla
                 automatica baste, y el formulario abierto invitaria a tocar algo que no hace falta.
               */}
-              {decide === 'TODOS' && typeConfig.requiresBeforeHire && hayContenidoPublicado && ajustando === null && !esDelPlan ? (
+              {decide === 'TODOS' && hayContenidoPublicado && ajustando === null && !esDelPlan ? (
                 grupoAbierto ? (
                   <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
-                    <p className="text-sm font-medium text-ink-900">Además, a un grupo de los que ya están</p>
+                    <p className="text-sm font-medium text-ink-900">
+                      {typeConfig.requiresBeforeHire ? 'Además, a un grupo de los que ya están' : 'Además, a un grupo'}
+                    </p>
                     <Button variant="ghost" size="sm" onClick={cerrarGrupo}>
                       Cancelar
                     </Button>
@@ -703,6 +756,7 @@ export function ActivityAudienceTab({
               */}
               {(decide !== 'TODOS' || ajustando !== null || grupoAbierto) && !esDelPlan ? (
                 <>
+              {fechaDeCalendario ? null : (
               <div className="grid grid-cols-2 gap-3">
                 <Field htmlFor="q-trigger" label="Se le exige">
                   <Select
@@ -714,15 +768,22 @@ export function ActivityAudienceTab({
                     <option value="ON_HIRE">Al ingresar a la empresa</option>
                   </Select>
                 </Field>
-                <Field htmlFor="q-dias" label="Vence a los" hint="Días después del disparador (al ingresar: después de la fecha de ingreso). Negativo = antes.">
+                <Field
+                  htmlFor="q-dias"
+                  label="Vence a los"
+                  hint="Días."
+                  ayuda="Se cuentan desde hoy con «Desde ahora», o desde la fecha de ingreso de cada persona con «Al ingresar a la empresa». Mínimo 1."
+                >
                   <Input
                     id="q-dias"
                     type="number"
+                    min={1}
                     value={plazo.dias}
                     onChange={(event) => setPlazo({ ...plazo, dias: event.target.value })}
                   />
                 </Field>
               </div>
+              )}
 
               {/*
                 LA TRAMPA DEL ANCLAJE, dicha antes de caer en ella. "Al ingresar" cuenta desde la
@@ -731,7 +792,7 @@ export function ActivityAudienceTab({
                 quien entra mañana y un desastre para estrenar un requisito con la plantilla
                 actual; en pantalla las dos opciones se parecen demasiado como para no avisar.
               */}
-              {plazo.trigger === 'ON_HIRE' ? (
+              {plazo.trigger === 'ON_HIRE' && !fechaDeCalendario ? (
                 <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
                   <Info size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
                   Se cuenta desde la fecha de ingreso de cada persona: quien lleve tiempo en la empresa quedara vencido de
@@ -764,15 +825,18 @@ export function ActivityAudienceTab({
                   onChange={(event) =>
                     setPlazo({
                       ...plazo,
-                      modoRepite: event.target.value as 'NO' | 'MESES' | 'ANUAL',
-                      everyMonths: event.target.value === 'MESES' ? plazo.everyMonths || '12' : '',
+                      modoRepite: event.target.value as ModoRepite,
+                      everyMonths:
+                        event.target.value === 'MESES' || event.target.value === 'INGRESO' || event.target.value === 'INDUCCION' ? plazo.everyMonths || '12' : '',
                       fixedDate: event.target.value === 'ANUAL' ? plazo.fixedDate || '03-31' : '',
                     })
                   }
                 >
                   <option value="NO">No se repite</option>
+                  <option value="INGRESO">Cada N meses desde su fecha de ingreso</option>
+                  <option value="INDUCCION">Cada N meses desde que terminó su inducción</option>
                   <option value="ANUAL">Cada año, en una fecha fija</option>
-                  <option value="MESES">Cada N meses desde que la hizo</option>
+                  <option value="MESES">Cada N meses desde que hizo esta misma formación</option>
                 </Select>
               </Field>
 
@@ -809,8 +873,18 @@ export function ActivityAudienceTab({
                 </p>
               ) : null}
 
-              {plazo.modoRepite === 'MESES' ? (
-                <Field htmlFor="q-repite" label="Cada cuantos meses" hint="Se cuenta desde que cada persona la completo.">
+              {plazo.modoRepite === 'MESES' || plazo.modoRepite === 'INGRESO' || plazo.modoRepite === 'INDUCCION' ? (
+                <Field
+                  htmlFor="q-repite"
+                  label="Cada cuantos meses"
+                  hint={
+                    plazo.modoRepite === 'INDUCCION'
+                      ? 'Se cuenta desde que cada persona terminó su inducción de ingreso.'
+                      : plazo.modoRepite === 'INGRESO'
+                      ? 'Se cuenta desde la fecha de ingreso de cada persona.'
+                      : 'Se cuenta desde que cada persona la completo.'
+                  }
+                >
                   <Input
                     id="q-repite"
                     type="number"
@@ -921,7 +995,10 @@ export function ActivityAudienceTab({
           estos tres, por la novedad de la semana"— y ponerla al mismo nivel que el requisito
           invita a resolver con ella cosas que deberian ser permanentes.
 
-          En una REINDUCCION no se ofrece: ya se exige a toda la empresa, y no hay nadie que falte.
+          En una REINDUCCION no se ofrecia («ya se exige a toda la empresa»). Desde el 2026-10-06 si,
+          igual que en la de ingreso y tambien solo publicada: la regla deja fuera a los recien
+          ingresados (la gracia del tipo), puede estar retirada, y a quien se eximio por error no
+          habia como devolversela. A quien ya la tiene pendiente no le nace otra.
 
           ─── EN LA INDUCCION DE INGRESO SI, UNA VEZ PUBLICADA (2026-09-30) ───
 
@@ -940,13 +1017,15 @@ export function ActivityAudienceTab({
           Solo despues de publicar: antes no hay contenido que hacer, y asignarla seria obligar a
           algo imposible.
         */}
-        {decide === 'TODOS' && !(typeConfig.requiresBeforeHire && hayContenidoPublicado) ? null : (
+        {decide === 'TODOS' && !hayContenidoPublicado ? null : (
         <section className="card p-5">
           <h2 className="font-display text-base font-semibold text-ink-900">O a personas concretas</h2>
           <p className="mb-4 mt-1 text-sm text-ink-500">
-            {decide === 'TODOS'
-              ? 'Para quien ya estaba en la empresa: la regla solo alcanza a quien entre desde que se publicó.'
-              : 'Obligación suelta: no alcanza a quien entre después.'}
+            {decide !== 'TODOS'
+              ? 'Obligación suelta: no alcanza a quien entre después.'
+              : typeConfig.requiresBeforeHire
+                ? 'Para quien ya estaba en la empresa: la regla solo alcanza a quien entre desde que se publicó.'
+                : 'Para quien la regla no alcanza hoy. Quien ya la tiene pendiente no recibe otra.'}
           </p>
           <div className="space-y-4">
             <Field htmlFor="q-people" label="Personas" hint={peopleError ?? undefined}>
@@ -1028,7 +1107,9 @@ export function ActivityAudienceTab({
                       */}
                       {requirement.soloNuevos
                         ? ` · solo a quien entre desde ahora (${requirement.assignmentCount} hasta hoy)`
-                        : ` · alcanza a ${requirement.reach} personas`}
+                        : requirement.recurrenceAnchor !== 'COMPLETED'
+                          ? ` · alcanza a ${requirement.reach} personas, a cada una cuando cumple los meses (${requirement.assignmentCount} hasta hoy)`
+                          : ` · alcanza a ${requirement.reach} personas`}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-1">
@@ -1088,6 +1169,13 @@ export function ActivityAudienceTab({
             alcances y compararlos con el total de abajo da distinto casi siempre, y sin esta linea
             parece que el sistema pierde gente.
           */}
+          {/* Solo si alguna regla cuenta desde el ingreso, o si es lo que se esta por guardar. */}
+          {(requirements ?? []).some((requirement) => requirement.recurrenceAnchor === 'HIRE') ||
+          plazo.modoRepite === 'INGRESO' ? (
+            <div className="mt-3">
+              <SinFechaDeIngreso />
+            </div>
+          ) : null}
           {requirements && requirements.length > 1 ? (
             <p className="mt-2 text-xs text-ink-500">
               Los alcances no se suman: quien cumple dos reglas cuenta en las dos y una sola vez abajo.
@@ -1222,6 +1310,14 @@ function describirRequisito(requirement: ActivityRequirement): string {
    */
   if (requirement.trigger === 'PLAN') {
     return 'el vencimiento lo pone el mes en el plan';
+  }
+  if (requirement.everyMonths && requirement.recurrenceAnchor === 'INDUCTION') {
+    return `vuelve cada ${requirement.everyMonths} meses desde que terminó su inducción`;
+  }
+  if (requirement.everyMonths && requirement.recurrenceAnchor === 'HIRE') {
+    return requirement.everyMonths === 12
+      ? 'vence en cada aniversario de ingreso'
+      : `vence cada ${requirement.everyMonths} meses desde el ingreso`;
   }
   const dias = requirement.dueDaysAfterTrigger;
   const cuando =

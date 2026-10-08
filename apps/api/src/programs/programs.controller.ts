@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { assignProgramSchema } from '@neo-pulse/shared';
+import { assignProgramSchema, assignProgramToPeopleSchema } from '@neo-pulse/shared';
 import { CurrentUser, RequirePermissions } from '../common/decorators.js';
 import type { AuthUser } from '../common/types.js';
 import { ProgramsService } from './programs.service.js';
@@ -89,6 +89,13 @@ export class ProgramsController {
   @RequirePermissions('assignments:manage')
   asignarAudiencia(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     return this.programs.asignarAudiencia(actor, id, assignProgramSchema.parse(body));
+  }
+
+  /** El programa a personas concretas: una obligacion suelta por modulo. Mismo permiso que asignar. */
+  @Post(':id/asignar-personas')
+  @RequirePermissions('assignments:manage')
+  asignarPersonas(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    return this.programs.asignarPersonas(actor, id, assignProgramToPeopleSchema.parse(body));
   }
 
   @Post(':id/modulos')

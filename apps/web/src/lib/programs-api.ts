@@ -176,11 +176,20 @@ export function assignProgram(
     dueDaysAfterTrigger: number;
     everyMonths?: number | null;
     fixedDate?: string | null;
+    recurrenceAnchor?: 'COMPLETED' | 'HIRE' | 'INDUCTION';
     soloNuevos?: boolean;
     reason?: string | null;
   },
 ): Promise<AssignProgramResult> {
   return apiFetch(`/programas/${programId}/asignar`, { method: 'POST', body });
+}
+
+/** El programa a personas concretas: una obligacion suelta por modulo y por persona. */
+export function assignProgramToPeople(
+  programId: string,
+  body: { userIds: string[]; dueAt?: string | null },
+): Promise<{ modulos: number; personas: number; obligacionesCreadas: number; yaLaTenian: number }> {
+  return apiFetch(`/programas/${programId}/asignar-personas`, { method: 'POST', body });
 }
 
 // ─────────────────────────── Lado del aprendiz ───────────────────────────

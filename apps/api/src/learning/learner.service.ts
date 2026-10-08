@@ -1,3 +1,4 @@
+import { decidirInscripcion } from './ronda-de-inscripcion.js';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { POINTS, type SelfEnrollInput } from '@neo-pulse/shared';
@@ -263,21 +264,48 @@ export class LearnerService {
       Se mira lo VIVO y no todo el historial a proposito: una formacion que se repite —la
       reinduccion del año que viene— necesita inscripcion nueva, y la anterior ya esta terminada.
     */
-    const existing = await this.prisma.scoped.enrollment.findFirst({
-      where: {
-        userId: actor.id,
-        OR: [
-          { offeringId: offering.id },
-          {
-            status: { in: ['ENROLLED', 'IN_PROGRESS'] },
-            activityVersion: { activityId: offering.activityVersion.activityId },
-          },
-        ],
-      },
-      orderBy: { enrolledAt: 'asc' },
-      select: { id: true },
-    });
-    if (existing) return { enrollmentId: existing.id, created: false as const };
+    const [previas, obligacionAbierta] = await Promise.all([
+      this.prisma.scoped.enrollment.findMany({
+        where: {
+          userId: actor.id,
+          OR: [
+            { offeringId: offering.id },
+            {
+              status: { in: ['ENROLLED', 'IN_PROGRESS'] },
+              activityVersion: { activityId: offering.activityVersion.activityId },
+            },
+          ],
+        },
+        orderBy: { enrolledAt: 'asc' },
+        select: { id: true, offeringId: true, status: true, round: true, assignmentId: true },
+      }),
+      this.prisma.scoped.assignment.findFirst({
+        where: {
+          userId: actor.id,
+          targetType: 'ACTIVITY',
+          targetId: offering.activityVersion.activityId,
+          status: OPEN_ASSIGNMENT,
+        },
+        orderBy: { dueAt: 'asc' },
+        select: { id: true },
+      }),
+    ]);
+    // Viva en OTRA convocatoria de la misma formacion: se sigue en esa (lo de arriba).
+    const vivaEnOtra = previas.find(
+      (fila) => fila.offeringId !== offering.id && (fila.status === 'ENROLLED' || fila.status === 'IN_PROGRESS'),
+    );
+    if (vivaEnOtra) return { enrollmentId: vivaEnOtra.id, created: false as const };
+
+    /*
+      Y EN ESTA CONVOCATORIA, UNA INSCRIPCION POR RONDA (2026-10-06). Si ya la hizo y vuelve a
+      deberla —la reinduccion del año siguiente—, abre la ronda nueva en vez de caer en la terminada,
+      donde no podia presentar el examen otra vez. La regla y el porque, en `ronda-de-inscripcion.ts`.
+    */
+    const decision = decidirInscripcion(
+      previas.filter((fila) => fila.offeringId === offering.id),
+      obligacionAbierta?.id ?? null,
+    );
+    if ('reusar' in decision) return { enrollmentId: decision.reusar, created: false as const };
 
     if (offering.capacity !== null && offering._count.enrollments >= offering.capacity) {
       throw new ConflictException({ code: 'OFFERING_CAPACITY_EXCEEDED' });
@@ -307,6 +335,7 @@ export class LearnerService {
         userId: actor.id,
         activityVersionId: offering.activityVersionId,
         assignmentId: assignment?.id ?? null,
+        round: decision.crear,
         status: 'ENROLLED',
         scoreSnapshot: {
           activityName: offering.activityVersion.activity.name,

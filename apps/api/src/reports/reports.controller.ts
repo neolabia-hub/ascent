@@ -77,7 +77,12 @@ export class ReportsController {
    */
   @Get('racha-cumplimiento')
   @RequirePermissions('reports:read_scope')
-  rachaCumplimiento(@CurrentUser() actor: AuthUser) {
+  async rachaCumplimiento(@CurrentUser() actor: AuthUser) {
+    // La racha es de la EMPRESA entera («dias sin nada vencido»): a quien solo ve una parte no se le
+    // da una cifra que habla de lo que no ve. Sin racha, Inicio simplemente no la nombra.
+    if ((await this.reports.formacionesVisibles(actor)) !== null) {
+      return { currentDays: 0, longestDays: 0, lastCheckedAt: null };
+    }
     return this.complianceStreak.obtener(actor.tenantId);
   }
 
@@ -91,15 +96,15 @@ export class ReportsController {
   /** Como va TODO. Es la primera pantalla que se abre cada mañana. */
   @Get('ejecucion')
   @RequirePermissions('reports:read_scope')
-  ejecucionGeneral() {
-    return this.reports.ejecucionGeneral();
+  async ejecucionGeneral(@CurrentUser() actor: AuthUser) {
+    return this.reports.ejecucionGeneral(await this.reports.formacionesVisibles(actor));
   }
 
   /** Persona por persona, como va una formacion. */
   @Get('actividades/:activityId/ejecucion')
   @RequirePermissions('reports:read_scope')
-  ejecucionDeActividad(@Param('activityId') activityId: string) {
-    return this.reports.ejecucionDeActividad(activityId);
+  async ejecucionDeActividad(@CurrentUser() actor: AuthUser, @Param('activityId') activityId: string) {
+    return this.reports.ejecucionDeActividad(activityId, await this.reports.formacionesVisibles(actor));
   }
 
   /**
@@ -115,8 +120,8 @@ export class ReportsController {
    */
   @Get('analitica')
   @RequirePermissions('reports:read_scope')
-  analitica(@Query('plan') planId?: string) {
-    return this.reports.analiticaCompleta(planId ?? null);
+  async analitica(@CurrentUser() actor: AuthUser, @Query('plan') planId?: string) {
+    return this.reports.analiticaCompleta(planId ?? null, await this.reports.formacionesVisibles(actor));
   }
 
   /**
@@ -127,14 +132,14 @@ export class ReportsController {
    */
   @Get('vencimientos')
   @RequirePermissions('reports:read_scope')
-  vencimientos(@Query('meses') meses?: string) {
+  async vencimientos(@CurrentUser() actor: AuthUser, @Query('meses') meses?: string) {
     /*
       El horizonte se acota entre 1 y 24 meses. Menos de un mes no es un horizonte, y mas de dos
       años no se planea: seria traer miles de filas que nadie va a mirar para que la pantalla tarde.
     */
     const pedidos = Number(meses);
     const horizonte = Number.isFinite(pedidos) ? Math.min(24, Math.max(1, Math.trunc(pedidos))) : 12;
-    return this.reports.vencimientos(horizonte);
+    return this.reports.vencimientos(horizonte, new Date(), undefined, await this.reports.formacionesVisibles(actor));
   }
 
   /**
@@ -143,15 +148,15 @@ export class ReportsController {
    */
   @Get('programas')
   @RequirePermissions('reports:read_scope')
-  programas() {
-    return this.reports.programas();
+  async programas(@CurrentUser() actor: AuthUser) {
+    return this.reports.programas(await this.reports.formacionesVisibles(actor));
   }
 
   /** Abrir un programa: quienes son los que faltan y que les falta. */
   @Get('programas/:pathId')
   @RequirePermissions('reports:read_scope')
-  programaDetalle(@Param('pathId', ParseUUIDPipe) pathId: string) {
-    return this.reports.programaDetalle(pathId);
+  async programaDetalle(@CurrentUser() actor: AuthUser, @Param('pathId', ParseUUIDPipe) pathId: string) {
+    return this.reports.programaDetalle(pathId, await this.reports.formacionesVisibles(actor));
   }
 
   /**
@@ -162,19 +167,19 @@ export class ReportsController {
    */
   @Get('evolucion')
   @RequirePermissions('reports:read_scope')
-  evolucion(@Query('year') year?: string) {
+  async evolucion(@CurrentUser() actor: AuthUser, @Query('year') year?: string) {
     const enCurso = new Date().getFullYear();
     const pedido = Number(year);
     const elegido =
       Number.isFinite(pedido) && pedido >= 2020 && pedido <= enCurso + 5 ? Math.trunc(pedido) : enCurso;
-    return this.reports.evolucion(elegido);
+    return this.reports.evolucion(elegido, await this.reports.formacionesVisibles(actor));
   }
 
   /** EN QUE FALLA LA GENTE. Mismo permiso que la analitica: es la misma pregunta, por dentro. */
   @Get('conocimiento')
   @RequirePermissions('reports:read_scope')
-  conocimiento() {
-    return this.reports.conocimiento();
+  async conocimiento(@CurrentUser() actor: AuthUser) {
+    return this.reports.conocimiento(await this.reports.formacionesVisibles(actor));
   }
 
   /*
@@ -192,10 +197,12 @@ export class ReportsController {
   @RequirePermissions('reports:export')
   @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   @Header('Content-Disposition', 'attachment; filename="seguimiento.xlsx"')
-  async ejecucionGeneralXlsx(@Query('estado') estado?: string): Promise<StreamableFile> {
+  async ejecucionGeneralXlsx(@CurrentUser() actor: AuthUser, @Query('estado') estado?: string): Promise<StreamableFile> {
     // StreamableFile y no el Buffer pelado: devolver un Buffer hace que Nest lo serialice como
     // JSON y el archivo llega corrupto.
-    return new StreamableFile(await this.reports.ejecucionGeneralXlsx(leerEstado(estado)));
+    return new StreamableFile(
+      await this.reports.ejecucionGeneralXlsx(leerEstado(estado), await this.reports.formacionesVisibles(actor)),
+    );
   }
 
   /** Persona por persona de una formacion, en Excel. Es la evidencia nominal. */
@@ -204,16 +211,23 @@ export class ReportsController {
   @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   @Header('Content-Disposition', 'attachment; filename="seguimiento-formacion.xlsx"')
   async ejecucionDeActividadXlsx(
+    @CurrentUser() actor: AuthUser,
     @Param('activityId') activityId: string,
     @Query('estado') estado?: string,
   ): Promise<StreamableFile> {
-    return new StreamableFile(await this.reports.ejecucionDeActividadXlsx(activityId, leerEstado(estado)));
+    return new StreamableFile(
+      await this.reports.ejecucionDeActividadXlsx(
+        activityId,
+        leerEstado(estado),
+        await this.reports.formacionesVisibles(actor),
+      ),
+    );
   }
 
   /** Renglon por renglon, como va un plan. Es la entrada al detalle de arriba. */
   @Get('planes/:planId/ejecucion')
   @RequirePermissions('reports:read_scope')
-  ejecucionDelPlan(@Param('planId') planId: string) {
-    return this.reports.ejecucionDelPlan(planId);
+  async ejecucionDelPlan(@CurrentUser() actor: AuthUser, @Param('planId') planId: string) {
+    return this.reports.ejecucionDelPlan(planId, await this.reports.formacionesVisibles(actor));
   }
 }

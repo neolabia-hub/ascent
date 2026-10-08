@@ -168,7 +168,7 @@
 <header class="principal">
   <p class="kicker" style="color:#6d28d9">NEO PULSE · Guía de uso · Reinducción</p>
   <h1>Reinducción, paso a paso</h1>
-  <p class="entradilla">La campaña anual de toda la empresa: los cambios del año en el sistema de gestión. Cae igual sobre quien lleva quince años y sobre quien entró hace un año.</p>
+  <p class="entradilla">La actualización periódica de toda la empresa: los cambios del año en el sistema de gestión. Puede volver sola a cada persona por su fecha de ingreso, o como campaña en una fecha fija para todos.</p>
 </header>
 
 <section class="tipo">
@@ -179,7 +179,7 @@
     <div><dt>Constancia</dt><dd>Sí</dd></div>
     <div><dt>A quién</dt><dd>Toda la empresa</dd></div>
     <div><dt>Convocatoria</dt><dd>Permanente</dd></div>
-    <div><dt>Se repite</dt><dd>Campaña anual</dd></div>
+    <div><dt>Se repite</dt><dd>Por ingreso o fecha fija</dd></div>
   </div>
 
   <h3>Paso a paso</h3>
@@ -193,7 +193,104 @@
     <li><b>Arma contenido y examen</b>, y <b>publica</b>. Aquí queda obligada la plantilla, de golpe.</li>
   </ol>
 
-  <h3>Cómo funciona el ciclo, despacio</h3>
+  <h3>Dos formas de volver: se elige una</h3>
+  <p>En <em>Configuración → Tipos de formación → Reinducción → Configurar → Cómo vuelve</em>:</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Opción</th><th>A quién le aparece y cuándo</th><th>Cuándo conviene</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Cada N meses, desde la fecha de ingreso de cada persona</strong></td>
+        <td>Al publicar, a <strong>quien ya cumplió sus meses</strong> desde el ingreso. A los demás,
+          unos días antes de cumplirlos. Después, a cada quien en su aniversario</td>
+        <td>Cuando se quiere que sea automática: quien ingresó la debe a los 12 meses, y después cada 12</td></tr>
+      <tr><td><strong>Cada N meses, desde que terminó su inducción de ingreso</strong></td>
+        <td>Igual, pero los meses se cuentan desde el día en que la persona terminó su inducción</td>
+        <td>Cuando la reinducción debe ir atada a la inducción y no a la fecha de contrato</td></tr>
+      <tr><td><strong>Cada año, antes de una fecha fija</strong></td>
+        <td>A toda la plantilla el mismo día: es una campaña</td>
+        <td>Cuando la empresa la hace en una fecha del calendario y el auditor pregunta «¿hicieron la de
+          este año?»</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>La automática, por fecha de ingreso</h3>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>La persona…</th><th>Qué le pasa</th></tr></thead>
+    <tbody>
+      <tr><td>ingresó el 15 de noviembre de 2025</td><td>Con 60 días de antelación, le aparece el
+        <strong>16 de septiembre de 2026</strong> y vence el <strong>15 de noviembre de 2026</strong></td></tr>
+      <tr><td>la hace, sea el día que sea</td><td>La siguiente vence el <strong>15 de noviembre de 2027</strong>,
+        y su constancia vale hasta ese mismo día</td></tr>
+      <tr><td>ingresó hace un mes</td><td>Nada todavía: le aparecerá cuando se acerquen sus 12 meses</td></tr>
+      <tr><td>lleva años y nunca la ha hecho</td><td>La recibe <strong>al publicar</strong>, con los
+        <strong>días de gracia</strong> contados desde ese día. No espera a su próximo aniversario</td></tr>
+      <tr><td>se puso al día así y su aniversario es dentro de dos meses</td><td>No la vuelve a deber a
+        los dos meses: la siguiente es en el aniversario del año que viene</td></tr>
+      <tr><td>tiene el aniversario dentro de 5 días el día que se publica</td><td>Se le dan los
+        <strong>días de gracia</strong> desde hoy, no 5</td></tr>
+    </tbody>
+  </table></div>
+  <div class="aviso">
+    <span class="etiqueta">Antes de publicar en una empresa que ya lleva años</span>
+    <p>Como la recibe todo el que ya cumplió sus meses, la primera vez queda obligada <strong>casi toda
+      la plantilla</strong> a la vez, con los días de gracia como plazo. Si es mucha gente para ese
+      plazo, sube los <em>Días de gracia</em> del tipo antes de publicar.</p>
+  </div>
+  <div class="aviso bien">
+    <span class="etiqueta">Días de gracia</span>
+    <p>Se configuran en el tipo, campo <strong>«Días de gracia»</strong> (30 si no se toca). Es el plazo
+      que se da cuando la fecha que tocaría ya pasó o cae encima: quien ya cumplió sus meses el día
+      que se publica, o quien tiene su fecha dentro de pocos días.</p>
+  </div>
+  <div class="aviso">
+    <span class="etiqueta">Quien no tiene fecha de ingreso</span>
+    <p>Se le cuenta desde el día en que <strong>terminó su inducción de ingreso</strong>; y si tampoco la
+      tiene registrada, desde que entró al grupo. La pestaña <em>Quiénes</em> avisa cuántas personas
+      están así, dice sus nombres y lleva a <em>Usuarios</em> ya filtrado por «Sin fecha de ingreso»
+      para completarla.</p>
+  </div>
+
+  <h3>Qué se configura, según cómo vuelve</h3>
+  <p>La pantalla del tipo solo enseña lo que decide algo en la forma elegida:</p>
+  <div class="tabla-envuelve"><table>
+    <thead><tr><th>Campo</th><th>Por fecha de ingreso</th><th>Por fecha fija</th></tr></thead>
+    <tbody>
+      <tr><td>Cada cuántos meses</td><td>Sí (12 lo normal)</td><td>No aplica</td></tr>
+      <tr><td>Antes de qué fecha</td><td>No aplica</td><td>Sí</td></tr>
+      <tr><td>Le aparece a la persona, días antes de vencer</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td>Días de gracia</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td>Si llega la siguiente y no hizo la anterior</td><td>Sí</td><td>Sí</td></tr>
+      <tr><td>No se le exige a quien entró hace menos de</td><td>No sale: a nadie le toca antes de sus
+        meses</td><td>Sí</td></tr>
+      <tr><td>Al publicar, a quién alcanza</td><td>No sale: alcanza a todos, a cada quien cuando le
+        toca</td><td>Sí: toda la plantilla</td></tr>
+      <tr><td>Días de plazo</td><td>No sale: vence en el aniversario</td><td>No sale: vence en la
+        fecha de la campaña</td></tr>
+      <tr><td>Cómo se convoca</td><td colspan="2">«Disponible siempre»: al publicar se abre sola la
+        convocatoria y cada persona entra cuando le aparece. Con «Sesión con fecha» alguien tendría que
+        abrir una jornada cada vez</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Las novedades: a un grupo o a personas concretas</h3>
+  <p>En la pestaña <em>Quiénes</em> de la formación publicada, igual que en la inducción general:
+    <strong>«Exigirla además a un grupo»</strong> (cargo, área, regional o servicio) y
+    <strong>«O a personas concretas»</strong>, para quien la necesita antes de que le toque. A quien ya
+    la tiene pendiente no le nace otra. Desde la lista de abajo se puede <strong>eximir</strong> a
+    cualquiera, con su motivo.</p>
+
+  <h3>Como programa</h3>
+  <p>Si la reinducción son varias formaciones, se arma un <em>programa</em> con ellas: cada módulo se
+    exige solo según su tipo, y la constancia que se emite es <strong>la del programa</strong>, al cerrar
+    el último módulo. Por fecha de ingreso, esa constancia vale hasta el aniversario siguiente de la
+    persona.</p>
+  <p>En la ficha del programa, <em>Asignar a una audiencia</em>: lo que se marque por cargo, área,
+    regional o servicio crea una <strong>regla en cada módulo</strong> —lo mismo que «Exigirla» en
+    Quiénes de cada formación— y a esa regla le aplican «Se le exige», «Vence a los» y «Se repite».
+    Debajo de «A un servicio» está <strong>«O a personas concretas»</strong>: reciben el programa
+    entero una sola vez, con el plazo en días contado desde hoy; no se repite ni alcanza a quien entre
+    después.</p>
+
+  <h3>Cómo funciona el ciclo de la fecha fija, despacio</h3>
   <p>Esta es la parte que más cuesta, así que va con un ejemplo. Supón que la campaña está puesta el
     <strong>31 de marzo</strong>.</p>
 
@@ -207,8 +304,8 @@
     </tbody>
   </table></div>
 
-  <p><strong>Los 60 días son la «ventana»</strong>: la antelación con la que el sistema abre cada
-    ronda. Si la campaña es el 31 de marzo, la ronda de cada año aparece en los pendientes de la
+  <p><strong>Los 60 días son la antelación</strong> con la que el sistema abre cada ronda, y se cambian
+    en el tipo: campo <em>«Le aparece a la persona, días antes de vencer»</em>. Si la campaña es el 31 de marzo, la ronda de cada año aparece en los pendientes de la
     gente el <strong>30 de enero</strong>, dos meses antes. Se usa el mismo número para decidir si
     la primera ronda cabe en la fecha, para que la primera se comporte como todas las demás.</p>
 

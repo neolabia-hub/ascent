@@ -293,3 +293,20 @@ export function resumirEjecucion(estados: EstadoEjecucion[]): ResumenEjecucion {
     avancePct: exigibles <= 0 ? 0 : Math.round((terminadas / exigibles) * 100),
   };
 }
+
+/**
+ * COMO SE LLAMA UNA CONVOCATORIA en un informe: su codigo, su clase y, si la tiene, su fecha.
+ *
+ * Con su CODIGO: «Jornada» a secas no distingue tres jornadas de la misma formacion. Se exporta
+ * porque lo dicen dos pantallas —Seguimiento y la ficha de la persona— y tienen que decir lo mismo.
+ */
+export function nombreDeConvocatoria(
+  offering: { code: string; kind: string; scheduledDate: Date | null } | null | undefined,
+): string | null {
+  if (!offering) return null;
+  if (offering.kind === 'PERMANENT') return `${offering.code} · Permanente`;
+  const clase = offering.kind === 'HYBRID' ? 'Sesión + disponible' : 'Jornada';
+  return offering.scheduledDate
+    ? `${offering.code} · ${clase} del ${offering.scheduledDate.toISOString().slice(0, 10)}`
+    : `${offering.code} · ${clase}`;
+}

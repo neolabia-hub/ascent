@@ -697,8 +697,14 @@ export function OfferingForm({
         alcance especifico—, y no se marca alli sola: automarcar la regional obligaba a acordarse
         de desmarcarla en las jornadas nacionales, que es peor que marcarla las pocas veces que
         hace falta acotar.
+
+        PERO SE OFRECE (2026-10-08). El cliente pregunto por que hay «dos sedes». Son dos preguntas
+        —donde se dicta y a quien atiende— que casi siempre tienen la misma respuesta, asi que al
+        elegir la sede se ofrece acotar a ella con un toque. Es una decision que se VE, no un
+        recorte que ocurre por debajo: hasta hoy el servidor recortaba a la sede en silencio
+        mientras esta pantalla decia que atendia a todos.
       */}
-      <Field htmlFor="o-regional" label="Donde se dicta (sede)" hint="Solo logistica: la dirección de la jornada.">
+      <Field htmlFor="o-regional" label="Dónde se dicta (sede)" hint="Solo logística: no limita a quién atiende.">
         <Select
           id="o-regional"
           disabled={soloLogistica}
@@ -713,6 +719,24 @@ export function OfferingForm({
           ))}
         </Select>
       </Field>
+      {value.regionalId && !soloLogistica && !value.scope.regionalIds.includes(value.regionalId) ? (
+        <p className="-mt-2 text-xs text-ink-500">
+          {value.scope.regionalIds.length === 0 ? 'Atiende a todas las regionales. ' : 'Esta sede no está entre las regionales que atiende. '}
+          <button
+            type="button"
+            id="o-regional-acotar"
+            className="focus-ring rounded font-medium text-info hover:underline"
+            onClick={() => {
+              set({ scope: { ...value.scope, regionalIds: [...value.scope.regionalIds, value.regionalId] } });
+              setTajadaAbierta(true);
+            }}
+          >
+            {value.scope.regionalIds.length === 0
+              ? `Atender solo a ${catalogs.regionals.find((regional) => regional.id === value.regionalId)?.name ?? 'esta sede'}`
+              : 'Añadirla'}
+          </button>
+        </p>
+      ) : null}
 
       {/*
         LA TAJADA, PLEGADA. Cuatro selectores mas en un formulario que ya es largo asustan, y en la

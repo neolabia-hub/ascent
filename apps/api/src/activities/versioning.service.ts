@@ -600,6 +600,7 @@ export class VersioningService {
         // La campaña anual manda: es una obligacion de calendario, no un aniversario por persona.
         everyMonths: config.data.defaultAnnualDate ? null : (config.data.defaultRecurrenceMonths ?? null),
         fixedDate: config.data.defaultAnnualDate ?? null,
+        recurrenceAnchor: config.data.defaultRecurrenceAnchor ?? 'COMPLETED',
         soloNuevos: esInduccionDeIngreso,
       });
     } catch (error) {

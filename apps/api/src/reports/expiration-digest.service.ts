@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { tenantSettingsSchema } from '@neo-pulse/shared';
+import { PermissionService } from '../common/permission.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { redactarAviso, resumirParaElAviso } from './expiration-digest.js';
@@ -36,6 +37,7 @@ export class ExpirationDigestService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly reports: ReportsService,
+    private readonly permissions: PermissionService,
   ) {}
 
   /**
@@ -74,19 +76,27 @@ export class ExpirationDigestService {
       acabaria diciendo un numero distinto del que se ve al entrar, y entonces no se creeria ninguno.
     */
     const meses = Math.max(1, Math.ceil(expirationDigestDays / 30) + 1);
-    const { items } = await this.reports.vencimientos(meses, hoy, db);
-
-    const resumen = resumirParaElAviso(items, hoy, expirationDigestDays);
-    const aviso = redactarAviso(resumen, expirationDigestDays);
-    if (!aviso) return { enviados: 0, motivo: 'NADA_QUE_AVISAR' };
 
     const gente = await db.user.findMany({
       where: {
         active: true,
         deletedAt: null,
-        role: { permissions: { some: { permission: { code: 'reports:read_scope' } } } },
+        /*
+          POR ROL O CONCEDIDO A LA PERSONA (2026-10-08). Solo miraba el rol: a quien se le daba el
+          permiso de informes a mano no le llegaba el aviso, y a quien se le quitaba a mano le
+          seguia llegando. Vale cualquiera de los dos permisos de informes.
+        */
+        OR: [
+          {
+            role: { permissions: { some: { permission: { code: { in: ['reports:read_scope', 'reports:read_all'] } } } } },
+            NOT: {
+              overrides: { some: { granted: false, permission: { code: { in: ['reports:read_scope', 'reports:read_all'] } } } },
+            },
+          },
+          { overrides: { some: { granted: true, permission: { code: { in: ['reports:read_scope', 'reports:read_all'] } } } } },
+        ],
       },
-      select: { id: true, email: true },
+      select: { id: true, email: true, roleId: true },
     });
     if (gente.length === 0) return { enviados: 0, motivo: 'NADIE_CON_PERMISO' };
 
@@ -106,9 +116,45 @@ export class ExpirationDigestService {
     }
     if (destinatarios.length === 0) return { enviados: 0, motivo: 'YA_SE_AVISO_ESTA_SEMANA' };
 
+    /*
+      A CADA QUIEN, LAS CIFRAS DE LO QUE VE (2026-10-07).
+
+      El aviso se redactaba UNA vez, con los vencimientos de toda la empresa, y se mandaba igual a
+      todo el que tuviera el permiso de informes: al analista de un proceso le llegaba «hay 240 por
+      vencer», y al abrir Seguimiento veia 12. Ahora cada destinatario recibe el resumen de las
+      formaciones que le tocan —la misma regla que la pantalla, `formaciones-visibles.ts`— y si en
+      lo suyo no hay nada que avisar, no recibe nada. Los que ven lo mismo comparten el calculo.
+    */
+    const redactados = new Map<string, ReturnType<typeof redactarAviso>>();
+    const avisos: Array<{ quien: (typeof destinatarios)[number]; aviso: NonNullable<ReturnType<typeof redactarAviso>> }> = [];
+    for (const quien of destinatarios) {
+      const [permisos, procesos, tipos] = await Promise.all([
+        this.permissions.getEffectivePermissions(quien.id, tenantId),
+        this.permissions.getAnalystScope(quien.id, tenantId),
+        this.permissions.getActivityTypeScope(quien.id, tenantId, quien.roleId),
+      ]);
+      const visibles = await this.reports.formacionesVisibles(
+        {
+          id: quien.id,
+          hasPermission: (codigo) => permisos.has(codigo),
+          scopeProcessIds: procesos,
+          scopeActivityTypeIds: tipos,
+        },
+        db,
+      );
+      const clave = visibles === null ? '*' : [...visibles].sort().join(',');
+      if (!redactados.has(clave)) {
+        const { items } = await this.reports.vencimientos(meses, hoy, db, visibles);
+        redactados.set(clave, redactarAviso(resumirParaElAviso(items, hoy, expirationDigestDays), expirationDigestDays));
+      }
+      const aviso = redactados.get(clave);
+      if (aviso) avisos.push({ quien, aviso });
+    }
+    if (avisos.length === 0) return { enviados: 0, motivo: 'NADA_QUE_AVISAR' };
+
     await this.notifications.notifyMany(
       tenantId,
-      destinatarios.map((quien) => ({
+      avisos.map(({ quien, aviso }) => ({
         eventType: ExpirationDigestService.EVENT_TYPE,
         recipientUserId: quien.id,
         recipientEmail: quien.email,
@@ -119,6 +165,6 @@ export class ExpirationDigestService {
       })),
     );
 
-    return { enviados: destinatarios.length };
+    return { enviados: avisos.length };    return { enviados: destinatarios.length };
   }
 }

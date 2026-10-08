@@ -97,6 +97,20 @@ export const activityTypeConfigSchema = z
      */
     defaultAnnualDate: fixedDateSchema.nullable().default(null),
     /**
+     * DESDE DONDE SE CUENTAN `defaultRecurrenceMonths` (2026-10-06, pedido del cliente): desde que
+     * cada quien la completo, o desde su FECHA DE INGRESO —la reinduccion automatica: a los 12
+     * meses de ingresar (y de su induccion) la debe, sin que nazca para todos a la vez—.
+     * Nace en COMPLETED: ningun tipo existente cambia hasta que alguien lo elija.
+     */
+    defaultRecurrenceAnchor: z.enum(['COMPLETED', 'HIRE', 'INDUCTION']).default('COMPLETED'),
+    /**
+     * CON CUANTOS DIAS DE ANTELACION aparece la ronda siguiente. Eran 60 fijos en el servidor y
+     * no se veian en ninguna pantalla; ahora se ven y se cambian en el tipo.
+     */
+    defaultWindowDays: z.number().int().min(1).max(365).default(60),
+    /** Dias de gracia de las formaciones de este tipo. Eran 30 fijos en el codigo. Ver `graceDays`. */
+    defaultGraceDays: z.number().int().min(1).max(365).default(30),
+    /**
      * QUE PASA CUANDO LLEGA LA RONDA SIGUIENTE Y LA ANTERIOR NO SE HIZO. Ver `onExpirySchema`.
      *
      * Es politica de la EMPRESA y no de cada formacion —"aqui la campaña cierra y se pasa de año"

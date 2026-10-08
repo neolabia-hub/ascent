@@ -34,6 +34,16 @@ export class PermissionService {
       else effective.delete(code);
     }
 
+    /*
+      «VER TODO» INCLUYE «VER LO DE MI ALCANCE» (2026-10-08).
+
+      Las pantallas se abren con el permiso de alcance (`reports:read_scope`) y el de «ver todo»
+      solo decide CUANTO se ve dentro. Darle a una persona solo «ver todos los informes» la dejaba
+      con un 403 en Seguimiento: habia que acordarse de marcarle los dos. El grande trae el chico.
+    */
+    if (effective.has('reports:read_all')) effective.add('reports:read_scope');
+    if (effective.has('enrollments:read_all')) effective.add('enrollments:read_scope');
+
     // TODA PERSONA ES APRENDIZ (Decision #65). "Ver lo tuyo" no es una capacidad que alguien
     // conceda: es consecuencia de existir en la plataforma. Se agrega DESPUES de los overrides,
     // asi que tampoco se puede revocar — quitarselo a alguien seria esconderle su propio

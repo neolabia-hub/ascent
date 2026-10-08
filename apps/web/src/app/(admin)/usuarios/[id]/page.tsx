@@ -853,7 +853,7 @@ function Obligacion({ fila, onIntentoExtra }: { fila: AssignmentRow; onIntentoEx
           : fila.dueAt
             ? `vence el ${formatDate(fila.dueAt)}`
             : 'sin plazo'
-      }${fila.cycleNumber > 1 ? ` · ronda ${fila.cycleNumber}` : ''}${fila.waivedReason ? ` · ${fila.waivedReason}` : ''}${
+      }${fila.cycleNumber > 1 ? ` · ciclo ${fila.cycleNumber}` : ''}${loQuePaso(fila)}${fila.waivedReason ? ` · ${fila.waivedReason}` : ''}${
         POR_QUE_RETIRADA[fila.status] ? ` · ${POR_QUE_RETIRADA[fila.status]}` : ''
       }`}
       pastilla={<StatusPill kind={estado.kind} label={estado.label} />}
@@ -1006,4 +1006,19 @@ function Bloque({
       )}
     </section>
   );
+}
+
+/**
+ * QUE PASO EN ESA VUELTA, en la misma linea (2026-10-06): la convocatoria, los intentos y la nota.
+ * La trayectoria decia cuando se cumplio y nada mas; con esto se lee de corrido que paso cada vez
+ * que la persona debio una formacion, que es lo que recorre un auditor.
+ */
+function loQuePaso(fila: AssignmentRow): string {
+  const ejecucion = fila.ejecucion;
+  if (!ejecucion) return '';
+  const partes: string[] = [];
+  if (ejecucion.convocatoria) partes.push(ejecucion.convocatoria);
+  if (ejecucion.intentos > 0) partes.push(`${ejecucion.intentos} intento${ejecucion.intentos === 1 ? '' : 's'}`);
+  if (ejecucion.mejorNota !== null) partes.push(`nota ${Math.round(ejecucion.mejorNota)}%`);
+  return partes.length > 0 ? ` · ${partes.join(' · ')}` : '';
 }

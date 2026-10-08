@@ -71,8 +71,42 @@ export interface FilaPersona {
   encuesta: string | null;
   respondioEncuesta: boolean;
   certificadoId: string | null;
+  /** De que convocatoria sale lo de la fila: su codigo y su clase. `null` = aun en ninguna. */
+  convocatoria: string | null;
+  convocatoriaId: string | null;
+  /** TODOS los ciclos de la persona, del primero al ultimo, si tuvo mas de uno. Vacio si solo hubo uno. */
+  historial: CicloDePersona[];
   /** Cuantos ciclos tuvo esta obligacion. La fila es UNA sola (la mas relevante); esto dice si hubo historia detras. */
   rondas: number;
+  /**
+   * Lo que hizo en la version anterior, si la reiniciaron al publicar una nueva. No entra en
+   * `intentos`, `mejorNota` ni `encuesta`, que solo hablan de la version que cursa hoy.
+   */
+  reinicio: ReinicioPorVersion | null;
+}
+
+/** Lo que paso en UNA vuelta de la formacion para una persona. */
+export interface CicloDePersona {
+  assignmentId: string;
+  cycleNumber: number;
+  estado: EstadoEjecucion;
+  dueAt: string | null;
+  completedAt: string | null;
+  convocatoria: string | null;
+  convocatoriaId: string | null;
+  intentos: number;
+  mejorNota: number | null;
+  encuesta: string | null;
+  respondioEncuesta: boolean;
+  certificadoId: string | null;
+}
+
+export interface ReinicioPorVersion {
+  desdeVersion: number | null;
+  fecha: string;
+  intentosAnteriores: number;
+  mejorNotaAnterior: number | null;
+  respondioEncuestaAnterior: boolean;
 }
 
 export function getEjecucionGeneral(): Promise<{ items: FilaGeneral[]; resumen: ResumenEjecucion }> {

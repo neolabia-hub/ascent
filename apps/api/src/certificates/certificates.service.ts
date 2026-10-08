@@ -3,6 +3,9 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../common/audit.service.js';
 import { SequenceService } from '../common/sequence.service.js';
+import { recurrenceSchema } from '@neo-pulse/shared';
+import { ingresoDeLaPersona } from '../assignments/ancla-de-ingreso.js';
+import { computeNextCycleDueAt } from '../assignments/due-date.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { vencimientoDe, vigenciaMasCorta } from './certificate-policy.js';
 import type { CertificateSnapshot } from './certificate-snapshot.js';
@@ -63,6 +66,38 @@ export class CertificatesService {
    * constancia es un papel que se puede volver a emitir. Al reves seria perder lo importante por
    * no poder imprimir lo secundario.
    */
+  /**
+   * HASTA CUANDO VALE cuando la formacion vuelve por aniversario de INGRESO (2026-10-06).
+   *
+   * Con «cada N meses desde que la hizo» la constancia vale N meses desde que se completo. Aqui no:
+   * la ronda siguiente vence en el aniversario POSTERIOR al periodo cumplido, la haga cuando la
+   * haga, y la constancia tiene que valer hasta ese mismo dia. Contando desde que se completo, a
+   * quien la hace 40 dias antes de su aniversario el papel le caducaba 40 dias antes de que el
+   * sistema le pidiera la siguiente. Es la misma cuenta que hace el motor (`computeNextCycleDueAt`).
+   */
+  private async vencePorIngreso(
+    tenantId: string,
+    userId: string,
+    reglas: Array<{ id: string; audienceId: string; recurrence: Prisma.JsonValue | null }>,
+    completadoEn: Date,
+  ): Promise<Date | null> {
+    const db = this.prisma.forTenant(tenantId);
+    let vence: Date | null = null;
+    for (const regla of reglas) {
+      if (!esPorIngreso(regla.recurrence)) continue;
+      const recurrencia = recurrenceSchema.safeParse(regla.recurrence);
+      if (!recurrencia.success) continue;
+      const ronda = await db.assignment.findFirst({
+        where: { ruleId: regla.id, userId },
+        orderBy: { cycleNumber: 'desc' },
+        select: { dueAt: true },
+      });
+      const ingreso = await ingresoDeLaPersona(db, userId, regla.audienceId, recurrencia.data.anchor === 'INDUCTION');
+      vence = laQueLlegaAntes(vence, computeNextCycleDueAt(recurrencia.data, ronda?.dueAt ?? completadoEn, ingreso));
+    }
+    return vence;
+  }
+
   async emitirPorEjecucion(tenantId: string, enrollmentId: string): Promise<{ id: string } | null> {
     const enrollment = await this.prisma.forTenant(tenantId).enrollment.findUnique({
       where: { id: enrollmentId },
@@ -119,9 +154,14 @@ export class CertificatesService {
       // `targetId` es la ACTIVIDAD, no la version: el requisito obliga a la formacion, y cambiar de
       // version no crea una obligacion nueva.
       where: { targetType: 'ACTIVITY', targetId: enrollment.activityVersion.activityId, active: true },
-      select: { recurrence: true },
+      select: { id: true, audienceId: true, recurrence: true },
     });
-    const vigenciaMeses = vigenciaMasCorta(requisitos.map((fila) => fila.recurrence));
+    // Las ancladas al INGRESO no valen «N meses desde que se completo»: valen hasta el aniversario
+    // siguiente. Se calculan aparte y manda la fecha que llegue antes.
+    const vigenciaMeses = vigenciaMasCorta(
+      requisitos.filter((fila) => !esPorIngreso(fila.recurrence)).map((fila) => fila.recurrence),
+    );
+    const vencePorIngreso = await this.vencePorIngreso(tenantId, enrollment.userId, requisitos, completadoEn);
 
     const snapshot: CertificateSnapshot = {
       schemaVersion: 1,
@@ -179,7 +219,7 @@ export class CertificatesService {
               `null` es lo normal y es correcto: una induccion que se hace una vez al entrar
               acredita para siempre que se hizo. Solo vence lo que hay que repetir.
             */
-            validUntil: vencimientoDe(completadoEn, vigenciaMeses),
+            validUntil: laQueLlegaAntes(vencimientoDe(completadoEn, vigenciaMeses), vencePorIngreso),
           },
           select: { id: true, serialNumber: true },
         });
@@ -298,6 +338,19 @@ export class CertificatesService {
     const temario = [...mejorPorModulo.values()].map((e) => ({ name: e.activityVersion.activity.name }));
 
     const completadoEn = inscripcion.completedAt ?? new Date();
+    /*
+      LA EXCEPCION AL «SIN VIGENCIA» (2026-10-06): si sus modulos vuelven por aniversario de INGRESO
+      —un programa de reinduccion—, la constancia del conjunto vale hasta el aniversario siguiente de
+      esa persona. Ahi si hay una unica respuesta a «cuando vence el programa»: la misma fecha para
+      todos sus modulos. Con las demas recurrencias sigue sin fecha, como estaba.
+    */
+    const reglasDeModulos = idsDeModulo.length
+      ? await this.prisma.forTenant(tenantId).assignmentRule.findMany({
+          where: { targetType: 'ACTIVITY', targetId: { in: idsDeModulo }, active: true },
+          select: { id: true, audienceId: true, recurrence: true },
+        })
+      : [];
+    const vencePrograma = await this.vencePorIngreso(tenantId, inscripcion.userId, reglasDeModulos, completadoEn);
 
     const snapshot: CertificateSnapshot = {
       schemaVersion: 1,
@@ -345,7 +398,7 @@ export class CertificatesService {
             templateId: plantilla.id,
             templateVersion: plantilla.versionNumber,
             renderSnapshot: snapshot as unknown as Prisma.InputJsonValue,
-            validUntil: null,
+            validUntil: vencePrograma,
           },
           select: { id: true, serialNumber: true },
         });
@@ -588,3 +641,17 @@ function enmascarar(documento: string): string {
   return `${documento.slice(0, 3)}***${documento.slice(-4)}`;
 }
 
+
+/** La recurrencia cuenta desde la fecha de INGRESO de cada persona (reinduccion automatica). */
+function esPorIngreso(recurrencia: unknown): boolean {
+  if (!recurrencia || typeof recurrencia !== 'object') return false;
+  const ancla = (recurrencia as Record<string, unknown>).anchor;
+  return ancla === 'HIRE' || ancla === 'INDUCTION';
+}
+
+/** De dos vencimientos manda el que llega antes; `null` = no vence por ese lado. */
+function laQueLlegaAntes(a: Date | null, b: Date | null): Date | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a < b ? a : b;
+}

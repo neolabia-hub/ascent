@@ -107,6 +107,25 @@ export const recurrenceSchema = z
      * (`exemptRecentHiresMonths`). `0` = no se excluye a nadie.
      */
     exemptRecentHiresMonths: z.number().int().min(0).max(24).default(0),
+    /**
+     * DESDE DONDE SE CUENTAN los N meses de `everyMonths` (2026-10-06).
+     *
+     *   COMPLETED  desde que cada persona la completo (el aniversario de siempre).
+     *   INDUCTION  igual que HIRE, pero contando desde que TERMINO su induccion de ingreso (la
+     *              reinduccion es otra formacion: su primera vez se cuenta desde la induccion).
+     *   HIRE       desde su FECHA DE INGRESO: vence en cada aniversario de ingreso. Es la
+     *              reinduccion automatica: quien ingreso —y por tanto hizo su induccion— hace 12
+     *              meses la debe ahora, y a nadie le nace antes de que le toque.
+     *
+     * Opcional, y sin el vale COMPLETED: las reglas que ya existen no lo traen y no cambian.
+     */
+    anchor: z.enum(['COMPLETED', 'HIRE', 'INDUCTION']).optional(),
+    /**
+     * DIAS DE GRACIA: el plazo que se da cuando la fecha que tocaria ya paso o cae encima —estrenar
+     * la regla sobre gente que ya cumplio sus meses, o a dias de la campaña—. Lo pone el TIPO
+     * (`defaultGraceDays`); sin el, 30.
+     */
+    graceDays: z.number().int().min(1).max(365).optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -115,6 +134,12 @@ export const recurrenceSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Elige un solo anclaje: cada N meses o una fecha fija anual.',
+      });
+    }
+    if (value.anchor !== undefined && value.anchor !== 'COMPLETED' && value.everyMonths === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Contar desde el ingreso necesita cada cuantos meses.',
       });
     }
   });
@@ -193,6 +218,8 @@ export const setActivityRequirementSchema = z
      * la reinduccion 2026?").
      */
     fixedDate: fixedDateSchema.nullable().default(null),
+    /** Con `everyMonths`: desde donde se cuentan. Ver `anchor` en `recurrenceSchema`. */
+    recurrenceAnchor: z.enum(['COMPLETED', 'HIRE', 'INDUCTION']).optional(),
     /**
      * A QUIEN ALCANZA: `true` = solo a quien entre a la audiencia desde ahora; `false` (por
      * defecto) = tambien a los que ya estan.
@@ -230,10 +257,22 @@ export const assignProgramSchema = z
     dueDaysAfterTrigger: z.number().int().min(-365).max(3650).default(0),
     everyMonths: z.number().int().min(1).max(120).nullable().default(null),
     fixedDate: fixedDateSchema.nullable().default(null),
+    /** Con `everyMonths`: desde donde se cuentan. Ver `anchor` en `recurrenceSchema`. */
+    recurrenceAnchor: z.enum(['COMPLETED', 'HIRE', 'INDUCTION']).optional(),
     soloNuevos: z.boolean().default(false),
     reason: z.string().min(10).max(500).nullable().optional(),
   })
   .superRefine(plazoDeIngreso);
+
+/**
+ * EL PROGRAMA, A PERSONAS CONCRETAS (2026-10-06). Lo mismo que «O a personas concretas» de una
+ * formacion, aplicado a cada modulo: la novedad puntual que ninguna regla cubre.
+ */
+export const assignProgramToPeopleSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(500),
+  dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').nullable().optional(),
+});
+export type AssignProgramToPeopleInput = z.infer<typeof assignProgramToPeopleSchema>;
 export type AssignProgramInput = z.infer<typeof assignProgramSchema>;
 
 /** Matriz cargo -> actividad: la forma corta de declarar las inducciones especificas. */

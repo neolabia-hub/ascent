@@ -72,6 +72,7 @@ export class UsersService {
       deletedAt: null,
       ...(query.active ? { active: query.active === 'true' } : {}),
       ...(query.areaId ? { areaId: query.areaId } : {}),
+      ...(query.sinFechaDeIngreso === 'true' ? { hiredAt: null } : {}),
       ...(query.roleCode ? { role: { code: query.roleCode } } : {}),
       ...(query.q
         ? {

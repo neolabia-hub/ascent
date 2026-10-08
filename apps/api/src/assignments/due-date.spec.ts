@@ -1,6 +1,10 @@
 import { recurrenceSchema } from '@neo-pulse/shared';
 import {
   addMonths,
+  aniversarioDeIngreso,
+  ingresoCivil,
+  primeraRondaPorIngreso,
+  proximoVencimiento,
   computeFirstDueAt,
   computeNextCycleDueAt,
   cycleAnchor,
@@ -253,5 +257,90 @@ describe('nextFixedDate: el dia se acota al mes', () => {
 
   it('y si ya paso, se acota tambien en el año siguiente', () => {
     expect(nextFixedDate('09-31', { year: 2026, month: 11, day: 1 })).toEqual({ year: 2027, month: 9, day: 30 });
+  });
+});
+
+describe('reinduccion automatica: cada N meses desde el INGRESO', () => {
+  const desdeIngreso = recurrenceSchema.parse({ everyMonths: 12, windowDays: 60, anchor: 'HIRE' });
+  const ingreso = { year: 2024, month: 3, day: 15 };
+  const a = (texto: string) => new Date(`${texto}T10:00:00-05:00`);
+
+  it('el aniversario es ingreso + N, + 2N...: el primero en o despues de la fecha', () => {
+    expect(aniversarioDeIngreso(ingreso, 12, { year: 2026, month: 3, day: 15 })).toEqual({ year: 2026, month: 3, day: 15 });
+    expect(aniversarioDeIngreso(ingreso, 12, { year: 2026, month: 3, day: 16 })).toEqual({ year: 2027, month: 3, day: 15 });
+    expect(aniversarioDeIngreso(ingreso, 6, { year: 2024, month: 3, day: 16 })).toEqual({ year: 2024, month: 9, day: 15 });
+  });
+
+  it('un ingreso del 29 de febrero cae en 28 los años cortos y vuelve al 29 en el bisiesto', () => {
+    const bisiesto = { year: 2024, month: 2, day: 29 };
+    expect(aniversarioDeIngreso(bisiesto, 12, { year: 2025, month: 1, day: 1 })).toEqual({ year: 2025, month: 2, day: 28 });
+    expect(aniversarioDeIngreso(bisiesto, 12, { year: 2028, month: 1, day: 1 })).toEqual({ year: 2028, month: 2, day: 29 });
+  });
+
+  it('el ancla: la fecha de ingreso; sin ella, cuando termino su induccion; y si no, cuando entro al grupo', () => {
+    const entro = a('2026-09-23');
+    const termino = a('2026-02-10');
+    expect(ingresoCivil(new Date('2024-03-15T00:00:00.000Z'), entro, termino)).toEqual(ingreso);
+    expect(ingresoCivil(null, entro, termino)).toEqual({ year: 2026, month: 2, day: 10 });
+    expect(ingresoCivil(null, entro, null)).toEqual({ year: 2026, month: 9, day: 23 });
+  });
+
+  it('quien todavia no cumple sus meses no la recibe: ni el recien ingresado ni el que esta fuera de la antelacion', () => {
+    expect(primeraRondaPorIngreso(desdeIngreso, { year: 2026, month: 9, day: 6 }, a('2026-10-06'))).toBeNull();
+    // Cumple sus 12 meses en 70 dias: fuera de los 60 de antelacion.
+    expect(primeraRondaPorIngreso(desdeIngreso, { year: 2025, month: 12, day: 15 }, a('2026-10-06'))).toBeNull();
+  });
+
+  it('quien YA cumplio sus meses la recibe al publicar, con los dias de gracia (no espera a su proximo aniversario)', () => {
+    // Ingreso en marzo de 2024: lleva dos años y medio, y su proximo aniversario es en cinco meses.
+    const vence = primeraRondaPorIngreso(desdeIngreso, ingreso, a('2026-10-06'));
+    expect(vence && civil(vence)).toBe('2026-11-05');
+  });
+
+  it('los dias de gracia son los de la regla, no siempre 30', () => {
+    const con15 = recurrenceSchema.parse({ everyMonths: 12, windowDays: 60, anchor: 'HIRE', graceDays: 15 });
+    const vence = primeraRondaPorIngreso(con15, ingreso, a('2026-10-06'));
+    expect(vence && civil(vence)).toBe('2026-10-21');
+  });
+
+  it('tras ponerse al dia no vuelve a deberla enseguida: le toca el aniversario a mas de medio periodo', () => {
+    // Se puso al dia con vencimiento el 5-nov-2026; su aniversario de marzo de 2027 queda a 4 meses.
+    const alDia = { dueAt: new Date('2026-11-05T23:59:59-05:00'), completedAt: a('2026-10-20') };
+    expect(civil(proximoVencimiento(desdeIngreso, alDia, a('2026-10-20'), ingreso))).toBe('2028-03-15');
+    // Si el aniversario queda a mas de seis meses, ese es el siguiente.
+    const lejos = { dueAt: new Date('2026-08-01T23:59:59-05:00'), completedAt: a('2026-07-20') };
+    expect(civil(proximoVencimiento(desdeIngreso, lejos, a('2026-07-20'), ingreso))).toBe('2027-03-15');
+  });
+
+  it('contando desde la INDUCCION manda la induccion aunque tenga fecha de ingreso', () => {
+    const entro = a('2026-09-23');
+    const termino = a('2026-02-10');
+    const hired = new Date('2024-03-15T00:00:00.000Z');
+    expect(ingresoCivil(hired, entro, termino, true)).toEqual({ year: 2026, month: 2, day: 10 });
+    // Sin induccion registrada, lo que queda es el ingreso.
+    expect(ingresoCivil(hired, entro, null, true)).toEqual(ingreso);
+  });
+
+  it('dentro de la ventana nace y vence en SU aniversario', () => {
+    const vence = primeraRondaPorIngreso(desdeIngreso, ingreso, a('2027-01-20'));
+    expect(vence && civil(vence)).toBe('2027-03-15');
+  });
+
+  it('si el aniversario cae encima al estrenar la regla, se dan los dias de gracia', () => {
+    const vence = primeraRondaPorIngreso(desdeIngreso, ingreso, a('2027-03-10'));
+    expect(vence && civil(vence)).toBe('2027-04-09');
+  });
+
+  it('la ronda siguiente es el aniversario POSTERIOR al periodo cumplido, la haga cuando la haga', () => {
+    const ronda = { dueAt: new Date('2027-03-15T23:59:59-05:00'), completedAt: a('2027-02-01') };
+    expect(civil(proximoVencimiento(desdeIngreso, ronda, a('2027-02-01'), ingreso))).toBe('2028-03-15');
+    // Tambien si la hizo tarde, o si su primera ronda vencio con gracia unos dias despues.
+    const conGracia = { dueAt: new Date('2027-04-09T23:59:59-05:00'), completedAt: a('2027-05-20') };
+    expect(civil(proximoVencimiento(desdeIngreso, conGracia, a('2027-05-20'), ingreso))).toBe('2028-03-15');
+  });
+
+  it('sin ancla la recurrencia de siempre no cambia: cuenta desde que la completo', () => {
+    const ronda = { dueAt: new Date('2027-03-15T23:59:59-05:00'), completedAt: a('2027-02-01') };
+    expect(civil(proximoVencimiento(anual, ronda, a('2027-02-01'), ingreso))).toBe('2028-02-01');
   });
 });

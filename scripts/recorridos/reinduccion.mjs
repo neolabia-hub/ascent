@@ -25,7 +25,28 @@ await admin.entrar('admin@transprensa.com', 'Transprensa2026*');
 
 paso(1, 'CATALOGOS: el tipo, y lo que promete');
 const tipos = (await admin.get('/catalogs/activity-types')).cuerpo;
-const tipo = tipos.find((t) => t.code === 'REINDUCCION');
+/*
+  TIPO PROPIO, EN FECHA FIJA (2026-10-06). Este recorrido prueba la CAMPAÑA, y usaba el tipo
+  «Reinduccion» de la empresa tal como estuviera: el dia que alguien lo paso a «desde la fecha de
+  ingreso» desde Configuracion —que es una decision legitima de la empresa— se puso en rojo sin que
+  nada se hubiera roto. Ahora copia lo que promete el de la empresa y fija el modo que viene a probar.
+*/
+const tipoDeLaEmpresa = tipos.find((t) => t.code === 'REINDUCCION');
+const tipoPropio = tipoDeLaEmpresa
+  ? await admin.post('/catalogs/activity-types', {
+      code: `E2E_REIN_${marca}`,
+      name: `Reinduccion de campaña ${SUFIJO}`,
+      config: {
+        ...tipoDeLaEmpresa.config,
+        defaultAssignmentMode: 'ON_HIRE',
+        requiresBeforeHire: false,
+        defaultAnnualDate: tipoDeLaEmpresa.config?.defaultAnnualDate ?? '03-31',
+        defaultRecurrenceMonths: null,
+        defaultRecurrenceAnchor: 'COMPLETED',
+      },
+    })
+  : null;
+const tipo = tipoPropio?.ok ? tipoPropio.cuerpo : null;
 comprobar(!!tipo, 'tipo "Reinduccion" existe', 'NO existe el tipo REINDUCCION');
 if (!tipo) { resumen(); process.exit(1); }
 console.log(`   ... examen=${tipo.config?.requiresAssessment} constancia=${tipo.config?.issuesCertificate} encuesta=${tipo.config?.requiresSurvey ?? false}`);
@@ -301,5 +322,6 @@ if (creado.ruleId) {
   comprobar((despues?.total ?? 0) === 0, 'no queda ninguna obligacion pendiente viva', `quedan ${despues?.total} pendientes`);
 }
 
+if (tipo?.id) await admin.patch(`/catalogs/activity-types/${tipo.id}`, { active: false });
 console.log(`\nCREADO PARA LIMPIAR: actividad=${creado.activityId} usuario=${creado.userId} sufijo=${SUFIJO}`);
 process.exit(resumen() === 0 ? 0 : 1);

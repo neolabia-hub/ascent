@@ -240,6 +240,7 @@ export function listUsers(params: {
   areaId?: string;
   roleCode?: string;
   active?: 'true' | 'false';
+  sinFechaDeIngreso?: 'true';
   page?: number;
   pageSize?: number;
 }): Promise<UsersPage> {

@@ -23,6 +23,8 @@ import {
   ruleReachesEveryone,
 } from './audience-rule.js';
 import { AudiencesService } from './audiences.service.js';
+import { formacionesVisibles, type QuienMira } from '../common/formaciones-visibles.js';
+import { inscripcionDeCadaRonda, nombreDeConvocatoria } from '../reports/execution-state.js';
 import { endOfDay, type CalendarDate } from './due-date.js';
 import { RequirementEngineService } from './requirement-engine.service.js';
 
@@ -41,8 +43,42 @@ export class AssignmentsService {
 
   // ─────────────────────────── Requisitos (reglas) ───────────────────────────
 
-  async listRules() {
+  /**
+   * EL ALCANCE DE QUIEN ASIGNA (2026-10-08). El permiso de asignar abria los requisitos, la matriz y
+   * las escrituras de TODAS las formaciones. Ahora van con la misma regla que la lista de
+   * obligaciones (`common/formaciones-visibles.ts`): sin `enrollments:read_all` —por rol o concedido
+   * a la persona—, solo las formaciones de su alcance y las suyas. `null` = todas.
+   */
+  private visiblesPara(actor?: QuienMira): Promise<string[] | null> {
+    return actor ? formacionesVisibles(this.prisma.scoped, actor, 'enrollments:read_all') : Promise.resolve(null);
+  }
+
+  /**
+   * Corta con 404 —no 403, que confirmaria que existe— si lo que se va a tocar es de una formacion
+   * fuera del alcance. Lo llama el CONTROLADOR y no cada metodo: Programas entra a estos mismos
+   * metodos con su propio permiso y no debe pasar por aqui.
+   */
+  async exigirAlcance(actor: QuienMira, que: { activityId?: string; ruleId?: string; assignmentId?: string }): Promise<void> {
+    const visibles = await this.visiblesPara(actor);
+    if (visibles === null) return;
+    let activityId = que.activityId ?? null;
+    if (que.ruleId) {
+      const regla = await this.prisma.scoped.assignmentRule.findUnique({ where: { id: que.ruleId }, select: { targetId: true } });
+      if (!regla) throw new NotFoundException({ code: 'RULE_NOT_FOUND' });
+      activityId = regla.targetId;
+    }
+    if (que.assignmentId) {
+      const fila = await this.prisma.scoped.assignment.findUnique({ where: { id: que.assignmentId }, select: { targetId: true } });
+      if (!fila) throw new NotFoundException({ code: 'ASSIGNMENT_NOT_FOUND' });
+      activityId = fila.targetId;
+    }
+    if (!activityId || !visibles.includes(activityId)) throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
+  }
+
+  async listRules(actor?: QuienMira) {
+    const visibles = await this.visiblesPara(actor);
     const rules = await this.prisma.scoped.assignmentRule.findMany({
+      ...(visibles ? { where: { targetId: { in: visibles } } } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
         audience: { select: { id: true, name: true, active: true } },
@@ -167,9 +203,50 @@ export class AssignmentsService {
       });
       await this.engine.withdrawLeavers(this.prisma.scoped);
       if (afectados.length > 0) {
-        await this.engine.generate(this.prisma.scoped, this.prisma.currentTenantId, {
-          userIds: [...new Set(afectados.map((fila) => fila.userId))],
+        const userIds = [...new Set(afectados.map((fila) => fila.userId))];
+        /*
+          Y SI LA OTRA REGLA YA TENIA UNA FILA RETIRADA DE ESA PERSONA, SE LE DEVUELVE (2026-10-06).
+          El motor no le abre nada a quien ya tiene historia con la regla, asi que tras «retirar la
+          automatica -> exigir a un grupo -> volver a encender la automatica -> retirar el grupo» la
+          persona quedaba sin obligacion aunque la regla de toda la empresa se la siguiera exigiendo.
+          Solo reglas ACTIVAS de la misma formacion y solo a quien sigue en su grupo; una por persona.
+        */
+        const retiradas = await this.prisma.scoped.assignment.findMany({
+          where: {
+            userId: { in: userIds },
+            status: 'WITHDRAWN_LEFT_AUDIENCE',
+            targetType: before.targetType,
+            targetId: before.targetId,
+            ruleId: { not: id },
+            rule: { active: true },
+            user: { active: true, deletedAt: null },
+          },
+          select: { id: true, userId: true, rule: { select: { audienceId: true } } },
+          orderBy: { assignedAt: 'desc' },
         });
+        if (retiradas.length > 0) {
+          const siguenDentro = await this.prisma.scoped.audienceMember.findMany({
+            where: {
+              userId: { in: retiradas.map((fila) => fila.userId) },
+              audienceId: { in: retiradas.flatMap((fila) => (fila.rule ? [fila.rule.audienceId] : [])) },
+              leftAt: null,
+            },
+            select: { userId: true, audienceId: true },
+          });
+          const dentro = new Set(siguenDentro.map((fila) => `${fila.userId}|${fila.audienceId}`));
+          const devueltas = new Map<string, string>();
+          for (const fila of retiradas) {
+            if (devueltas.has(fila.userId) || !fila.rule) continue;
+            if (dentro.has(`${fila.userId}|${fila.rule.audienceId}`)) devueltas.set(fila.userId, fila.id);
+          }
+          if (devueltas.size > 0) {
+            await this.prisma.scoped.assignment.updateMany({
+              where: { id: { in: [...devueltas.values()] } },
+              data: { status: 'PENDING' },
+            });
+          }
+        }
+        await this.engine.generate(this.prisma.scoped, this.prisma.currentTenantId, { userIds });
       }
     }
     if (input.active === true) {
@@ -186,10 +263,25 @@ export class AssignmentsService {
         cerrado no se toca: no estaba pendiente cuando se retiro.
       */
       if (!before.active) {
+        /*
+          MENOS A QUIEN YA LA DEBE POR OTRO LADO (2026-10-06). Mientras la regla estuvo apagada, otra
+          regla (un grupo) o una asignacion a mano pudo abrirle la misma formacion: devolverle ademas
+          la retirada le dejaba DOS obligaciones vivas de lo mismo. Lo destapo la prueba de la
+          reinduccion al retirar la automatica, exigirla a un grupo y volver a encenderla.
+        */
+        const yaLaDeben = await this.prisma.scoped.assignment.findMany({
+          where: {
+            targetType: before.targetType,
+            targetId: before.targetId,
+            status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
+          },
+          select: { userId: true },
+        });
         await this.prisma.scoped.assignment.updateMany({
           where: {
             ruleId: id,
             status: 'WITHDRAWN_LEFT_AUDIENCE',
+            userId: { notIn: [...new Set(yaLaDeben.map((fila) => fila.userId))] },
             user: {
               active: true,
               deletedAt: null,
@@ -239,7 +331,8 @@ export class AssignmentsService {
    * porque apagar una tendria que partir una audiencia que otras formaciones tambien usan. Esa se
    * corrige donde se creo.
    */
-  async jobTitleMatrix() {
+  async jobTitleMatrix(actor?: QuienMira) {
+    const visibles = await this.visiblesPara(actor);
     const [jobTitles, activities, rules, audiences] = await Promise.all([
       this.prisma.scoped.jobTitle.findMany({
         where: { active: true },
@@ -247,7 +340,7 @@ export class AssignmentsService {
         select: { id: true, code: true, name: true, jobTitleType: { select: { name: true } } },
       }),
       this.prisma.scoped.activity.findMany({
-        where: { active: true, deletedAt: null },
+        where: { active: true, deletedAt: null, ...(visibles ? { id: { in: visibles } } : {}) },
         orderBy: { name: 'asc' },
         select: {
           id: true,
@@ -432,6 +525,8 @@ export class AssignmentsService {
           dueDaysAfterTrigger: rule.dueDaysAfterTrigger,
           everyMonths: this.everyMonthsOf(rule.recurrence),
           fixedDate: this.fixedDateOf(rule.recurrence),
+          recurrenceAnchor: this.anchorOf(rule.recurrence),
+          windowDays: this.windowDaysOf(rule.recurrence),
           assignmentCount: rule._count.assignments,
           /**
            * SOLO A QUIEN ENTRE DESDE ENTONCES. Cambia por completo como hay que leer la cifra de
@@ -560,12 +655,26 @@ export class AssignmentsService {
     // lee. Quien ingreso hace menos de N meses no entra al ciclo — su induccion es su actualizacion
     // de ese año (ver `exemptRecentHiresMonths` en el esquema del tipo).
     const exemptRecentHiresMonths = config.exemptRecentHiresMonths ?? 0;
+    // La antelacion con la que aparece cada ronda la pone el TIPO (eran 60 dias fijos aqui).
+    const windowDays = config.defaultWindowDays ?? 60;
+    // Y los dias de gracia, igual: los del tipo (eran 30 fijos en `due-date.ts`).
+    const graceDays = config.defaultGraceDays ?? 30;
     const recurrence = esDelPlan
       ? null
       : input.fixedDate
-        ? { fixedDate: input.fixedDate, windowDays: 60, onExpiry, exemptRecentHiresMonths }
+        ? { fixedDate: input.fixedDate, windowDays, onExpiry, exemptRecentHiresMonths, graceDays }
         : input.everyMonths
-          ? { everyMonths: input.everyMonths, windowDays: 60, onExpiry, exemptRecentHiresMonths }
+          ? {
+              everyMonths: input.everyMonths,
+              windowDays,
+              onExpiry,
+              exemptRecentHiresMonths,
+              graceDays,
+              // Solo se escribe cuando es por aniversario: las reglas de siempre quedan como estaban.
+              ...(input.recurrenceAnchor && input.recurrenceAnchor !== 'COMPLETED'
+                ? { anchor: input.recurrenceAnchor }
+                : {}),
+            }
           : null;
 
     if (existing) {
@@ -737,6 +846,18 @@ export class AssignmentsService {
     return typeof value === "string" ? value : null;
   }
 
+  private anchorOf(recurrence: Prisma.JsonValue | null): 'COMPLETED' | 'HIRE' | 'INDUCTION' {
+    if (!recurrence || typeof recurrence !== 'object' || Array.isArray(recurrence)) return 'COMPLETED';
+    const ancla = (recurrence as Record<string, unknown>).anchor;
+    return ancla === 'HIRE' || ancla === 'INDUCTION' ? ancla : 'COMPLETED';
+  }
+
+  private windowDaysOf(recurrence: Prisma.JsonValue | null): number | null {
+    if (!recurrence || typeof recurrence !== 'object' || Array.isArray(recurrence)) return null;
+    const value = (recurrence as Record<string, unknown>).windowDays;
+    return typeof value === 'number' ? value : null;
+  }
+
   private everyMonthsOf(recurrence: Prisma.JsonValue | null): number | null {
     if (!recurrence || typeof recurrence !== 'object' || Array.isArray(recurrence)) return null;
     const value = (recurrence as Record<string, unknown>).everyMonths;
@@ -854,7 +975,13 @@ export class AssignmentsService {
     return { created: recipients.length, skipped: skip.size };
   }
 
-  async list(query: ListAssignmentsQuery) {
+  /**
+   * `actor`: quien la pide. Sin `enrollments:read_all` solo ve las obligaciones de las formaciones de
+   * su alcance (2026-10-07). Esta lista la abria cualquiera con permiso de asignar —el analista lo
+   * tiene— y traia las obligaciones de toda la empresa, persona por persona.
+   */
+  async list(query: ListAssignmentsQuery, actor?: QuienMira) {
+    const visibles = actor ? await formacionesVisibles(this.prisma.scoped, actor, 'enrollments:read_all') : null;
     /*
       SIN LA PAPELERA (2026-09-30): lo de una formacion eliminada no aparece en la lista de nadie ni
       en sus cuentas. Salvo si se pide ESA formacion por su id: su historia sigue consultable.
@@ -890,6 +1017,8 @@ export class AssignmentsService {
       : {};
     const where: Prisma.AssignmentWhereInput = {
       ...(papelera.length > 0 ? { NOT: { targetId: { in: papelera } } } : {}),
+      // Solo las formaciones que le tocan a quien mira (ver `formaciones-visibles.ts`).
+      ...(visibles ? { AND: [{ targetId: { in: visibles } }] } : {}),
       ...(query.q
         ? { OR: [porPersona, ...(formacionesQueCoinciden.length ? [{ targetId: { in: formacionesQueCoinciden } }] : [])] }
         : {}),
@@ -930,6 +1059,8 @@ export class AssignmentsService {
           // cuyo certificado dice otra fecha — y es la fecha del papel la que manda.
           validUntilOverride: true,
           waivedReason: true,
+          // Que inscripcion la cerro: de ahi sale lo que paso en esa vuelta (ver `resolveEjecucion`).
+          completedEnrollmentId: true,
           user: {
             select: {
               id: true,
@@ -944,11 +1075,13 @@ export class AssignmentsService {
     ]);
 
     const ids = items.map((i) => i.targetId);
-    const [titles, tipos, programas, bloqueos] = await Promise.all([
+    const [titles, tipos, programas, bloqueos, ejecuciones] = await Promise.all([
       this.resolveActivityTitles(ids),
       this.resolveActivityTypes(ids),
       this.resolveProgramasDeActividad(ids),
       this.resolveBloqueos(items.map((i) => i.user.id), ids),
+      // Solo en el expediente de UNA persona: es donde se lee su historia vuelta por vuelta.
+      query.userId ? this.resolveEjecucion(items) : Promise.resolve(new Map<string, EjecucionDeLaVuelta>()),
     ]);
     return {
       total,
@@ -968,8 +1101,46 @@ export class AssignmentsService {
           pantalla propia.
         */
         bloqueada: bloqueos.get(`${item.user.id}|${item.targetId}`) ?? null,
+        ejecucion: ejecuciones.get(item.id) ?? null,
       })),
     };
+  }
+
+  /**
+   * QUE PASO EN CADA VUELTA (2026-10-06): en que convocatoria la curso, cuantos intentos y con que
+   * nota. La trayectoria de la ficha decia «cumplida el 27 de octubre · ronda 2» y nada mas; para
+   * saber que saco habia que irse a Seguimiento, formacion por formacion. Es la trazabilidad que
+   * recorre un auditor, y tiene que leerse en el expediente de la persona.
+   *
+   * La inscripcion de cada obligacion se resuelve con la MISMA regla que Seguimiento
+   * (`inscripcionDeCadaRonda`): dos pantallas que dicen la nota de un ciclo tienen que decir la misma.
+   */
+  private async resolveEjecucion(
+    items: Array<{ id: string; completedEnrollmentId: string | null }>,
+  ): Promise<Map<string, EjecucionDeLaVuelta>> {
+    const mapa = new Map<string, EjecucionDeLaVuelta>();
+    if (items.length === 0) return mapa;
+    const cerradas = items.flatMap((item) => (item.completedEnrollmentId ? [item.completedEnrollmentId] : []));
+    const inscripciones = await this.prisma.scoped.enrollment.findMany({
+      where: { OR: [{ assignmentId: { in: items.map((item) => item.id) } }, { id: { in: cerradas } }] },
+      select: {
+        id: true,
+        assignmentId: true,
+        offeringId: true,
+        offering: { select: { code: true, kind: true, scheduledDate: true } },
+        attempts: { select: { score: true } },
+      },
+    });
+    for (const [assignmentId, inscripcion] of inscripcionDeCadaRonda(items, inscripciones)) {
+      const notas = inscripcion.attempts.flatMap((intento) => (intento.score === null ? [] : [Number(intento.score)]));
+      mapa.set(assignmentId, {
+        convocatoria: nombreDeConvocatoria(inscripcion.offering),
+        convocatoriaId: inscripcion.offeringId,
+        intentos: inscripcion.attempts.length,
+        mejorNota: notas.length > 0 ? Math.max(...notas) : null,
+      });
+    }
+    return mapa;
   }
 
   /** Inscripciones BLOQUEADAS por intentos agotados, por persona y formacion. */
@@ -1119,4 +1290,12 @@ export class AssignmentsService {
     const [year, month, day] = value.split('-').map(Number) as [number, number, number];
     return { year, month, day };
   }
+}
+
+/** Lo que paso en una vuelta de una formacion: donde se curso y con que resultado. */
+interface EjecucionDeLaVuelta {
+  convocatoria: string | null;
+  convocatoriaId: string;
+  intentos: number;
+  mejorNota: number | null;
 }

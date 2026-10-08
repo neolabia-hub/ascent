@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { formacionesVisibles, type QuienMira } from '../common/formaciones-visibles.js';
 import { PrismaService, type TenantPrisma } from '../prisma/prisma.service.js';
 import {
   ESTADOS_RETIRADOS,
   consolidarPorPersona,
   inscripcionDeCadaRonda,
+  nombreDeConvocatoria,
   resolverEstadoEjecucion,
   resumirEjecucion,
   type EstadoEjecucion,
@@ -16,6 +18,7 @@ import {
   type HechoVencimiento,
 } from './expirations.js';
 import { libroDeEjecucionDeActividad, libroDeEjecucionGeneral } from './execution-xlsx.js';
+import { loQueCuentaHoy } from './intentos-vigentes.js';
 
 @Injectable()
 export class ReportsService {
@@ -38,7 +41,17 @@ export class ReportsService {
    * demuestra el cumplimiento. Por eso se parte de las ASIGNACIONES —vivas y cerradas— y no de las
    * inscripciones.
    */
-  async ejecucionDeActividad(activityId: string) {
+  /**
+   * Que formaciones puede ver esta persona en los informes; `null` = todas. La regla y el porque,
+   * en `common/formaciones-visibles.ts`: sin `reports:read_all`, solo las de su alcance y las suyas.
+   */
+  formacionesVisibles(actor: QuienMira, db: TenantPrisma = this.prisma.scoped): Promise<string[] | null> {
+    return formacionesVisibles(db, actor, 'reports:read_all');
+  }
+
+  async ejecucionDeActividad(activityId: string, visibles: string[] | null = null) {
+    // Fuera de su alcance es 404 y no 403: un 403 sobre un id concreto confirma que existe.
+    if (visibles && !visibles.includes(activityId)) throw new NotFoundException({ code: 'ACTIVITY_NOT_FOUND' });
     const asignaciones = await this.prisma.scoped.assignment.findMany({
       where: {
         targetType: 'ACTIVITY',
@@ -99,23 +112,37 @@ export class ReportsService {
         // A QUE OBLIGACION pertenece. Nace enlazada al inscribir (Decision #2), tanto si la
         // inscribe quien convoca como si la persona entra sola.
         assignmentId: true,
+        // En que version va HOY y si la movieron de version: es lo que separa los intentos que
+        // cuentan de los que hizo en un examen que ya no cursa (ver `intentos-vigentes.ts`).
+        activityVersionId: true,
+        scoreSnapshot: true,
         activityVersion: { select: { versionNumber: true } },
+        // EN QUE CONVOCATORIA esta: una formacion puede tener varias (la permanente y jornadas), y
+        // la fila dice de cual sale lo que enseña.
+        offering: { select: { id: true, code: true, kind: true, scheduledDate: true } },
       },
     });
     const enrollmentIds = inscripciones.map((fila) => fila.id);
 
-    const [intentos, encuestas, certificados, autoservicio] = await Promise.all([
+    const [intentos, encuestas, evaluaciones, certificados, autoservicio] = await Promise.all([
       this.prisma.scoped.attempt.findMany({
         where: { enrollmentId: { in: enrollmentIds } },
-        select: { userId: true, score: true, status: true },
+        select: { userId: true, enrollmentId: true, assessmentId: true, score: true, status: true },
       }),
       this.prisma.scoped.surveyResponse.findMany({
         where: { enrollmentId: { in: enrollmentIds } },
-        select: { respondentUserId: true, result: true },
+        // En orden, para que si respondio dos veces mande la ultima y no la que llegue primero.
+        orderBy: { respondedAt: 'asc' },
+        select: { respondentUserId: true, enrollmentId: true, result: true, respondedAt: true },
+      }),
+      // Que evaluacion tiene cada version de esta formacion.
+      this.prisma.scoped.activityContent.findMany({
+        where: { assessmentId: { not: null }, activityVersion: { activityId } },
+        select: { activityVersionId: true, assessmentId: true },
       }),
       this.prisma.scoped.certificate.findMany({
         where: { enrollmentId: { in: enrollmentIds } },
-        select: { id: true, userId: true, revokedAt: true },
+        select: { id: true, userId: true, enrollmentId: true, revokedAt: true },
       }),
       /*
         ¿HAY PUERTA ABIERTA? Es lo que separa "no la ha hecho" de "no ha podido hacerla", y esa
@@ -155,21 +182,56 @@ export class ReportsService {
     */
     const inscripcionPorObligacion = inscripcionDeCadaRonda(vivas, inscripciones);
 
-    const mejorNota = new Map<string, number>();
-    const cuantosIntentos = new Map<string, number>();
+    /*
+      SOLO LO DE LA VERSION QUE CURSA HOY (2026-10-05).
+
+      Aqui se sumaban todos los intentos de la inscripcion, y una persona reiniciada en una version
+      nueva salia «Sin empezar» con diez intentos y 80 %: los del examen anterior. La regla y el
+      caso medido en produccion estan en `intentos-vigentes.ts`.
+    */
+    const evaluacionesPorVersion = new Map<string, Set<string>>();
+    for (const contenido of evaluaciones) {
+      if (!contenido.assessmentId) continue;
+      const deLaVersion = evaluacionesPorVersion.get(contenido.activityVersionId) ?? new Set<string>();
+      deLaVersion.add(contenido.assessmentId);
+      evaluacionesPorVersion.set(contenido.activityVersionId, deLaVersion);
+    }
+    /*
+      Y DE LA INSCRIPCION DE ESA RONDA, NO DE LA PERSONA (2026-10-06).
+
+      Intentos, nota, encuesta y constancia se sumaban por PERSONA sobre todas sus inscripciones de
+      la formacion. Con una sola ronda da igual. Con dos —la reinduccion del año siguiente— la fila
+      «sin empezar» de este año enseñaba los intentos, el 100 % y la constancia del año pasado: una
+      persona que no ha empezado, con cara de haber terminado. El estado ya se resolvia por ronda
+      (`inscripcionDeCadaRonda`); lo demas de la fila tiene que salir del mismo sitio.
+    */
+    const intentosPorInscripcion = new Map<string, typeof intentos>();
     for (const intento of intentos) {
-      cuantosIntentos.set(intento.userId, (cuantosIntentos.get(intento.userId) ?? 0) + 1);
-      if (intento.score === null) continue;
-      const valor = Number(intento.score);
-      // La MEJOR y no la ultima: quien aprobo con 95 y repaso el examen sacando 80 por curiosidad
-      // acredito 95.
-      if (!mejorNota.has(intento.userId) || valor > (mejorNota.get(intento.userId) as number)) {
-        mejorNota.set(intento.userId, valor);
+      intentosPorInscripcion.set(intento.enrollmentId, [...(intentosPorInscripcion.get(intento.enrollmentId) ?? []), intento]);
+    }
+    const encuestasPorInscripcion = new Map<string, typeof encuestas>();
+    for (const encuesta of encuestas) {
+      encuestasPorInscripcion.set(encuesta.enrollmentId, [...(encuestasPorInscripcion.get(encuesta.enrollmentId) ?? []), encuesta]);
+    }
+    const hoyPorInscripcion = new Map<string, ReturnType<typeof loQueCuentaHoy> extends Map<string, infer V> ? V : never>();
+    for (const inscripcion of inscripciones) {
+      const suyo = loQueCuentaHoy(
+        [inscripcion],
+        intentosPorInscripcion.get(inscripcion.id) ?? [],
+        encuestasPorInscripcion.get(inscripcion.id) ?? [],
+        evaluacionesPorVersion,
+      ).get(inscripcion.userId);
+      if (suyo) hoyPorInscripcion.set(inscripcion.id, suyo);
+    }
+    // La constancia de ESA inscripcion; si hubo una anulada y otra vigente, manda la vigente.
+    const certificadoPorInscripcion = new Map<string, (typeof certificados)[number]>();
+    for (const certificado of certificados) {
+      if (!certificado.enrollmentId) continue;
+      const previo = certificadoPorInscripcion.get(certificado.enrollmentId);
+      if (!previo || (previo.revokedAt !== null && certificado.revokedAt === null)) {
+        certificadoPorInscripcion.set(certificado.enrollmentId, certificado);
       }
     }
-
-    const encuestaPorUsuario = new Map(encuestas.map((fila) => [fila.respondentUserId, fila.result]));
-    const certificadoPorUsuario = new Map(certificados.map((fila) => [fila.userId, fila]));
 
     const items = vivas.map((fila) => {
       const inscripcion = inscripcionPorObligacion.get(fila.id) ?? null;
@@ -179,7 +241,8 @@ export class ReportsService {
         enrollmentStatus: inscripcion?.status ?? null,
         puedeAutoinscribirse: autoservicio !== null,
       });
-      const certificado = certificadoPorUsuario.get(fila.userId) ?? null;
+      const certificado = (inscripcion ? certificadoPorInscripcion.get(inscripcion.id) : undefined) ?? null;
+      const hoy = inscripcion ? hoyPorInscripcion.get(inscripcion.id) : undefined;
 
       return {
         assignmentId: fila.id,
@@ -192,14 +255,20 @@ export class ReportsService {
         dueAt: fila.dueAt,
         cycleNumber: fila.cycleNumber,
         enrollmentId: inscripcion?.id ?? null,
+        // De que convocatoria sale lo de esta fila. Sin inscripcion todavia no esta en ninguna.
+        convocatoria: inscripcion ? nombreDeConvocatoria(inscripcion.offering) : null,
+        convocatoriaId: inscripcion?.offering?.id ?? null,
         versionNumber: inscripcion?.activityVersion.versionNumber ?? null,
         completedAt: inscripcion?.completedAt ?? null,
-        intentos: cuantosIntentos.get(fila.userId) ?? 0,
-        mejorNota: mejorNota.get(fila.userId) ?? null,
+        intentos: hoy?.intentos ?? 0,
+        mejorNota: hoy?.mejorNota ?? null,
         // `undefined` = no la ha respondido; un valor = que dijo. Son cosas distintas y la pantalla
         // las pinta distinto.
-        encuesta: encuestaPorUsuario.get(fila.userId) ?? null,
-        respondioEncuesta: encuestaPorUsuario.has(fila.userId),
+        encuesta: hoy?.encuesta ?? null,
+        respondioEncuesta: hoy !== undefined && hoy.encuesta !== undefined,
+        // Lo que hizo en la version anterior, si a ESTA ronda la reiniciaron. No cuenta, pero se
+        // dice: una fila «sin empezar» que esconde diez intentos tambien engaña.
+        reinicio: (inscripcion ? hoy?.reinicios.get(inscripcion.id) : undefined) ?? null,
         certificadoId: certificado && certificado.revokedAt === null ? certificado.id : null,
       };
     });
@@ -215,7 +284,42 @@ export class ReportsService {
     */
     const porPersona = consolidarPorPersona(items);
 
-    return { items: porPersona, resumen: resumirEjecucion(porPersona.map((item) => item.estado)) };
+    /*
+      Y LA HISTORIA NO SE PIERDE: VIAJA CON LA FILA (2026-10-06).
+
+      La tabla enseña UNA fila por persona —la que responde «¿como esta hoy?»— y antes solo decia
+      «2×» al lado, sin forma de ver que paso en la otra vuelta. El cliente lo pregunto dos veces: que
+      significa, y como ve un auditor la trazabilidad. Cada persona con mas de un ciclo lleva aqui
+      TODOS, en orden, con lo de cada uno: cuando vencia, como quedo, en que convocatoria, sus
+      intentos, su nota, su encuesta y su constancia. La pantalla los despliega y el Excel los lista.
+    */
+    const ciclosDe = new Map<string, typeof items>();
+    for (const item of items) ciclosDe.set(item.userId, [...(ciclosDe.get(item.userId) ?? []), item]);
+    const conHistorial = porPersona.map((fila) => {
+      const suyos = ciclosDe.get(fila.userId) ?? [];
+      const historial =
+        suyos.length < 2
+          ? []
+          : [...suyos]
+              .sort((a, b) => a.cycleNumber - b.cycleNumber || (a.dueAt?.getTime() ?? 0) - (b.dueAt?.getTime() ?? 0))
+              .map((ciclo) => ({
+                assignmentId: ciclo.assignmentId,
+                cycleNumber: ciclo.cycleNumber,
+                estado: ciclo.estado,
+                dueAt: ciclo.dueAt,
+                completedAt: ciclo.completedAt,
+                convocatoria: ciclo.convocatoria,
+                convocatoriaId: ciclo.convocatoriaId,
+                intentos: ciclo.intentos,
+                mejorNota: ciclo.mejorNota,
+                encuesta: ciclo.encuesta,
+                respondioEncuesta: ciclo.respondioEncuesta,
+                certificadoId: ciclo.certificadoId,
+              }));
+      return { ...fila, historial };
+    });
+
+    return { items: conHistorial, resumen: resumirEjecucion(porPersona.map((item) => item.estado)) };
   }
 
 
@@ -256,6 +360,7 @@ export class ReportsService {
 
   private async estadosPorActividad(
     activityIds: string[] | null,
+    visibles: string[] | null = null,
   ): Promise<{ porActividad: Map<string, EstadoEjecucion[]>; todos: EstadoEjecucion[] } | null> {
     const papelera = await this.enPapelera();
     const asignaciones = await this.prisma.scoped.assignment.findMany({
@@ -263,6 +368,7 @@ export class ReportsService {
         targetType: 'ACTIVITY',
         NOT: { targetId: { in: papelera } },
         ...(activityIds ? { targetId: { in: activityIds } } : {}),
+        ...(visibles ? { AND: [{ targetId: { in: visibles } }] } : {}),
         // Quien ya no trabaja aqui no cuenta como incumplimiento: su obligacion murio con su
         // salida, y dejarlo infla el denominador con gente que no se va a formar.
         user: { active: true, deletedAt: null },
@@ -337,8 +443,8 @@ export class ReportsService {
    * estados: se sigue llamando a `resolverEstadoEjecucion`, que es lo unico que no puede tener dos
    * versiones. Optimizar la consulta esta bien; reimplementar el criterio, no.
    */
-  async ejecucionGeneral() {
-    const lote = await this.estadosPorActividad(null);
+  async ejecucionGeneral(visibles: string[] | null = null) {
+    const lote = await this.estadosPorActividad(null, visibles);
     if (lote === null) return { items: [], resumen: resumirEjecucion([]) };
     const { porActividad, todos } = lote;
 
@@ -381,7 +487,7 @@ export class ReportsService {
    * Es la vista general que da entrada al detalle: el plan tiene un porcentaje arriba y hasta ahora
    * no habia forma de saber que renglon lo esta hundiendo.
    */
-  async ejecucionDelPlan(planId: string) {
+  async ejecucionDelPlan(planId: string, visibles: string[] | null = null) {
     /*
       UN RENGLON DEL PLAN APUNTA A UNA CONVOCATORIA, no a una formacion.
 
@@ -427,9 +533,13 @@ export class ReportsService {
       y un plan anual tiene facilmente treinta. Ciento cincuenta consultas para pintar una pestana,
       y creciendo con el plan — justo al reves de lo que debe pasar.
     */
-    const lote = await this.estadosPorActividad(renglones.map((renglon) => renglon.offering.activityVersion.activity.id));
+    // Los renglones de formaciones que no le tocan no salen: ni su avance ni su nombre.
+    const suyos = visibles
+      ? renglones.filter((renglon) => visibles.includes(renglon.offering.activityVersion.activity.id))
+      : renglones;
+    const lote = await this.estadosPorActividad(suyos.map((renglon) => renglon.offering.activityVersion.activity.id));
 
-    const conAvance = renglones.map((renglon) => {
+    const conAvance = suyos.map((renglon) => {
       const actividad = renglon.offering.activityVersion.activity;
       const resumen = resumirEjecucion(lote?.porActividad.get(actividad.id) ?? []);
       return {
@@ -467,7 +577,7 @@ export class ReportsService {
    * no hace la jornada de marzo y no puede contar como incumplimiento del plan. Sin `planId` se
    * mira todo lo vivo, que es la otra pregunta legitima.
    */
-  private async hechosDeAnalitica(planId: string | null): Promise<HechoAnalitica[]> {
+  private async hechosDeAnalitica(planId: string | null, visibles: string[] | null = null): Promise<HechoAnalitica[]> {
     const papelera = await this.enPapelera();
     const asignaciones = await this.prisma.scoped.assignment.findMany({
       where: {
@@ -476,6 +586,7 @@ export class ReportsService {
         user: { active: true, deletedAt: null },
         // Lo retirado no cuenta, igual que quien ya no trabaja aqui (ver `ESTADOS_RETIRADOS`).
         status: { notIn: [...ESTADOS_RETIRADOS] },
+        ...(visibles ? { AND: [{ targetId: { in: visibles } }] } : {}),
         ...(planId ? { source: 'PLAN', planItem: { planId } } : {}),
       },
       select: {
@@ -562,8 +673,8 @@ export class ReportsService {
   }
 
   /** La ejecucion agrupada por una dimension. Con `planId`, solo lo que nacio del plan. */
-  async analitica(dimension: Dimension, planId: string | null) {
-    return agrupar(await this.hechosDeAnalitica(planId), dimension);
+  async analitica(dimension: Dimension, planId: string | null, visibles: string[] | null = null) {
+    return agrupar(await this.hechosDeAnalitica(planId, visibles), dimension);
   }
 
   /**
@@ -574,8 +685,8 @@ export class ReportsService {
    * los mismos hechos. Se calculan una vez y se agrupan siete veces, que es gratis al lado de la
    * consulta.
    */
-  async analiticaCompleta(planId: string | null) {
-    const hechos = await this.hechosDeAnalitica(planId);
+  async analiticaCompleta(planId: string | null, visibles: string[] | null = null) {
+    const hechos = await this.hechosDeAnalitica(planId, visibles);
     const dimensiones = Object.keys(DIMENSIONES) as Dimension[];
     return {
       resumen: resumirEjecucion(hechos.map((hecho) => hecho.estado)),
@@ -606,7 +717,7 @@ export class ReportsService {
    * Un mes SIN obligaciones que venzan sale con `pct: null` y no con cero: no haber tenido nada que
    * hacer no es haberlo hecho mal, y pintarlo como cero dibuja un valle que no existio.
    */
-  async evolucion(year: number) {
+  async evolucion(year: number, visibles: string[] | null = null) {
     const desde = new Date(Date.UTC(year, 0, 1));
     const hasta = new Date(Date.UTC(year + 1, 0, 1));
 
@@ -617,6 +728,7 @@ export class ReportsService {
         NOT: { targetId: { in: papelera } },
         user: { active: true, deletedAt: null },
         status: { notIn: [...ESTADOS_RETIRADOS] },
+        ...(visibles ? { AND: [{ targetId: { in: visibles } }] } : {}),
         dueAt: { gte: desde, lt: hasta },
       },
       select: { dueAt: true, completedAt: true, status: true },
@@ -678,14 +790,18 @@ export class ReportsService {
    * diez preguntas por examen, traerse las respuestas una a una serian decenas de miles de filas
    * para calcular veinte promedios.
    */
-  async conocimiento() {
+  async conocimiento(visibles: string[] | null = null) {
     const porVersion = await this.prisma.scoped.attemptQuestion.groupBy({
       by: ['questionVersionId'],
       // Sin las de formaciones en la PAPELERA (2026-09-30): una prueba borrada no dice nada de la gente.
       where: {
         invalidated: false,
         pointsAwarded: { not: null },
-        attempt: { enrollment: { activityVersion: { activity: { deletedAt: null } } } },
+        attempt: {
+          enrollment: {
+            activityVersion: { activity: { deletedAt: null, ...(visibles ? { id: { in: visibles } } : {}) } },
+          },
+        },
       },
       _sum: { pointsPossible: true, pointsAwarded: true },
       _count: { _all: true },
@@ -804,12 +920,23 @@ export class ReportsService {
    * cuenta por OBLIGACION: quien tiene una `Assignment` de cualquier modulo esta dentro del
    * programa, haya hecho algo o no.
    */
-  async programas() {
-    const programas = await this.prisma.scoped.learningPath.findMany({
+  async programas(visibles: string[] | null = null) {
+    const publicados = await this.prisma.scoped.learningPath.findMany({
       where: { status: 'PUBLISHED', active: true },
       include: { items: true },
       orderBy: { name: 'asc' },
     });
+    /*
+      UN PROGRAMA LE TOCA SI LE TOCAN TODOS SUS MODULOS. Con uno solo fuera, el avance del programa
+      ya cuenta el resultado de gente en una formacion que no es suya; y enseñarlo a medias —sin ese
+      modulo— daria un «completos» que no cuadra con el del administrador.
+    */
+    const programas = visibles
+      ? publicados.filter((programa) => {
+          const modulos = programa.items.filter((i) => i.itemType === 'ACTIVITY');
+          return modulos.length > 0 && modulos.every((i) => visibles.includes(i.itemId));
+        })
+      : publicados;
     if (programas.length === 0) return [];
 
     const idsDeActividad = [
@@ -966,9 +1093,15 @@ export class ReportsService {
    * quien va a falta de un modulo se cierra con una convocatoria, y quien no ha empezado necesita
    * otra conversacion. Puestos por nombre, los dos grupos quedan mezclados y hay que leerse los 172.
    */
-  async programaDetalle(pathId: string) {
+  async programaDetalle(pathId: string, visibles: string[] | null = null) {
     const programa = await this.prisma.scoped.learningPath.findUnique({ where: { id: pathId }, include: { items: true } });
     if (!programa) return null;
+    if (
+      visibles &&
+      !programa.items.filter((i) => i.itemType === 'ACTIVITY').every((i) => visibles.includes(i.itemId))
+    ) {
+      return null;
+    }
 
     const idsDeActividad = programa.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId);
     if (idsDeActividad.length === 0) return { programa: { id: programa.id, name: programa.name }, personas: [] };
@@ -1066,7 +1199,7 @@ export class ReportsService {
     return { programa: { id: programa.id, name: programa.name }, personas: activas };
   }
 
-  async vencimientos(meses: number, hoy = new Date(), db?: TenantPrisma) {
+  async vencimientos(meses: number, hoy = new Date(), db?: TenantPrisma, visibles: string[] | null = null) {
     const cliente = db ?? this.prisma.scoped;
     const papelera = await this.enPapelera(cliente);
     const desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
@@ -1116,7 +1249,7 @@ export class ReportsService {
       */
       cliente.certificate.findMany({
         where: { validUntil: { not: null, lt: hasta }, revokedAt: null, enrollmentId: { not: null } },
-        select: { validUntil: true, enrollmentId: true },
+        select: { id: true, userId: true, issuedAt: true, validUntil: true, enrollmentId: true },
       }),
       /*
         3. LAS OBLIGACIONES ABIERTAS, con su fecha limite.
@@ -1181,10 +1314,6 @@ export class ReportsService {
         },
       }),
     ]);
-    const nombreDeActividad = new Map(actividades.map((fila) => [fila.id, fila.name]));
-    const inscripcionDeConstancia = new Map(inscripcionesDeConstancia.map((fila) => [fila.id, fila]));
-    const yaLaTuvo = new Set(cumplidasAntes.map((fila) => `${fila.userId}|${fila.targetId}`));
-
     const dimensionesDe = (quien: {
       id: string;
       fullName: string;
@@ -1200,6 +1329,121 @@ export class ReportsService {
       cargo: quien.jobTitle?.name ?? null,
       regional: quien.regional?.name ?? null,
     });
+    const nombreDeActividad = new Map(actividades.map((fila) => [fila.id, fila.name]));
+    const inscripcionDeConstancia = new Map(inscripcionesDeConstancia.map((fila) => [fila.id, fila]));
+    const yaLaTuvo = new Set(cumplidasAntes.map((fila) => `${fila.userId}|${fila.targetId}`));
+
+    /*
+      UNA CONSTANCIA QUE YA TIENE SUCESORA NO VENCE (2026-10-06).
+
+      Quien hizo la reinduccion dos años tiene dos constancias de la misma formacion. La del año
+      pasado caduca pronto —por eso entra en la consulta de arriba, que solo mira este horizonte— y
+      la de este año caduca despues, fuera de el. Sin mirar mas lejos, el informe diria «por vencer»
+      de alguien que ya la renovo. Se buscan las constancias MAS NUEVAS de esas mismas personas y
+      formaciones, caduquen cuando caduquen, y la que tiene una posterior se descarta.
+    */
+    const otrasDeEsasPersonas = await cliente.certificate.findMany({
+      where: {
+        userId: { in: [...new Set(porConstancia.map((fila) => fila.userId))] },
+        revokedAt: null,
+        enrollmentId: { not: null },
+        OR: [{ validUntil: null }, { validUntil: { gte: hasta } }],
+      },
+      select: { userId: true, issuedAt: true, enrollmentId: true },
+    });
+    const actividadDeOtras = new Map(
+      (
+        await cliente.enrollment.findMany({
+          where: { id: { in: [...new Set(otrasDeEsasPersonas.map((fila) => fila.enrollmentId as string))] } },
+          select: { id: true, activityVersion: { select: { activityId: true } } },
+        })
+      ).map((fila) => [fila.id, fila.activityVersion.activityId]),
+    );
+    const ultimaEmitida = new Map<string, Date>();
+    const anotar = (clave: string, emitida: Date) => {
+      const previa = ultimaEmitida.get(clave);
+      if (!previa || emitida > previa) ultimaEmitida.set(clave, emitida);
+    };
+    for (const fila of porConstancia) {
+      const actividad = inscripcionDeConstancia.get(fila.enrollmentId as string)?.activityVersion.activity.id;
+      if (actividad) anotar(`${fila.userId}|${actividad}`, fila.issuedAt);
+    }
+    for (const fila of otrasDeEsasPersonas) {
+      const actividad = actividadDeOtras.get(fila.enrollmentId as string);
+      if (actividad) anotar(`${fila.userId}|${actividad}`, fila.issuedAt);
+    }
+
+    /*
+      LA CONSTANCIA DE UN PROGRAMA TAMBIEN VENCE (2026-10-06).
+
+      Hasta hoy los programas se certificaban sin fecha, asi que aqui no habia nada que mirar. Desde
+      que un programa de reinduccion vale hasta el aniversario siguiente de la persona, esa fecha
+      tiene que salir en este informe: es el papel que se le enseña al auditor, y era el unico que
+      no avisaba de que iba a caducar.
+
+      De cada persona y programa cuenta la ULTIMA emitida, igual que arriba. Y si la ronda siguiente
+      ya le nacio —tiene abierta la obligacion de algun modulo—, la fila del programa sobra: ese
+      trabajo ya esta en la lista, modulo por modulo, y contarlo dos veces infla el calendario.
+    */
+    const dePrograma = await cliente.certificate.findMany({
+      where: { pathEnrollmentId: { not: null }, revokedAt: null, validUntil: { not: null } },
+      select: { userId: true, issuedAt: true, validUntil: true, pathEnrollmentId: true },
+      orderBy: { issuedAt: 'desc' },
+    });
+    const [inscripcionesDePrograma, personasDePrograma] = await Promise.all([
+      cliente.pathEnrollment.findMany({
+        where: { id: { in: [...new Set(dePrograma.map((fila) => fila.pathEnrollmentId as string))] } },
+        select: {
+          id: true,
+          pathId: true,
+          path: { select: { name: true, items: { select: { itemType: true, itemId: true } } } },
+        },
+      }),
+      cliente.user.findMany({
+        where: { id: { in: [...new Set(dePrograma.map((fila) => fila.userId))] }, active: true, deletedAt: null },
+        ...persona,
+      }),
+    ]);
+    const programaDe = new Map(inscripcionesDePrograma.map((fila) => [fila.id, fila]));
+    const personaDePrograma = new Map(personasDePrograma.map((fila) => [fila.id, fila]));
+    const debeAbierta = new Set(abiertas.map((fila) => `${fila.userId}|${fila.targetId}`));
+    const programasVistos = new Set<string>();
+    const porPrograma: HechoVencimiento[] = [];
+    for (const fila of dePrograma) {
+      const inscripcion = programaDe.get(fila.pathEnrollmentId as string);
+      const quien = personaDePrograma.get(fila.userId);
+      if (!inscripcion || !quien) continue;
+      // Vienen de la mas nueva a la mas vieja: la primera de cada persona y programa es la que vale.
+      const clave = `${fila.userId}|${inscripcion.pathId}`;
+      if (programasVistos.has(clave)) continue;
+      programasVistos.add(clave);
+      if ((fila.validUntil as Date) >= hasta) continue;
+      const yaEnMarcha = inscripcion.path.items.some(
+        (item) => item.itemType === 'ACTIVITY' && debeAbierta.has(`${fila.userId}|${item.itemId}`),
+      );
+      if (yaEnMarcha) continue;
+      porPrograma.push({
+        clase: 'REPROGRAMAR',
+        fuente: 'CONSTANCIA',
+        fecha: fila.validUntil as Date,
+        ...dimensionesDe(quien),
+        formacion: `Programa: ${inscripcion.path.name}`,
+        // Sin formacion que enlazar: no es una, es el conjunto. Ya viene deduplicada de arriba.
+        actividadId: null,
+      });
+    }
+    // La fila de un programa no lleva formacion: se decide aqui si le toca a quien mira.
+    if (visibles) {
+      const leTocan = new Set(
+        inscripcionesDePrograma
+          .filter((fila) => fila.path.items.filter((i) => i.itemType === 'ACTIVITY').every((i) => visibles.includes(i.itemId)))
+          .map((fila) => fila.path.name),
+      );
+      for (let i = porPrograma.length - 1; i >= 0; i -= 1) {
+        if (!leTocan.has(String(porPrograma[i]?.formacion).replace(/^Programa: /, ''))) porPrograma.splice(i, 1);
+      }
+    }
+
 
     const candidatos: HechoVencimiento[] = [
       ...porPapel.map((fila) => ({
@@ -1216,6 +1460,9 @@ export class ReportsService {
         // ni formacion que nombrar.
         const inscripcion = inscripcionDeConstancia.get(fila.enrollmentId as string);
         if (!inscripcion) return [];
+        // Ya tiene una mas nueva de esa misma formacion: esta no vence, fue reemplazada.
+        const ultima = ultimaEmitida.get(`${fila.userId}|${inscripcion.activityVersion.activity.id}`);
+        if (ultima && fila.issuedAt < ultima) return [];
         return [
           {
             clase: 'REPROGRAMAR' as const,
@@ -1227,6 +1474,7 @@ export class ReportsService {
           },
         ];
       }),
+      ...porPrograma,
       ...abiertas.map((fila) => ({
         clase: yaLaTuvo.has(`${fila.userId}|${fila.targetId}`)
           ? ('REPROGRAMAR' as const)
@@ -1240,7 +1488,11 @@ export class ReportsService {
     ];
 
     // Y una sola fila por persona y formacion: la ventana de 60 dias las hacia salir dos veces.
-    const hechos = consolidarVencimientos(candidatos);
+    // Antes, fuera lo que no le toca a quien mira: por formacion, y los programas por sus modulos.
+    const suyos = visibles
+      ? candidatos.filter((hecho) => hecho.actividadId === null || visibles.includes(hecho.actividadId))
+      : candidatos;
+    const hechos = consolidarVencimientos(suyos);
 
     return {
       resumen: resumirVencimientos(hechos, hoy),
@@ -1269,8 +1521,8 @@ export class ReportsService {
     return tenant?.name ?? 'Ascent';
   }
 
-  async ejecucionGeneralXlsx(estado: EstadoEjecucion | null): Promise<Buffer> {
-    const [{ items }, tenantName] = await Promise.all([this.ejecucionGeneral(), this.nombreDelTenant()]);
+  async ejecucionGeneralXlsx(estado: EstadoEjecucion | null, visibles: string[] | null = null): Promise<Buffer> {
+    const [{ items }, tenantName] = await Promise.all([this.ejecucionGeneral(visibles), this.nombreDelTenant()]);
 
     /*
       CON UN FILTRO PUESTO SE EXPORTAN LAS FORMACIONES QUE LO TIENEN, y no las filas del estado.
@@ -1284,9 +1536,13 @@ export class ReportsService {
     return libroDeEjecucionGeneral(filtradas, { tenantName, generadoEn: new Date(), estado });
   }
 
-  async ejecucionDeActividadXlsx(activityId: string, estado: EstadoEjecucion | null): Promise<Buffer> {
+  async ejecucionDeActividadXlsx(
+    activityId: string,
+    estado: EstadoEjecucion | null,
+    visibles: string[] | null = null,
+  ): Promise<Buffer> {
     const [{ items }, tenantName, actividad] = await Promise.all([
-      this.ejecucionDeActividad(activityId),
+      this.ejecucionDeActividad(activityId, visibles),
       this.nombreDelTenant(),
       this.prisma.scoped.activity.findUnique({ where: { id: activityId }, select: { name: true } }),
     ]);

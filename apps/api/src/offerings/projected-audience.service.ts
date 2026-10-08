@@ -51,8 +51,8 @@ export interface ProjectedPreview extends ProjectedAudience {
  *
  *   audienceId  el grupo que declara la convocatoria (cargo, area, regional, servicio). Es la
  *               respuesta explicita, y cuando esta, manda.
- *   regionalId  la SEDE. Solo acota cuando no hay tajada declarada, que es el caso simple de
- *               siempre: "esta jornada es en Neiva, atiende a los de Neiva".
+ *   regionalId  la SEDE. Es LOGISTICA y NO acota (2026-10-08): viaja aqui porque la convocatoria la
+ *               trae, pero quien decide a quien atiende es el alcance. Ver `tajadaWhere`.
  */
 export interface OfferingScope {
   audienceId: string | null;
@@ -264,10 +264,12 @@ export class ProjectedAudienceService {
   /**
    * El filtro de la tajada, y como se dice en pantalla.
    *
-   * La audiencia declarada MANDA sobre la regional: si alguien acota la jornada a "los
-   * conductores", que se dicte en Neiva no puede recortar en silencio a quien atiende —una
-   * jornada nacional puede darse en una sede—. La regional sigue acotando en el caso simple, que
-   * es el de siempre: jornada sin tajada declarada.
+   * LA SEDE NO ACOTA (2026-10-08). Hasta hoy, una jornada sin alcance marcado se recortaba sola a la
+   * regional de su sede: la pantalla decia «Solo logistica» junto al campo y «Atiende a todos los
+   * obligados» debajo, y el numero bajaba igual al elegirla. Lo vio el cliente: *"al seleccionar
+   * sale como acotado, como si filtrara; se supone que quien acota es la regional a la que
+   * atiende"*. Tenia razon: una jornada nacional se dicta en una sede y atiende a todo el pais.
+   * Para atender solo a una regional se marca en «Regionales a las que atiende».
    */
   private async tajadaWhere(scope: OfferingScope): Promise<{ where: Prisma.UserWhereInput; detail: string }> {
     // La tajada que se esta marcando manda sobre todo lo demas: es lo que el usuario tiene
@@ -284,9 +286,6 @@ export class ProjectedAudienceService {
         where: { audienceMembers: { some: { audienceId: scope.audienceId, leftAt: null } } },
         detail: audience ? ` de "${audience.name}"` : ' en el alcance de la convocatoria',
       };
-    }
-    if (scope.regionalId) {
-      return { where: { regionalId: scope.regionalId }, detail: ' en la regional de la convocatoria' };
     }
     return { where: {}, detail: '' };
   }

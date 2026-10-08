@@ -1,3 +1,4 @@
+import { decidirInscripcion } from '../learning/ronda-de-inscripcion.js';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type Modality } from '@prisma/client';
 import type {
@@ -1585,7 +1586,7 @@ export class OfferingsService {
         targetId: version.activityId,
         status: { in: ['PENDING', 'IN_PROGRESS', 'OVERDUE'] },
         // "Todos los obligados" significa los que ESTA jornada atiende: su TAJADA. Si no la
-        // declara, la sede; y si tampoco, la empresa entera. Es el mismo alcance con el que se
+        // declara, todos (la sede es logistica y no acota). Es el mismo alcance con el que se
         // derivan los proyectados, para que numerador y denominador hablen de la misma gente:
         // convocar a mas de los proyectados es inflar el numerador de la cobertura.
         ...(input.allAssigned ? { user: this.tajadaDeUsuarios(offering) } : {}),
@@ -1638,10 +1639,25 @@ export class OfferingsService {
             },
           ],
         },
-        select: { id: true, userId: true, offeringId: true, status: true },
+        select: { id: true, userId: true, offeringId: true, status: true, round: true, assignmentId: true },
       }),
     ]);
-    const enrolledAlready = new Set(already.filter((e) => e.offeringId === id).map((e) => e.userId));
+    /*
+      UNA INSCRIPCION POR RONDA (2026-10-06). «Ya inscrita» es quien sigue en su inscripcion de esta
+      convocatoria; quien la termino y vuelve a deber la formacion —otra obligacion abierta— abre la
+      ronda siguiente aqui mismo. Misma regla que el autoservicio: `ronda-de-inscripcion.ts`.
+    */
+    const enEstaPorPersona = new Map<string, typeof already>();
+    for (const fila of already.filter((e) => e.offeringId === id)) {
+      enEstaPorPersona.set(fila.userId, [...(enEstaPorPersona.get(fila.userId) ?? []), fila]);
+    }
+    const rondaDe = new Map<string, number>();
+    const enrolledAlready = new Set<string>();
+    for (const [userId, filas] of enEstaPorPersona) {
+      const decision = decidirInscripcion(filas, assignmentByUser.get(userId) ?? null);
+      if ('reusar' in decision) enrolledAlready.add(userId);
+      else rondaDe.set(userId, decision.crear);
+    }
     const candidatos = people.filter((person) => !enrolledAlready.has(person.id));
 
     /*
@@ -1730,6 +1746,7 @@ export class OfferingsService {
           userId: person.id,
           activityVersionId: offering.activityVersionId,
           assignmentId: assignmentByUser.get(person.id) ?? null,
+          round: rondaDe.get(person.id) ?? 1,
           status: 'ENROLLED' as const,
           scoreSnapshot: {
             activityName: version.activity.name,
@@ -1826,13 +1843,12 @@ export class OfferingsService {
 
   /**
    * El filtro de personas de la tajada de una jornada, para usarlo dentro de otra consulta.
-   * Mismo criterio que `ProjectedAudienceService`: la audiencia declarada manda sobre la sede.
+   * Mismo criterio que `ProjectedAudienceService`: acota el alcance declarado; la sede, nunca.
    */
   private tajadaDeUsuarios(offering: { audienceId: string | null; regionalId: string | null }): Prisma.UserWhereInput {
     if (offering.audienceId) {
       return { audienceMembers: { some: { audienceId: offering.audienceId, leftAt: null } } };
     }
-    if (offering.regionalId) return { regionalId: offering.regionalId };
     return {};
   }
   private toDate(value: string | null | undefined): Date | null {

@@ -30,6 +30,8 @@ export interface ActivityTypeConfig {
   defaultRecurrenceMonths: number | null;
   /** "Cada año antes del 31 de marzo" (MM-DD): la campaña anual. Manda sobre los meses. */
   defaultAnnualDate: string | null;
+  /** Con los meses: desde que la completo, o desde su fecha de INGRESO (reinduccion automatica). */
+  defaultRecurrenceAnchor: 'COMPLETED' | 'HIRE' | 'INDUCTION';
   participatesInPlan: boolean;
   isMicro: boolean;
 }
@@ -44,6 +46,7 @@ const DEFAULTS: ActivityTypeConfig = {
   defaultOfferingKind: 'PERMANENT',
   defaultRecurrenceMonths: null,
   defaultAnnualDate: null,
+  defaultRecurrenceAnchor: 'COMPLETED',
   participatesInPlan: false,
   isMicro: false,
 };
@@ -75,6 +78,10 @@ export function readTypeConfig(raw: Record<string, unknown> | null | undefined):
       kind === 'EVENT' || kind === 'PERMANENT' || kind === 'HYBRID' ? kind : DEFAULTS.defaultOfferingKind,
     defaultRecurrenceMonths: typeof months === 'number' && months > 0 ? months : DEFAULTS.defaultRecurrenceMonths,
     defaultAnnualDate: typeof raw.defaultAnnualDate === 'string' ? raw.defaultAnnualDate : DEFAULTS.defaultAnnualDate,
+    defaultRecurrenceAnchor:
+      raw.defaultRecurrenceAnchor === 'HIRE' || raw.defaultRecurrenceAnchor === 'INDUCTION'
+        ? raw.defaultRecurrenceAnchor
+        : 'COMPLETED',
     participatesInPlan: bool('participatesInPlan', DEFAULTS.participatesInPlan),
     isMicro: bool('isMicro', DEFAULTS.isMicro),
   };

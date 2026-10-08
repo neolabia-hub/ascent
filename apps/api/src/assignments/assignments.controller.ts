@@ -73,32 +73,37 @@ export class AssignmentsController {
 
   @Get('assignment-rules')
   @RequirePermissions('assignments:manage')
-  listRules() {
-    return this.assignments.listRules();
+  listRules(@CurrentUser() actor: AuthUser) {
+    return this.assignments.listRules(actor);
   }
 
   @Post('assignment-rules')
   @RequirePermissions('assignments:manage')
-  createRule(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
-    return this.assignments.createRule(actor, createAssignmentRuleSchema.parse(body));
+  async createRule(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
+    const input = createAssignmentRuleSchema.parse(body);
+    await this.assignments.exigirAlcance(actor, { activityId: input.targetId });
+    return this.assignments.createRule(actor, input);
   }
 
   @Patch('assignment-rules/:id')
   @RequirePermissions('assignments:manage')
-  updateRule(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  async updateRule(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    await this.assignments.exigirAlcance(actor, { ruleId: id });
     return this.assignments.updateRule(actor, id, updateAssignmentRuleSchema.parse(body));
   }
 
   @Get('assignment-rules/job-title-matrix')
   @RequirePermissions('assignments:manage')
-  matrix() {
-    return this.assignments.jobTitleMatrix();
+  matrix(@CurrentUser() actor: AuthUser) {
+    return this.assignments.jobTitleMatrix(actor);
   }
 
   @Post('assignment-rules/job-title-matrix')
   @RequirePermissions('assignments:manage')
-  toggleMatrix(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
-    return this.assignments.toggleJobTitleMatrix(actor, toggleJobTitleMatrixSchema.parse(body));
+  async toggleMatrix(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
+    const input = toggleJobTitleMatrixSchema.parse(body);
+    await this.assignments.exigirAlcance(actor, { activityId: input.activityId });
+    return this.assignments.toggleJobTitleMatrix(actor, input);
   }
 
   // ──────────────── Exigirla desde la formacion ────────────────
@@ -110,27 +115,30 @@ export class AssignmentsController {
    */
   @Get('activities/:activityId/requirements')
   @RequirePermissions('assignments:manage')
-  activityRequirements(@Param('activityId', ParseUUIDPipe) activityId: string) {
+  async activityRequirements(@CurrentUser() actor: AuthUser, @Param('activityId', ParseUUIDPipe) activityId: string) {
+    await this.assignments.exigirAlcance(actor, { activityId });
     return this.assignments.activityRequirements(activityId);
   }
 
   @Post('activities/:activityId/requirements')
   @RequirePermissions('assignments:manage')
-  setActivityRequirement(
+  async setActivityRequirement(
     @CurrentUser() actor: AuthUser,
     @Param('activityId', ParseUUIDPipe) activityId: string,
     @Body() body: unknown,
   ) {
     const input = setActivityRequirementSchema.parse({ ...(body as object), activityId });
+    await this.assignments.exigirAlcance(actor, { activityId });
     return this.assignments.setActivityRequirement(actor, input);
   }
 
   @Delete('activities/:activityId/requirements/:ruleId')
   @RequirePermissions('assignments:manage')
-  retireActivityRequirement(
+  async retireActivityRequirement(
     @CurrentUser() actor: AuthUser,
     @Param('ruleId', ParseUUIDPipe) ruleId: string,
   ) {
+    await this.assignments.exigirAlcance(actor, { ruleId });
     return this.assignments.retireActivityRequirement(actor, ruleId);
   }
 
@@ -138,19 +146,22 @@ export class AssignmentsController {
 
   @Get('assignments')
   @RequirePermissions('assignments:manage')
-  list(@Query() query: Record<string, string>) {
-    return this.assignments.list(listAssignmentsQuerySchema.parse(query));
+  list(@CurrentUser() actor: AuthUser, @Query() query: Record<string, string>) {
+    return this.assignments.list(listAssignmentsQuerySchema.parse(query), actor);
   }
 
   @Post('assignments')
   @RequirePermissions('assignments:manage')
-  create(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
-    return this.assignments.createManual(actor, createAssignmentSchema.parse(body));
+  async create(@CurrentUser() actor: AuthUser, @Body() body: unknown) {
+    const input = createAssignmentSchema.parse(body);
+    await this.assignments.exigirAlcance(actor, { activityId: input.targetId });
+    return this.assignments.createManual(actor, input);
   }
 
   @Post('assignments/:id/waive')
   @RequirePermissions('assignments:manage')
-  waive(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  async waive(@CurrentUser() actor: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    await this.assignments.exigirAlcance(actor, { assignmentId: id });
     return this.assignments.waive(actor, id, waiveAssignmentSchema.parse(body));
   }
 }

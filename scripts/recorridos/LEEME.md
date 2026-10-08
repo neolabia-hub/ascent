@@ -15,8 +15,12 @@ Con el stack levantado (`.\scripts\mirar.ps1`, api en 3012):
 ```
 node scripts/recorridos/induccion-general.mjs
 node scripts/recorridos/induccion-especifica.mjs
-node scripts/recorridos/reinduccion.mjs   # OJO: obliga a la plantilla entera y la retira al final
+node scripts/recorridos/reinduccion.mjs   # OJO: obliga a la plantilla entera y la retira al final. Supone el tipo REINDUCCION en FECHA FIJA
 node scripts/recorridos/reinduccion-ciclos.mjs      # la ronda SIGUIENTE: cierra y abre
+node scripts/recorridos/reinduccion-por-ingreso.mjs # automatica: cada N meses desde el INGRESO, sin obligar a todos
+node scripts/recorridos/programa-induccion-y-reinduccion.mjs # los dos como PROGRAMA: a personas concretas y vigencia de la constancia
+node scripts/recorridos/alcance-en-informes.mjs            # quien ve que: un analista acotado en Seguimiento, Inicio y Asignaciones
+node scripts/recorridos/programa-reinduccion-completo.mjs    # programa con contenido, examen, encuesta y asistencia, y la SEGUNDA vez entera: una inscripcion por ronda
 node scripts/recorridos/capacitacion-del-plan.mjs   # crea y APRUEBA un plan en un año libre
 node scripts/recorridos/varias-convocatorias.mjs    # dos convocatorias de la misma formacion
 node scripts/recorridos/pildora.mjs

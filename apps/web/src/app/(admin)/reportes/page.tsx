@@ -15,13 +15,17 @@ import {
   type PersonaDePrograma,
   type EstadoEjecucion,
   type FilaGeneral,
+  type CicloDePersona,
   type FilaPersona,
   type ResumenEjecucion,
   conteoPorEstado,
 } from '@/lib/reports-api';
 import { descargarPdf } from '@/lib/certificates-api';
 import { BarraEjecucion, ChipEstado } from '@/components/modules/admin/barra-ejecucion';
+import { Ayuda } from '@/components/ui/ayuda';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -609,6 +613,8 @@ function DetalleFormacion({
   const [datos, setDatos] = useState<{ items: FilaPersona[]; resumen: ResumenEjecucion } | null>(null);
   const [filtro, setFiltro] = useState<EstadoEjecucion | null>(inicial);
   const [busqueda, setBusqueda] = useState('');
+  /** Ver solo a quien estuvo en UNA convocatoria, con lo que saco en ella. '' = todas. */
+  const [convocatoria, setConvocatoria] = useState('');
   const [bajando, setBajando] = useState(false);
 
   const exportar = async () => {
@@ -628,9 +634,34 @@ function DetalleFormacion({
       .catch(() => setDatos({ items: [], resumen: vacio() }));
   }, [fila.activityId]);
 
+  /*
+    LAS CONVOCATORIAS DE ESTA FORMACION, sacadas de lo que la gente curso (2026-10-06). Tambien las
+    de ciclos anteriores: quien estuvo en la jornada de marzo el año pasado sigue saliendo en ella.
+  */
+  const convocatorias = useMemo(() => {
+    const vistas = new Map<string, string>();
+    for (const persona of datos?.items ?? []) {
+      if (persona.convocatoriaId && persona.convocatoria) vistas.set(persona.convocatoriaId, persona.convocatoria);
+      for (const ciclo of persona.historial) {
+        if (ciclo.convocatoriaId && ciclo.convocatoria) vistas.set(ciclo.convocatoriaId, ciclo.convocatoria);
+      }
+    }
+    return [...vistas.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [datos]);
+
   const personas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
-    return (datos?.items ?? []).filter((persona) => {
+    /*
+      CON UNA CONVOCATORIA ELEGIDA, LA FILA ES LA DE ESA CONVOCATORIA: lo que la persona saco ALLI,
+      aunque hoy vaya por otro ciclo. Es la respuesta a «quienes estuvieron en esta y que sacaron».
+    */
+    const base = (datos?.items ?? []).flatMap((persona) => {
+      if (!convocatoria) return [persona];
+      if (persona.convocatoriaId === convocatoria) return [persona];
+      const enEsa = persona.historial.find((ciclo) => ciclo.convocatoriaId === convocatoria);
+      return enEsa ? [{ ...persona, ...enEsa }] : [];
+    });
+    return base.filter((persona) => {
       if (filtro && persona.estado !== filtro) return false;
       if (!texto) return true;
       return (
@@ -639,7 +670,7 @@ function DetalleFormacion({
         (persona.area ?? '').toLowerCase().includes(texto)
       );
     });
-  }, [datos, filtro, busqueda]);
+  }, [datos, filtro, busqueda, convocatoria]);
 
   const { visibles: personasVisibles, paginador: paginadorPersonas } = usePaginacion(personas);
 
@@ -678,6 +709,20 @@ function DetalleFormacion({
               {personas.length} de {datos.items.length} personas
               {filtro ? ` · ${ESTADOS[filtro].label}` : ''}
             </p>
+            <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+            {convocatorias.length > 0 ? (
+              <Select
+                aria-label="Convocatoria"
+                className="w-60"
+                value={convocatoria}
+                onChange={(e) => setConvocatoria(e.target.value)}
+              >
+                <option value="">Todas las convocatorias</option>
+                {convocatorias.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </Select>
+            ) : null}
             <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-300"
@@ -690,6 +735,7 @@ function DetalleFormacion({
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
               />
+            </div>
             </div>
           </div>
 
@@ -729,24 +775,36 @@ function DetalleFormacion({
 
 function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
   const [bajando, setBajando] = useState(false);
+  const [verCiclos, setVerCiclos] = useState(false);
 
   return (
+    <>
     <Tr>
       <Td>
         <p className="flex items-center gap-1.5 font-medium text-ink-900">
-          {persona.fullName}
+          {/*
+            EL NOMBRE ABRE SU FICHA (2026-10-06). Es adonde va quien administra con alguien atrasado o
+            sin empezar: alli se exime, se da un intento mas y se lee toda su trayectoria.
+          */}
+          <Link href={`/usuarios/${persona.userId}`} className="focus-ring rounded hover:underline">
+            {persona.fullName}
+          </Link>
           {/*
             LA FILA YA ES UNA SOLA POR PERSONA (no una por ronda): esto solo dice que hubo historia
             detras, sin obligar a abrir el perfil para saberlo. Sin badge cuando rondas=1: un "(1)"
             en cada fila no informaria nada, solo repetiria ruido.
           */}
-          {persona.rondas > 1 ? (
-            <span
-              className="rounded-full bg-paper px-1.5 py-0.5 text-[11px] font-normal text-ink-500"
-              title={`${persona.rondas} ciclos de esta formacion; se muestra el que importa hoy`}
+          {persona.historial.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => setVerCiclos((visible) => !visible)}
+              aria-expanded={verCiclos}
+              className="focus-ring inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-ink-700 hover:text-ink-900"
+              title="Esta persona ha debido esta formación más de una vez. La fila muestra el ciclo de hoy; aquí se ven todos."
             >
-              {persona.rondas}×
-            </span>
+              Ciclo {persona.cycleNumber} de {persona.historial.length}
+              <ChevronRight size={12} className={cn('transition-transform', verCiclos && 'rotate-90')} aria-hidden="true" />
+            </button>
           ) : null}
         </p>
         <p className="text-xs tabular-nums text-ink-500">{persona.documentNumber}</p>
@@ -756,7 +814,52 @@ function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
         <p className="text-xs text-ink-500">{persona.jobTitle ?? ''}</p>
       </Td>
       <Td>
-        <ChipEstado estado={persona.estado} />
+        <span className="inline-flex items-center gap-1.5">
+          <ChipEstado estado={persona.estado} />
+          {/*
+            REINICIADA POR VERSION NUEVA. Los intentos, la nota y la encuesta de la fila son solo de
+            la version que cursa hoy; lo que hizo en la anterior se cuenta aqui, detras del icono,
+            para que «sin empezar» no esconda que la persona ya habia presentado.
+          */}
+          {persona.reinicio ? (
+            <Ayuda sobre={`el reinicio de ${persona.fullName}`}>
+              <p className="font-semibold text-ink-900">Reiniciada por versión nueva</p>
+              <p className="mt-1">
+                El{' '}
+                {new Date(persona.reinicio.fecha).toLocaleDateString('es-CO', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}{' '}
+                se publicó una versión nueva de esta formación con la opción de reiniciar a quienes iban a
+                mitad, y esta persona volvió a empezar.
+              </p>
+              <p className="mt-2 font-medium text-ink-900">
+                {persona.reinicio.desdeVersion === null
+                  ? 'En la versión anterior'
+                  : `En la versión ${persona.reinicio.desdeVersion}`}
+              </p>
+              <ul className="mt-0.5 space-y-0.5">
+                <li>Intentos: {persona.reinicio.intentosAnteriores}</li>
+                <li>
+                  Mejor nota:{' '}
+                  {persona.reinicio.mejorNotaAnterior === null
+                    ? 'sin nota'
+                    : `${Math.round(persona.reinicio.mejorNotaAnterior)}%`}
+                </li>
+                <li>Encuesta: {persona.reinicio.respondioEncuestaAnterior ? 'respondida' : 'sin responder'}</li>
+              </ul>
+              <p className="mt-2">Estos datos no cuentan para la versión vigente.</p>
+            </Ayuda>
+          ) : null}
+        </span>
+        {/*
+          DE QUE CONVOCATORIA SALE EL DATO, BAJO EL ESTADO (2026-10-06). Una formacion puede tener
+          varias —la permanente y las jornadas— y la fila es una por persona: sin esto no habia como
+          saber en cual esta. Va aqui y no en una columna propia porque la tabla ya tenia ocho: su
+          nombre, pequeño, que al pulsarlo abre la convocatoria; la clase y la fecha, al pasar el cursor.
+        */}
+        <EnlaceDeConvocatoria nombre={persona.convocatoria} id={persona.convocatoriaId} />
       </Td>
       <Td>
         {/*
@@ -821,7 +924,126 @@ function FilaPersonaTabla({ persona }: { persona: FilaPersona }) {
         )}
       </Td>
     </Tr>
+    {/*
+      LOS CICLOS, COMO FILAS DE LA MISMA TABLA (2026-10-06). El «2×» que habia no decia que era ni
+      dejaba ver nada, y la primera version de esto era un renglon de texto corrido. Asi cada dato
+      cae bajo SU columna —estado, convocatoria, vencimiento, intentos, nota, encuesta, constancia— y
+      se lee igual que la fila de arriba. Es la trazabilidad que pide un auditor, sin salir de aqui.
+      Quien solo ha tenido un ciclo no lleva boton ni filas de mas: su fila ya lo dice todo.
+    */}
+    {verCiclos
+      ? persona.historial.map((ciclo) => (
+          <FilaDeCiclo
+            key={ciclo.assignmentId}
+            ciclo={ciclo}
+            nombre={persona.fullName}
+            esElDeHoy={ciclo.assignmentId === persona.assignmentId}
+          />
+        ))
+      : null}
+    </>
   );
+}
+
+/** Una vuelta de la formacion para una persona, alineada con las columnas de la tabla. */
+function FilaDeCiclo({ ciclo, nombre, esElDeHoy }: { ciclo: CicloDePersona; nombre: string; esElDeHoy: boolean }) {
+  const [bajando, setBajando] = useState(false);
+  const fecha = (valor: string) =>
+    new Date(valor).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: '2-digit' });
+
+  return (
+    <Tr className="bg-paper hover:bg-paper">
+      <Td>
+        <p className="flex items-center gap-1.5 whitespace-nowrap pl-5 text-sm font-medium text-ink-700">
+          Ciclo {ciclo.cycleNumber}
+          {esElDeHoy ? (
+            <span className="rounded-full bg-surface px-1.5 py-0.5 text-[11px] font-normal text-ink-500">el de hoy</span>
+          ) : null}
+        </p>
+      </Td>
+      <Td>
+        {/* Bajo «Área» no hay nada que repetir: se aprovecha para decir cuando la termino. */}
+        <span className="whitespace-nowrap text-xs text-ink-500">
+          {ciclo.completedAt ? `Terminada el ${fecha(ciclo.completedAt)}` : ''}
+        </span>
+      </Td>
+      <Td>
+        <ChipEstado estado={ciclo.estado} />
+        <EnlaceDeConvocatoria nombre={ciclo.convocatoria} id={ciclo.convocatoriaId} />
+      </Td>
+      <Td>
+        <span className="whitespace-nowrap text-sm text-ink-700">{ciclo.dueAt ? fecha(ciclo.dueAt) : '—'}</span>
+      </Td>
+      <Td>
+        <span className="text-sm tabular-nums text-ink-700">{ciclo.intentos > 0 ? ciclo.intentos : '—'}</span>
+      </Td>
+      <Td>
+        <span className="text-sm font-medium tabular-nums text-ink-900">
+          {ciclo.mejorNota === null ? '—' : `${Math.round(ciclo.mejorNota)}%`}
+        </span>
+      </Td>
+      <Td>
+        {!ciclo.respondioEncuesta ? (
+          <span className="text-sm text-ink-300">—</span>
+        ) : (
+          <span
+            className={cn(
+              'inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold',
+              ciclo.encuesta === 'NEGATIVE' ? 'bg-warn-soft text-warn' : 'bg-ok-soft text-ok',
+            )}
+          >
+            {ciclo.encuesta === 'NEGATIVE' ? 'Negativa' : ciclo.encuesta === 'NA' ? 'Respondida' : 'Positiva'}
+          </span>
+        )}
+      </Td>
+      <Td>
+        {/* La constancia de ESE ciclo se baja igual que la de la fila de arriba. */}
+        {ciclo.certificadoId ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={bajando}
+            aria-label={`Descargar la constancia de ${nombre}, ciclo ${ciclo.cycleNumber}`}
+            onClick={async () => {
+              setBajando(true);
+              try {
+                await descargarPdf(`/certificates/${ciclo.certificadoId}/pdf`, `${nombre} - ciclo ${ciclo.cycleNumber}.pdf`);
+              } finally {
+                setBajando(false);
+              }
+            }}
+          >
+            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+          </Button>
+        ) : (
+          <span className="text-sm text-ink-300">—</span>
+        )}
+      </Td>
+    </Tr>
+  );
+}
+
+/** El nombre de la convocatoria, pequeño y bajo el estado, que abre la convocatoria. Sin ella, nada. */
+function EnlaceDeConvocatoria({ nombre, id }: { nombre: string | null; id: string | null }) {
+  if (!nombre || !id) return null;
+  return (
+    <Link
+      href={`/convocatorias/${id}`}
+      title={nombre}
+      className="focus-ring mt-1 block w-fit whitespace-nowrap rounded font-mono text-[11px] text-ink-500 hover:text-ink-900 hover:underline"
+    >
+      {convocatoriaCorta(nombre)}
+    </Link>
+  );
+}
+
+/**
+ * LA CONVOCATORIA SE DICE POR SU NOMBRE, que es su codigo (2026-10-06): «CONV-2026-0012». Es lo que
+ * la identifica en Convocatorias, en el plan y en el acta. La clase y la fecha —«Jornada del 6 de
+ * octubre», «Permanente»— quedan al pasar el cursor: afuera solo va lo que la distingue de las demas.
+ */
+function convocatoriaCorta(nombre: string): string {
+  return nombre.includes(' · ') ? nombre.slice(0, nombre.indexOf(' · ')) : nombre;
 }
 
 function vacio(): ResumenEjecucion {

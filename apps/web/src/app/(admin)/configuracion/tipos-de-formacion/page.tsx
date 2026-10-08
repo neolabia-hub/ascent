@@ -69,6 +69,12 @@ interface TipoConfig {
    */
   defaultAnnualDate?: string | null;
   defaultRecurrenceMonths?: number | null;
+  /** Con `defaultRecurrenceMonths`: desde que la completo, o desde su fecha de INGRESO (2026-10-06). */
+  defaultRecurrenceAnchor?: 'COMPLETED' | 'HIRE' | 'INDUCTION';
+  /** Con cuantos dias de antelacion aparece cada ronda. Eran 60 fijos y no se veian. */
+  defaultWindowDays?: number;
+  /** Dias de gracia: el plazo cuando la fecha ya paso o cae encima. Eran 30 fijos en el codigo. */
+  defaultGraceDays?: number;
   /** Que pasa si llega la ronda siguiente y no hizo la anterior (Decision #142). */
   defaultOnExpiry?: 'CIERRA' | 'ACUMULA' | 'ESPERA';
   /** No se le exige a quien entro hace menos de N meses. 0 = no se excluye a nadie. */
@@ -104,6 +110,8 @@ const COMO_SE_REPITE: Record<string, string> = {
   NO: 'Se hace una vez y no vuelve.',
   ANUAL: 'CAMPANA: todos vencen el mismo día, sea cuando sea que la hicieran.',
   MESES: 'ANIVERSARIO: cada persona vence en su propia fecha, contada desde que la completo.',
+  INGRESO: 'AUTOMÁTICA: quien ya cumplió los meses desde su ingreso la debe al publicar; los demás, al cumplirlos.',
+  INDUCCION: 'AUTOMÁTICA: igual, pero los meses se cuentan desde que terminó su inducción de ingreso.',
 };
 
 /**
@@ -466,7 +474,13 @@ function Tarjeta({
     a la vez y del que solo una es verdad, asi que al elegir una se limpia la otra.
   */
   const [configurando, setConfigurando] = useState(false);
-  const modoRepite = tipo.config.defaultAnnualDate ? 'ANUAL' : tipo.config.defaultRecurrenceMonths ? 'MESES' : 'NO';
+  const modoRepite = tipo.config.defaultAnnualDate
+    ? 'ANUAL'
+    : tipo.config.defaultRecurrenceMonths
+      ? tipo.config.defaultRecurrenceAnchor === 'HIRE' ? 'INGRESO' : tipo.config.defaultRecurrenceAnchor === 'INDUCTION' ? 'INDUCCION' : 'MESES'
+      : 'NO';
+  /** Vuelve por aniversario de la persona: de su ingreso o de su induccion. */
+  const porAniversario = modoRepite === 'INGRESO' || modoRepite === 'INDUCCION';
   const cambiarRepeticion = (modo: string) => {
     if (modo === modoRepite) return;
     if (modo === 'NO') {
@@ -479,8 +493,17 @@ function Tarjeta({
       });
       return;
     }
+    // Las dos de «cada N meses» comparten los meses; lo que cambia es desde donde se cuentan.
     onGuardar({
-      config: { ...tipo.config, defaultRecurrenceMonths: tipo.config.defaultRecurrenceMonths ?? 12, defaultAnnualDate: null },
+      config: {
+        ...tipo.config,
+        defaultRecurrenceMonths: tipo.config.defaultRecurrenceMonths ?? 12,
+        defaultAnnualDate: null,
+        defaultRecurrenceAnchor: modo === 'INGRESO' ? 'HIRE' : modo === 'INDUCCION' ? 'INDUCTION' : 'COMPLETED',
+        // Por ingreso alcanza a toda la plantilla y a cada quien cuando le toca: «solo a quien
+        // ingrese» dejaria fuera para siempre a la gente que ya esta.
+        ...(modo === 'INGRESO' || modo === 'INDUCCION' ? { requiresBeforeHire: false } : {}),
+      },
     });
   };
 
@@ -786,7 +809,9 @@ function Tarjeta({
             htmlFor={`t-convoca-${tipo.id}`}
             label="Por defecto"
             hint={
-              (tipo.config.defaultOfferingKind ?? 'PERMANENT') !== 'EVENT'
+              porAniversario && (tipo.config.defaultOfferingKind ?? 'PERMANENT') !== 'PERMANENT'
+                ? 'Con la vuelta automática conviene «Disponible siempre»: cada persona la hace cuando le aparece, sin esperar a que alguien abra una sesión.'
+                : (tipo.config.defaultOfferingKind ?? 'PERMANENT') !== 'EVENT'
                 ? 'Al publicar se abre sola una convocatoria permanente, y se vuelve a abrir si la cierran. La gente entra cuando pueda.'
                 : 'La convocatoria la crea una persona: fecha, hora, lugar, quién la dicta y cupo.'
             }
@@ -840,7 +865,18 @@ function Tarjeta({
             </Select>
           </Field>
 
-          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' ? (
+          {/*
+            SOLO LO QUE DECIDE ALGO (2026-10-06, pedido del cliente: «no mostrar cosas que confundan»).
+            Cuando vuelve por aniversario de ingreso no hay nada que elegir aqui: alcanza a toda la
+            plantilla y a cada quien le aparece cuando le toca. Y el plazo en dias no se usa ni ahi ni
+            en la campaña de fecha fija, donde la fecha la pone el calendario.
+          */}
+          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' && porAniversario ? (
+            <p className="rounded-lg bg-paper px-3 py-2 text-sm text-ink-500">
+              Alcanza a toda la plantilla: quien ya cumplió los meses la debe al publicar; los demás, al cumplirlos.
+            </p>
+          ) : null}
+          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' && !porAniversario ? (
             <Field
               htmlFor={`t-alcance-${tipo.id}`}
               label="Al publicar, a quién alcanza"
@@ -867,7 +903,9 @@ function Tarjeta({
             la plantilla. Al ingresar el minimo es 1 dia: antes o el mismo dia, a quien se crea la
             vispera de su ingreso le nace vencida.
           */}
-          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' ? (
+          {(tipo.config.defaultAssignmentMode ?? 'MANUAL') === 'ON_HIRE' &&
+          !porAniversario &&
+          !(modoRepite === 'ANUAL' && !tipo.config.requiresBeforeHire) ? (
             <Field
               htmlFor={`t-plazo-${tipo.id}`}
               label={tipo.config.requiresBeforeHire ? 'Días después de su fecha de ingreso' : 'Días de plazo desde que se publica'}
@@ -906,8 +944,10 @@ function Tarjeta({
               onChange={(e) => cambiarRepeticion(e.target.value)}
             >
               <option value="NO">No se repite</option>
+              <option value="INGRESO">Cada N meses, desde la fecha de ingreso de cada persona</option>
+              <option value="INDUCCION">Cada N meses, desde que terminó su inducción de ingreso</option>
               <option value="ANUAL">Cada año, antes de una fecha fija</option>
-              <option value="MESES">Cada N meses, desde que cada quien la hizo</option>
+              <option value="MESES">Cada N meses, desde que cada quien hizo esta misma formación</option>
             </Select>
           </Field>
 
@@ -936,11 +976,22 @@ function Tarjeta({
             </Field>
           ) : null}
 
-          {modoRepite === 'MESES' ? (
+          {modoRepite === 'MESES' || porAniversario ? (
             <Field
               htmlFor={`t-meses-${tipo.id}`}
               label="Cada cuantos meses"
-              hint="Se cuenta desde que cada persona la completo, así que cada uno tiene su fecha."
+              hint={
+                porAniversario
+                  ? modoRepite === 'INDUCCION'
+                    ? 'Se cuenta desde que terminó su inducción de ingreso: con 12, vence en cada aniversario.'
+                    : 'Se cuenta desde la fecha de ingreso: con 12, vence en cada aniversario de ingreso.'
+                  : 'Se cuenta desde que cada persona la completo, así que cada uno tiene su fecha.'
+              }
+              ayuda={
+                porAniversario
+                  ? 'Quien ya cumplió los meses la debe al publicar, con los días de gracia. Quien no, la recibe cuando se acerque la fecha, y después en cada aniversario. Si falta la fecha elegida se usa la otra (ingreso o inducción) y, si tampoco, la de entrada al grupo. Las novedades se asignan a mano desde Quiénes.'
+                  : undefined
+              }
             >
               <Input
                 id={`t-meses-${tipo.id}`}
@@ -952,6 +1003,62 @@ function Tarjeta({
                   if (!Number.isInteger(meses) || meses < 1) return;
                   if (meses === tipo.config.defaultRecurrenceMonths) return;
                   onGuardar({ config: { ...tipo.config, defaultRecurrenceMonths: meses, defaultAnnualDate: null } });
+                }}
+              />
+            </Field>
+          ) : null}
+
+          {/*
+            LOS DIAS DE GRACIA, CONFIGURABLES (2026-10-06, pedido del cliente). Eran 30 fijos en el
+            codigo. Por TIPO y no general: una reinduccion de media hora y una recertificacion de
+            dos dias no se ponen al dia en el mismo plazo.
+          */}
+          {modoRepite !== 'NO' ? (
+            <Field
+              htmlFor={`t-gracia-${tipo.id}`}
+              label="Días de gracia"
+              hint="El plazo cuando la fecha ya pasó o cae encima."
+              ayuda="Ejemplo: se publica hoy y una persona ya cumplió sus 12 meses, o su fecha es dentro de 5 días. En vez de nacer vencida o con 5 días, se le dan estos días contados desde hoy. Rige para las reglas que se creen o se ajusten desde ahora."
+            >
+              <Input
+                id={`t-gracia-${tipo.id}`}
+                type="number"
+                min={1}
+                max={365}
+                defaultValue={tipo.config.defaultGraceDays ?? 30}
+                key={`${tipo.id}-gracia-${tipo.config.defaultGraceDays ?? 30}`}
+                onBlur={(e) => {
+                  const dias = Math.round(Number(e.target.value));
+                  if (!Number.isFinite(dias) || dias < 1 || dias > 365) return;
+                  if (dias === (tipo.config.defaultGraceDays ?? 30)) return;
+                  onGuardar({ config: { ...tipo.config, defaultGraceDays: dias } });
+                }}
+              />
+            </Field>
+          ) : null}
+
+          {/*
+            LA ANTELACION, A LA VISTA (2026-10-06). Eran 60 dias fijos en el servidor: la del 31 de
+            marzo aparecia el 30 de enero y ninguna pantalla lo decia. Lo pregunto el cliente.
+          */}
+          {modoRepite !== 'NO' ? (
+            <Field
+              htmlFor={`t-ventana-${tipo.id}`}
+              label="Le aparece a la persona, días antes de vencer"
+              hint="Rige para las reglas que se creen o se ajusten desde ahora."
+            >
+              <Input
+                id={`t-ventana-${tipo.id}`}
+                type="number"
+                min={1}
+                max={365}
+                defaultValue={tipo.config.defaultWindowDays ?? 60}
+                key={`${tipo.id}-ventana-${tipo.config.defaultWindowDays ?? 60}`}
+                onBlur={(e) => {
+                  const dias = Math.round(Number(e.target.value));
+                  if (!Number.isFinite(dias) || dias < 1 || dias > 365) return;
+                  if (dias === (tipo.config.defaultWindowDays ?? 60)) return;
+                  onGuardar({ config: { ...tipo.config, defaultWindowDays: dias } });
                 }}
               />
             </Field>
@@ -997,7 +1104,7 @@ function Tarjeta({
 
             Solo tiene sentido si la formacion VUELVE: sin ciclo no hay "dentro del ciclo".
           */}
-          {modoRepite !== 'NO' ? (
+          {modoRepite !== 'NO' && !porAniversario ? (
             <Field
               htmlFor={`t-recien-${tipo.id}`}
               label="No se le exige a quien entro hace menos de"
@@ -1067,6 +1174,12 @@ function comoSeRepite(config: TipoConfig): string {
     const cuando = MESES[(mes ?? 1) - 1] ? `${dia} de ${MESES[(mes ?? 1) - 1]}` : config.defaultAnnualDate;
     return `Cada año antes del ${cuando} · ${alVencer(config)}`;
   }
+  if (config.defaultRecurrenceMonths && config.defaultRecurrenceAnchor === 'INDUCTION') {
+    return `Cada ${config.defaultRecurrenceMonths} meses desde que terminó su inducción de ingreso · ${alVencer(config)}`;
+  }
+  if (config.defaultRecurrenceMonths && config.defaultRecurrenceAnchor === 'HIRE') {
+    return `Cada ${config.defaultRecurrenceMonths} meses desde la fecha de ingreso de cada persona · ${alVencer(config)}`;
+  }
   if (config.defaultRecurrenceMonths) {
     return `Cada ${config.defaultRecurrenceMonths} meses desde que cada quien la hizo · ${alVencer(config)}`;
   }
@@ -1081,6 +1194,9 @@ function plazoDelTipo(config: TipoConfig): number {
 /** A quien se le exige, en una linea: lo que la tarjeta dice sin abrir el cajon. */
 function aQuienSeExige(config: TipoConfig): string {
   const modo = config.defaultAssignmentMode ?? 'MANUAL';
+  if (modo === 'ON_HIRE' && !config.defaultAnnualDate && config.defaultRecurrenceMonths && (config.defaultRecurrenceAnchor === 'HIRE' || config.defaultRecurrenceAnchor === 'INDUCTION')) {
+    return 'Se exige sola: a quien ya cumplió los meses, al publicar; a los demás, al cumplirlos';
+  }
   if (modo === 'ON_HIRE') {
     return config.requiresBeforeHire
       ? `Se exige sola a quien ingrese, con ${plazoDelTipo(config)} días desde su ingreso`

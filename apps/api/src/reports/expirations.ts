@@ -140,6 +140,14 @@ function gana(a: HechoVencimiento, b: HechoVencimiento): HechoVencimiento {
   const abiertaA = a.fuente === 'OBLIGACION_ABIERTA';
   const abiertaB = b.fuente === 'OBLIGACION_ABIERTA';
   if (abiertaA !== abiertaB) return abiertaA ? a : b;
+  /*
+    DOS PAPELES DE LA MISMA CLASE SON DOS RONDAS, y cuenta el MAS RECIENTE (2026-10-06). Quien hizo
+    la reinduccion dos años tiene dos constancias de la misma formacion; quedarse con la que caduca
+    antes es quedarse con la del año pasado, y la persona saldria por vencer —o vencida— con su
+    constancia nueva en la mano. «La que caduca antes» sigue valiendo entre clases DISTINTAS (la
+    constancia propia frente al papel de un tercero), que es para lo que se escribio.
+  */
+  if (!abiertaA && a.fuente === b.fuente) return a.fecha >= b.fecha ? a : b;
   return a.fecha <= b.fecha ? a : b;
 }
 

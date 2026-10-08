@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BadgeCheck,
@@ -84,6 +84,15 @@ export default function UsuariosPage() {
   // Filtros y datos
   const [q, setQ] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
+  /*
+    SOLO QUIEN NO TIENE FECHA DE INGRESO (2026-10-06). La reinduccion automatica cuenta desde esa
+    fecha, y el aviso de Quiénes trae aqui con `?sinIngreso=1` para completarla. Se lee de la
+    direccion al montar, no en el primer render: el servidor no la conoce.
+  */
+  const [sinIngreso, setSinIngreso] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('sinIngreso') === '1') setSinIngreso(true);
+  }, []);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<UsersPage | null>(null);
   const [areas, setAreas] = useState<CatalogRow[]>([]);
@@ -143,14 +152,30 @@ export default function UsuariosPage() {
   /** El archivo ya simulado, esperando el «Aplicar». `null` = no hay nada pendiente de confirmar. */
   const [pendiente, setPendiente] = useState<File | null>(null);
 
+  /*
+    SOLO VALE LA ULTIMA PETICION (2026-10-06). Con un filtro lento —«sin fecha de ingreso» sobre
+    miles de personas— y una busqueda escrita justo despues, la respuesta vieja llegaba la ultima y
+    pisaba la lista: el buscador decia una cedula y la tabla enseñaba a otras personas.
+  */
+  const peticion = useRef(0);
   const load = useCallback(async () => {
+    const esta = (peticion.current += 1);
     try {
-      const result = await listUsers({ q: q || undefined, areaId: areaFilter || undefined, page, pageSize: PAGE_SIZE });
+      const result = await listUsers({
+        q: q || undefined,
+        areaId: areaFilter || undefined,
+        sinFechaDeIngreso: sinIngreso ? 'true' : undefined,
+        // Solo activos: es la cifra que da el aviso, y a un inactivo no le nace ninguna obligacion.
+        active: sinIngreso ? 'true' : undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      if (esta !== peticion.current) return;
       setData(result);
     } catch (error) {
       showToast({ kind: 'danger', title: 'No se pudo cargar el listado de personas', description: motivoDelError(error) });
     }
-  }, [q, areaFilter, page, showToast]);
+  }, [q, areaFilter, sinIngreso, page, showToast]);
 
   useEffect(() => {
     void load();
@@ -448,6 +473,15 @@ export default function UsuariosPage() {
           {areas.map((a) => (
             <option key={a.id} value={a.id}>{nombreConRama(a, areas)}</option>
           ))}
+        </Select>
+        <Select
+          aria-label="Fecha de ingreso"
+          value={sinIngreso ? 'SIN' : ''}
+          onChange={(e) => { setSinIngreso(e.target.value === 'SIN'); setPage(1); }}
+          className="w-56"
+        >
+          <option value="">Con o sin fecha de ingreso</option>
+          <option value="SIN">Activos sin fecha de ingreso</option>
         </Select>
       </div>
 
