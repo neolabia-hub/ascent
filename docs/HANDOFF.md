@@ -197,6 +197,18 @@ tengan asignado, y solo por permiso pueden ver todo»).** Era cierto y mas ancho
   «Atender solo a <sede>», que la pasa a «Regionales a las que atiende». Se decide a la vista.
 - `sprint-4.spec.ts` elige el area por el final del rotulo: ya no depende de donde cuelgue en dev.
 
+**11 quinquies. EL PROGRAMA DICE LOS ASIGNADOS A MANO Y QUIEN LO TIENE A MEDIAS (2026-10-08).**
+- «A quien se le exige» salia solo de las reglas: las personas concretas no aparecian, y un modulo con
+  solo gente a mano decia «A nadie todavia». Ahora cada modulo dice «N personas asignadas a mano» (con
+  enlace a su «Quienes») y el programa trae `personasAMano`.
+- El aviso «a N personas les falta algun modulo» ahora se abre: «Ver quienes lo tienen a medias», con
+  nombre, «2 de 8» y cuantos a mano (`parciales`, hasta 100). Ya no cuenta cuentas desactivadas.
+- Caso de produccion que lo origino: «Induccion Corporativa», 8 modulos exigidos a «Toda la empresa,
+  solo a quien ingrese» (desde el 28-sep / 1-oct). 39 personas con los 8; 18 a medias, casi todas
+  analistas o administradores con UN modulo puesto a mano. NO esta publicado para todos.
+- Recorrido `programa-a-mano.mjs`.
+- LATENTE: `POST /programas/:id/modulos` con un cuerpo mal formado responde 500 (no valida con esquema).
+
 **12. Textos:** «Vence a los» ya no dice «Negativo = antes» —dejo de ser cierto el 2026-10-01: al ingresar el
 minimo es 1— y el detalle va detras del icono, en Quiénes y en el programa.
 

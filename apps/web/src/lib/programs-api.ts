@@ -39,6 +39,8 @@ export interface ProgramModule {
   audiencias: string[];
   /** Sin publicar no la puede hacer nadie: bloquea que el programa llegue a completarse. */
   publicada: boolean;
+  /** Cuantas personas tienen este modulo asignado a mano, fuera de toda regla. */
+  aMano: number;
   /** Tuvo regla y se la quitaron. Distinto de no haberla tenido nunca. */
   reglaRetirada: boolean;
   /** "MM-DD" si su regla es una campana anual de fecha fija. `null` si no se repite asi. */
@@ -74,6 +76,8 @@ export interface ProgramDetail {
   items: ProgramModule[];
   secciones: ProgramSection[];
   obligados: ProgramObligados[];
+  /** Personas con algun modulo asignado a mano (obligacion viva). */
+  personasAMano: number;
   /**
    * A cuántas personas se les exige ALGUNO de los módulos pero **no todos**. Es la cuenta que dice
    * si el programa funciona, y se hace POR PERSONA y no por audiencia: dos audiencias distintas
@@ -84,6 +88,8 @@ export interface ProgramDetail {
   afectados: number;
   /** A cuántas se les exigen TODOS: esas sí lo completarán y tendrán la constancia del conjunto. */
   conTodos: number;
+  /** Quiénes lo tienen a medias (hasta 100), con cuántos módulos y cuántos de ellos a mano. */
+  parciales: Array<{ userId: string; fullName: string; modulos: number; aMano: number }>;
 }
 
 export function listPrograms(): Promise<ProgramListItem[]> {

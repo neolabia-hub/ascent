@@ -263,14 +263,41 @@ export class ProgramsService {
       ...new Set(programa.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId)),
     ]);
 
+    /*
+      LOS ASIGNADOS A MANO TAMBIEN SON «A QUIEN SE LE EXIGE» (2026-10-08, pedido del cliente).
+
+      «A quien se le exige» salia solo de las REGLAS. A quien se le asigno el programa —o un modulo—
+      como persona concreta no aparecia en ningun lado: en produccion habia 32 personas con modulos
+      de la induccion puestos a mano y la ficha del programa no las nombraba. Peor: un modulo que
+      solo tenia gente a mano decia «A nadie todavia».
+
+      Se cuentan PERSONAS con la obligacion viva, por modulo y en el programa entero.
+    */
+    const aMano = await this.prisma.scoped.assignment.findMany({
+      where: {
+        targetType: 'ACTIVITY',
+        targetId: { in: programa.items.filter((i) => i.itemType === 'ACTIVITY').map((i) => i.itemId) },
+        source: 'MANUAL',
+        status: { notIn: [...ESTADOS_RETIRADOS] },
+      },
+      select: { userId: true, targetId: true },
+      distinct: ['userId', 'targetId'],
+    });
+    const aManoPorActividad = new Map<string, number>();
+    for (const fila of aMano) aManoPorActividad.set(fila.targetId, (aManoPorActividad.get(fila.targetId) ?? 0) + 1);
+
     return {
       ...programa,
       secciones: [...seccionPorNombre].map(([name, datos]) => ({ name, ...datos })),
       obligados: [...porAudiencia.values()].sort((a, b) => b.modulos - a.modulos),
+      /** Personas con algun modulo asignado a mano (obligacion viva). */
+      personasAMano: new Set(aMano.map((fila) => fila.userId)).size,
       /** A cuantos se les exige ALGUNO de los modulos pero no todos: no completaran el programa. */
       afectados: cobertura.afectados,
       /** A cuantos se les exigen TODOS: esos si lo completaran y tendran la constancia del conjunto. */
       conTodos: cobertura.conTodos,
+      /** Quienes tienen el programa a medias, con cuantos modulos y cuantos de ellos a mano. */
+      parciales: cobertura.parciales,
       items: programa.items.map((item) => {
         const actividad = item.itemType === 'ACTIVITY' ? (actividadPorId.get(item.itemId) ?? null) : null;
         const config = activityTypeConfigSchema.partial().safeParse(actividad?.activityType.config ?? {});
@@ -283,6 +310,8 @@ export class ProgramsService {
           yaExigido: yaExigidos.has(item.itemId),
           /** Quien tiene que hacer ESTE modulo, por nombre. Vacio = no se le exige a nadie. */
           audiencias: audienciasPorActividad.get(item.itemId) ?? [],
+          /** Cuantas personas tienen ESTE modulo asignado a mano, fuera de toda regla. */
+          aMano: aManoPorActividad.get(item.itemId) ?? 0,
           /** Tuvo regla y se la quitaron. Distinto de no haberla tenido nunca. */
           reglaRetirada: !yaExigidos.has(item.itemId) && retiradas.has(item.itemId),
           /*
@@ -490,7 +519,7 @@ export class ProgramsService {
    * Ni cero (a esa el programa no le afecta) ni todos (esa lo completara y tendra su constancia).
    */
   private async contarPorPersona(idsDeActividad: string[]) {
-    if (idsDeActividad.length === 0) return { modulos: 0, afectados: 0, conTodos: 0 };
+    if (idsDeActividad.length === 0) return { modulos: 0, afectados: 0, conTodos: 0, parciales: [] };
 
     // Las RETIRADAS no cuentan: a quien salio de la audiencia ya no se le exige ese modulo. Misma
     // lista que usa el informe, para que dos pantallas no den numeros distintos.
@@ -499,23 +528,50 @@ export class ProgramsService {
         targetType: 'ACTIVITY',
         targetId: { in: idsDeActividad },
         status: { notIn: [...ESTADOS_RETIRADOS] },
+        // Quien ya no esta en la empresa no es un problema por resolver: en produccion el aviso
+        // contaba a dos cuentas desactivadas (2026-10-08).
+        user: { active: true, deletedAt: null },
       },
-      select: { userId: true, targetId: true },
-      distinct: ['userId', 'targetId'],
+      select: { userId: true, targetId: true, source: true },
     });
 
-    const modulosPorPersona = new Map<string, number>();
+    // Una persona puede tener el mismo modulo por regla Y a mano: cuenta una vez.
+    const porPersona = new Map<string, { modulos: Set<string>; aMano: Set<string> }>();
     for (const fila of exigidos) {
-      modulosPorPersona.set(fila.userId, (modulosPorPersona.get(fila.userId) ?? 0) + 1);
+      const actual = porPersona.get(fila.userId) ?? { modulos: new Set<string>(), aMano: new Set<string>() };
+      actual.modulos.add(fila.targetId);
+      if (fila.source === 'MANUAL') actual.aMano.add(fila.targetId);
+      porPersona.set(fila.userId, actual);
     }
 
     let afectados = 0;
     let conTodos = 0;
-    for (const cuantos of modulosPorPersona.values()) {
-      if (cuantos === idsDeActividad.length) conTodos += 1;
-      else afectados += 1;
+    const aMedias: Array<{ userId: string; modulos: number; aMano: number }> = [];
+    for (const [userId, datos] of porPersona) {
+      if (datos.modulos.size === idsDeActividad.length) conTodos += 1;
+      else {
+        afectados += 1;
+        aMedias.push({ userId, modulos: datos.modulos.size, aMano: datos.aMano.size });
+      }
     }
-    return { modulos: idsDeActividad.length, afectados, conTodos };
+
+    /*
+      QUIENES, NO SOLO CUANTOS (2026-10-08, pedido del cliente: «tengo que saber si lo tienen todos
+      o no»). El aviso decia «a 18 personas les falta algun modulo» y no habia donde ver a quienes:
+      eran casi todos analistas con UN modulo puesto a mano. Con el nombre delante se decide en un
+      minuto si hay que darles el programa entero o quitarles ese modulo suelto.
+
+      Hasta 100: mas que eso no es una lista para leer, es una regla mal puesta.
+    */
+    const primeros = aMedias.sort((a, b) => b.modulos - a.modulos).slice(0, 100);
+    const nombres = await this.prisma.scoped.user.findMany({
+      where: { id: { in: primeros.map((fila) => fila.userId) } },
+      select: { id: true, fullName: true },
+    });
+    const nombrePorId = new Map(nombres.map((fila) => [fila.id, fila.fullName]));
+    const parciales = primeros.map((fila) => ({ ...fila, fullName: nombrePorId.get(fila.userId) ?? '' }));
+
+    return { modulos: idsDeActividad.length, afectados, conTodos, parciales };
   }
 
   // ─────────────────────────────── Modulos ───────────────────────────────

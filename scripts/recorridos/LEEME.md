@@ -19,6 +19,7 @@ node scripts/recorridos/reinduccion.mjs   # OJO: obliga a la plantilla entera y 
 node scripts/recorridos/reinduccion-ciclos.mjs      # la ronda SIGUIENTE: cierra y abre
 node scripts/recorridos/reinduccion-por-ingreso.mjs # automatica: cada N meses desde el INGRESO, sin obligar a todos
 node scripts/recorridos/programa-induccion-y-reinduccion.mjs # los dos como PROGRAMA: a personas concretas y vigencia de la constancia
+node scripts/recorridos/programa-a-mano.mjs                  # el programa dice los asignados a mano y quien lo tiene a medias
 node scripts/recorridos/alcance-en-informes.mjs            # quien ve que: un analista acotado en Seguimiento, Inicio y Asignaciones
 node scripts/recorridos/programa-reinduccion-completo.mjs    # programa con contenido, examen, encuesta y asistencia, y la SEGUNDA vez entera: una inscripcion por ronda
 node scripts/recorridos/capacitacion-del-plan.mjs   # crea y APRUEBA un plan en un año libre

@@ -97,11 +97,12 @@ function EstadoDelPrograma({
 
     Se cuenta por MODULO y no por audiencia porque es como se arregla: hay que ir a ese modulo.
   */
-  const sinRegla = programa.items.filter((item) => !item.yaExigido).length;
+  // Un modulo sin regla pero con gente asignada a mano SI se le exige a alguien.
+  const sinRegla = programa.items.filter((item) => !item.yaExigido && item.aMano === 0).length;
 
   if (programa.status !== 'PUBLISHED') {
     problemas.push({ texto: <>El programa está en borrador: todavía no lo ve nadie.</>, grave: false });
-  } else if (programa.obligados.length === 0) {
+  } else if (programa.obligados.length === 0 && programa.personasAMano === 0) {
     problemas.push({
       texto: (
         <>
@@ -156,6 +157,7 @@ function EstadoDelPrograma({
           </strong>
           : se les exige parte del programa pero no los {programa.items.length}, así que no podrán completarlo. Y como
           sus módulos pertenecen a un programa publicado, tampoco reciben la constancia individual de lo que sí hacen.
+          <QuienesAMedias programa={programa} />
         </>
       ),
       grave: true,
@@ -229,6 +231,55 @@ function EstadoDelPrograma({
  * Dos nombres caben y se leen; a partir de tres se cuenta. Los nombres completos no se pierden:
  * viven en la ficha que se despliega al abrir el módulo, que es donde se va a buscarlos.
  */
+/**
+ * QUIÉNES TIENEN EL PROGRAMA A MEDIAS (2026-10-08). El aviso daba el número y no los nombres, y sin
+ * nombres no se puede decidir: o se les da el programa entero, o se les quita el módulo suelto.
+ * Plegada: la lista se abre cuando se va a resolver, no estorba mientras tanto.
+ */
+function QuienesAMedias({ programa }: { programa: ProgramDetail }) {
+  const [abierta, setAbierta] = useState(false);
+  if (programa.parciales.length === 0) return null;
+  return (
+    <span className="mt-1 block">
+      <span className="text-ink-500">
+        {programa.conTodos.toLocaleString('es-CO')} {programa.conTodos === 1 ? 'persona sí lo tiene' : 'personas sí lo tienen'}{' '}
+        entero.{' '}
+      </span>
+      <button
+        type="button"
+        id="programa-a-medias"
+        onClick={() => setAbierta((actual) => !actual)}
+        className="focus-ring rounded font-medium text-info hover:underline"
+      >
+        {abierta ? 'Ocultar' : 'Ver quiénes lo tienen a medias'}
+      </button>
+      {abierta ? (
+        <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-md border border-line bg-paper px-3 py-2 text-xs">
+          {programa.parciales.map((persona) => (
+            <li key={persona.userId} className="flex items-baseline justify-between gap-3">
+              <a href={`/usuarios/${persona.userId}`} className="focus-ring truncate rounded text-ink-900 hover:underline">
+                {persona.fullName}
+              </a>
+              <span className="shrink-0 text-ink-500">
+                {persona.modulos} de {programa.items.length}
+                {persona.aMano > 0 ? ` · ${persona.aMano} a mano` : ''}
+              </span>
+            </li>
+          ))}
+          {programa.afectados > programa.parciales.length ? (
+            <li className="text-ink-500">y {programa.afectados - programa.parciales.length} más.</li>
+          ) : null}
+        </ul>
+      ) : null}
+    </span>
+  );
+}
+
+/** «3 personas asignadas a mano»: las que la deben sin venir de ninguna regla. */
+function aManoEnTexto(cuantas: number): string {
+  return cuantas === 1 ? '1 persona asignada a mano' : cuantas + ' personas asignadas a mano';
+}
+
 function resumenDeAudiencias(audiencias: string[]): string {
   if (audiencias.length <= 2) return audiencias.join(' · ');
   return `${audiencias[0]} y ${audiencias.length - 1} más`;
@@ -1125,10 +1176,17 @@ export default function ProgramaDetailPage() {
                             {item.isRequired ? 'Obligatorio' : `Grupo "${item.sectionName}"`}
                             {marca ? <span className="ml-2 text-warn">· {marca}</span> : null}
                           </span>
-                          {item.audiencias.length > 0 ? (
+                          {item.audiencias.length > 0 || item.aMano > 0 ? (
                             <span className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-500">
                               <Users size={12} className="shrink-0" strokeWidth={2} aria-hidden="true" />
-                              <span className="truncate">{resumenDeAudiencias(item.audiencias)}</span>
+                              <span className="truncate">
+                                {[
+                                  item.audiencias.length > 0 ? resumenDeAudiencias(item.audiencias) : null,
+                                  item.aMano > 0 ? aManoEnTexto(item.aMano) : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </span>
                             </span>
                           ) : null}
                         </span>
@@ -1212,7 +1270,7 @@ export default function ProgramaDetailPage() {
                         */}
                         <div>
                           <h4 className="text-xs font-semibold text-ink-900">A quién se le exige</h4>
-                          {item.audiencias.length > 0 ? (
+                          {item.audiencias.length > 0 || item.aMano > 0 ? (
                             <>
                               <ul className="mt-1.5 flex flex-wrap gap-1.5">
                                 {item.audiencias.map((nombre) => {
@@ -1252,6 +1310,23 @@ export default function ProgramaDetailPage() {
                                     </li>
                                   );
                                 })}
+                                {/* Las personas concretas: no vienen de ninguna regla, pero la deben. */}
+                                {item.aMano > 0 ? (
+                                  <li className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink-700">
+                                    {aManoEnTexto(item.aMano)}
+                                    {item.actividad ? (
+                                      <>
+                                        {' · '}
+                                        <a
+                                          href={`/contenido-formativo/${item.actividad.id}?tab=quienes`}
+                                          className="focus-ring rounded font-medium text-info hover:underline"
+                                        >
+                                          Ver quiénes
+                                        </a>
+                                      </>
+                                    ) : null}
+                                  </li>
+                                ) : null}
                               </ul>
                               {/*
                                 LA AUDIENCIA QUE NO ALCANZA AL RESTO DEL PROGRAMA (2026-09-16).
